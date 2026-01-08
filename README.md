@@ -23,20 +23,20 @@ The system follows a **Hub-and-Spoke** microservices pattern.
 
 ```mermaid
 graph TD
-    User[Client / API Consumer] -->|REST Request| Gateway[API Gateway / Nginx]
+    User["Client / API Consumer"] -->|REST Request| Gateway["API Gateway / Nginx"]
     
     subgraph "Service Layer"
-        Gateway --> Orchestrator[Orchestrator Service<br>(LangGraph + FastAPI)]
+        Gateway --> Orchestrator["Orchestrator Service<br>(LangGraph + FastAPI)"]
         
-        Orchestrator -->|HTTP/RPC| ToolService[Tool Sandbox Service<br>(Docker/E2B)]
-        Orchestrator -->|HTTP/RPC| RAGService[Domain RAG Service<br>(Qdrant/Weaviate)]
-        Orchestrator -->|HTTP/RPC| ScraperService[Web Gathering Service<br>(Tavily/Firecrawl)]
+        Orchestrator -->|HTTP/RPC| ToolService["Tool Sandbox Service<br>(Docker/E2B)"]
+        Orchestrator -->|HTTP/RPC| RAGService["Domain RAG Service<br>(Qdrant/Weaviate)"]
+        Orchestrator -->|HTTP/RPC| ScraperService["Web Gathering Service<br>(Tavily/Firecrawl)"]
     end
     
     subgraph "Data Layer"
-        Orchestrator -->|State Persist| Postgres[(PostgreSQL<br>Graph State)]
-        ToolService -->|Analytical Data| DuckDB[(DuckDB<br>Parquet/CSV)]
-        RAGService -->|Embeddings| VectorDB[(Vector DB)]
+        Orchestrator -->|State Persist| Postgres[("PostgreSQL<br>Graph State")]
+        ToolService -->|Analytical Data| DuckDB[("DuckDB<br>Parquet/CSV")]
+        RAGService -->|Embeddings| VectorDB[("Vector DB")]
     end
 ```
 
@@ -98,15 +98,15 @@ graph TD
 
     %% --- 1. CLIENT LAYER ---
     subgraph Clients ["📡 Client / Trigger Layer"]
-        UI[💻 Web Dashboard]:::client
-        API_C[🔌 API Consumer]:::client
-        Cron[⏰ Scheduled Cron]:::client
+        UI["💻 Web Dashboard"]:::client
+        API_C["🔌 API Consumer"]:::client
+        Cron["⏰ Scheduled Cron"]:::client
     end
 
     %% --- 2. GATEWAY LAYER ---
     subgraph Gateway ["🛡️ API Gateway & Load Balancer"]
-        Nginx[NGINX / Kong Gateway]:::gateway
-        Auth[🔐 Auth Service (JWT/OAuth)]:::gateway
+        Nginx["NGINX / Kong Gateway"]:::gateway
+        Auth["🔐 Auth Service (JWT/OAuth)"]:::gateway
     end
 
     UI --> Nginx
@@ -118,21 +118,21 @@ graph TD
     subgraph Orchestrator_Cluster ["🧠 Core Orchestration Service (LangGraph)"]
         direction TB
         
-        API_Orch[FastAPI Endpoint]:::orchestrator
+        API_Orch["FastAPI Endpoint"]:::orchestrator
         
         subgraph Graph_Logic ["State Machine (DAG)"]
-            Planner[📝 Planner Node]:::orchestrator
-            Router[🔀 Dispatcher/Router]:::orchestrator
+            Planner["📝 Planner Node"]:::orchestrator
+            Router["🔀 Dispatcher/Router"]:::orchestrator
             
             subgraph Consensus_Loop ["🔄 Consensus Sub-Architecture"]
-                Critic[🧐 Critic / Judge]:::orchestrator
-                Verifier[✅ Fact Checker]:::orchestrator
+                Critic["🧐 Critic / Judge"]:::orchestrator
+                Verifier["✅ Fact Checker"]:::orchestrator
             end
             
-            Writer[✍️ Report Generator]:::orchestrator
+            Writer["✍️ Report Generator"]:::orchestrator
         end
         
-        Checkpointer[💾 State Manager (Async)]:::orchestrator
+        Checkpointer["💾 State Manager (Async)"]:::orchestrator
     end
 
     Nginx ==>|/research/trigger| API_Orch
@@ -149,15 +149,15 @@ graph TD
         direction LR
         
         subgraph Fin_Agent ["Finance Agent"]
-            Fin_Logic[market_analyst.py]:::compute
+            Fin_Logic["market_analyst.py"]:::compute
         end
         
         subgraph Legal_Agent ["Legal Agent"]
-            Leg_Logic[legal_researcher.py]:::compute
+            Leg_Logic["legal_researcher.py"]:::compute
         end
         
         subgraph Web_Agent ["Deep Web Agent"]
-            Scraper_Logic[scrapper.py]:::compute
+            Scraper_Logic["scrapper.py"]:::compute
         end
     end
 
@@ -169,15 +169,15 @@ graph TD
     subgraph Sandbox_Cluster ["🛠️ Tool Sandbox Service (E2B / Docker)"]
         direction TB
         
-        Code_Runner[🐍 Python REPL (Isolated)]:::compute
+        Code_Runner["🐍 Python REPL (Isolated)"]:::compute
         
         subgraph Data_Science_Stack ["libs"]
-            Pandas[Pandas/Polars]:::compute
-            Scikit[Scikit-Learn]:::compute
-            Matplot[Plotly/Matplotlib]:::compute
+            Pandas["Pandas/Polars"]:::compute
+            Scikit["Scikit-Learn"]:::compute
+            Matplot["Plotly/Matplotlib"]:::compute
         end
         
-        DuckDB[(🦆 DuckDB - In-Memory OLAP)]:::database
+        DuckDB[("🦆 DuckDB - In-Memory OLAP")]:::database
     end
 
     Fin_Agent -.->|Exec Code| Code_Runner
@@ -189,12 +189,12 @@ graph TD
     subgraph RAG_System ["📚 Universal RAG Service"]
         direction TB
         
-        Ingest[📥 Ingestion Pipeline]:::rag
-        Retriever[🔎 Hybrid Search]:::rag
-        Reranker[⚖️ Cross-Encoder Rerank]:::rag
+        Ingest["📥 Ingestion Pipeline"]:::rag
+        Retriever["🔎 Hybrid Search"]:::rag
+        Reranker["⚖️ Cross-Encoder Rerank"]:::rag
         
         subgraph Embed_Models ["Model Serving"]
-            BiEnc[Bi-Encoder Model]:::rag
+            BiEnc["Bi-Encoder Model"]:::rag
         end
     end
 
@@ -204,10 +204,10 @@ graph TD
 
     %% --- 7. PERSISTENCE LAYER ---
     subgraph Persistence ["💾 Data Persistence Layer"]
-        Postgres[(🐘 PostgreSQL<br>Graph State & Users)]:::database
-        VectorDB[(💠 Qdrant/Weaviate<br>Vector Store)]:::database
-        Redis[(⚡ Redis<br>Queue & Cache)]:::database
-        S3[(📦 S3 / MinIO<br>Artifact Store)]:::database
+        Postgres[("🐘 PostgreSQL<br>Graph State & Users")]:::database
+        VectorDB[("💠 Qdrant/Weaviate<br>Vector Store")]:::database
+        Redis[("⚡ Redis<br>Queue & Cache")]:::database
+        S3[("📦 S3 / MinIO<br>Artifact Store")]:::database
     end
 
     Checkpointer --> Postgres
@@ -217,9 +217,9 @@ graph TD
 
     %% --- 8. EXTERNAL APIS ---
     subgraph External_World ["☁️ External World"]
-        LLM_Prov[🤖 LLM Providers<br>(OpenAI/Gemini/Anthropic)]:::external
-        Search_API[🌍 Search APIs<br>(Tavily/Serp)]:::external
-        Fin_API[📈 Financial Data<br>(YFinance/OpenBB)]:::external
+        LLM_Prov["🤖 LLM Providers<br>(OpenAI/Gemini/Anthropic)"]:::external
+        Search_API["🌍 Search APIs<br>(Tavily/Serp)"]:::external
+        Fin_API["📈 Financial Data<br>(YFinance/OpenBB)"]:::external
     end
 
     Planner -.->|Inference| LLM_Prov
