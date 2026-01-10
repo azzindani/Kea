@@ -1,0 +1,323 @@
+{
+    "annotations": {
+        "list": []
+    },
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 0,
+    "id": null,
+    "links": [],
+    "liveNow": false,
+    "panels": [
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 6,
+                "x": 0,
+                "y": 0
+            },
+            "id": 1,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "textMode": "auto"
+            },
+            "pluginVersion": "10.0.0",
+            "targets": [
+                {
+                    "expr": "sum(research_jobs_total)",
+                    "legendFormat": "Total Jobs"
+                }
+            ],
+            "title": "Total Jobs",
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 6,
+                "x": 6,
+                "y": 0
+            },
+            "id": 2,
+            "targets": [
+                {
+                    "expr": "sum(research_active_jobs)",
+                    "legendFormat": "Active Jobs"
+                }
+            ],
+            "title": "Active Jobs",
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 6,
+                "x": 12,
+                "y": 0
+            },
+            "id": 3,
+            "targets": [
+                {
+                    "expr": "sum(research_tool_invocations_total)",
+                    "legendFormat": "Tool Calls"
+                }
+            ],
+            "title": "Total Tool Calls",
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 6,
+                "x": 18,
+                "y": 0
+            },
+            "id": 4,
+            "targets": [
+                {
+                    "expr": "sum(research_llm_tokens_total)",
+                    "legendFormat": "LLM Tokens"
+                }
+            ],
+            "title": "Total LLM Tokens",
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisCenteredZero": false,
+                        "axisLabel": "",
+                        "drawStyle": "line",
+                        "fillOpacity": 10,
+                        "lineWidth": 1,
+                        "pointSize": 5
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 8
+            },
+            "id": 5,
+            "targets": [
+                {
+                    "expr": "rate(research_tool_invocations_total[5m])",
+                    "legendFormat": "{{tool_name}}"
+                }
+            ],
+            "title": "Tool Invocations Rate",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "drawStyle": "line",
+                        "fillOpacity": 10
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 8
+            },
+            "id": 6,
+            "targets": [
+                {
+                    "expr": "histogram_quantile(0.95, rate(research_tool_duration_seconds_bucket[5m]))",
+                    "legendFormat": "p95 Duration"
+                }
+            ],
+            "title": "Tool Duration (p95)",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "drawStyle": "bars"
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 16
+            },
+            "id": 7,
+            "targets": [
+                {
+                    "expr": "rate(research_api_requests_total[5m])",
+                    "legendFormat": "{{method}} {{endpoint}}"
+                }
+            ],
+            "title": "API Request Rate",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "drawStyle": "line"
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 16
+            },
+            "id": 8,
+            "targets": [
+                {
+                    "expr": "rate(research_llm_requests_total[5m])",
+                    "legendFormat": "{{model}}"
+                }
+            ],
+            "title": "LLM Request Rate",
+            "type": "timeseries"
+        }
+    ],
+    "refresh": "5s",
+    "schemaVersion": 38,
+    "style": "dark",
+    "tags": [
+        "kea",
+        "research"
+    ],
+    "templating": {
+        "list": []
+    },
+    "time": {
+        "from": "now-1h",
+        "to": "now"
+    },
+    "title": "Kea Research Engine",
+    "uid": "kea-research-engine",
+    "version": 1
+}

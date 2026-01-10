@@ -1,29 +1,35 @@
+# Shared Logging Package
 """
-Structured Logging Package.
+Structured logging with OpenTelemetry integration.
 
-Provides:
-- Structured JSON logging
-- OpenTelemetry trace correlation
-- FastAPI middleware
-- Logging decorators
+Components:
+- structured: JSON formatter and logger setup
+- context: Log context management (trace/span IDs)
+- decorators: @log_execution decorator
+- metrics: Prometheus metrics
+- middleware: FastAPI and MCP middleware
 """
 
 from shared.logging.structured import (
-    get_logger,
     setup_logging,
+    get_logger,
     LogConfig,
 )
 from shared.logging.context import (
+    set_log_context,
+    get_log_context,
     LogContext,
-    get_context,
-    set_context,
+    log_context,
 )
+from shared.logging.decorators import log_execution
 
 __all__ = [
-    "get_logger",
     "setup_logging",
+    "get_logger",
     "LogConfig",
+    "set_log_context",
+    "get_log_context",
     "LogContext",
-    "get_context",
-    "set_context",
+    "log_context",
+    "log_execution",
 ]

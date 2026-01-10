@@ -1,21 +1,23 @@
-# Orchestrator Core package
+# Orchestrator Core Package
 """
-Core orchestrator components.
+Core components for the research orchestrator.
 
-- graph: LangGraph research state machine
-- router: Query intention classification
+- graph: LangGraph state machine for research workflow
+- checkpointing: PostgreSQL state persistence
 """
 
 from services.orchestrator.core.graph import (
-    build_research_graph,
-    compile_research_graph,
     GraphState,
-    NodeName,
+    compile_research_graph,
+)
+from services.orchestrator.core.checkpointing import (
+    CheckpointStore,
+    get_checkpoint_store,
 )
 
 __all__ = [
-    "build_research_graph",
-    "compile_research_graph",
     "GraphState",
-    "NodeName",
+    "compile_research_graph",
+    "CheckpointStore",
+    "get_checkpoint_store",
 ]

@@ -18,7 +18,7 @@ from shared.logging import setup_logging, get_logger, LogConfig
 from shared.logging.middleware import RequestLoggingMiddleware
 from shared.logging.metrics import set_system_info
 
-from services.api_gateway.routes import jobs, memory, mcp, system
+from services.api_gateway.routes import jobs, memory, mcp, system, artifacts, interventions, llm, graph
 
 
 logger = get_logger(__name__)
@@ -77,6 +77,10 @@ app.include_router(jobs.router, prefix="/api/v1/jobs", tags=["Jobs"])
 app.include_router(memory.router, prefix="/api/v1/memory", tags=["Memory"])
 app.include_router(mcp.router, prefix="/api/v1/mcp", tags=["MCP"])
 app.include_router(system.router, prefix="/api/v1/system", tags=["System"])
+app.include_router(artifacts.router, prefix="/api/v1/artifacts", tags=["Artifacts"])
+app.include_router(interventions.router, prefix="/api/v1/interventions", tags=["HITL"])
+app.include_router(llm.router, prefix="/api/v1/llm", tags=["LLM"])
+app.include_router(graph.router, prefix="/api/v1/graph", tags=["Graph"])
 
 
 # ============================================================================
