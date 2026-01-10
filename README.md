@@ -514,6 +514,47 @@ Instead of simple HTTP requests (which get blocked), Kea controls a cluster of h
     *   **Snapshot:** Takes a screenshot of the viewport.
     *   **Vision Model:** Sends image to GPT-4o-Vision/Gemini-Pro-Vision with prompt: *"Extract the table data from this image into JSON."*
 
+```mermaid
+graph TD
+    %% --- STYLES ---
+    classDef control fill:#2d3436,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef infra fill:#0984e3,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef logic fill:#00b894,stroke:#333,stroke-width:2px,color:#fff;
+    classDef external fill:#fdcb6e,stroke:#333,stroke-width:2px,color:#333;
+
+    %% --- INPUT ---
+    Queue[("URL Queue")] --> FleetMgr{"Fleet Manager"}:::control
+
+    %% --- INFRASTRUCTURE CONFIG ---
+    subgraph StealthConfig ["Stealth Configuration"]
+        FleetMgr --"Assign IP"--> Proxy["Residential Proxy Pool"]:::infra
+        FleetMgr --"Spoof Headers"--> UA["User-Agent Rotator<br/>(iPhone/Chrome/Mac)"]:::infra
+        
+        Proxy --> Browser
+        UA --> Browser
+    end
+
+    %% --- THE BROWSER INSTANCE ---
+    subgraph BrowserNode ["Headless Browser Instance"]
+        Browser["🎭 Playwright Engine<br/>(Stealth Mode)"]:::logic
+        Browser --"1. Load Page"--> PageContent["Page DOM / Canvas"]
+        
+        %% --- DECISION LOGIC ---
+        PageContent --> Check{Is Readable?}:::control
+        
+        %% --- PATH A: STANDARD PARSING ---
+        Check --"Yes (Text/HTML)"--> Parser["📄 HTML Parser<br/>(BeautifulSoup)"]:::logic
+        
+        %% --- PATH B: VISION MODE (The Backup) ---
+        Check --"No (Obfuscated/Chart)"--> Screenshot["📸 Take Snapshot"]:::logic
+        Screenshot --> VisionLLM["👁️ Vision Model<br/>(GPT-4o / Gemini)"]:::external
+        
+        %% --- OUTPUT ---
+        Parser --> CleanData["✅ Clean JSON"]
+        VisionLLM --"OCR / Interpret"--> CleanData
+    end
+```
+
 ### 6.2. Politeness & Rate Limiting
 To ensure long-term stability and ethical scraping, Kea implements **Domain-Level Throttling**.
 
@@ -541,10 +582,82 @@ Deep research takes time (minutes to hours). A standard HTTP request will timeou
 4.  **Worker:** Picks up job, runs for 45 minutes, updates **PostgreSQL** state.
 5.  **Client:** Polls `/api/research/status/{job_id}` or receives Webhook.
 
+```mermaid
+graph LR
+    %% --- STYLES ---
+    classDef client fill:#ff7675,stroke:#333,stroke-width:2px,color:#fff;
+    classDef api fill:#0984e3,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef queue fill:#fdcb6e,stroke:#333,stroke-width:2px,color:#333;
+    classDef worker fill:#00b894,stroke:#333,stroke-width:2px,color:#fff;
+    classDef db fill:#6c5ce7,stroke:#fff,stroke-width:2px,color:#fff;
+
+    %% --- ACTORS ---
+    User(("User / Frontend")):::client
+    
+    subgraph SynchronousLayer ["⚡ Synchronous Layer (Fast)"]
+        API["API Gateway<br/>(FastAPI)"]:::api
+        Redis[("Redis Task Queue")]:::queue
+    end
+
+    subgraph AsyncLayer ["🐢 Asynchronous Layer (Deep Work)"]
+        Worker["👷 Background Worker<br/>(Orchestrator Instance)"]:::worker
+        Postgres[("PostgreSQL<br/>Job State & History")]:::db
+    end
+
+    %% --- STEP 1: THE TRIGGER (FIRE) ---
+    User --"1. POST /research/start"--> API
+    API --"2. Push Job Payload"--> Redis
+    API --"3. Return HTTP 202 Accepted<br/>(Contains: job_id)"--> User
+
+    %% --- STEP 2: THE EXECUTION (FORGET) ---
+    Redis -.->|"4. Worker Pops Job"| Worker
+    Worker -->|"5. Run Deep Research Loop<br/>(Takes 10-60 mins)"| Worker
+    Worker --"6. Update Status: COMPLETED"--> Postgres
+
+    %% --- STEP 3: THE CHECKUP ---
+    User -.->|"7. Poll GET /status/{job_id}"| API
+    API --"8. Query State"--> Postgres
+```
 ### 7.2. Distributed State Machine
 Since the process is long, the state must be persisted. We use **LangGraph Checkpointing**.
 *   **Benefit:** If the server crashes at *Step 4 (Analysis)*, it restarts exactly at Step 4, not Step 1.
 *   **Pause/Resume:** The system can pause to ask the user for confirmation ("I found a conflict, continue?") and resume days later.
+
+```mermaid
+graph TD
+    %% --- STYLES ---
+    classDef execute fill:#00b894,stroke:#333,stroke-width:2px,color:#fff;
+    classDef save fill:#0984e3,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef db fill:#2d3436,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef crash fill:#d63031,stroke:#333,stroke-width:2px,color:#fff;
+    classDef recover fill:#fdcb6e,stroke:#333,stroke-width:2px,color:#333;
+
+    %% --- THE THREAD ---
+    subgraph ExecutionFlow ["Active Research Thread (ID: 123)"]
+        Step1["Step 1: Planner Node"]:::execute --> Save1{"💾 Checkpoint State"}:::save
+        Save1 --> Step2["Step 2: Scraper Node"]:::execute
+        Step2 --> Save2{"💾 Checkpoint State"}:::save
+        
+        Save2 --> Crash["🔥 SERVER CRASH / RESTART"]:::crash
+    end
+
+    %% --- THE PERSISTENCE LAYER ---
+    subgraph StateStore ["PostgreSQL State Store"]
+        Postgres[("🐘 DB Table: checkpoints<br/>Key: thread_id_123<br/>Blob: {plan: ..., data: ...}")]:::db
+    end
+
+    %% --- THE RECOVERY ---
+    subgraph RecoveryFlow ["Recovery / Resume"]
+        Restart("🚀 Worker Restart"):::recover --> Load("📂 Load Last Checkpoint<br/>(thread_id_123)"):::recover
+        Load --> Resume("▶️ Resume at Step 3: Analysis<br/>(Skip Steps 1 & 2)"):::execute
+    end
+
+    %% --- CONNECTIONS ---
+    Save1 -.->|Serialize & UPSERT| Postgres
+    Save2 -.->|Serialize & UPSERT| Postgres
+    Postgres -.->|Deserialize| Load
+    Crash -.-> Restart
+```
 
 ---
 
