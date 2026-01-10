@@ -99,6 +99,63 @@ graph TD
 
 ---
 
+## 📝 Naming Conventions & Standards
+
+### Code Naming Rules
+
+> ⚠️ **IMPORTANT:** Do NOT use "Kea" in any code, function names, class names, variable names, or directory names. Use generic, descriptive names instead.
+
+| Element | ❌ Avoid | ✅ Use |
+|:--------|:---------|:-------|
+| **Directories** | `kea/`, `kea_service/` | `services/`, `core/`, `shared/` |
+| **Classes** | `KeaOrchestrator`, `KeaClient` | `Orchestrator`, `MCPClient` |
+| **Functions** | `kea_search()`, `run_kea()` | `search()`, `run_research()` |
+| **Variables** | `kea_config`, `kea_result` | `config`, `research_result` |
+| **Modules** | `kea_utils.py` | `utils.py`, `helpers.py` |
+
+### Configuration Management
+
+| File | Purpose | Git |
+|:-----|:--------|:---:|
+| `.env` | Secrets (API keys, passwords) | ❌ Ignored |
+| `.env.example` | Template for `.env` | ✅ Committed |
+| `configs/settings.yaml` | Application settings | ✅ Committed |
+| `configs/mcp_servers.yaml` | MCP server registry | ✅ Committed |
+| `configs/logging.yaml` | Logging configuration | ✅ Committed |
+| `configs/vocab/*.yaml` | Vocabulary & prompts | ✅ Committed |
+
+### Environment Variables
+
+```bash
+# LLM Provider
+OPENROUTER_API_KEY=sk-or-...
+OPENROUTER_MODEL=nvidia/nemotron-3-nano-30b-a3b:free
+
+# Database
+DATABASE_URL=postgresql://user:pass@localhost:5432/dare
+REDIS_URL=redis://localhost:6379
+
+# Mode
+ENVIRONMENT=development  # development | staging | production
+LOG_LEVEL=DEBUG
+```
+
+### Vocabulary List (configs/vocab/)
+
+```yaml
+# configs/vocab/domains.yaml - Domain terminology
+mining:
+  entities: ["nickel", "coal", "copper"]
+  sources: ["esdm.go.id"]
+
+# configs/vocab/prompts.yaml - Prompt templates  
+roles:
+  generator: "You are a thorough research assistant..."
+  critic: "You are a skeptical fact-checker..."
+```
+
+---
+
 ## �📁 Project Directory Structure
 
 ```
