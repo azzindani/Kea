@@ -103,15 +103,20 @@ graph TD
 
 ### Code Naming Rules
 
-> ⚠️ **IMPORTANT:** Do NOT use "Kea" in any code, function names, class names, variable names, or directory names. Use generic, descriptive names instead.
+> ⚠️ **IMPORTANT:** 
+> - **"Kea"** = Project/Product name only (use in documentation, README, marketing)
+> - **"DARE"** = Methodology term only (Distributed Autonomous Research Engine)
+> - **Neither** should appear in code, classes, functions, variables, directories, or metrics
 
 | Element | ❌ Avoid | ✅ Use |
 |:--------|:---------|:-------|
-| **Directories** | `kea/`, `kea_service/` | `services/`, `core/`, `shared/` |
-| **Classes** | `KeaOrchestrator`, `KeaClient` | `Orchestrator`, `MCPClient` |
-| **Functions** | `kea_search()`, `run_kea()` | `search()`, `run_research()` |
-| **Variables** | `kea_config`, `kea_result` | `config`, `research_result` |
+| **Package name** | `kea`, `dare` | Generic name or no prefix |
+| **Directories** | `kea/`, `dare_service/` | `services/`, `core/`, `shared/` |
+| **Classes** | `KeaOrchestrator`, `DareClient` | `Orchestrator`, `MCPClient` |
+| **Functions** | `kea_search()`, `run_dare()` | `search()`, `run_research()` |
+| **Variables** | `kea_config`, `dare_result` | `config`, `research_result` |
 | **Modules** | `kea_utils.py` | `utils.py`, `helpers.py` |
+| **Metrics** | `kea_*`, `dare_*` | `research_*`, `tool_*` |
 
 ### Configuration Management
 
