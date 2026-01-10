@@ -1,14 +1,870 @@
-This is the best way to handle documentation for a system this complex. We will structure the `README.md` as a **Master Architecture Document**.
-
-Here is **Part 1: The General Architecture & Core Philosophy**. This section establishes the high-level map and the "Router" logic that governs the entire system.
-
-You can create a file named `ARCHITECTURE.md` or put this at the top of your `README.md`.
-
-***
-
 # 🦜 Kea: Distributed Autonomous Research Engine (DARE)
 
 > **"Not just a Chatbot. A Research Factory."**
+
+---
+
+## � MCP Tool Calling Standard
+
+Kea adopts the **Model Context Protocol (MCP)** as its universal tool calling interface. MCP enables:
+
+- **Parallel Tool Execution:** Multiple MCP servers run simultaneously, allowing the orchestrator to invoke scraping, analysis, and vision tools concurrently
+- **Standardized Communication:** JSON-RPC 2.0 over stdio/SSE provides consistent request/response patterns across all tools
+- **Dynamic Discovery:** Tools self-register their capabilities, allowing hot-swapping and runtime extension
+- **Isolated Execution:** Each MCP server runs in its own process/container, ensuring fault isolation
+
+### MCP Architecture Overview
+
+```mermaid
+graph TD
+    %% --- STYLES ---
+    classDef orchestrator fill:#2d3436,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef mcp fill:#0984e3,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef tool fill:#00b894,stroke:#333,stroke-width:2px,color:#fff;
+    classDef transport fill:#fdcb6e,stroke:#333,stroke-width:2px,color:#333;
+
+    %% --- THE BRAIN ---
+    Orchestrator["🧠 Orchestrator<br/>(MCP Client)"]:::orchestrator
+
+    %% --- MCP TRANSPORT LAYER ---
+    subgraph MCPLayer ["MCP Transport Layer (JSON-RPC 2.0)"]
+        Router{{"🔀 MCP Router<br/>(Parallel Dispatcher)"}}:::mcp
+        
+        Router -->|stdio| MCP1["🕷️ Scraper Server"]:::mcp
+        Router -->|stdio| MCP2["🐍 Python Server"]:::mcp
+        Router -->|stdio| MCP3["👁️ Vision Server"]:::mcp
+        Router -->|SSE| MCP4["📊 Analysis Server"]:::mcp
+        Router -->|stdio| MCP5["🔍 Search Server"]:::mcp
+    end
+
+    %% --- TOOL IMPLEMENTATIONS ---
+    subgraph Tools ["Tool Implementations"]
+        MCP1 --> T1["Playwright<br/>BeautifulSoup"]:::tool
+        MCP2 --> T2["Pandas<br/>DuckDB"]:::tool
+        MCP3 --> T3["GPT-4o Vision<br/>Gemini Vision"]:::tool
+        MCP4 --> T4["Statistical<br/>ML Models"]:::tool
+        MCP5 --> T5["Tavily<br/>Brave Search"]:::tool
+    end
+
+    %% --- CONNECTIONS ---
+    Orchestrator -->|"tools/list"| Router
+    Orchestrator -->|"tools/call (parallel)"| Router
+    
+    %% --- RESPONSE FLOW ---
+    T1 -->|Result| MCP1
+    T2 -->|Result| MCP2
+    T3 -->|Result| MCP3
+    T4 -->|Result| MCP4
+    T5 -->|Result| MCP5
+```
+
+### MCP Message Flow
+
+```
+┌─────────────────┐    JSON-RPC 2.0    ┌─────────────────┐
+│   Orchestrator  │ ←───────────────→  │   MCP Server    │
+│   (MCP Client)  │                    │   (Tool Host)   │
+└─────────────────┘                    └─────────────────┘
+        │                                      │
+        │  1. initialize                       │
+        │  ─────────────────────────────────→  │
+        │                                      │
+        │  2. tools/list (discover)            │
+        │  ─────────────────────────────────→  │
+        │  ←─────────────────────────────────  │
+        │     [{name, description, schema}]    │
+        │                                      │
+        │  3. tools/call (parallel batch)      │
+        │  ─────────────────────────────────→  │
+        │  ─────────────────────────────────→  │ (concurrent)
+        │  ─────────────────────────────────→  │
+        │                                      │
+        │  4. results (streamed/batched)       │
+        │  ←─────────────────────────────────  │
+        │  ←─────────────────────────────────  │
+        │  ←─────────────────────────────────  │
+        │                                      │
+```
+
+### Key MCP Benefits for Kea
+
+| Feature | Benefit |
+|:--------|:--------|
+| **Parallel Execution** | Scrape 10 URLs while running Python analysis simultaneously |
+| **Tool Isolation** | Crashing scraper doesn't affect Python executor |
+| **Schema Validation** | JSON Schema ensures type-safe tool invocations |
+| **Progress Streaming** | Long-running tools report incremental progress |
+| **Resource Management** | MCP servers can be scaled independently |
+| **Hot Reload** | Add new tools without restarting orchestrator |
+
+---
+
+## �📁 Project Directory Structure
+
+```
+kea/
+├── 📁 services/                              # Microservices (The Core)
+│   │
+│   ├── 📁 orchestrator/                      # 🧠 The Brain - Main Orchestrator (MCP Client)
+│   │   ├── __init__.py
+│   │   ├── main.py                           # FastAPI entrypoint
+│   │   ├── config.py                         # Environment & mode detection
+│   │   ├── 📁 core/
+│   │   │   ├── __init__.py
+│   │   │   ├── graph.py                      # LangGraph cyclic state machine
+│   │   │   ├── router.py                     # Intention Router (Path A/B/C/D)
+│   │   │   └── consensus.py                  # Adversarial Collaboration Engine
+│   │   ├── 📁 mcp/                           # ⚡ MCP Client Implementation
+│   │   │   ├── __init__.py
+│   │   │   ├── client.py                     # MCP Client (JSON-RPC 2.0)
+│   │   │   ├── registry.py                   # Tool registry & discovery
+│   │   │   ├── parallel_executor.py          # Parallel tool invocation manager
+│   │   │   └── session_manager.py            # MCP session lifecycle
+│   │   ├── 📁 nodes/                         # LangGraph Nodes
+│   │   │   ├── __init__.py
+│   │   │   ├── planner.py                    # 📝 Planner & Decomposer
+│   │   │   ├── keeper.py                     # 🛡️ The Keeper (Context Guard)
+│   │   │   ├── divergence.py                 # ✨ Divergence Engine (Abductive)
+│   │   │   ├── synthesizer.py                # ✍️ Report Synthesizer
+│   │   │   └── architect.py                  # 🏗️ Meta-Prompt Layer
+│   │   ├── 📁 agents/                        # Specialized Worker Agents
+│   │   │   ├── __init__.py
+│   │   │   ├── generator.py                  # 🤠 The Optimist
+│   │   │   ├── critic.py                     # 🧐 The Pessimist
+│   │   │   └── judge.py                      # ⚖️ The Synthesizer
+│   │   └── 📁 state/
+│   │       ├── __init__.py
+│   │       └── models.py                     # Pydantic state schemas
+│   │
+│   ├── 📁 rag_service/                       # 💾 The Memory Vault
+│   │   ├── __init__.py
+│   │   ├── main.py                           # FastAPI/gRPC entrypoint
+│   │   ├── config.py
+│   │   ├── 📁 core/
+│   │   │   ├── __init__.py
+│   │   │   ├── vector_store.py               # Qdrant/Chroma abstraction
+│   │   │   ├── graph_store.py                # GraphRAG relationships
+│   │   │   └── artifact_store.py             # S3/Parquet blob storage
+│   │   ├── 📁 schemas/
+│   │   │   ├── __init__.py
+│   │   │   ├── atomic_fact.py                # Atomic Fact Schema
+│   │   │   └── session.py                    # Conversation Project Schema
+│   │   └── 📁 api/
+│   │       ├── __init__.py
+│   │       ├── search.py                     # Semantic search endpoints
+│   │       ├── provenance.py                 # Provenance graph endpoints
+│   │       └── artifacts.py                  # Artifact download/preview
+│   │
+│   └── 📁 api_gateway/                       # 🚪 The Front Door
+│       ├── __init__.py
+│       ├── main.py                           # FastAPI gateway
+│       ├── config.py
+│       ├── 📁 routes/
+│       │   ├── __init__.py
+│       │   ├── jobs.py                       # /api/v1/jobs (Job Dispatcher)
+│       │   ├── memory.py                     # /api/v1/memory (Knowledge Brain)
+│       │   ├── artifacts.py                  # /api/v1/artifacts
+│       │   ├── interventions.py              # /api/v1/interventions (HITL)
+│       │   ├── system.py                     # /api/v1/system (Capabilities)
+│       │   ├── llm.py                        # /api/v1/llm (Provider Management)
+│       │   └── mcp.py                        # /api/v1/mcp (Tool Management)
+│       ├── 📁 middleware/
+│       │   ├── __init__.py
+│       │   ├── auth.py                       # JWT Bearer Token
+│       │   ├── rate_limit.py                 # API rate limiting
+│       │   └── request_id.py                 # Request correlation IDs
+│       └── 📁 schemas/
+│           ├── __init__.py
+│           ├── job.py                        # Job request/response models
+│           └── response.py                   # Standard API responses
+│
+├── 📁 mcp_servers/                           # 🔌 MCP Tool Servers (Parallel Hands)
+│   │
+│   ├── 📁 scraper_server/                    # 🕷️ Web Scraping MCP Server
+│   │   ├── __init__.py
+│   │   ├── server.py                         # MCP server entrypoint (stdio/SSE)
+│   │   ├── config.py
+│   │   ├── 📁 tools/
+│   │   │   ├── __init__.py
+│   │   │   ├── fetch_url.py                  # Simple HTTP fetch
+│   │   │   ├── browser_scrape.py             # Playwright headless scraping
+│   │   │   ├── batch_scrape.py               # Parallel URL batch processing
+│   │   │   └── pdf_extract.py                # PDF text/table extraction
+│   │   ├── 📁 stealth/
+│   │   │   ├── __init__.py
+│   │   │   ├── proxy_rotator.py              # Residential proxy management
+│   │   │   ├── ua_rotator.py                 # User-Agent spoofing
+│   │   │   ├── fingerprint.py                # Browser fingerprint randomization
+│   │   │   └── rate_limiter.py               # Domain-level throttling
+│   │   └── manifest.json                     # MCP tool definitions
+│   │
+│   ├── 📁 python_server/                     # 🐍 Python Execution MCP Server
+│   │   ├── __init__.py
+│   │   ├── server.py                         # MCP server entrypoint
+│   │   ├── config.py
+│   │   ├── 📁 tools/
+│   │   │   ├── __init__.py
+│   │   │   ├── execute_code.py               # Sandboxed Python execution
+│   │   │   ├── dataframe_ops.py              # Pandas DataFrame operations
+│   │   │   ├── sql_query.py                  # DuckDB SQL queries
+│   │   │   └── statistical.py                # Statistical analysis functions
+│   │   ├── 📁 sandbox/
+│   │   │   ├── __init__.py
+│   │   │   ├── docker_runner.py              # Docker container isolation
+│   │   │   ├── e2b_runner.py                 # E2B cloud sandbox
+│   │   │   └── local_runner.py               # Local subprocess (dev only)
+│   │   └── manifest.json                     # MCP tool definitions
+│   │
+│   ├── 📁 vision_server/                     # �️ Vision/OCR MCP Server
+│   │   ├── __init__.py
+│   │   ├── server.py                         # MCP server entrypoint
+│   │   ├── config.py
+│   │   ├── 📁 tools/
+│   │   │   ├── __init__.py
+│   │   │   ├── screenshot_extract.py         # Screenshot → structured data
+│   │   │   ├── chart_reader.py               # Chart/graph interpretation
+│   │   │   ├── table_ocr.py                  # Table structure extraction
+│   │   │   └── document_vision.py            # Full document understanding
+│   │   └── manifest.json                     # MCP tool definitions
+│   │
+│   ├── 📁 search_server/                     # 🔍 Web Search MCP Server
+│   │   ├── __init__.py
+│   │   ├── server.py                         # MCP server entrypoint
+│   │   ├── config.py
+│   │   ├── 📁 tools/
+│   │   │   ├── __init__.py
+│   │   │   ├── web_search.py                 # Tavily/Brave/SerpAPI search
+│   │   │   ├── news_search.py                # News-specific search
+│   │   │   ├── academic_search.py            # Semantic Scholar/arXiv
+│   │   │   └── site_search.py                # Domain-restricted search
+│   │   └── manifest.json                     # MCP tool definitions
+│   │
+│   ├── 📁 analysis_server/                   # 📊 Analysis MCP Server
+│   │   ├── __init__.py
+│   │   ├── server.py                         # MCP server entrypoint (SSE for streaming)
+│   │   ├── config.py
+│   │   ├── 📁 tools/
+│   │   │   ├── __init__.py
+│   │   │   ├── meta_analysis.py              # Cross-source meta-analysis
+│   │   │   ├── trend_detection.py            # Time-series trend analysis
+│   │   │   ├── anomaly_detection.py          # Outlier/anomaly detection
+│   │   │   └── comparative.py                # Comparative analysis tools
+│   │   └── manifest.json                     # MCP tool definitions
+│   │
+│   └── 📁 _template_server/                  # 📝 Template for new MCP servers
+│       ├── __init__.py
+│       ├── server.py                         # Boilerplate MCP server
+│       ├── config.py
+│       ├── 📁 tools/
+│       │   ├── __init__.py
+│       │   └── example_tool.py               # Example tool implementation
+│       └── manifest.json                     # MCP tool schema template
+│
+├── 📁 shared/                                # Shared Utilities & Contracts
+│   ├── __init__.py
+│   ├── 📁 mcp/                               # 🔌 MCP SDK & Utilities
+│   │   ├── __init__.py
+│   │   ├── protocol.py                       # JSON-RPC 2.0 message types
+│   │   ├── transport.py                      # stdio/SSE transport abstractions
+│   │   ├── server_base.py                    # Base MCP server class
+│   │   ├── client_base.py                    # Base MCP client class
+│   │   └── schemas.py                        # Tool/Resource/Prompt schemas
+│   ├── 📁 llm/
+│   │   ├── __init__.py
+│   │   ├── provider.py                       # LLM provider abstraction
+│   │   ├── openai.py
+│   │   ├── gemini.py
+│   │   └── anthropic.py
+│   ├── 📁 queue/
+│   │   ├── __init__.py
+│   │   ├── base.py                           # Queue abstraction
+│   │   ├── redis_queue.py                    # Production Redis queue
+│   │   └── memory_queue.py                   # Local threading queue
+│   ├── 📁 storage/
+│   │   ├── __init__.py
+│   │   ├── base.py                           # Storage abstraction
+│   │   ├── s3.py                             # S3/MinIO storage
+│   │   └── local.py                          # Local filesystem
+│   ├── 📁 database/
+│   │   ├── __init__.py
+│   │   ├── base.py                           # DB abstraction
+│   │   ├── postgres.py                       # Production PostgreSQL
+│   │   └── sqlite.py                         # Local SQLite
+│   └── 📁 logging/                           # 📊 Standardized Logging Infrastructure
+│       ├── __init__.py
+│       ├── config.py                         # Logging configuration
+│       ├── structured.py                     # Structured JSON logging
+│       ├── context.py                        # Context propagation (trace_id, span_id)
+│       ├── formatters.py                     # Log formatters (JSON, Console, File)
+│       ├── handlers.py                       # Custom log handlers
+│       ├── middleware.py                     # FastAPI/MCP logging middleware
+│       ├── decorators.py                     # @log_execution, @trace decorators
+│       ├── metrics.py                        # Prometheus metrics integration
+│       └── exporters.py                      # OpenTelemetry exporters (Jaeger, Zipkin)
+│
+├── 📁 workers/                               # Background Job Workers
+│   ├── __init__.py
+│   ├── research_worker.py                    # Deep Research job processor
+│   ├── synthesis_worker.py                   # Grand Synthesis job processor
+│   └── shadow_lab_worker.py                  # Shadow Lab job processor
+│
+├── 📁 tests/                                 # Test Suite
+│   ├── 📁 unit/
+│   │   ├── 📁 orchestrator/
+│   │   │   ├── test_router.py
+│   │   │   ├── test_planner.py
+│   │   │   ├── test_keeper.py
+│   │   │   ├── test_consensus.py
+│   │   │   └── test_mcp_client.py            # MCP client tests
+│   │   ├── 📁 mcp_servers/
+│   │   │   ├── test_scraper_server.py
+│   │   │   ├── test_python_server.py
+│   │   │   ├── test_vision_server.py
+│   │   │   └── test_search_server.py
+│   │   ├── 📁 rag_service/
+│   │   │   ├── test_vector_store.py
+│   │   │   └── test_artifact_store.py
+│   │   └── 📁 shared/
+│   │       ├── test_logging.py               # Logging infrastructure tests
+│   │       └── test_mcp_protocol.py          # MCP protocol tests
+│   ├── 📁 integration/
+│   │   ├── test_job_lifecycle.py             # Full job flow (submit → complete)
+│   │   ├── test_memory_fork.py               # Path A: Incremental research
+│   │   ├── test_shadow_lab.py                # Path B: Recalculation
+│   │   ├── test_grand_synthesis.py           # Path C: Meta-analysis
+│   │   ├── test_deep_research.py             # Path D: Zero-shot
+│   │   ├── test_mcp_parallel.py              # Parallel MCP tool execution
+│   │   └── test_logging_pipeline.py          # End-to-end logging tests
+│   ├── 📁 e2e/
+│   │   ├── test_api_gateway.py               # Full API flow tests
+│   │   ├── test_human_intervention.py        # HITL workflow tests
+│   │   └── test_checkpoint_recovery.py       # Crash recovery tests
+│   ├── 📁 fixtures/
+│   │   ├── sample_documents/                 # Test PDFs, CSVs
+│   │   ├── mock_responses/                   # Mocked LLM/API responses
+│   │   ├── parquet_samples/                  # Sample artifact files
+│   │   └── mcp_mocks/                        # Mocked MCP server responses
+│   └── conftest.py                           # Pytest fixtures & configuration
+│
+├── 📁 scripts/                               # Utility Scripts
+│   ├── setup_local.py                        # Local development setup
+│   ├── run_tests.py                          # Test runner with coverage
+│   ├── migrate_db.py                         # Database migration script
+│   ├── start_mcp_servers.py                  # Launch all MCP servers
+│   └── log_viewer.py                         # CLI log viewer/analyzer
+│
+├── 📁 deployment/                            # Deployment Configurations
+│   ├── 📁 docker/
+│   │   ├── Dockerfile.orchestrator
+│   │   ├── Dockerfile.rag
+│   │   ├── Dockerfile.gateway
+│   │   ├── Dockerfile.mcp-scraper
+│   │   ├── Dockerfile.mcp-python
+│   │   ├── Dockerfile.mcp-vision
+│   │   ├── Dockerfile.mcp-search
+│   │   └── Dockerfile.mcp-analysis
+│   ├── docker-compose.yml                    # Full stack local
+│   ├── docker-compose.dev.yml                # Development overrides
+│   ├── docker-compose.mcp.yml                # MCP servers only
+│   ├── 📁 k8s/                               # Kubernetes manifests
+│   │   ├── orchestrator.yaml
+│   │   ├── rag-service.yaml
+│   │   ├── mcp-servers.yaml                  # MCP server deployments
+│   │   ├── logging-stack.yaml                # Loki/Promtail/Grafana
+│   │   └── ingress.yaml
+│   └── 📁 logging/                           # Logging Infrastructure Configs
+│       ├── promtail-config.yaml              # Log collection
+│       ├── loki-config.yaml                  # Log aggregation
+│       ├── grafana-dashboards/               # Pre-built dashboards
+│       │   ├── mcp-tools.json
+│       │   ├── orchestrator.json
+│       │   └── api-gateway.json
+│       └── alerting-rules.yaml               # Alert definitions
+│
+├── 📁 docs/                                  # Extended Documentation
+│   ├── ARCHITECTURE.md                       # Detailed architecture (mirror)
+│   ├── API_REFERENCE.md                      # Full API documentation
+│   ├── MCP_GUIDE.md                          # MCP tool development guide
+│   ├── LOGGING_GUIDE.md                      # Logging standards & usage
+│   ├── DEVELOPMENT.md                        # Developer guide
+│   └── DEPLOYMENT.md                         # Production deployment guide
+│
+├── 📁 configs/                               # Configuration Files
+│   ├── mcp_servers.yaml                      # MCP server registry
+│   ├── logging.yaml                          # Logging configuration
+│   └── rate_limits.yaml                      # Rate limiting rules
+│
+├── .env.example                              # Environment template
+├── pyproject.toml                            # Python dependencies (Poetry)
+├── README.md                                 # This file
+└── Makefile                                  # Common development commands
+```
+
+---
+
+## 📋 Development Plan
+
+### Phase 0: Foundation Setup *(Week 1)*
+**Goal:** Establish project scaffolding, core abstractions, and logging infrastructure.
+
+| Task | Description | Priority |
+|:-----|:------------|:--------:|
+| Initialize project structure | Create all directories & `__init__.py` files | 🔴 Critical |
+| Setup `pyproject.toml` | Define dependencies (LangGraph, FastAPI, MCP SDK, etc.) | 🔴 Critical |
+| Create shared abstractions | Implement `shared/` modules for LLM, Queue, Storage, DB | 🔴 Critical |
+| **Setup logging infrastructure** | Implement `shared/logging/` with structured JSON logging | 🔴 Critical |
+| **Configure OpenTelemetry** | Setup trace/span context propagation | 🔴 Critical |
+| Environment configuration | Build `config.py` with local/production mode detection | 🔴 Critical |
+| Create base Pydantic schemas | Define state models, API schemas, and contracts | 🟡 High |
+| **MCP SDK base classes** | Implement `shared/mcp/` with protocol and transport | 🟡 High |
+
+**Deliverables:**
+- [ ] Working project structure with all directories
+- [ ] `pyproject.toml` with pinned dependencies
+- [ ] Shared abstractions for LLM, Queue, Storage, Database
+- [ ] **Structured logging with JSON output and trace correlation**
+- [ ] **MCP protocol types and base classes**
+- [ ] Environment-aware configuration system
+
+---
+
+### Phase 1: Logging & Observability Infrastructure *(Week 1-2)*
+**Goal:** Establish comprehensive logging, metrics, and tracing before building features.
+
+| Task | Description | Priority |
+|:-----|:------------|:--------:|
+| Implement structured logger | JSON logging with configurable formatters | 🔴 Critical |
+| Context propagation | trace_id, span_id, request_id across services | � Critical |
+| Logging middleware | FastAPI middleware for request/response logging | 🔴 Critical |
+| MCP logging middleware | Tool call logging with timing and results | 🔴 Critical |
+| Metrics integration | Prometheus metrics for latency, errors, throughput | 🟡 High |
+| Log decorators | `@log_execution`, `@trace` for function logging | 🟡 High |
+| OpenTelemetry exporters | Jaeger/Zipkin trace export | 🟡 High |
+| Log aggregation config | Loki/Promtail configuration for deployment | 🟢 Medium |
+| Grafana dashboards | Pre-built dashboards for MCP, API, Orchestrator | � Medium |
+
+**Deliverables:**
+- [ ] Structured JSON logging across all services
+- [ ] Distributed tracing with OpenTelemetry
+- [ ] Prometheus metrics endpoint
+- [ ] Pre-built Grafana dashboards
+- [ ] Logging documentation (LOGGING_GUIDE.md)
+
+**Log Schema Standard:**
+```json
+{
+  "timestamp": "2026-01-10T19:00:00.000Z",
+  "level": "INFO",
+  "service": "orchestrator",
+  "trace_id": "abc123",
+  "span_id": "def456",
+  "request_id": "req-789",
+  "message": "Tool execution completed",
+  "context": {
+    "tool_name": "web_scraper",
+    "mcp_server": "scraper_server",
+    "duration_ms": 1234,
+    "result_size_bytes": 5678
+  }
+}
+```
+
+---
+
+### Phase 2: MCP Tool Servers *(Week 2-3)*
+**Goal:** Build parallel-capable MCP tool servers for all "Hands" functionality.
+
+| Task | Description | Priority |
+|:-----|:------------|:--------:|
+| **MCP Server Base** | Implement `shared/mcp/server_base.py` with JSON-RPC 2.0 | 🔴 Critical |
+| **Scraper MCP Server** | Web scraping tools with Playwright/BeautifulSoup | 🔴 Critical |
+| **Python MCP Server** | Sandboxed Python execution with Pandas/DuckDB | 🔴 Critical |
+| **Search MCP Server** | Web search tools (Tavily, Brave, SerpAPI) | 🔴 Critical |
+| Vision MCP Server | Screenshot/OCR extraction with GPT-4o/Gemini | 🟡 High |
+| Analysis MCP Server | Statistical analysis and trend detection | 🟡 High |
+| Stealth infrastructure | Proxy rotation, UA spoofing, rate limiting | 🟡 High |
+| Sandbox isolation | Docker/E2B runners for code execution | 🟡 High |
+| MCP tool manifests | JSON Schema definitions for all tools | 🟡 High |
+| Template server | Boilerplate for adding new MCP servers | 🟢 Medium |
+
+**Deliverables:**
+- [ ] 5 working MCP servers (Scraper, Python, Search, Vision, Analysis)
+- [ ] Parallel execution capability (invoke multiple servers simultaneously)
+- [ ] Tool manifests with JSON Schema validation
+- [ ] Stealth infrastructure for web scraping
+- [ ] MCP development guide (MCP_GUIDE.md)
+
+**MCP Tool Example:**
+```python
+@mcp_tool(
+    name="browser_scrape",
+    description="Scrape webpage content using headless browser",
+    schema={
+        "type": "object",
+        "properties": {
+            "url": {"type": "string", "format": "uri"},
+            "wait_for": {"type": "string", "description": "CSS selector to wait for"},
+            "extract_tables": {"type": "boolean", "default": True}
+        },
+        "required": ["url"]
+    }
+)
+async def browser_scrape(url: str, wait_for: str = None, extract_tables: bool = True):
+    # Implementation with integrated logging
+    logger.info("Starting browser scrape", extra={"url": url})
+    ...
+```
+
+---
+
+### Phase 3: Core Orchestrator with MCP Client *(Week 3-4)*
+**Goal:** Build the central "Brain" with LangGraph state machine and MCP client.
+
+| Task | Description | Priority |
+|:-----|:------------|:--------:|
+| Implement LangGraph graph | Build cyclic state machine with checkpointing | 🔴 Critical |
+| **MCP Client implementation** | Connect to MCP servers via JSON-RPC 2.0 | 🔴 Critical |
+| **Parallel executor** | Invoke multiple MCP tools concurrently | 🔴 Critical |
+| **Tool registry** | Dynamic tool discovery via `tools/list` | 🔴 Critical |
+| Create Intention Router | Classify queries into Path A/B/C/D | 🔴 Critical |
+| Build Planner node | Query decomposition into atomic facts | 🔴 Critical |
+| Build Keeper node | Context drift detection (cosine similarity) | � High |
+| Build Divergence Engine | Hypothesis verification & abductive reasoning | 🟡 High |
+| Build Synthesizer node | Report generation from validated facts | 🟡 High |
+| Implement Meta-Prompt Layer | Dynamic persona injection for workers | 🟡 High |
+| Build Consensus Engine | Generator/Critic/Judge adversarial loop | 🟢 Medium |
+
+**Deliverables:**
+- [ ] Working LangGraph state machine with OODA loop
+- [ ] **MCP Client with parallel tool invocation**
+- [ ] **Tool registry with hot-reload capability**
+- [ ] Intention Router with 4-path classification
+- [ ] All core nodes (Planner, Keeper, Divergence, Synthesizer)
+- [ ] Unit tests for each node and MCP client
+
+---
+
+### Phase 4: RAG Service *(Week 4-5)*
+**Goal:** Build the "Memory Vault" for atomic facts and artifacts.
+
+| Task | Description | Priority |
+|:-----|:------------|:--------:|
+| Implement Vector Store | Qdrant/Chroma abstraction with embedding | 🔴 Critical |
+| Create Atomic Fact schema | Entity-Attribute-Value-Time-Source structure | 🔴 Critical |
+| Implement Artifact Store | S3/Local filesystem for Parquet/Blobs | 🔴 Critical |
+| Build GraphRAG layer | Relationship storage between facts | 🟡 High |
+| Create Session schema | Conversation Project manifest tracking | 🟡 High |
+| Implement semantic search | Query-to-fact similarity matching | 🟡 High |
+| Build Provenance Graph API | Node/Edge export for UI visualization | 🟢 Medium |
+| Add logging integration | Structured logging for all RAG operations | 🟢 Medium |
+
+**Deliverables:**
+- [ ] Vector store with atomic fact ingestion
+- [ ] Artifact store with Parquet/blob support
+- [ ] Semantic search with confidence scoring
+- [ ] Unit tests for all storage operations
+
+---
+
+### Phase 5: API Gateway *(Week 5-6)*
+**Goal:** Build the "Front Door" with all API endpoints and MCP management.
+
+| Task | Description | Priority |
+|:-----|:------------|:--------:|
+| Setup FastAPI gateway | Base server with versioned routing | 🔴 Critical |
+| Implement Job Dispatcher | `/jobs` CRUD with polymorphic payloads | 🔴 Critical |
+| Implement Memory API | `/memory/search`, `/memory/graph` | 🔴 Critical |
+| **Implement MCP API** | `/mcp/servers`, `/mcp/tools`, `/mcp/invoke` | 🔴 Critical |
+| Implement Artifacts API | `/artifacts` download/preview | 🟡 High |
+| Implement HITL API | `/interventions` pause/resume | 🟡 High |
+| Implement System API | `/system/capabilities`, `/system/health` | 🟡 High |
+| Implement LLM Management | `/llm/providers`, `/llm/config` | 🟢 Medium |
+| Add JWT authentication | Bearer token middleware | 🟢 Medium |
+| Add API rate limiting | Request throttling middleware | 🟢 Medium |
+| **Request ID middleware** | Correlation ID propagation for distributed tracing | 🟢 Medium |
+
+**Deliverables:**
+- [ ] Full REST API with all endpoints documented
+- [ ] **MCP management API for tool discovery and invocation**
+- [ ] Authentication & authorization middleware
+- [ ] OpenAPI/Swagger documentation
+- [ ] Integration tests for all routes
+
+---
+
+### Phase 6: Background Workers *(Week 6-7)*
+**Goal:** Implement async job processing with checkpointing.
+
+| Task | Description | Priority |
+|:-----|:------------|:--------:|
+| Setup Redis queue | Job enqueue/dequeue infrastructure | 🔴 Critical |
+| Implement Research Worker | Deep research job processor with MCP tools | 🔴 Critical |
+| Implement Synthesis Worker | Grand synthesis job processor | 🟡 High |
+| Implement Shadow Lab Worker | Recalculation job processor | 🟡 High |
+| Add LangGraph checkpointing | PostgreSQL state persistence | 🟡 High |
+| Implement crash recovery | Resume from last checkpoint | 🟡 High |
+| Add webhook notifications | Callback on job completion | 🟢 Medium |
+| **Worker logging** | Structured logging with job context | 🟢 Medium |
+
+**Deliverables:**
+- [ ] Background workers with Redis queue
+- [ ] Checkpointing and crash recovery
+- [ ] All job types processing correctly
+- [ ] Integration tests for job lifecycle
+
+---
+
+### Phase 7: Integration & Testing *(Week 7-8)*
+**Goal:** End-to-end testing and hardening.
+
+| Task | Description | Priority |
+|:-----|:------------|:--------:|
+| Write unit tests | Cover all modules >80% | 🔴 Critical |
+| Write integration tests | Full job lifecycle flows | 🔴 Critical |
+| **MCP integration tests** | Parallel tool execution tests | 🔴 Critical |
+| **Logging pipeline tests** | End-to-end trace correlation tests | 🔴 Critical |
+| Write E2E tests | API gateway full scenarios | 🟡 High |
+| Setup CI/CD pipeline | GitHub Actions for testing | 🟡 High |
+| Performance testing | Load testing with Locust | 🟢 Medium |
+| Documentation | API reference & developer guide | 🟢 Medium |
+
+**Deliverables:**
+- [ ] >80% test coverage
+- [ ] **MCP parallel execution tests**
+- [ ] **Distributed tracing verification**
+- [ ] CI/CD pipeline with automated testing
+- [ ] Performance benchmarks
+- [ ] Complete documentation
+
+#### 🧪 Standardized Testing Environments
+
+> **Testing Philosophy:** We use **Real Simulation & Case-Based Testing** instead of traditional pytest. Tests are executable notebooks with actual API calls, real data scenarios, and observable outputs that demonstrate system behavior.
+
+All tests are designed to run in cloud notebook environments for reproducibility and GPU access:
+
+| Environment | Primary Use | GPU Access | Notes |
+|:------------|:------------|:-----------|:------|
+| **Kaggle Notebooks** | Integration & E2E simulations | ✅ Free T4/P100 | 30hr/week GPU quota, persistent datasets |
+| **Google Colab** | Component smoke tests | ✅ Free T4 | Easy sharing, quick iteration |
+| **Local (Hybrid)** | Development & debugging | ⚡ Optional | Fast feedback, full control |
+
+**Why Real Simulation Over Pytest?**
+
+| Aspect | Traditional Pytest | Real Simulation (Our Approach) |
+|:-------|:-------------------|:-------------------------------|
+| **Coverage** | Mocked responses | Actual API calls & real data |
+| **Debugging** | Stack traces | Visual outputs, logs, artifacts |
+| **Reproducibility** | Environment-dependent | Notebook cells = reproducible steps |
+| **Documentation** | Separate docs | Test IS the documentation |
+| **Observability** | Pass/Fail | Rich outputs, charts, intermediate states |
+
+**Execution Strategy:**
+
+```mermaid
+graph LR
+    %% --- STYLES ---
+    classDef local fill:#00b894,stroke:#333,stroke-width:2px,color:#fff;
+    classDef cloud fill:#0984e3,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef hybrid fill:#6c5ce7,stroke:#fff,stroke-width:2px,color:#fff;
+
+    %% --- TEST FLOW ---
+    Dev["🧑‍💻 Developer"] --> Local["💻 Local Simulation<br/>(Fast Feedback)"]:::local
+    Local --> Push["📤 Git Push"]
+    Push --> CI["⚙️ GitHub Actions<br/>(Lint + Smoke)"]
+    CI --> Kaggle["📊 Kaggle<br/>(Full Simulation)"]:::cloud
+    CI --> Colab["🔬 Colab<br/>(Component Tests)"]:::cloud
+    
+    Kaggle --> Report["📋 Execution Report<br/>(Artifacts + Logs)"]
+    Colab --> Report
+    
+    Report --> Merge["✅ Merge Ready"]
+```
+
+**Test Case Distribution:**
+
+| Test Scenario | Local | Colab | Kaggle |
+|:--------------|:-----:|:-----:|:------:|
+| MCP Server Simulation | ✅ Primary | ✅ | ⚪ |
+| Single Tool Execution | ✅ Primary | ✅ | ⚪ |
+| Multi-Tool Parallel Simulation | ⚪ | ✅ | ✅ Primary |
+| Full Research Pipeline | ⚪ | ⚪ | ✅ Primary |
+| LLM Integration Cases | ⚪ | ✅ | ✅ Primary |
+| End-to-End Scenarios | ⚪ | ⚪ | ✅ Primary |
+
+**Real Simulation Notebook Example:**
+
+```python
+# tests/simulations/research_pipeline_simulation.ipynb
+
+# ═══════════════════════════════════════════════════════════════
+# SIMULATION: Full Research Pipeline - Nickel Market Analysis
+# ═══════════════════════════════════════════════════════════════
+
+# Cell 1: Setup Environment
+from kea.services.orchestrator import Orchestrator
+from kea.mcp_servers import ScraperServer, PythonServer, SearchServer
+from kea.shared.logging import setup_simulation_logging
+
+setup_simulation_logging(level="DEBUG")
+print("✅ Environment Ready")
+
+# Cell 2: Initialize MCP Servers (Real Instances)
+scraper = ScraperServer.start()
+python_exec = PythonServer.start()
+search = SearchServer.start()
+
+orchestrator = Orchestrator(
+    mcp_servers=[scraper, python_exec, search]
+)
+print(f"✅ {len(orchestrator.tools)} tools registered")
+
+# Cell 3: Execute Real Research Query
+result = await orchestrator.research(
+    query="Analyze nickel mining trends in Indonesia 2024",
+    depth=2,
+    max_sources=5
+)
+
+# Cell 4: Inspect Intermediate States (Observable)
+print("📊 Research Stages:")
+for stage in result.execution_log:
+    print(f"  {stage.name}: {stage.duration_ms}ms - {stage.status}")
+
+# Cell 5: Validate Output Artifacts
+assert result.report is not None, "Report should be generated"
+assert len(result.sources) >= 3, "Should have at least 3 sources"
+assert result.data_artifacts, "Should have data artifacts"
+
+# Display actual outputs
+display(result.report[:500])  # Show report preview
+display(result.sources)       # Show sources table
+
+# Cell 6: Test Shadow Lab (Recalculation)
+recalc_result = await orchestrator.shadow_lab(
+    artifact_id=result.data_artifacts[0],
+    instruction="Recalculate with 15% growth assumption"
+)
+print(f"✅ Recalculation completed: {recalc_result.summary}")
+
+# Cell 7: Cleanup & Summary
+await orchestrator.shutdown()
+print("═" * 50)
+print("SIMULATION COMPLETE")
+print(f"  Total Duration: {result.total_duration_ms}ms")
+print(f"  Tools Invoked: {result.tool_invocations}")
+print(f"  Artifacts Generated: {len(result.data_artifacts)}")
+```
+
+**Case Categories:**
+
+| Category | Example Cases |
+|:---------|:--------------|
+| **Happy Path** | Complete research flow, successful scraping, valid analysis |
+| **Error Recovery** | Scraper timeout → retry, LLM rate limit → fallback |
+| **Edge Cases** | Empty search results, malformed HTML, conflicting sources |
+| **Performance** | Parallel 10-URL scrape, large DataFrame processing |
+| **Integration** | MCP → Orchestrator → RAG → API Gateway flow |
+
+**Hybrid Mode (Local + Cloud):**
+- **Local:** Quick component simulations during development
+- **Colab:** Validate individual MCP server behavior with real calls
+- **Kaggle:** Full end-to-end research simulations with GPU acceleration
+
+---
+
+### Phase 8: Deployment *(Week 8-9)*
+**Goal:** Production-ready deployment with full observability.
+
+| Task | Description | Priority |
+|:-----|:------------|:--------:|
+| Create Dockerfiles | Multi-stage builds for all services + MCP servers | 🔴 Critical |
+| Setup docker-compose | Local full-stack development | 🔴 Critical |
+| **docker-compose.mcp.yml** | MCP servers standalone deployment | 🔴 Critical |
+| Create Kubernetes manifests | Production cluster deployment | 🟡 High |
+| **Deploy logging stack** | Loki + Promtail + Grafana | 🟡 High |
+| **Setup tracing** | Jaeger/Zipkin for distributed tracing | 🟡 High |
+| Setup monitoring | Prometheus + Grafana dashboards | 🟢 Medium |
+| Security hardening | Secret management, network policies | 🟢 Medium |
+| **MCP scaling** | Horizontal scaling for MCP servers | 🟢 Medium |
+
+**Deliverables:**
+- [ ] Docker images for all services and MCP servers
+- [ ] docker-compose for local development
+- [ ] **docker-compose.mcp.yml for isolated MCP testing**
+- [ ] Kubernetes manifests for production
+- [ ] **Logging stack deployment (Loki/Grafana)**
+- [ ] **Distributed tracing deployment**
+- [ ] Monitoring and alerting setup
+
+---
+
+## 🎯 Milestone Summary
+
+| Milestone | Target | Key Deliverable |
+|:----------|:-------|:----------------|
+| **M0** | Week 1 | Project scaffolding & abstractions |
+| **M1** | Week 2 | **Logging infrastructure & observability** |
+| **M2** | Week 3 | **5 MCP Tool Servers operational** |
+| **M3** | Week 4 | Orchestrator with MCP Client & parallel execution |
+| **M4** | Week 5 | Memory vault with atomic facts |
+| **M5** | Week 6 | Full API gateway with MCP management |
+| **M6** | Week 7 | Async job processing with checkpoints |
+| **M7** | Week 8 | >80% test coverage, CI/CD |
+| **M8** | Week 9+ | Production deployment with full observability |
+
+---
+
+## 📊 Logging Standard
+
+All services follow a unified structured logging format:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        LOGGING ARCHITECTURE                          │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐                │
+│  │ Orchestrator│   │ MCP Servers │   │ API Gateway │                │
+│  │  (service)  │   │  (tools)    │   │  (routes)   │                │
+│  └──────┬──────┘   └──────┬──────┘   └──────┬──────┘                │
+│         │                 │                 │                        │
+│         └────────────┬────┴─────────────────┘                        │
+│                      │                                               │
+│           ┌──────────▼──────────┐                                    │
+│           │  Structured Logger  │                                    │
+│           │   (JSON Format)     │                                    │
+│           │                     │                                    │
+│           │ • trace_id          │                                    │
+│           │ • span_id           │                                    │
+│           │ • request_id        │                                    │
+│           │ • service           │                                    │
+│           │ • mcp_server        │                                    │
+│           │ • tool_name         │                                    │
+│           └──────────┬──────────┘                                    │
+│                      │                                               │
+│    ┌─────────────────┼─────────────────┐                             │
+│    │                 │                 │                             │
+│    ▼                 ▼                 ▼                             │
+│ ┌──────┐       ┌──────────┐     ┌──────────┐                        │
+│ │ File │       │ Promtail │     │ Console  │                        │
+│ │ Logs │       │ (→ Loki) │     │ (Dev)    │                        │
+│ └──────┘       └────┬─────┘     └──────────┘                        │
+│                     │                                                │
+│                     ▼                                                │
+│              ┌──────────┐                                            │
+│              │  Grafana │                                            │
+│              │Dashboard │                                            │
+│              └──────────┘                                            │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+---
+
+# 📐 Architecture Documentation
+
+> This section documents the complete system architecture for Kea.
 
 **Kea** is a microservice-based, recursive AI architecture designed for open-ended domain investigation. Unlike linear RAG systems, Kea utilizes a **Cyclic State Graph** to mimic human research behavior: formulating hypotheses, gathering data, verifying consistency, and autonomously reformulating strategies when results are suboptimal.
 
