@@ -703,40 +703,216 @@ services:
 
 ## 🔌 9. API Interface (The User Layer)
 
-Kea exposes a RESTful API for integration with frontends, dashboards, or other agents.
+The API follows a **Polymorphic Asynchronous Pattern**. It is designed to be "infrastructure agnostic," meaning the same API structure works whether the backend is a simple Python script or a Kubernetes cluster.
 
-### Core Endpoints
+### 9.1. Base Configuration
 
-#### A. Trigger Research
-`POST /v1/research`
+*   **Base URL:** `/api/v1`
+*   **Versioning:** Strict URI versioning (`v1`, `v2`) to allow breaking changes without disrupting existing connectors.
+*   **Authentication:** Bearer Token (JWT).
+*   **Content-Type:** `application/json`
+
+---
+
+### 9.2. The Universal "Job" Endpoint (The Core Lego)
+
+Instead of hardcoding `/research` or `/scrape` endpoints, we use a single **Job Dispatcher**. This allows you to add new "Agent Types" (e.g., a Video Analyzer) in the backend without changing the frontend API client.
+
+### A. Submit a Job
+**Endpoint:** `POST /jobs`
+
+**Request Payload:**
 ```json
 {
-  "query": "Future of Nickel Mining",
-  "depth": "deep",
-  "config": {
-    "use_memory": true,   // Check Atomic DB first
-    "allow_web": true     // Scrape new data
+  "project_id": "session_alpha_99",  // Links to a specific conversation/memory context
+  "type": "deep_research",           // <--- THIS IS THE SWITCH (research, synthesis, shadow_lab)
+  "priority": "normal",              // high, normal, background
+  "callback_url": "https://myapp.com/webhook", // Optional: For async notification
+  
+  // The "Lego" Config - Schema validation changes based on 'type'
+  "payload": {
+    "query": "Future of Nickel Mining in Sulawesi",
+    "depth": 3,
+    "constraints": {
+      "time_range": ["2023-01-01", "2025-12-31"],
+      "domains": ["reuters.com", "esdm.go.id"],
+      "excluded_domains": ["reddit.com"]
+    }
   }
 }
 ```
 
-#### B. The Grand Synthesis (Meta-Analysis)
-`POST /v1/synthesis`
+**Response (Immediate 202 Accepted):**
 ```json
 {
-  "project_id": "session_99",
-  "job_ids": ["job_a", "job_b"], // Merge these two
-  "mode": "systematic_review"    // or "quantitative_merge"
+  "job_id": "job_550e8400-e29b",
+  "status": "queued",
+  "queue_position": 4,
+  "tracking_url": "/api/v1/jobs/job_550e8400-e29b",
+  "estimated_time_sec": 300
 }
 ```
 
-#### C. The Shadow Lab (Recalculate)
-`POST /v1/tools/recalc`
+### B. Check Job Status / Poll Result
+**Endpoint:** `GET /jobs/{job_id}`
+
+**Response (While Running):**
 ```json
 {
-  "artifact_id": "data_job_a.parquet",
-  "instruction": "Filter for rows where year > 2023 and recalculate mean revenue."
+  "job_id": "job_550e8400-e29b",
+  "status": "processing",
+  "progress": 45, // Percent
+  "current_stage": "analyzing_financials", // Granular step
+  "logs": [
+    {"ts": "10:00:01", "msg": "Scraping completed. Found 14 sources."},
+    {"ts": "10:00:05", "msg": "Context drift detected in Source 4. Pruning."}
+  ]
 }
+```
+
+**Response (Completed):**
+```json
+{
+  "job_id": "job_550e8400-e29b",
+  "status": "completed",
+  "result": {
+    "summary": "Nickel prices are projected to...",
+    "artifacts": {
+      "report_markdown": "s3://.../report.md",
+      "raw_data": "s3://.../data.parquet",
+      "visuals": ["s3://.../chart1.png"]
+    }
+  },
+  "usage": {"tokens": 4500, "search_calls": 12}
+}
+```
+
+---
+
+### 9.3. The "Lego" Payload Types
+
+This is where the modularity happens. The `payload` object changes based on the `type`.
+
+#### Type 1: `deep_research` (The Standard)
+*   **Purpose:** Standard web scraping and reasoning.
+*   **Payload Config:**
+    ```json
+    {
+      "query": "...",
+      "mode": "autonomous", // or "guided" (asks human for help)
+      "output_format": "html"
+    }
+    ```
+
+#### Type 2: `synthesis` (The Alchemist)
+*   **Purpose:** Combining previous jobs.
+*   **Payload Config:**
+    ```json
+    {
+      "input_job_ids": ["job_123", "job_456"],
+      "synthesis_mode": "meta_analysis", // or "systematic_review"
+      "conflict_resolution": "highlight" // or "trust_latest"
+    }
+    ```
+
+#### Type 3: `shadow_lab` (Re-Calculation)
+*   **Purpose:** Running code on existing artifacts (No Internet).
+*   **Payload Config:**
+    ```json
+    {
+      "artifact_id": "job_123_data.parquet",
+      "instruction": "Recalculate EBITDA column with 10% tax rate",
+      "output_type": "json_table"
+    }
+    ```
+
+---
+
+### 9.4. The Memory & Knowledge API
+
+Endpoints to inspect, modify, and "debug" the system's brain.
+
+#### A. Semantic Search (Recall)
+**Endpoint:** `POST /memory/search`
+*   **Use Case:** "What do we *already* know about Adaro?"
+*   **Payload:** `{"query": "Adaro revenue", "threshold": 0.8}`
+*   **Response:** List of "Atomic Facts" with source pointers.
+
+#### B. The Provenance Graph (Audit)
+**Endpoint:** `GET /memory/provenance/{job_id}`
+*   **Use Case:** Visualizing the research path in a frontend.
+*   **Response:** Nodes and Edges JSON (compatible with ReactFlow/Cytoscape).
+
+#### C. Blacklist Management (The Immune System)
+**Endpoint:** `POST /config/blacklist`
+*   **Use Case:** Manually blocking a bad source.
+*   **Payload:** `{"domain": "fake-news.com", "reason": "Hallucination risk"}`
+
+---
+
+### 9.5. The "Human-in-the-Loop" API
+
+Future-proofing for when the AI needs help.
+
+#### A. List Active Interventions
+**Endpoint:** `GET /interventions`
+*   **Response:** List of jobs currently PAUSED waiting for human input.
+    *   *Example:* "Job 555 paused. Reason: Keeper detected 80% ambiguity in query."
+
+#### B. Submit Feedback
+**Endpoint:** `POST /interventions/{id}/resolve`
+*   **Payload:** `{"decision": "proceed", "feedback": "Focus only on thermal coal, not coking coal."}`
+
+---
+
+### 9.6. Connectors (System Capabilities)
+
+This allows the frontend to dynamically render the "Tools" available, even as you add new ones (like Audio or Video).
+
+**Endpoint:** `GET /system/capabilities`
+
+**Response:**
+```json
+{
+  "version": "1.2.0",
+  "available_agents": [
+    {"id": "scraper_v1", "name": "Web Scraper", "cost_per_run": "medium"},
+    {"id": "analyst_v2", "name": "Python Sandbox", "cost_per_run": "low"},
+    {"id": "vision_v1", "name": "Chart Reader", "cost_per_run": "high"} // New feature added
+  ],
+  "supported_file_types": ["parquet", "csv", "json", "pdf"]
+}
+```
+
+---
+
+### 9.7. API Architecture Diagram
+
+```mermaid
+graph LR
+    %% --- STYLES ---
+    classDef client fill:#ff7675,stroke:#333,stroke-width:2px,color:#fff;
+    classDef router fill:#0984e3,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef handler fill:#00b894,stroke:#333,stroke-width:2px,color:#fff;
+
+    %% --- ACTORS ---
+    Client(("Frontend / SDK")):::client --> Gateway["API Gateway /v1"]:::router
+
+    %% --- ROUTES ---
+    subgraph Routes
+        Gateway --"/jobs (POST)"--> Dispatcher{"Job Dispatcher"}:::router
+        Gateway --"/jobs/{id} (GET)"--> StatusCheck["Status Monitor"]:::handler
+        Gateway --"/memory/*"--> MemoryMgr["Memory Manager"]:::handler
+        Gateway --"/system/*"--> SysConfig["System Config"]:::handler
+    end
+
+    %% --- DISPATCH LOGIC ---
+    Dispatcher --"type: deep_research"--> AgentA["Research Agent"]:::handler
+    Dispatcher --"type: synthesis"--> AgentB["Synthesis Agent"]:::handler
+    Dispatcher --"type: shadow_lab"--> AgentC["Shadow Lab Agent"]:::handler
+
+    %% --- FUTURE PROOFING ---
+    Dispatcher -.->|"type: audio_analysis"| AgentNew["(Future) Audio Agent"]:::handler
 ```
 
 ---
