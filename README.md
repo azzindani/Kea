@@ -29,35 +29,35 @@ graph TD
     classDef tool fill:#00b894,stroke:#333,stroke-width:2px,color:#fff;
 
     %% --- ACTORS ---
-    User((User / API)) -->|Query| Gateway[API Gateway & Rate Limiter]
-    Gateway --> Router{Intention Router}
+    User(("User / API")) -->|Query| Gateway["API Gateway & Rate Limiter"]
+    Gateway --> Router{"Intention Router"}
 
     %% --- THE ROUTING LAYER ---
-    Router --"Simple Q"--> FastRAG[⚡ Fast RAG / Memory]
-    Router --"Methodology Q"--> Provenance[🔍 Provenance Graph]
-    Router --"Recalculation"--> ShadowLab[🧮 Shadow Lab (Sandbox)]
-    Router --"Deep Research"--> Orchestrator[🧠 Main Orchestrator]
+    Router --"Simple Q"--> FastRAG["⚡ Fast RAG / Memory"]
+    Router --"Methodology Q"--> Provenance["🔍 Provenance Graph"]
+    Router --"Recalculation"--> ShadowLab["🧮 Shadow Lab (Sandbox)"]
+    Router --"Deep Research"--> Orchestrator["🧠 Main Orchestrator"]
 
     %% --- THE DEEP RESEARCH LOOP ---
-    subgraph "The Cognitive Core"
-        Orchestrator --> Planner[📝 Planner & Decomposer]
-        Planner --> Keeper[🛡️ The Keeper (Context Guard)]
-        Keeper --> Divergence[✨ Divergence Engine (Analysis)]
-        Divergence --> Synthesizer[✍️ Report Synthesizer]
+    subgraph CognitiveCore ["The Cognitive Core"]
+        Orchestrator --> Planner["📝 Planner & Decomposer"]
+        Planner --> Keeper["🛡️ The Keeper (Context Guard)"]
+        Keeper --> Divergence["✨ Divergence Engine (Analysis)"]
+        Divergence --> Synthesizer["✍️ Report Synthesizer"]
     end
 
     %% --- THE TOOLS LAYER (The Muscle) ---
-    subgraph "Tool Microservices"
-        Scraper[🕷️ Robotic Scraper]:::tool
-        Analyst[🐍 Python Analyst]:::tool
-        Meta[📊 Meta-Analysis]:::tool
+    subgraph Tools ["Tool Microservices"]
+        Scraper["🕷️ Robotic Scraper"]:::tool
+        Analyst["🐍 Python Analyst"]:::tool
+        Meta["📊 Meta-Analysis"]:::tool
     end
 
     %% --- THE MEMORY LAYER (The Vault) ---
-    subgraph "The Triple-Vault Memory"
-        Atomic[Atomic Facts DB]:::memory
-        Episodic[Episodic Logs]:::memory
-        Artifacts[Parquet/Blob Store]:::memory
+    subgraph MemoryVault ["The Triple-Vault Memory"]
+        Atomic["Atomic Facts DB"]:::memory
+        Episodic["Episodic Logs"]:::memory
+        Artifacts["Parquet/Blob Store"]:::memory
     end
 
     %% --- CONNECTIONS ---
