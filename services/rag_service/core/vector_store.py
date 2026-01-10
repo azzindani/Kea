@@ -80,17 +80,21 @@ class QdrantVectorStore(VectorStore):
     """
     Qdrant vector store implementation.
     
+    Uses Qwen3-Embedding-8B via OpenRouter for embeddings.
     Requires QDRANT_URL and optionally QDRANT_API_KEY.
     """
     
     def __init__(
         self,
         collection_name: str = "research_facts",
-        embedding_dim: int = 1536,
+        embedding_dim: int = 1024,  # Qwen3 default
+        use_local_embedding: bool = False,
     ) -> None:
         self.collection_name = collection_name
         self.embedding_dim = embedding_dim
+        self.use_local_embedding = use_local_embedding
         self._client = None
+        self._embedding_provider = None
     
     async def _get_client(self):
         """Get or create Qdrant client."""
@@ -118,24 +122,16 @@ class QdrantVectorStore(VectorStore):
         return self._client
     
     async def _get_embedding(self, text: str) -> list[float]:
-        """Get embedding for text using OpenRouter."""
-        import httpx
-        
-        api_key = os.getenv("OPENROUTER_API_KEY", "")
-        
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.post(
-                "https://openrouter.ai/api/v1/embeddings",
-                headers={"Authorization": f"Bearer {api_key}"},
-                json={
-                    "model": "openai/text-embedding-3-small",
-                    "input": text,
-                }
+        """Get embedding for text using Qwen3 embedding provider."""
+        if self._embedding_provider is None:
+            from shared.embedding import create_embedding_provider
+            
+            self._embedding_provider = create_embedding_provider(
+                use_local=self.use_local_embedding,
+                dimension=self.embedding_dim,
             )
-            response.raise_for_status()
-            data = response.json()
         
-        return data["data"][0]["embedding"]
+        return await self._embedding_provider.embed_query(text)
     
     async def add(self, documents: list[Document]) -> list[str]:
         """Add documents to Qdrant."""
