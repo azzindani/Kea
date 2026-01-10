@@ -1,419 +1,166 @@
-# Autonomous Multi-Agent Research Engine
+This is the best way to handle documentation for a system this complex. We will structure the `README.md` as a **Master Architecture Document**.
 
-**A high-throughput, microservice-based architecture for deep domain research, autonomous data analysis, and multi-agent consensus.**
+Here is **Part 1: The General Architecture & Core Philosophy**. This section establishes the high-level map and the "Router" logic that governs the entire system.
 
-## 📖 Technical Overview
+You can create a file named `ARCHITECTURE.md` or put this at the top of your `README.md`.
 
-This project is an **Autonomous Agentic System** designed to move beyond simple RAG (Retrieval Augmented Generation) towards **Deep Research**. It utilizes a hierarchical "Supervisor-Worker" architecture—a pattern where a central "Supervisor" LLM acts as an architect/planner, delegating specialized sub-tasks to "Worker" agents (specialized Python sub-systems).
+***
 
-Unlike standard chatbots, this system separates **Reasoning** (LLM) from **Execution** (Code). It features a self-correcting code execution environment, allowing agents to scrape data, build local SQL databases (DuckDB), perform statistical analysis via Pandas/Polars, and generate visualizations programmatically.
+# 🦜 Kea: Distributed Autonomous Research Engine (DARE)
 
-### Key Differentiators
-*   **Microservices Architecture:** Fully containerized services communicating via REST/gRPC and OpenAPI standards.
-*   **Graph-Based Orchestration:** Uses **LangGraph** for cyclic state management (loops, retries, consensus), moving beyond linear chains to dynamic, adaptive workflows.
-*   **Code-First Analysis:** Hallucination reduction by forcing LLMs to write Python code for calculations rather than performing mental math.
-*   **Asynchronous Parallelism:** Implements `asyncio` semaphores and batch processing to handle deep web scraping without hitting API rate limits.
-*   **Persisted State:** Uses PostgreSQL checkpointers to support long-running research tasks (hours/days) with pause/resume capabilities.
+> **"Not just a Chatbot. A Research Factory."**
+
+**Kea** is a microservice-based, recursive AI architecture designed for open-ended domain investigation. Unlike linear RAG systems, Kea utilizes a **Cyclic State Graph** to mimic human research behavior: formulating hypotheses, gathering data, verifying consistency, and autonomously reformulating strategies when results are suboptimal.
+
+It separates **Reasoning** (The Brain/LLM) from **Execution** (The Muscle/Python), ensuring mathematical precision and hallucination-proof results.
 
 ---
 
-## 🏗 System Architecture
+## 🗺️ 1. The General Architecture (High-Level Map)
 
-The system follows a **Hub-and-Spoke** microservices pattern.
+The system follows a **Hub-and-Spoke Microservices Pattern**. The central Orchestrator manages the lifecycle of a request, delegating work to specialized, isolated services via gRPC/REST.
 
 ```mermaid
 graph TD
-    User["Client / API Consumer"] -->|REST Request| Gateway["API Gateway / Nginx"]
-    
-    subgraph "Service Layer"
-        Gateway --> Orchestrator["Orchestrator Service<br>(LangGraph + FastAPI)"]
-        
-        Orchestrator -->|HTTP/RPC| ToolService["Tool Sandbox Service<br>(Docker/E2B)"]
-        Orchestrator -->|HTTP/RPC| RAGService["Domain RAG Service<br>(Qdrant/Weaviate)"]
-        Orchestrator -->|HTTP/RPC| ScraperService["Web Gathering Service<br>(Tavily/Firecrawl)"]
+    %% --- STYLES ---
+    classDef brain fill:#2d3436,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef router fill:#0984e3,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef memory fill:#6c5ce7,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef tool fill:#00b894,stroke:#333,stroke-width:2px,color:#fff;
+
+    %% --- ACTORS ---
+    User((User / API)) -->|Query| Gateway[API Gateway & Rate Limiter]
+    Gateway --> Router{Intention Router}
+
+    %% --- THE ROUTING LAYER ---
+    Router --"Simple Q"--> FastRAG[⚡ Fast RAG / Memory]
+    Router --"Methodology Q"--> Provenance[🔍 Provenance Graph]
+    Router --"Recalculation"--> ShadowLab[🧮 Shadow Lab (Sandbox)]
+    Router --"Deep Research"--> Orchestrator[🧠 Main Orchestrator]
+
+    %% --- THE DEEP RESEARCH LOOP ---
+    subgraph "The Cognitive Core"
+        Orchestrator --> Planner[📝 Planner & Decomposer]
+        Planner --> Keeper[🛡️ The Keeper (Context Guard)]
+        Keeper --> Divergence[✨ Divergence Engine (Analysis)]
+        Divergence --> Synthesizer[✍️ Report Synthesizer]
     end
-    
-    subgraph "Data Layer"
-        Orchestrator -->|State Persist| Postgres[("PostgreSQL<br>Graph State")]
-        ToolService -->|Analytical Data| DuckDB[("DuckDB<br>Parquet/CSV")]
-        RAGService -->|Embeddings| VectorDB[("Vector DB")]
+
+    %% --- THE TOOLS LAYER (The Muscle) ---
+    subgraph "Tool Microservices"
+        Scraper[🕷️ Robotic Scraper]:::tool
+        Analyst[🐍 Python Analyst]:::tool
+        Meta[📊 Meta-Analysis]:::tool
     end
+
+    %% --- THE MEMORY LAYER (The Vault) ---
+    subgraph "The Triple-Vault Memory"
+        Atomic[Atomic Facts DB]:::memory
+        Episodic[Episodic Logs]:::memory
+        Artifacts[Parquet/Blob Store]:::memory
+    end
+
+    %% --- CONNECTIONS ---
+    Orchestrator <--> Scraper
+    Orchestrator <--> Analyst
+    Divergence <--> Atomic
+    Scraper --> Artifacts
+    Analyst --> Artifacts
 ```
 
-### 1. The Orchestrator (The Brain)
-*   **Stack:** Python, FastAPI, LangGraph, LiteLLM.
-*   **Role:** Receives queries, decomposes them into a DAG (Directed Acyclic Graph) of tasks, and manages the state.
-*   **Logic:** Decides *which* tool service to call based on OpenAPI specifications. Handles the "Consensus Loop" where critic agents review worker outputs.
+---
 
-### 2. The Tool Sandbox Service (The Muscle)
-*   **Stack:** Docker / E2B Sandbox, Pandas, Scikit-Learn.
-*   **Role:** Safely executes Python code generated by the Orchestrator in an isolated environment.
-*   **Capabilities:**
-    *   Dataframe manipulation (Filtering, Grouping, Correlation).
-    *   Financial calculation (ratios, growth rates).
-    *   Visualization generation (Plotly/Matplotlib).
+## 🚦 2. Pipeline Routing Logic
 
-### 3. The RAG Service (The Library)
-*   **Stack:** LlamaIndex, Qdrant/Weaviate, Cross-Encoders.
-*   **Role:** Domain-specific knowledge retrieval.
-*   **Pipeline:** Hybrid Search (Keyword + Vector) → Re-Ranking (Cohere/BGE) → Context Injection.
+Kea does not treat every query the same. It uses an **Intention Router** to determine the most efficient execution path.
+
+### Path A: The "Memory Fork" (Incremental Research)
+*   **Trigger:** User asks a question partially covered by previous research.
+*   **Logic:**
+    1.  **Introspection:** The Planner decomposes the query into atomic facts ($A, B, C$).
+    2.  **Vector Lookup:** Checks `Atomic Facts DB` for $A, B, C$.
+    3.  **Gap Analysis:**
+        *   Found $A$ (Confidence > 0.9).
+        *   Missing $B, C$.
+    4.  **Delta Plan:** The system generates a research task *only* for $B$ and $C$, ignoring $A$.
+*   **Outcome:** 50-80% reduction in API costs and latency.
+
+### Path B: The "Shadow Lab" (Re-Calculation)
+*   **Trigger:** User asks to modify a parameter of a previous result (e.g., "What if growth is 10% instead of 5%?").
+*   **Logic:**
+    1.  **Artifact Retrieval:** The system retrieves the clean `data.parquet` file from the `Artifacts Store` (S3/HuggingFace).
+    2.  **Code Injection:** The system sends the data + the new parameter to the **Python Sandbox**.
+    3.  **Execution:** Python recalculates the specific formula.
+*   **Outcome:** Instant answer with zero new web scraping.
+
+### Path C: The "Grand Synthesis" (Meta-Analysis)
+*   **Trigger:** User asks to combine multiple research jobs (e.g., "Combine the Market Study and the Regulatory Study").
+*   **Logic:**
+    1.  **Librarian Fetch:** Retrieves `Job_ID_1` and `Job_ID_2` from the Manifest.
+    2.  **Schema Alignment:** The **Analyst Agent** writes Python code to normalize columns (e.g., mapping `revenue_usd` to `rev_global`).
+    3.  **Fusion:** Executes a `pd.concat` or merge operation.
+    4.  **Conflict Check:** The **Divergence Engine** highlights where Job 1 contradicts Job 2.
 
 ---
 
-## ⚙️ The "Funnel" Workflow
+## 🧬 3. Sub-Architectures (The "How-To")
 
-The system utilizes a 3-stage funnel to optimize for cost and accuracy:
-
-1.  **Phase 1: Broad Screening (Code-Heavy)**
-    *   *Action:* Python scripts fetch broad datasets (e.g., 2,000 tickers or 500 legal cases).
-    *   *Filtering:* Hard-coded filters (e.g., `PBV < 1.0` or `Year > 2020`) reduce the list to ~50 candidates.
-    *   *No LLM:* This phase is purely deterministic to save tokens.
-
-2.  **Phase 2: Deep Dive (Agent-Heavy)**
-    *   *Action:* The 50 candidates are split into batches (e.g., 5 concurrent agents).
-    *   *Parallelism:* Agents trigger sub-routines: News Search + Financial Extraction + Risk Analysis.
-    *   *Throttling:* `asyncio.Semaphore` ensures external API rate limits are respected.
-
-3.  **Phase 3: Synthesis & Consensus (Reasoning-Heavy)**
-    *   *Action:* Aggregated reports are passed to a "Critic" agent.
-    *   *Loop:* If data is missing or contradictory, the Critic rejects the state, triggering a targeted re-fetch loop.
-    *   *Final Output:* HTML report generation.
-
----
-
-### 🧩 System Architecture Diagram
+### A. The "Keeper" Protocol (Context Immune System)
+*Goal: To prevent the "Rabbit Hole" effect and hallucinations.*
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#252a34', 'edgeLabelBackground':'#ffffff', 'tertiaryColor': '#f5f5f5'}}}%%
+sequenceDiagram
+    participant Scraper as Robotic Scraper
+    participant Quarantine as Quarantine Zone
+    participant Keeper as The Keeper
+    participant Brain as Orchestrator
 
-graph TD
-    %% --- STYLE DEFINITIONS ---
-    classDef client fill:#ff6b6b,stroke:#333,stroke-width:2px,color:white;
-    classDef gateway fill:#4ecdc4,stroke:#333,stroke-width:2px,color:white;
-    classDef orchestrator fill:#45b7d1,stroke:#333,stroke-width:2px,color:white;
-    classDef compute fill:#96ceb4,stroke:#333,stroke-width:2px,color:#333;
-    classDef rag fill:#ffbe76,stroke:#333,stroke-width:2px,color:#333;
-    classDef database fill:#2d3436,stroke:#333,stroke-width:2px,color:white,shape:cylinder;
-    classDef external fill:#dfe6e9,stroke:#333,stroke-width:1px,color:#333,stroke-dasharray: 5 5;
-
-    %% --- 1. CLIENT LAYER ---
-    subgraph Clients ["📡 Client / Trigger Layer"]
-        UI["💻 Web Dashboard"]:::client
-        API_C["🔌 API Consumer"]:::client
-        Cron["⏰ Scheduled Cron"]:::client
-    end
-
-    %% --- 2. GATEWAY LAYER ---
-    subgraph Gateway ["🛡️ API Gateway & Load Balancer"]
-        Nginx["NGINX / Kong Gateway"]:::gateway
-        Auth["🔐 Auth Service (JWT/OAuth)"]:::gateway
-    end
-
-    UI --> Nginx
-    API_C --> Nginx
-    Cron --> Nginx
-    Nginx -.->|Validate Token| Auth
-
-    %% --- 3. ORCHESTRATION SERVICE (THE BRAIN) ---
-    subgraph Orchestrator_Cluster ["🧠 Core Orchestration Service (LangGraph)"]
-        direction TB
-        
-        API_Orch["FastAPI Endpoint"]:::orchestrator
-        
-        subgraph Graph_Logic ["State Machine (DAG)"]
-            Planner["📝 Planner Node"]:::orchestrator
-            Router["🔀 Dispatcher/Router"]:::orchestrator
-            
-            subgraph Consensus_Loop ["🔄 Consensus Sub-Architecture"]
-                Critic["🧐 Critic / Judge"]:::orchestrator
-                Verifier["✅ Fact Checker"]:::orchestrator
-            end
-            
-            Writer["✍️ Report Generator"]:::orchestrator
-        end
-        
-        Checkpointer["💾 State Manager (Async)"]:::orchestrator
-    end
-
-    Nginx ==>|/research/trigger| API_Orch
-    API_Orch --> Planner
-    Planner --> Router
-    
-    %% FEEDBACK LOOPS
-    Critic --"Reject (Contradiction)"--> Router
-    Verifier --"Failed Verification"--> Router
-    Critic --"Approved"--> Writer
-
-    %% --- 4. DOMAIN AGENT SERVICES ---
-    subgraph Agents ["🕵️ Specialized Agent Services"]
-        direction LR
-        
-        subgraph Fin_Agent ["Finance Agent"]
-            Fin_Logic["market_analyst.py"]:::compute
-        end
-        
-        subgraph Legal_Agent ["Legal Agent"]
-            Leg_Logic["legal_researcher.py"]:::compute
-        end
-        
-        subgraph Web_Agent ["Deep Web Agent"]
-            Scraper_Logic["scrapper.py"]:::compute
+    Scraper->>Quarantine: Ingest Raw Text (Chunked)
+    loop Every Chunk
+        Quarantine->>Keeper: Send Vector(Chunk)
+        Keeper->>Keeper: Calc Cosine Similarity(User_Intent, Chunk)
+        alt Similarity < 0.75 (Drift Detected)
+            Keeper-->>Quarantine: 🔥 INCINERATE (Ignore)
+        else Similarity > 0.75
+            Keeper->>Brain: Release to Context
         end
     end
-
-    Router == "gRPC/REST" ==> Fin_Agent
-    Router == "gRPC/REST" ==> Legal_Agent
-    Router == "gRPC/REST" ==> Web_Agent
-
-    %% --- 5. TOOL SANDBOX (THE MUSCLE) ---
-    subgraph Sandbox_Cluster ["🛠️ Tool Sandbox Service (E2B / Docker)"]
-        direction TB
-        
-        Code_Runner["🐍 Python REPL (Isolated)"]:::compute
-        
-        subgraph Data_Science_Stack ["libs"]
-            Pandas["Pandas/Polars"]:::compute
-            Scikit["Scikit-Learn"]:::compute
-            Matplot["Plotly/Matplotlib"]:::compute
-        end
-        
-        DuckDB[("🦆 DuckDB - In-Memory OLAP")]:::database
-    end
-
-    Fin_Agent -.->|Exec Code| Code_Runner
-    Web_Agent -.->|Exec Scraper| Code_Runner
-    Code_Runner --> Pandas
-    Pandas --> DuckDB
-
-    %% --- 6. RAG & KNOWLEDGE LAYER ---
-    subgraph RAG_System ["📚 Universal RAG Service"]
-        direction TB
-        
-        Ingest["📥 Ingestion Pipeline"]:::rag
-        Retriever["🔎 Hybrid Search"]:::rag
-        Reranker["⚖️ Cross-Encoder Rerank"]:::rag
-        
-        subgraph Embed_Models ["Model Serving"]
-            BiEnc["Bi-Encoder Model"]:::rag
-        end
-    end
-
-    Legal_Agent -.->|Query| Retriever
-    Retriever --> BiEnc
-    Retriever --> Reranker
-
-    %% --- 7. PERSISTENCE LAYER ---
-    subgraph Persistence ["💾 Data Persistence Layer"]
-        Postgres[("🐘 PostgreSQL<br>Graph State & Users")]:::database
-        VectorDB[("💠 Qdrant/Weaviate<br>Vector Store")]:::database
-        Redis[("⚡ Redis<br>Queue & Cache")]:::database
-        S3[("📦 S3 / MinIO<br>Artifact Store")]:::database
-    end
-
-    Checkpointer --> Postgres
-    RAG_System --> VectorDB
-    API_Orch --> Redis
-    Writer --> S3
-
-    %% --- 8. EXTERNAL APIS ---
-    subgraph External_World ["☁️ External World"]
-        LLM_Prov["🤖 LLM Providers<br>(OpenAI/Gemini/Anthropic)"]:::external
-        Search_API["🌍 Search APIs<br>(Tavily/Serp)"]:::external
-        Fin_API["📈 Financial Data<br>(YFinance/OpenBB)"]:::external
-    end
-
-    Planner -.->|Inference| LLM_Prov
-    Fin_Agent -.-> Fin_API
-    Web_Agent -.-> Search_API
-    
 ```
 
-### 🔍 Architectural Explanation
+### B. The "Divergence Engine" (Abductive Reasoning)
+*Goal: To investigate why data doesn't match expectations.*
 
-This diagram is broken down into **Sub-Architectures** to show depth:
+```mermaid
+graph LR
+    Hypothesis(Expected: Revenue UP) --Collision--> Reality(Observed: Revenue DOWN)
+    Reality --> Trigger{Divergence Type?}
+    
+    Trigger --"Numbers Wrong?"--> AgentA[Data Scientist: Normalize Units]
+    Trigger --"Missing Factor?"--> AgentB[News Scout: Find Disruptions]
+    Trigger --"Bias?"--> AgentC[Judge: Check Source Credibility]
+    
+    AgentA --> Synthesis
+    AgentB --> Synthesis
+    AgentC --> Synthesis
+    Synthesis --> FinalReport[Explained Contradiction]
+```
 
-1.  **The Orchestration Cluster (The Brain):**
-    *   Unlike simple scripts, this is a **State Machine**.
-    *   **The Loop:** Notice the arrows from `Critic` back to `Router`. This represents the **Self-Correction** capability. If the data isn't good enough, the system loops back and tries again automatically.
-    *   **Planner:** Breaks user input into atomic sub-tasks.
-
-2.  **The Agent Layer (The Specialists):**
-    *   These are decoupled Microservices. The `Finance Agent` is separate from the `Legal Agent`.
-    *   This allows you to update the Financial logic without breaking the Legal logic.
-
-3.  **The Tool Sandbox Service (The Muscle):**
-    *   This is the most "Advanced" part. It is an **Isolated Sandbox** (Docker/E2B).
-    *   **DuckDB Integration:** Agents don't just "read" text. They dump raw CSV/JSON data into an in-memory DuckDB instance to run SQL queries and complex Pandas aggregations. Use of DuckDB here is primarily for fast, in-process analytical queries on transient data, separate from the long-term persistence layer.
-
-4.  **The RAG System (The Library):**
-    *   Shows a full pipeline: `Ingest` → `Hybrid Search` → `Bi-Encoder` → `Reranker`.
-    *   This ensures high precision (Context Filtering) before data ever hits the LLM.
-
-5.  **Data Persistence:**
-    *   **PostgreSQL:** Saves the *thinking process* (LangGraph Checkpoints). You can pause a research job and resume it 2 days later.
-    *   **S3/MinIO:** Stores the heavy artifacts (PDFs, Generated HTML Reports, Charts).
-    *   **Redis:** Handles the message queue for long-running jobs (to prevent HTTP timeouts).
-  
 ---
-## 🛠 Tech Stack
 
-| Component | Technology | Reasoning |
+## 🛠️ Technology Stack
+
+| Component | Tech | Role |
 | :--- | :--- | :--- |
-| **Language** | Python 3.11+ | Native support for AI & Data Science libraries. |
-| **API Framework** | FastAPI | High-performance, async support, auto-OpenAPI generation. |
-| **Orchestration** | LangGraph | Supports cyclic graphs and fine-grained state control. |
-| **LLM Interface** | LiteLLM | Unified interface for OpenAI, Anthropic, Gemini, & Local LLMs. |
-| **Vector DB** | Qdrant / Weaviate | High-speed semantic search. |
-| **Analytical DB** | DuckDB | In-process SQL OLAP database for handling agent-generated datasets. |
-| **Search/Scraping** | Tavily / Firecrawl | LLM-optimized web data extraction. |
-| **State DB** | PostgreSQL | Persistence for long-running graph threads. |
-| **Containerization** | Docker Compose | Microservices orchestration. |
+| **Orchestrator** | **Python / LangGraph** | Cyclic state management and consensus loops. |
+| **API Interface** | **FastAPI** | Asynchronous microservice communication. |
+| **Analysis** | **Pandas / DuckDB** | In-memory SQL/Dataframe manipulation for "Shadow Lab". |
+| **Memory** | **Qdrant + GraphRAG** | Storage of atomic facts and their relationships. |
+| **Storage** | **Parquet / S3** | Efficient storage of "Artifacts" (Raw DataFrames). |
+| **Isolation** | **Docker / E2B** | Sandboxed code execution environment. |
+| **Browser** | **Playwright** | Headless, stealthy web scraping with vision capabilities. |
 
 ---
 
-## ⚡ Minimum Spec Execution Strategies
+**[End of Part 1]**
 
-To run this high-throughput architecture on limited hardware (e.g., standard laptops with 8GB-16GB RAM, no dedicated GPU), follow these configuration strategies:
-
-### 1. Cloud-First Inference
-Avoid running local LLMs (like Llama-3-8b or Mistral). They consume significant RAM/VRAM.
-*   **Strategy:** Configure `.env` to use exclusively cloud providers (OpenAI, Gemini, Anthropic) via LiteLLM.
-*   **Benefit:** Offloads the heaviest computation (Generation & Reasoning) to the cloud.
-
-### 2. Lightweight Vector Store
-*   **Strategy:** Use **Qdrant** in `disk` mode (memory mapping) rather than full in-memory mode, or limit its container resource usage. Alternatively, use **ChromaDB** as a lighter-weight dev alternative if strictly necessary, though Qdrant is efficient.
-*   **Docker Config:** Set `mem_limit: 512m` for the Vector DB container.
-
-### 3. Database Optimizations
-*   **PostgreSQL:** For local dev, a standard Postgres instance is fine, but you can turn off heavy logging or use **SQLite** (if supported by the specific persistence adapter) for extremely resource-constrained environments. *Recommendation: Stick to a lean Postgres container.*
-*   **DuckDB:** Being in-process, this is already highly optimized. Ensure broad datasets fetched are capped (e.g., limit fetching 1000s of rows if RAM is tight).
-
-### 4. Concurrency Limiting
-Deep research tends to spawn multiple parallel agents.
-*   **Strategy:** Limit `MAX_CONCURRENT_AGENTS=1` or `2` in your environment variables.
-*   **Benefit:** Prevents the system from overwhelming your CPU/Network with too many concurrent Docker container spins or async tasks.
-
-### 5. Sandbox Management
-*   **Strategy:** Use **E2B** (Cloud Sandbox) instead of local Docker-in-Docker containers for the Tool Sandbox.
-*   **Benefit:** Running code execution containers locally consumes significant overhead. E2B runs this in their cloud, saving your local machine resources.
-
----
-
-## 🚀 Setup & Installation
-
-### Prerequisites
-*   Docker & Docker Compose
-*   Python 3.11+
-*   PostgreSQL (optional for local dev, required for prod)
-
-### 1. Clone & Environment
-```bash
-git clone https://github.com/your-username/repo-name.git
-cd repo-name
-cp .env.example .env
-```
-
-### 2. Configuration (`.env`)
-Fill in the required API keys. The system supports multi-provider routing.
-```ini
-# LLM Providers
-OPENAI_API_KEY=sk-...
-GEMINI_API_KEY=...
-ANTHROPIC_API_KEY=...
-
-# Search & Tools
-TAVILY_API_KEY=tvly-...
-FIRECRAWL_API_KEY=fc-...
-
-# Database
-POSTGRES_URI=postgresql://user:pass@localhost:5432/agent_db
-QDRANT_URL=http://localhost:6333
-```
-
-### 3. Run Microservices (Docker)
-```bash
-docker-compose up --build -d
-```
-This spins up:
-*   `orchestrator-service` (Port 8000)
-*   `rag-service` (Port 8001)
-*   `tool-sandbox` (Port 8002)
-*   `db-postgres` (Port 5432)
-*   `db-qdrant` (Port 6333)
-
----
-
-## 🔌 API Usage
-
-The system exposes a RESTful API via FastAPI.
-
-### Trigger Deep Research
-**Endpoint:** `POST /api/v1/research/trigger`
-
-```json
-{
-  "query": "Identify top 10 Indonesian mining companies with high export volume.",
-  "domain": "finance",
-  "depth": "deep",
-  "config": {
-    "max_concurrent_agents": 3,
-    "require_quantitative_analysis": true,
-    "output_format": "html"
-  }
-}
-```
-
-### Check Status (Long Polling)
-**Endpoint:** `GET /api/v1/research/status/{thread_id}`
-
-```json
-{
-  "thread_id": "550e8400-e29b...",
-  "status": "processing",
-  "current_step": "financial_analysis_agent",
-  "completed_steps": ["planner", "screener", "data_collection"],
-  "artifacts": {
-    "candidates_csv": "s3://bucket/data/candidates.csv"
-  }
-}
-```
-
----
-
-## 📂 Project Structure
-
-```text
-├── services/
-│   ├── orchestrator/       # Main LangGraph Logic
-│   │   ├── agents/         # Planner, Critic, Writer definitions
-│   │   ├── graph.py        # Node & Edge definitions
-│   │   └── main.py         # FastAPI entry point
-│   ├── rag_service/        # Embedding & Retrieval Logic
-│   │   └── ingestion.py    # PDF/Text ingestion pipelines
-│   └── tool_sandbox/       # Python REPL & Sandbox
-│       └── tools.py        # Pandas/Scikit scripts
-├── shared/                 # Shared Pydantic models & Utils
-├── docker-compose.yml
-└── README.md
-```
-
-## 🗺 Roadmap
-
-*   [x] Core Microservices Architecture
-*   [x] LangGraph Implementation (Cyclic)
-*   [x] DuckDB Integration for Agent Analytics
-*   [ ] **Model Context Protocol (MCP)** Implementation for IDE integration.
-*   [ ] **Multimodal Agents:** Adding Whisper (Audio) and Vision processing nodes.
-*   [ ] **Human-in-the-Loop:** UI for pausing execution and manual approval of "Consensus" steps.
-
-## 🤝 Contribution
-
-1.  Fork the repository.
-2.  Create a feature branch (`git checkout -b feature/amazing-feature`).
-3.  Commit your changes (`git commit -m 'Add some amazing feature'`).
-4.  Push to the branch (`git push origin feature/amazing-feature`).
-5.  Open a Pull Request.
-
-## 📄 License
-
-Distributed under the MIT License. See `LICENSE` for more information.
+*Do you want me to proceed to **Part 2: The Workflow Details**, where we detail the exact prompt engineering logic for the "System Prompt Definer" and the "Consensus Loop"?*
