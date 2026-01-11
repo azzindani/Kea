@@ -10,7 +10,7 @@ Complete test documentation for running all tests.
 
 ```bash
 # Install all dependencies
-pip install pydantic httpx pandas numpy scikit-learn yfinance plotly matplotlib seaborn beautifulsoup4 pymupdf python-docx openpyxl pytest pytest-asyncio
+pip install pydantic httpx pandas numpy scikit-learn yfinance plotly matplotlib seaborn beautifulsoup4 pymupdf python-docx openpyxl pytest pytest-asyncio pytest-timeout
 ```
 
 ### Run All Tests
