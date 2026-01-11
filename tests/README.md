@@ -1,242 +1,275 @@
-# 🧪 Kea Research Engine Test Suite
+# 🧪 Kea Research Engine - Test Suite
 
-Complete test suite with **17 MCP servers** and **87 tools**.
-
----
-
-## 📊 Quick Summary
-
-| Metric | Count |
-|--------|:-----:|
-| MCP Servers | 17 |
-| Total Tools | 87 |
-| Unit Tests | 35+ |
-| Simulation Tests | 40+ |
-| Workflow Tests | 5 |
+Complete test documentation for running all tests.
 
 ---
 
-## 🚀 Quick Start
+## � Quick Start
+
+### Prerequisites
 
 ```bash
-# Install dependencies
-pip install pydantic httpx pandas numpy scikit-learn yfinance plotly beautifulsoup4 pytest pytest-asyncio
+# Install all dependencies
+pip install pydantic httpx pandas numpy scikit-learn yfinance plotly matplotlib seaborn beautifulsoup4 pymupdf python-docx openpyxl pytest pytest-asyncio
+```
 
-# Run standalone simulation (easiest - no pytest needed)
-python tests/simulation/run_simulation.py
+### Run All Tests
 
-# Run unit tests (no API)
-pytest tests/unit -v
+```bash
+# Navigate to project root
+cd d:\Antigravity\Kea
 
-# Run simulation tests
-pytest tests/simulation -v
+# Run everything
+pytest tests -v
 ```
 
 ---
 
-## 📁 Test Directory Structure
+## 📋 Test Categories
+
+| Category | Path | Description | Requires API |
+|----------|------|-------------|:------------:|
+| Unit | `tests/unit/` | Core functionality tests | ❌ |
+| Simulation | `tests/simulation/` | Real API calls | ✅ Internet |
+| Integration | `tests/integration/` | Full API endpoints | ✅ API Server |
+| MCP | `tests/mcp/` | MCP protocol tests | ❌ |
+| Stress | `tests/stress/` | Load testing | ✅ API Server |
+
+---
+
+## � How to Run Each Test Type
+
+### 1. Unit Tests (No API Required)
+
+```bash
+# Run all unit tests
+pytest tests/unit -v
+
+# Run with short traceback
+pytest tests/unit -v --tb=short
+
+# Stop on first failure
+pytest tests/unit -v -x
+
+# Run specific test file
+pytest tests/unit/test_schemas.py -v
+
+# Run specific test class
+pytest tests/unit/test_new_servers.py::TestDataSourcesServer -v
+
+# Run specific test function
+pytest tests/unit/test_new_servers.py::TestDataSourcesServer::test_init -v
+```
+
+**Unit test files:**
+- `test_schemas.py` - Schema validation
+- `test_config.py` - Configuration
+- `test_mcp_protocol.py` - MCP protocol
+- `test_vector_store.py` - Vector storage
+- `test_graph_rag.py` - Graph RAG
+- `test_embedding.py` - Embeddings
+- `test_scraper_tools.py` - Scraper tools
+- `test_search_tools.py` - Search tools
+- `test_python_tools.py` - Python tools
+- `test_analysis_server.py` - Analysis server
+- `test_vision_tools.py` - Vision tools
+- `test_logging_detailed.py` - Logging
+- `test_new_servers.py` - Phase 1 servers
+- `test_phase2_servers.py` - Phase 2 servers
+- `test_phase3_servers.py` - Phase 3 servers
+- `test_phase4_servers.py` - Phase 4 servers
+
+---
+
+### 2. Simulation Tests (Requires Internet)
+
+These tests make real API calls to external services (arXiv, PubMed, PyPI, etc.)
+
+```bash
+# OPTION A: Standalone script (EASIEST - no pytest needed)
+python tests/simulation/run_simulation.py
+
+# OPTION B: Run all simulation tests with pytest
+pytest tests/simulation -v
+
+# Run specific simulation file
+pytest tests/simulation/test_new_servers_simulation.py -v
+
+# Run workflow tests only
+pytest tests/simulation/test_workflow_simulation.py -v
+
+# Run tests for specific server
+pytest tests/simulation/test_new_servers_simulation.py -k "academic" -v
+pytest tests/simulation/test_new_servers_simulation.py -k "security" -v
+pytest tests/simulation/test_new_servers_simulation.py -k "ml" -v
+```
+
+**Simulation test files:**
+- `run_simulation.py` - Standalone runner (no pytest)
+- `test_new_servers_simulation.py` - All 12 new servers
+- `test_workflow_simulation.py` - End-to-end workflows
+- `test_research_simulation.py` - Research flow tests
+
+---
+
+### 3. Integration Tests (Requires API Server)
+
+```bash
+# Terminal 1: Start API server
+python -m services.api_gateway.main
+
+# Terminal 2: Run integration tests
+pytest tests/integration -v
+```
+
+---
+
+### 4. Run by Server/Feature
+
+```bash
+# Data sources
+pytest tests -k "data_sources" -v
+
+# Analytics
+pytest tests -k "analytics" -v
+
+# ML
+pytest tests -k "ml" -v
+
+# Academic sources
+pytest tests -k "academic" -v
+
+# Security
+pytest tests -k "security" -v
+
+# Qualitative analysis
+pytest tests -k "qualitative" -v
+
+# Tool discovery
+pytest tests -k "tool_discovery" -v
+```
+
+---
+
+## 📊 Complete Test Commands
+
+| What to Test | Command |
+|:-------------|:--------|
+| **Everything** | `pytest tests -v` |
+| **Unit only** | `pytest tests/unit -v` |
+| **Simulations only** | `pytest tests/simulation -v` |
+| **Standalone simulation** | `python tests/simulation/run_simulation.py` |
+| **Quick check** | `pytest tests/unit -v -x` |
+| **With coverage** | `pytest tests --cov=mcp_servers --cov=shared` |
+| **Verbose output** | `pytest tests -v --tb=long` |
+| **Show print output** | `pytest tests -v -s` |
+
+---
+
+## 📁 Directory Structure
 
 ```
 tests/
-├── unit/                              # Unit tests (no API)
-│   ├── test_schemas.py                # Schema validation
-│   ├── test_config.py                 # Configuration
-│   ├── test_mcp_protocol.py           # MCP protocol
-│   ├── test_vector_store.py           # Vector storage
-│   ├── test_graph_rag.py              # Graph RAG
-│   ├── test_embedding.py              # Embeddings
-│   ├── test_scraper_tools.py          # Scraper tools
-│   ├── test_search_tools.py           # Search tools
-│   ├── test_python_tools.py           # Python tools
-│   ├── test_analysis_server.py        # Analysis server
-│   ├── test_vision_tools.py           # Vision tools
-│   ├── test_logging_detailed.py       # Logging
-│   ├── test_new_servers.py            # Phase 1 servers
-│   ├── test_phase2_servers.py         # Phase 2 servers
-│   ├── test_phase3_servers.py         # Phase 3 servers
-│   └── test_phase4_servers.py         # Phase 4 servers
+├── unit/                              # Unit tests (offline)
+│   ├── test_schemas.py
+│   ├── test_config.py
+│   ├── test_mcp_protocol.py
+│   ├── test_vector_store.py
+│   ├── test_graph_rag.py
+│   ├── test_embedding.py
+│   ├── test_scraper_tools.py
+│   ├── test_search_tools.py
+│   ├── test_python_tools.py
+│   ├── test_analysis_server.py
+│   ├── test_vision_tools.py
+│   ├── test_logging_detailed.py
+│   ├── test_new_servers.py           # Phase 1
+│   ├── test_phase2_servers.py        # Phase 2
+│   ├── test_phase3_servers.py        # Phase 3
+│   └── test_phase4_servers.py        # Phase 4
 │
-├── simulation/                         # Real API simulation tests
-│   ├── run_simulation.py              # Standalone runner (no pytest)
-│   ├── test_new_servers_simulation.py # All server simulations
-│   ├── test_workflow_simulation.py    # E2E workflows
-│   └── test_research_simulation.py    # Research flows
+├── simulation/                        # Real API tests
+│   ├── run_simulation.py             # Standalone (no pytest)
+│   ├── test_new_servers_simulation.py
+│   ├── test_workflow_simulation.py
+│   └── test_research_simulation.py
 │
-├── integration/                        # API integration tests
-│   └── test_e2e.py                    # End-to-end API tests
+├── integration/                       # API integration
+│   └── test_e2e.py
 │
-├── mcp/                               # MCP-specific tests
+├── mcp/                              # MCP protocol
 │   └── ...
 │
-├── stress/                            # Stress/load tests
+├── stress/                           # Load testing
 │   └── ...
 │
-└── README.md                          # This file
+└── README.md                         # This file
 ```
-
----
-
-## 📦 MCP Server Test Coverage
-
-### Original Servers (5 servers, 14 tools)
-| Server | Tools | Unit Test | Simulation |
-|--------|:-----:|:---------:|:----------:|
-| scraper_server | 3 | ✅ | ✅ |
-| search_server | 3 | ✅ | ✅ |
-| python_server | 3 | ✅ | ✅ |
-| analysis_server | 2 | ✅ | ✅ |
-| vision_server | 3 | ✅ | ✅ |
-
-### Phase 1: Data & ML (6 servers, 29 tools)
-| Server | Tools | Unit Test | Simulation |
-|--------|:-----:|:---------:|:----------:|
-| data_sources_server | 4 | ✅ | ✅ |
-| analytics_server | 6 | ✅ | ✅ |
-| crawler_server | 5 | ✅ | ✅ |
-| ml_server | 5 | ✅ | ✅ |
-| visualization_server | 4 | ✅ | ✅ |
-| document_server | 5 | ✅ | ✅ |
-
-### Phase 2: Research (3 servers, 18 tools)
-| Server | Tools | Unit Test | Simulation |
-|--------|:-----:|:---------:|:----------:|
-| academic_server | 6 | ✅ | ✅ |
-| regulatory_server | 6 | ✅ | ✅ |
-| browser_agent_server | 6 | ✅ | ✅ |
-
-### Phase 3: Qualitative/Security (2 servers, 16 tools)
-| Server | Tools | Unit Test | Simulation |
-|--------|:-----:|:---------:|:----------:|
-| qualitative_server | 10 | ✅ | ✅ |
-| security_server | 6 | ✅ | ✅ |
-
-### Phase 4: Tool Discovery (1 server, 10 tools)
-| Server | Tools | Unit Test | Simulation |
-|--------|:-----:|:---------:|:----------:|
-| tool_discovery_server | 10 | ✅ | ✅ |
-
----
-
-## 🔬 Simulation Tests Detail
-
-### `run_simulation.py` - Standalone Script
-Run all simulations without pytest:
-```bash
-python tests/simulation/run_simulation.py
-```
-
-Tests included:
-- CSV fetch with real data
-- Yahoo Finance stock data
-- EDA on diabetes dataset
-- Correlation matrix
-- ML clustering
-- Anomaly detection
-- arXiv paper search
-- PubMed search
-- Link extraction
-- Source validation
-- Entity extraction
-- Fact triangulation
-- URL scanning
-- Content sanitization
-- Code safety check
-- PyPI search
-- Package evaluation
-- MCP stub generation
-
-### `test_new_servers_simulation.py` - Pytest
-```bash
-pytest tests/simulation/test_new_servers_simulation.py -v
-```
-
-Classes:
-- `TestDataSourcesSimulation` - CSV, yfinance
-- `TestAnalyticsSimulation` - EDA, correlation, cleaning
-- `TestMLSimulation` - AutoML, clustering, anomaly
-- `TestCrawlerSimulation` - Links, sitemap
-- `TestAcademicSimulation` - arXiv, PubMed, Semantic Scholar
-- `TestRegulatorySimulation` - Federal Register, EDGAR
-- `TestBrowserAgentSimulation` - Validation, search
-- `TestQualitativeSimulation` - Entities, triangulation, graph
-- `TestSecuritySimulation` - URL scan, sanitize, code check
-- `TestToolDiscoverySimulation` - PyPI, evaluate, stub
-
-### `test_workflow_simulation.py` - E2E Workflows
-```bash
-pytest tests/simulation/test_workflow_simulation.py -v
-```
-
-Workflows:
-1. **Financial Research** - Stock data → EDA → Academic papers
-2. **Medical Research** - PubMed → Dataset → ML model
-3. **Investigative Research** - Entity extraction → Graph → Triangulation
-4. **Tool Discovery** - Search → Evaluate → Generate stub
-5. **Data Pipeline** - Fetch → Clean → Analyze → Model
 
 ---
 
 ## 🧪 Sample Data URLs
 
+The simulation tests use these real CSV files:
+
 ```python
 SAMPLE_URLS = {
-    "adidas": "https://raw.githubusercontent.com/azzindani/00_Data_Source/refs/heads/main/Adidas_US_Sales.csv",
+    "adidas_sales": "https://raw.githubusercontent.com/azzindani/00_Data_Source/refs/heads/main/Adidas_US_Sales.csv",
     "diabetes": "https://raw.githubusercontent.com/azzindani/00_Data_Source/refs/heads/main/Diabetes_Indicators.csv",
     "churn": "https://raw.githubusercontent.com/azzindani/00_Data_Source/refs/heads/main/Ecommerce_Customer_Churn.csv",
     "bike_sales": "https://raw.githubusercontent.com/azzindani/00_Data_Source/refs/heads/main/Europe_Bike_Sales.csv",
-    "property": "https://raw.githubusercontent.com/azzindani/00_Data_Source/refs/heads/main/NYC_Property_Sales.csv",
-    "loan": "https://raw.githubusercontent.com/azzindani/00_Data_Source/refs/heads/main/Loan_Default.csv",
 }
 ```
 
 ---
 
-## ✅ Run Commands
+## 📦 MCP Servers Tested
 
-| Purpose | Command |
-|:--------|:--------|
-| Standalone simulation | `python tests/simulation/run_simulation.py` |
-| Quick unit tests | `pytest tests/unit -v -x` |
-| All simulations | `pytest tests/simulation -v` |
-| Specific server | `pytest tests/simulation -k "academic" -v` |
-| Full suite | `pytest tests -v --tb=short` |
-| With coverage | `pytest tests --cov=mcp_servers --cov=shared` |
-| Workflows only | `pytest tests/simulation/test_workflow_simulation.py -v` |
+| Phase | Server | Tools | Test File |
+|:------|:-------|:-----:|:----------|
+| Original | scraper_server | 3 | test_scraper_tools.py |
+| Original | search_server | 3 | test_search_tools.py |
+| Original | python_server | 3 | test_python_tools.py |
+| Original | analysis_server | 2 | test_analysis_server.py |
+| Original | vision_server | 3 | test_vision_tools.py |
+| Phase 1 | data_sources_server | 4 | test_new_servers.py |
+| Phase 1 | analytics_server | 6 | test_new_servers.py |
+| Phase 1 | crawler_server | 5 | test_new_servers.py |
+| Phase 1 | ml_server | 5 | test_new_servers.py |
+| Phase 1 | visualization_server | 4 | test_new_servers.py |
+| Phase 1 | document_server | 5 | test_new_servers.py |
+| Phase 2 | academic_server | 6 | test_phase2_servers.py |
+| Phase 2 | regulatory_server | 6 | test_phase2_servers.py |
+| Phase 2 | browser_agent_server | 6 | test_phase2_servers.py |
+| Phase 3 | qualitative_server | 10 | test_phase3_servers.py |
+| Phase 3 | security_server | 6 | test_phase3_servers.py |
+| Phase 4 | tool_discovery_server | 10 | test_phase4_servers.py |
+
+**Total: 17 servers, 87 tools**
 
 ---
 
-## 📋 Dependencies
+## ⚠️ Troubleshooting
 
+### Missing module error
 ```bash
-# Core
-pip install pydantic httpx pandas numpy
+pip install <module_name>
+```
 
-# ML
-pip install scikit-learn
-
-# Data Sources
-pip install yfinance
-
-# Visualization
-pip install plotly matplotlib seaborn
-
-# Document Parsing
-pip install beautifulsoup4 pymupdf python-docx openpyxl
-
-# Testing
+### pytest not found
+```bash
 pip install pytest pytest-asyncio
 ```
 
----
+### Import errors
+```bash
+# Run from project root
+cd d:\Antigravity\Kea
+python -m pytest tests -v
+```
 
-## 🔧 Tool Categories Tested
-
-| Category | Tools | Sample Tests |
-|----------|:-----:|--------------|
-| Data Collection | 15 | CSV fetch, yfinance, FRED |
-| Analytics/ML | 17 | EDA, AutoML, clustering |
-| Documents | 10 | PDF, DOCX, HTML parsing |
-| Browsing | 6 | Source validation, search |
-| Qualitative | 10 | Entity extraction, graph |
-| Security | 6 | URL scan, code safety |
-| Discovery | 10 | PyPI search, stub gen |
+### Timeout on simulation tests
+Some API calls may be slow. Increase timeout:
+```bash
+pytest tests/simulation -v --timeout=120
+```
