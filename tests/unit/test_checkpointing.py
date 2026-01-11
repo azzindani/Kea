@@ -10,81 +10,86 @@ import pytest
 class TestCheckpointStore:
     """Tests for checkpoint store."""
     
-    def test_init_memory(self):
-        """Initialize in-memory store."""
+    @pytest.mark.asyncio
+    async def test_init_memory(self):
+        """Initialize checkpoint store with in-memory fallback."""
         from services.orchestrator.core.checkpointing import CheckpointStore
         
-        store = CheckpointStore(use_memory=True)
+        store = CheckpointStore()
+        # Don't call initialize() - it requires database
+        # Store should work without initialization (memory fallback)
         
         assert store is not None
     
     @pytest.mark.asyncio
     async def test_save_checkpoint(self):
-        """Save checkpoint."""
+        """Save checkpoint to store."""
         from services.orchestrator.core.checkpointing import CheckpointStore
         
-        store = CheckpointStore(use_memory=True)
+        store = CheckpointStore()
+        # Use in-memory by not initializing database
         
-        state = {
-            "job_id": "test-job",
-            "query": "Test query",
-            "status": "running",
-            "iteration": 2,
-        }
+        state = {"job_id": "test-job", "query": "test", "status": "running"}
         
-        checkpoint_id = await store.save("test-job", state)
+        await store.save("test-job", "router", state)
         
-        assert checkpoint_id is not None
+        # Verify save worked by loading
+        loaded = await store.load("test-job", "router")
+        assert loaded == state
     
     @pytest.mark.asyncio
     async def test_load_checkpoint(self):
-        """Load checkpoint."""
+        """Load checkpoint from store."""
         from services.orchestrator.core.checkpointing import CheckpointStore
         
-        store = CheckpointStore(use_memory=True)
+        store = CheckpointStore()
         
-        state = {"job_id": "load-test", "data": "test"}
-        await store.save("load-test", state)
+        state = {"iteration": 1, "facts": []}
+        await store.save("load-job", "planner", state)
         
-        loaded = await store.load("load-test")
+        loaded = await store.load("load-job", "planner")
         
         assert loaded is not None
-        assert loaded["job_id"] == "load-test"
+        assert loaded["iteration"] == 1
     
     @pytest.mark.asyncio
     async def test_load_nonexistent(self):
-        """Load nonexistent checkpoint returns None."""
+        """Load non-existent checkpoint returns None."""
         from services.orchestrator.core.checkpointing import CheckpointStore
         
-        store = CheckpointStore(use_memory=True)
+        store = CheckpointStore()
         
-        loaded = await store.load("nonexistent")
+        loaded = await store.load("nonexistent-job", "nonexistent-node")
         
         assert loaded is None
     
     @pytest.mark.asyncio
     async def test_delete_checkpoint(self):
-        """Delete checkpoint."""
+        """Delete job checkpoints."""
         from services.orchestrator.core.checkpointing import CheckpointStore
         
-        store = CheckpointStore(use_memory=True)
+        store = CheckpointStore()
         
-        await store.save("del-test", {"data": "value"})
-        await store.delete("del-test")
+        await store.save("del-job", "node1", {"data": "test"})
         
-        loaded = await store.load("del-test")
+        count = await store.delete_job_checkpoints("del-job")
         
+        assert count >= 1
+        
+        # Verify deleted
+        loaded = await store.load("del-job", "node1")
         assert loaded is None
 
 
 class TestCheckpointStoreFactory:
-    """Tests for factory function."""
+    """Tests for checkpoint store factory."""
     
-    def test_get_store(self):
-        """Get checkpoint store singleton."""
+    @pytest.mark.asyncio
+    async def test_get_store(self):
+        """Get global checkpoint store."""
         from services.orchestrator.core.checkpointing import get_checkpoint_store
         
-        store = get_checkpoint_store()
+        store = await get_checkpoint_store()
         
         assert store is not None
 

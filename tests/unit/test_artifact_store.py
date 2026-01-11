@@ -12,7 +12,7 @@ class TestLocalArtifactStore:
     
     @pytest.mark.asyncio
     async def test_save_artifact(self):
-        """Save artifact to store."""
+        """Save artifact to store using put()."""
         from services.rag_service.core.artifact_store import LocalArtifactStore, Artifact
         import tempfile
         
@@ -20,19 +20,18 @@ class TestLocalArtifactStore:
             store = LocalArtifactStore(base_path=tmpdir)
             
             artifact = Artifact(
-                id="art-001",
+                artifact_id="art-001",
                 name="test.txt",
                 content_type="text/plain",
-                data=b"Hello World",
             )
             
-            artifact_id = await store.save(artifact)
+            artifact_id = await store.put(artifact, b"Hello World")
             
             assert artifact_id == "art-001"
     
     @pytest.mark.asyncio
     async def test_load_artifact(self):
-        """Load artifact from store."""
+        """Load artifact from store using get()."""
         from services.rag_service.core.artifact_store import LocalArtifactStore, Artifact
         import tempfile
         
@@ -41,18 +40,18 @@ class TestLocalArtifactStore:
             
             # Save first
             artifact = Artifact(
-                id="art-load",
+                artifact_id="art-load",
                 name="data.bin",
                 content_type="application/octet-stream",
-                data=b"binary data",
             )
-            await store.save(artifact)
+            await store.put(artifact, b"binary data")
             
             # Load
-            loaded = await store.load("art-load")
+            result = await store.get("art-load")
             
-            assert loaded is not None
-            assert loaded.data == b"binary data"
+            assert result is not None
+            loaded_artifact, content = result
+            assert content == b"binary data"
     
     @pytest.mark.asyncio
     async def test_delete_artifact(self):
@@ -64,17 +63,16 @@ class TestLocalArtifactStore:
             store = LocalArtifactStore(base_path=tmpdir)
             
             artifact = Artifact(
-                id="art-del",
+                artifact_id="art-del",
                 name="to_delete.txt",
                 content_type="text/plain",
-                data=b"delete me",
             )
-            await store.save(artifact)
+            await store.put(artifact, b"delete me")
             
             await store.delete("art-del")
             
-            loaded = await store.load("art-del")
-            assert loaded is None
+            result = await store.get("art-del")
+            assert result is None
     
     @pytest.mark.asyncio
     async def test_list_artifacts(self):
@@ -85,8 +83,8 @@ class TestLocalArtifactStore:
         with tempfile.TemporaryDirectory() as tmpdir:
             store = LocalArtifactStore(base_path=tmpdir)
             
-            await store.save(Artifact(id="a1", name="a", content_type="t", data=b"1"))
-            await store.save(Artifact(id="a2", name="b", content_type="t", data=b"2"))
+            await store.put(Artifact(artifact_id="a1", name="a", content_type="t"), b"1")
+            await store.put(Artifact(artifact_id="a2", name="b", content_type="t"), b"2")
             
             artifacts = await store.list()
             

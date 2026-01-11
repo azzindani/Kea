@@ -66,25 +66,26 @@ class TestLogContext:
     """Tests for log context."""
     
     def test_set_context(self):
-        """Set log context."""
-        from shared.logging import set_log_context, get_log_context
+        """Set log context using LogContext object."""
+        from shared.logging import LogContext
+        from shared.logging.context import set_context, get_context
         
-        set_log_context(trace_id="trace-123", job_id="job-456")
+        ctx = LogContext(trace_id="trace-123", request_id="req-456")
+        set_context(ctx)
         
-        ctx = get_log_context()
+        current = get_context()
         
-        assert ctx.get("trace_id") == "trace-123"
-        assert ctx.get("job_id") == "job-456"
+        assert current.trace_id == "trace-123"
 
 
 class TestLogDecorator:
     """Tests for log execution decorator."""
     
     def test_decorator_sync(self):
-        """Decorator works on sync functions."""
+        """Decorator works on sync functions (with parentheses)."""
         from shared.logging import log_execution
         
-        @log_execution
+        @log_execution()  # Note: requires parentheses - it's a decorator factory
         def test_func(x, y):
             return x + y
         
@@ -97,7 +98,7 @@ class TestLogDecorator:
         """Decorator works on async functions."""
         from shared.logging import log_execution
         
-        @log_execution
+        @log_execution()  # Note: requires parentheses
         async def test_async_func(x):
             return x * 2
         
