@@ -130,3 +130,10 @@ class trace_context:
     def __exit__(self, *args: Any) -> None:
         if self._token:
             reset_context(self._token)
+
+
+# Aliases for backward compatibility with __init__.py imports
+set_log_context = set_context
+get_log_context = get_context
+log_context = trace_context
+
