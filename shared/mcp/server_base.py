@@ -193,3 +193,8 @@ class MCPServer(ABC):
         self._running = False
         if self._transport:
             await self._transport.close()
+
+
+# Alias for backward compatibility
+MCPServerBase = MCPServer
+
