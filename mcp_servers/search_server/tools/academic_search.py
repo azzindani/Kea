@@ -94,7 +94,7 @@ async def _search_arxiv(query: str, max_results: int) -> list[dict]:
         import urllib.parse
         
         encoded_query = urllib.parse.quote(query)
-        url = f"http://export.arxiv.org/api/query?search_query=all:{encoded_query}&start=0&max_results={max_results}"
+        url = f"https://export.arxiv.org/api/query?search_query=all:{encoded_query}&start=0&max_results={max_results}"
         
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.get(url)

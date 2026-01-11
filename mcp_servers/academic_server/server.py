@@ -226,7 +226,7 @@ class AcademicServer(MCPServerBase):
         }
         
         async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.get("http://export.arxiv.org/api/query", params=params)
+            response = await client.get("https://export.arxiv.org/api/query", params=params)
             
             # Parse XML
             root = ElementTree.fromstring(response.text)
