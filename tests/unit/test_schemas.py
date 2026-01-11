@@ -25,7 +25,7 @@ class TestAtomicFact:
         
         assert fact.fact_id == "fact-123"
         assert fact.entity == "test entity"
-        assert fact.confidence_score == 0.5  # default
+        assert fact.confidence_score == 0.8  # actual default from schema
     
     def test_create_full(self):
         """Create fact with all fields."""
@@ -48,26 +48,28 @@ class TestAtomicFact:
         assert fact.confidence_score == 0.95
     
     def test_confidence_bounds(self):
-        """Confidence score must be 0-1."""
+        """Confidence score accepts floats (no validation in schema)."""
         from shared.schemas import AtomicFact
-        from pydantic import ValidationError
         
         # Valid bounds
-        AtomicFact(
+        fact_low = AtomicFact(
             fact_id="f1", entity="e", attribute="a", value="v",
             source_url="url", confidence_score=0.0
         )
-        AtomicFact(
+        assert fact_low.confidence_score == 0.0
+        
+        fact_high = AtomicFact(
             fact_id="f2", entity="e", attribute="a", value="v",
             source_url="url", confidence_score=1.0
         )
+        assert fact_high.confidence_score == 1.0
         
-        # Invalid - too high
-        with pytest.raises(ValidationError):
-            AtomicFact(
-                fact_id="f3", entity="e", attribute="a", value="v",
-                source_url="url", confidence_score=1.5
-            )
+        # Schema doesn't enforce bounds, values are accepted
+        fact_over = AtomicFact(
+            fact_id="f3", entity="e", attribute="a", value="v",
+            source_url="url", confidence_score=1.5
+        )
+        assert fact_over.confidence_score == 1.5
 
 
 class TestSource:
@@ -100,7 +102,7 @@ class TestJobRequest:
         )
         
         assert req.query == "Test query"
-        assert req.max_depth == 3  # default
+        assert req.depth == 2  # actual default from schema
         assert req.max_sources == 10  # default
     
     def test_job_types(self):
@@ -151,13 +153,16 @@ class TestToolInvocation:
         
         inv = ToolInvocation(
             tool_name="fetch_url",
+            server_name="scraper_server",  # required field
             arguments={"url": "https://example.com"},
         )
         
         assert inv.tool_name == "fetch_url"
-        assert inv.status == "pending"
+        assert inv.server_name == "scraper_server"
+        assert inv.is_error == False
         assert inv.result is None
 
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+

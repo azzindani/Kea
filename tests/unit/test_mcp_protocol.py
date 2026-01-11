@@ -38,15 +38,17 @@ class TestJSONRPCRequest:
         assert req.params["name"] == "fetch_url"
     
     def test_notification_no_id(self):
-        """Notification has no id."""
-        from shared.mcp.protocol import JSONRPCRequest
+        """Notification has no id - use JSONRPCNotification class."""
+        from shared.mcp.protocol import JSONRPCNotification
         
-        notif = JSONRPCRequest(
+        notif = JSONRPCNotification(
             jsonrpc="2.0",
             method="notifications/message",
         )
         
-        assert notif.id is None
+        # JSONRPCNotification doesn't have id field
+        assert notif.method == "notifications/message"
+        assert not hasattr(notif, 'id') or getattr(notif, 'id', None) is None
 
 
 class TestJSONRPCResponse:
