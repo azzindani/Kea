@@ -541,5 +541,442 @@ pytest tests/real/test_sse_streaming.py tests/real/test_mcp_retry_live.py -v -s
 
 ---
 
+## 🚀 Common Setup
+
+### Install Dependencies
+
+```bash
+pip install -r requirements.txt
+
+# For real tests (uses OpenRouter)
+pip install httpx aiohttp
+
+# For local LLM (optional)
+pip install sentence-transformers torch
+```
+
+### Environment Variables
+
+```bash
+# Required for real tests
+export OPENROUTER_API_KEY="your-key"
+
+# Optional for database
+export DATABASE_URL="postgresql://localhost/research_engine"
+export REDIS_URL="redis://localhost:6379"
+export QDRANT_URL="http://localhost:6333"
+```
+
+### Kaggle/Notebook Setup
+
+```python
+import sys, os, threading, time
+
+# Setup path
+os.chdir('/kaggle/working/Kea')
+sys.path.insert(0, '/kaggle/working/Kea')
+
+# Set API key
+os.environ["OPENROUTER_API_KEY"] = "sk-or-v1-..."
+
+# Option 1: Run tests directly
+!cd /kaggle/working/Kea && python -m pytest tests/unit -v
+
+# Option 2: Start orchestrator in background (for integration tests)
+def start_server():
+    import uvicorn
+    from services.orchestrator.main import app
+    uvicorn.run(app, host="127.0.0.1", port=8000)
+
+server_thread = threading.Thread(target=start_server, daemon=True)
+server_thread.start()
+time.sleep(30)  # Wait for initialization
+
+# Then run integration tests
+!python -m pytest tests/integration -v
+```
+
+---
+
+## 🧪 Running Tests
+
+### Unit Tests (No API Required)
+
+```bash
+# All unit tests
+python -m pytest tests/unit/ -v
+
+# With coverage report
+python -m pytest tests/unit/ -v --cov=. --cov-report=html
+
+# Specific category
+python -m pytest tests/unit/orchestrator/ -v
+python -m pytest tests/unit/api_gateway/ -v
+python -m pytest tests/unit/mcp_servers/ -v
+
+# Specific test file
+python -m pytest tests/unit/test_config.py -v
+```
+
+### Real Tests (Requires OpenRouter API)
+
+```bash
+# Set API key first
+export OPENROUTER_API_KEY="your-key"
+
+# All real tests (uses ~100 API calls)
+python -m pytest tests/real/ -v -s --log-cli-level=INFO
+
+# Specific real tests
+python -m pytest tests/real/test_llm_streaming.py -v -s
+python -m pytest tests/real/test_full_research_flow.py -v -s
+python -m pytest tests/real/test_sse_streaming.py -v -s
+```
+
+### Integration Tests
+
+```bash
+# API endpoint tests
+python -m pytest tests/integration/test_api_health.py -v
+python -m pytest tests/integration/test_jobs_api.py -v
+python -m pytest tests/integration/test_mcp_api.py -v
+```
+
+### MCP Tool Tests
+
+```bash
+# MCP server tools (uses real web APIs)
+python -m pytest tests/mcp/test_search_tools.py -v
+python -m pytest tests/mcp/test_scraper_tools.py -v
+python -m pytest tests/mcp/test_analysis_tools.py -v
+```
+
+### Simulation Tests
+
+```bash
+# Full workflow simulations
+python -m pytest tests/simulation/ -v -s --log-cli-level=INFO
+```
+
+### Stress Tests
+
+```bash
+# Concurrent request tests
+python -m pytest tests/stress/test_concurrent_requests.py -v
+```
+
+---
+
+## ✅ Recommended Test Sequence
+
+### For Development (Fast Feedback)
+
+```bash
+# 1. Unit tests only (fast)
+python -m pytest tests/unit/ -v
+
+# 2. Quick real test
+python -m pytest tests/real/test_llm_streaming.py::TestLLMStreaming::test_basic_streaming -v -s
+```
+
+### For Pre-Commit
+
+```bash
+# 1. All unit tests
+python -m pytest tests/unit/ -v
+
+# 2. Core real tests
+python -m pytest tests/real/test_llm_streaming.py -v -s
+python -m pytest tests/real/test_mcp_with_llm.py -v -s
+```
+
+### For Release
+
+```bash
+# Full test suite
+python -m pytest tests/unit/ -v
+python -m pytest tests/real/ -v -s --log-cli-level=INFO
+python -m pytest tests/integration/ -v
+python -m pytest tests/simulation/ -v -s
+python -m pytest tests/stress/ -v
+```
+
+### For Kaggle Demo
+
+```python
+# Cell 1: Setup
+import os
+os.environ["OPENROUTER_API_KEY"] = "your-key"
+os.chdir('/kaggle/working/Kea')
+
+# Cell 2: Unit tests
+!python -m pytest tests/unit/ -v --tb=short
+
+# Cell 3: Real LLM test (streaming output)
+!python -m pytest tests/real/test_llm_streaming.py -v -s --log-cli-level=INFO
+
+# Cell 4: Full research pipeline
+!python -m pytest tests/real/test_full_research_flow.py::TestFullResearchFlow::test_complete_pipeline -v -s
+
+# Cell 5: MCP tool tests
+!python -m pytest tests/real/test_all_tools_live.py -v -s --log-cli-level=INFO
+```
+
+---
+
+## 📈 Expected Results
+
+### Unit Tests
+```
+======================== 270 passed in 45.00s ========================
+```
+
+### Real Tests
+```
+======================== 100 passed in 120.00s ========================
+```
+(With streaming LLM output visible in terminal)
+
+### Integration Tests
+```
+======================== 50 passed in 30.00s ========================
+```
+
+---
+
+## 🔍 Debugging
+
+```bash
+# Full error trace
+python -m pytest tests/unit/test_file.py -v --tb=long
+
+# Single test with debug logs
+python -m pytest tests/unit/test_file.py::TestClass::test_name -v -s --log-cli-level=DEBUG
+
+# Stop on first failure
+python -m pytest tests/unit -v -x
+
+# Run last failed tests
+python -m pytest tests/unit --lf -v
+```
+
+---
+
+## 📓 Complete Notebook Test Execution
+
+Copy these cells to run the full test suite in Kaggle/Colab.
+
+### Cell 1: Setup & Installation
+
+```python
+# ============================================
+# KEA RESEARCH ENGINE - COMPLETE TEST SUITE
+# ============================================
+
+# ============================================
+# CELL 1: SETUP & INSTALLATION
+# ============================================
+
+%%capture
+!pip install httpx aiohttp pytest pytest-asyncio pytest-cov
+!pip install langgraph langchain-core pydantic pydantic-settings
+!pip install prometheus-client PyYAML
+
+!git clone https://github.com/azzindani/Kea.git
+%cd Kea
+
+import os
+os.environ["OPENROUTER_API_KEY"] = "sk-or-v1-..."  # Replace with your key
+```
+
+### Cell 2: Syntax Check
+
+```python
+# ============================================
+# CELL 2: SYNTAX CHECK
+# ============================================
+print("=" * 60)
+print("SYNTAX CHECK")
+print("=" * 60)
+!python -m py_compile shared/config.py shared/schemas.py shared/logging/*.py
+!python -m py_compile services/orchestrator/main.py services/api_gateway/main.py
+!python -m py_compile services/orchestrator/agents/*.py services/orchestrator/nodes/*.py
+print("✓ Syntax check passed\n")
+```
+
+### Cell 3: Core Module Tests
+
+```python
+# ============================================
+# CELL 3: CORE MODULE TESTS
+# ============================================
+print("=" * 60)
+print("CORE MODULE TESTS")
+print("=" * 60)
+!python -m pytest tests/unit/test_config.py -v --tb=short
+!python -m pytest tests/unit/test_schemas.py -v --tb=short
+!python -m pytest tests/unit/test_logging.py -v --tb=short
+print("")
+```
+
+### Cell 4: MCP Protocol Tests
+
+```python
+# ============================================
+# CELL 4: MCP PROTOCOL TESTS
+# ============================================
+print("=" * 60)
+print("MCP PROTOCOL TESTS")
+print("=" * 60)
+!python -m pytest tests/unit/test_mcp_protocol.py -v --tb=short
+!python -m pytest tests/unit/test_mcp_client.py -v --tb=short
+!python -m pytest tests/unit/test_mcp_tools.py -v --tb=short
+!python -m pytest tests/unit/test_mcp_retry.py -v --tb=short
+print("")
+```
+
+### Cell 5: Orchestrator Tests
+
+```python
+# ============================================
+# CELL 5: ORCHESTRATOR TESTS
+# ============================================
+print("=" * 60)
+print("ORCHESTRATOR TESTS")
+print("=" * 60)
+!python -m pytest tests/unit/orchestrator/ -v --tb=short
+!python -m pytest tests/unit/orchestrator/test_nodes.py -v --tb=short
+!python -m pytest tests/unit/orchestrator/test_agents.py -v --tb=short
+!python -m pytest tests/unit/orchestrator/test_router_consensus.py -v --tb=short
+print("")
+```
+
+### Cell 6: API Gateway Tests
+
+```python
+# ============================================
+# CELL 6: API GATEWAY TESTS
+# ============================================
+print("=" * 60)
+print("API GATEWAY TESTS")
+print("=" * 60)
+!python -m pytest tests/unit/api_gateway/ -v --tb=short
+!python -m pytest tests/unit/api_gateway/test_main.py -v --tb=short
+!python -m pytest tests/unit/api_gateway/test_routes.py -v --tb=short
+!python -m pytest tests/unit/api_gateway/test_clients.py -v --tb=short
+print("")
+```
+
+### Cell 7: LLM Provider Tests
+
+```python
+# ============================================
+# CELL 7: LLM PROVIDER TESTS
+# ============================================
+print("=" * 60)
+print("LLM PROVIDER TESTS")
+print("=" * 60)
+!python -m pytest tests/unit/test_llm_client.py -v --tb=short
+!python -m pytest tests/unit/test_llm_provider.py -v --tb=short
+!python -m pytest tests/unit/test_streaming.py -v --tb=short
+print("")
+```
+
+### Cell 8: Real LLM Tests (Requires API Key)
+
+```python
+# ============================================
+# CELL 8: REAL LLM TESTS
+# ============================================
+print("=" * 60)
+print("REAL LLM TESTS (Uses OpenRouter API)")
+print("=" * 60)
+!python -m pytest tests/real/test_llm_streaming.py -v -s --log-cli-level=INFO
+!python -m pytest tests/real/test_sse_streaming.py -v -s --log-cli-level=INFO
+print("")
+```
+
+### Cell 9: MCP Tool Tests (Real APIs)
+
+```python
+# ============================================
+# CELL 9: MCP TOOL TESTS (Real Web APIs)
+# ============================================
+print("=" * 60)
+print("MCP TOOL TESTS")
+print("=" * 60)
+!python -m pytest tests/real/test_all_tools_live.py -v -s --log-cli-level=INFO
+!python -m pytest tests/real/test_mcp_retry_live.py -v -s --log-cli-level=INFO
+print("")
+```
+
+### Cell 10: Full Research Pipeline
+
+```python
+# ============================================
+# CELL 10: FULL RESEARCH PIPELINE
+# ============================================
+print("=" * 60)
+print("FULL RESEARCH PIPELINE (End-to-End)")
+print("=" * 60)
+!python -m pytest tests/real/test_full_research_flow.py::TestFullResearchFlow::test_complete_pipeline -v -s --log-cli-level=INFO
+print("")
+```
+
+### Cell 11: All Unit Tests Summary
+
+```python
+# ============================================
+# CELL 11: ALL UNIT TESTS SUMMARY
+# ============================================
+print("=" * 60)
+print("ALL UNIT TESTS")
+print("=" * 60)
+!python -m pytest tests/unit/ -v --tb=short
+
+print("")
+print("=" * 60)
+print("TEST SUMMARY")
+print("=" * 60)
+```
+
+### Cell 12: Coverage Report
+
+```python
+# ============================================
+# CELL 12: COVERAGE REPORT
+# ============================================
+print("=" * 60)
+print("COVERAGE REPORT")
+print("=" * 60)
+!python -m pytest tests/unit/ --cov=shared --cov=services --cov=workers --cov-report=term-missing
+print("")
+```
+
+---
+
+## 📋 Quick Copy-Paste Version
+
+For quick execution, combine all tests in a single cell:
+
+```python
+# ============================================
+# KEA - QUICK TEST SUITE
+# ============================================
+import os
+os.environ["OPENROUTER_API_KEY"] = "sk-or-v1-..."
+
+# Unit tests
+!python -m pytest tests/unit/ -v --tb=short
+
+# Real LLM tests
+!python -m pytest tests/real/test_llm_streaming.py -v -s
+
+# Full pipeline
+!python -m pytest tests/real/test_full_research_flow.py -v -s
+```
+
+---
+
 **Total: 79 test files, 510+ tests, 100% component coverage** 🎉
 
