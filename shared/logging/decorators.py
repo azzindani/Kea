@@ -48,8 +48,8 @@ def log_execution(
             # Log start
             extra: dict[str, Any] = {"function": func_name}
             if log_args:
-                extra["args"] = str(args)[:200]
-                extra["kwargs"] = {k: str(v)[:100] for k, v in kwargs.items()}
+                extra["func_args"] = str(args)[:200]
+                extra["func_kwargs"] = {k: str(v)[:100] for k, v in kwargs.items()}
             
             logger.info(f"Starting {func_name}", extra=extra)
             
@@ -87,8 +87,8 @@ def log_execution(
             
             extra: dict[str, Any] = {"function": func_name}
             if log_args:
-                extra["args"] = str(args)[:200]
-                extra["kwargs"] = {k: str(v)[:100] for k, v in kwargs.items()}
+                extra["func_args"] = str(args)[:200]
+                extra["func_kwargs"] = {k: str(v)[:100] for k, v in kwargs.items()}
             
             logger.info(f"Starting {func_name}", extra=extra)
             

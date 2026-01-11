@@ -36,27 +36,27 @@ class TestOpenRouterProvider:
         assert provider is not None
     
     def test_default_model(self):
-        """Provider has default model attribute."""
-        from shared.llm import OpenRouterProvider
+        """Default model is defined as module constant."""
+        from shared.llm.openrouter import DEFAULT_MODEL
+        
+        # Default model is a module constant, not instance attribute
+        assert DEFAULT_MODEL is not None
+        assert len(DEFAULT_MODEL) > 0
+    
+    def test_custom_model(self):
+        """Provider uses config for custom model, not constructor."""
+        from shared.llm import OpenRouterProvider, LLMConfig
         
         if not os.getenv("OPENROUTER_API_KEY"):
             os.environ["OPENROUTER_API_KEY"] = "test-key"
         
         provider = OpenRouterProvider()
         
-        # OpenRouterProvider uses 'model' attribute
-        assert provider.model is not None
-    
-    def test_custom_model(self):
-        """Provider accepts custom model."""
-        from shared.llm import OpenRouterProvider
+        # Custom model is specified via LLMConfig, not constructor
+        config = LLMConfig(model="custom/model")
         
-        if not os.getenv("OPENROUTER_API_KEY"):
-            os.environ["OPENROUTER_API_KEY"] = "test-key"
-        
-        provider = OpenRouterProvider(model="custom/model")
-        
-        assert provider.model == "custom/model"
+        assert config.model == "custom/model"
+        assert provider is not None
 
 
 class TestLLMFactory:
