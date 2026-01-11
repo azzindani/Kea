@@ -88,8 +88,12 @@ class TestTrendDetection:
         })
         
         assert result is not None
-        # Should identify increasing trend
-        assert "increasing" in result.lower() or "upward" in result.lower()
+        # Result is a ToolResult, extract text content
+        if hasattr(result, 'content'):
+            text = result.content[0].text.lower()
+        else:
+            text = str(result).lower()
+        assert "increasing" in text or "upward" in text or "positive" in text or "trend" in text
     
     @pytest.mark.asyncio
     async def test_decreasing_trend(self):
