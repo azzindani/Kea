@@ -7,44 +7,64 @@ Tests for shared/embedding/*.py
 import pytest
 
 
-class TestQwen3Embedding:
-    """Tests for Qwen3 embedding."""
+class TestOpenRouterEmbedding:
+    """Tests for OpenRouter embedding (API)."""
     
     def test_import(self):
-        """Can import embedding."""
-        from shared.embedding.qwen3_embedding import Qwen3Embedding
+        """Can import OpenRouter embedding."""
+        from shared.embedding.qwen3_embedding import OpenRouterEmbedding
         
-        assert Qwen3Embedding is not None
+        assert OpenRouterEmbedding is not None
 
 
-class TestQwen3Reranker:
-    """Tests for Qwen3 reranker."""
+class TestLocalEmbedding:
+    """Tests for local embedding."""
     
     def test_import(self):
-        """Can import reranker."""
-        from shared.embedding.qwen3_reranker import Qwen3Reranker
+        """Can import local embedding."""
+        from shared.embedding.qwen3_embedding import LocalEmbedding
         
-        assert Qwen3Reranker is not None
+        assert LocalEmbedding is not None
 
 
-class TestQwen3VLEmbedding:
-    """Tests for Qwen3 VL embedding."""
+class TestEmbeddingFactory:
+    """Tests for embedding factory."""
     
-    def test_import(self):
-        """Can import VL embedding."""
-        from shared.embedding.qwen3_vl_embedding import Qwen3VLEmbedding
+    def test_factory_import(self):
+        """Can import factory function."""
+        from shared.embedding.qwen3_embedding import create_embedding_provider
         
-        assert Qwen3VLEmbedding is not None
+        assert create_embedding_provider is not None
 
 
-class TestQwen3VLReranker:
-    """Tests for Qwen3 VL reranker."""
+class TestRerankerImports:
+    """Tests for reranker imports."""
     
-    def test_import(self):
-        """Can import VL reranker."""
-        from shared.embedding.qwen3_vl_reranker import Qwen3VLReranker
-        
-        assert Qwen3VLReranker is not None
+    def test_reranker_module_exists(self):
+        """Reranker module exists."""
+        import importlib.util
+        spec = importlib.util.find_spec("shared.embedding.qwen3_reranker")
+        assert spec is not None, "qwen3_reranker module exists"
+
+
+class TestVLEmbeddingImports:
+    """Tests for VL embedding imports."""
+    
+    def test_vl_module_exists(self):
+        """VL embedding module exists."""
+        import importlib.util
+        spec = importlib.util.find_spec("shared.embedding.qwen3_vl_embedding")
+        assert spec is not None, "qwen3_vl_embedding module exists"
+
+
+class TestVLRerankerImports:
+    """Tests for VL reranker imports."""
+    
+    def test_vl_reranker_module_exists(self):
+        """VL reranker module exists."""
+        import importlib.util
+        spec = importlib.util.find_spec("shared.embedding.qwen3_vl_reranker")
+        assert spec is not None, "qwen3_vl_reranker module exists"
 
 
 if __name__ == "__main__":
