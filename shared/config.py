@@ -50,8 +50,20 @@ class MCPServerConfig(BaseModel):
 
 
 class MCPSettings(BaseModel):
-    """MCP configuration."""
+    """MCP configuration with retry settings."""
     servers: list[MCPServerConfig] = Field(default_factory=list)
+    
+    # Retry configuration
+    max_retries: int = 3
+    retry_delay: float = 1.0
+    retry_backoff: float = 2.0
+    retry_on_timeout: bool = True
+    retry_on_connection_error: bool = True
+    
+    # Rate limiting
+    rate_limit_per_second: float = 10.0
+    max_concurrent_tools: int = 5
+    tool_timeout_seconds: float = 60.0
 
 
 class ResearchSettings(BaseModel):

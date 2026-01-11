@@ -140,7 +140,7 @@ class MCPOrchestrator:
         arguments: dict[str, Any],
     ) -> ToolResult:
         """
-        Call a tool by name.
+        Call a tool by name with retry support.
         
         Args:
             tool_name: Name of the tool to call
@@ -164,21 +164,62 @@ class MCPOrchestrator:
                 isError=True
             )
         
-        import time
-        start_time = time.perf_counter()
+        # Get retry config
+        from shared.config import get_settings
+        settings = get_settings()
+        max_retries = settings.mcp.max_retries
+        retry_delay = settings.mcp.retry_delay
+        retry_backoff = settings.mcp.retry_backoff
         
-        try:
-            ACTIVE_TOOLS.labels(server_name=server_name).inc()
+        last_error = None
+        
+        for attempt in range(max_retries):
+            import time
+            start_time = time.perf_counter()
             
-            result = await server.client.call_tool(tool_name, arguments)
-            
-            duration = time.perf_counter() - start_time
-            record_tool_call(tool_name, server_name, duration, not result.isError)
-            
-            return result
-            
-        finally:
-            ACTIVE_TOOLS.labels(server_name=server_name).dec()
+            try:
+                ACTIVE_TOOLS.labels(server_name=server_name).inc()
+                
+                result = await server.client.call_tool(tool_name, arguments)
+                
+                duration = time.perf_counter() - start_time
+                record_tool_call(tool_name, server_name, duration, not result.isError)
+                
+                return result
+                
+            except asyncio.TimeoutError as e:
+                last_error = e
+                if settings.mcp.retry_on_timeout and attempt < max_retries - 1:
+                    wait_time = retry_delay * (retry_backoff ** attempt)
+                    logger.warning(f"Tool {tool_name} timeout, retry {attempt + 1}/{max_retries} in {wait_time:.1f}s")
+                    await asyncio.sleep(wait_time)
+                    continue
+                raise
+                
+            except (ConnectionError, OSError) as e:
+                last_error = e
+                if settings.mcp.retry_on_connection_error and attempt < max_retries - 1:
+                    wait_time = retry_delay * (retry_backoff ** attempt)
+                    logger.warning(f"Tool {tool_name} connection error, retry {attempt + 1}/{max_retries} in {wait_time:.1f}s")
+                    await asyncio.sleep(wait_time)
+                    continue
+                raise
+                
+            except Exception as e:
+                logger.error(f"Tool {tool_name} error: {e}")
+                return ToolResult(
+                    content=[TextContent(text=f"Error: {str(e)}")],
+                    isError=True
+                )
+                
+            finally:
+                ACTIVE_TOOLS.labels(server_name=server_name).dec()
+        
+        # All retries exhausted
+        return ToolResult(
+            content=[TextContent(text=f"Failed after {max_retries} attempts: {last_error}")],
+            isError=True
+        )
     
     async def call_tools_parallel(
         self,

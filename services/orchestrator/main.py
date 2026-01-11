@@ -204,6 +204,130 @@ async def call_tool(tool_name: str, arguments: dict[str, Any]):
 
 
 # ============================================================================
+# Streaming Endpoints (SSE)
+# ============================================================================
+
+from fastapi.responses import StreamingResponse
+import json
+
+
+@app.get("/research/stream")
+async def stream_research(query: str, depth: int = 2, max_sources: int = 10):
+    """
+    Stream research results via Server-Sent Events (SSE).
+    
+    This endpoint provides real-time updates as the research progresses:
+    - Planning phase updates
+    - Tool call results
+    - LLM streaming output
+    - Final report
+    
+    Example:
+        curl -N "http://localhost:8000/research/stream?query=What%20is%20AI"
+    """
+    
+    async def event_generator():
+        global research_graph
+        
+        if not research_graph:
+            yield f"data: {json.dumps({'event': 'error', 'message': 'Research graph not initialized'})}\n\n"
+            return
+        
+        job_id = f"stream-{uuid.uuid4().hex[:8]}"
+        
+        # Send start event
+        yield f"data: {json.dumps({'event': 'start', 'job_id': job_id, 'query': query})}\n\n"
+        
+        # Build initial state
+        initial_state: GraphState = {
+            "job_id": job_id,
+            "query": query,
+            "path": "",
+            "status": ResearchStatus.PENDING.value,
+            "sub_queries": [],
+            "hypotheses": [],
+            "facts": [],
+            "sources": [],
+            "artifacts": [],
+            "generator_output": "",
+            "critic_feedback": "",
+            "judge_verdict": "",
+            "report": "",
+            "confidence": 0.0,
+            "iteration": 0,
+            "max_iterations": depth,
+            "should_continue": True,
+            "error": None,
+        }
+        
+        try:
+            # Stream LLM if available
+            import os
+            if os.getenv("OPENROUTER_API_KEY"):
+                from shared.llm import OpenRouterProvider, LLMConfig
+                from shared.llm.provider import LLMMessage, LLMRole
+                
+                provider = OpenRouterProvider()
+                config = LLMConfig(temperature=0.7, max_tokens=1000)
+                
+                # Phase 1: Planning
+                yield f"data: {json.dumps({'event': 'phase', 'phase': 'planning'})}\n\n"
+                
+                messages = [
+                    LLMMessage(role=LLMRole.SYSTEM, content="You are a research planner. Be concise."),
+                    LLMMessage(role=LLMRole.USER, content=f"Plan research for: {query}")
+                ]
+                
+                async for chunk in provider.stream(messages, config):
+                    if chunk.content:
+                        yield f"data: {json.dumps({'event': 'chunk', 'phase': 'planning', 'content': chunk.content})}\n\n"
+                
+                # Phase 2: Research (using graph)
+                yield f"data: {json.dumps({'event': 'phase', 'phase': 'research'})}\n\n"
+                
+                final_state = await research_graph.ainvoke(initial_state)
+                
+                # Phase 3: Synthesis with streaming
+                yield f"data: {json.dumps({'event': 'phase', 'phase': 'synthesis'})}\n\n"
+                
+                facts_text = "\n".join([str(f)[:100] for f in final_state.get("facts", [])[:5]])
+                
+                messages = [
+                    LLMMessage(role=LLMRole.SYSTEM, content="You are a research synthesizer. Create concise reports."),
+                    LLMMessage(role=LLMRole.USER, content=f"Synthesize research on: {query}\n\nFacts:\n{facts_text}")
+                ]
+                
+                report_chunks = []
+                async for chunk in provider.stream(messages, config):
+                    if chunk.content:
+                        report_chunks.append(chunk.content)
+                        yield f"data: {json.dumps({'event': 'chunk', 'phase': 'synthesis', 'content': chunk.content})}\n\n"
+                
+                final_report = "".join(report_chunks) or final_state.get("report", "")
+                
+            else:
+                # Fallback without streaming
+                final_state = await research_graph.ainvoke(initial_state)
+                final_report = final_state.get("report", "Research completed without LLM.")
+            
+            # Send completion
+            yield f"data: {json.dumps({'event': 'complete', 'job_id': job_id, 'report': final_report, 'confidence': final_state.get('confidence', 0.5), 'facts_count': len(final_state.get('facts', [])), 'sources_count': len(final_state.get('sources', []))})}\n\n"
+            
+        except Exception as e:
+            logger.error(f"Stream research error: {e}")
+            yield f"data: {json.dumps({'event': 'error', 'message': str(e)})}\n\n"
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
+
+
+# ============================================================================
 # Main
 # ============================================================================
 
