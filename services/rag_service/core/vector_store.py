@@ -286,10 +286,37 @@ def create_vector_store(use_memory: bool = False) -> VectorStore:
     
     Args:
         use_memory: Use in-memory store instead of Qdrant
+        
+    Returns:
+        VectorStore instance (Qdrant if available, else InMemory)
     """
-    if use_memory or not os.getenv("QDRANT_URL"):
-        logger.info("Using in-memory vector store")
+    if use_memory:
+        logger.info("Using in-memory vector store (requested)")
         return InMemoryVectorStore()
     
-    logger.info("Using Qdrant vector store")
-    return QdrantVectorStore()
+    qdrant_url = os.getenv("QDRANT_URL")
+    if not qdrant_url:
+        logger.info("Using in-memory vector store (no QDRANT_URL)")
+        return InMemoryVectorStore()
+    
+    # Try to connect to Qdrant, fallback to in-memory if unavailable
+    try:
+        from qdrant_client import QdrantClient
+        
+        api_key = os.getenv("QDRANT_API_KEY")
+        client = QdrantClient(url=qdrant_url, api_key=api_key, timeout=5)
+        
+        # Test connection
+        client.get_collections()
+        
+        logger.info(f"Using Qdrant vector store at {qdrant_url}")
+        return QdrantVectorStore()
+        
+    except ImportError:
+        logger.warning("qdrant_client not installed, using in-memory vector store")
+        return InMemoryVectorStore()
+        
+    except Exception as e:
+        logger.warning(f"Qdrant unavailable ({e}), using in-memory vector store")
+        return InMemoryVectorStore()
+
