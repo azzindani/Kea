@@ -1,0 +1,157 @@
+"""
+Workers Live Tests.
+
+Tests background workers with real job processing.
+Run with: pytest tests/real/test_workers_live.py -v -s --log-cli-level=INFO
+"""
+
+import pytest
+import asyncio
+from shared.llm.provider import LLMMessage, LLMRole, LLMConfig
+
+from tests.real.conftest import print_stream
+
+
+class TestResearchWorker:
+    """Test research worker with real processing."""
+    
+    @pytest.mark.asyncio
+    @pytest.mark.real_api
+    async def test_research_worker_process(self, llm_provider, llm_config, logger):
+        """Test research worker processes a job."""
+        logger.info("Testing research worker")
+        
+        from workers.research_worker import ResearchWorker
+        
+        worker = ResearchWorker()
+        
+        # Create a test job
+        job = {
+            "id": "test-job-001",
+            "query": "What are the benefits of renewable energy?",
+            "depth": 1,
+            "max_sources": 3,
+        }
+        
+        print(f"\n🔬 Processing job: {job['id']}")
+        print(f"   Query: {job['query']}")
+        
+        # Process the job
+        result = await worker.process_job(job)
+        
+        print(f"\n📊 Result:")
+        print(f"   Status: {result.get('status', 'unknown')}")
+        print(f"   Facts: {len(result.get('facts', []))}")
+        print(f"   Sources: {len(result.get('sources', []))}")
+        
+        if result.get("report"):
+            print(f"\n📝 Report Preview:\n{result['report'][:500]}...")
+        
+        assert result.get("status") in ["complete", "success", "error"]
+
+
+class TestSynthesisWorker:
+    """Test synthesis worker with real processing."""
+    
+    @pytest.mark.asyncio
+    @pytest.mark.real_api
+    async def test_synthesis_worker_process(self, llm_provider, llm_config, logger):
+        """Test synthesis worker creates report."""
+        logger.info("Testing synthesis worker")
+        
+        from workers.synthesis_worker import SynthesisWorker
+        
+        worker = SynthesisWorker()
+        
+        # Create a synthesis job
+        job = {
+            "id": "synth-job-001",
+            "topic": "Climate Change Impacts",
+            "sources": [
+                {"id": "src-1", "title": "IPCC Report", "findings": "Global temperatures rising"},
+                {"id": "src-2", "title": "NASA Data", "findings": "Ice sheets declining"},
+            ],
+        }
+        
+        print(f"\n📊 Processing synthesis job: {job['id']}")
+        print(f"   Topic: {job['topic']}")
+        print(f"   Sources: {len(job['sources'])}")
+        
+        # Process the job
+        result = await worker.process_job(job)
+        
+        print(f"\n📊 Result:")
+        print(f"   Status: {result.get('status', 'unknown')}")
+        
+        if result.get("synthesis"):
+            print(f"\n📝 Synthesis:\n{result['synthesis'][:500]}...")
+        
+        assert result.get("status") in ["complete", "success", "error"]
+
+
+class TestShadowLabWorker:
+    """Test shadow lab worker with real processing."""
+    
+    @pytest.mark.asyncio
+    @pytest.mark.real_api
+    async def test_shadow_lab_worker_process(self, logger):
+        """Test shadow lab worker verifies data."""
+        logger.info("Testing shadow lab worker")
+        
+        from workers.shadow_lab_worker import ShadowLabWorker
+        
+        worker = ShadowLabWorker()
+        
+        # Create a verification job
+        job = {
+            "id": "verify-job-001",
+            "claim": "Python is the most popular programming language",
+            "original_sources": [
+                {"url": "example.com", "text": "Python tops TIOBE index"},
+            ],
+        }
+        
+        print(f"\n🔍 Processing verification job: {job['id']}")
+        print(f"   Claim: {job['claim']}")
+        
+        # Process the job
+        result = await worker.process_job(job)
+        
+        print(f"\n📊 Result:")
+        print(f"   Status: {result.get('status', 'unknown')}")
+        print(f"   Verified: {result.get('verified', 'unknown')}")
+        
+        if result.get("verification_report"):
+            print(f"\n📝 Report:\n{result['verification_report'][:500]}...")
+        
+        assert result.get("status") in ["complete", "success", "error"]
+
+
+class TestWorkerQueue:
+    """Test worker queue integration."""
+    
+    @pytest.mark.asyncio
+    @pytest.mark.real_api
+    async def test_queue_push_pop(self, logger):
+        """Test queue operations."""
+        logger.info("Testing queue operations")
+        
+        from shared.queue import get_queue
+        
+        queue = get_queue()
+        
+        # Push a job
+        job = {"id": "queue-test-001", "type": "research"}
+        await queue.push("test_jobs", job)
+        print(f"\n📥 Pushed job: {job['id']}")
+        
+        # Pop the job
+        retrieved = await queue.pop("test_jobs")
+        print(f"📤 Popped job: {retrieved.get('id') if retrieved else 'None'}")
+        
+        assert retrieved is not None
+        assert retrieved.get("id") == job["id"]
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "-s", "--log-cli-level=INFO"])

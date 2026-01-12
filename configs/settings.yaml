@@ -1,0 +1,60 @@
+# Application Settings
+app:
+  name: "research-engine"
+  version: "0.1.0"
+  environment: "${ENVIRONMENT:development}"
+
+# Logging Configuration
+logging:
+  level: "${LOG_LEVEL:INFO}"
+  format: "${LOG_FORMAT:json}"
+  service_name: "research-engine"
+
+# LLM Configuration
+llm:
+  default_provider: "openrouter"
+  default_model: "${OPENROUTER_MODEL:nvidia/nemotron-3-nano-30b-a3b:free}"
+  temperature: 0.7
+  max_tokens: 4096
+  enable_reasoning: true
+
+# MCP Servers Configuration
+mcp:
+  servers:
+    - name: "scraper_server"
+      enabled: true
+      transport: "stdio"
+      command: "python -m mcp_servers.scraper_server.server"
+    - name: "python_server"
+      enabled: true
+      transport: "stdio"
+      command: "python -m mcp_servers.python_server.server"
+    - name: "search_server"
+      enabled: true
+      transport: "stdio"
+      command: "python -m mcp_servers.search_server.server"
+    - name: "vision_server"
+      enabled: false
+      transport: "stdio"
+      command: "python -m mcp_servers.vision_server.server"
+    - name: "analysis_server"
+      enabled: false
+      transport: "sse"
+      url: "http://localhost:8001/mcp"
+
+# Research Configuration
+research:
+  max_depth: 3
+  max_sources: 10
+  timeout_seconds: 300
+  parallel_tools: 5
+
+# Rate Limiting
+rate_limits:
+  default:
+    requests_per_minute: 60
+    requests_per_hour: 1000
+  domains:
+    "*.gov.id":
+      requests_per_minute: 10
+      delay_seconds: 2

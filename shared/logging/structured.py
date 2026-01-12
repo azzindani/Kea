@@ -1,0 +1,186 @@
+"""
+Structured Logging Implementation.
+
+Provides JSON logging with configurable output and trace correlation.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import sys
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Any
+
+from pydantic import BaseModel
+
+
+class LogLevel(str, Enum):
+    """Log levels."""
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+
+
+class LogConfig(BaseModel):
+    """Logging configuration."""
+    level: LogLevel = LogLevel.INFO
+    format: str = "json"  # json or console
+    service_name: str = "research-engine"
+    include_timestamp: bool = True
+    include_trace: bool = True
+
+
+class JSONFormatter(logging.Formatter):
+    """
+    JSON log formatter for structured logging.
+    
+    Produces logs in the format:
+    {
+        "timestamp": "2026-01-10T19:00:00.000Z",
+        "level": "INFO",
+        "service": "orchestrator",
+        "trace_id": "abc123",
+        "span_id": "def456",
+        "request_id": "req-789",
+        "message": "Processing request",
+        "context": {...}
+    }
+    """
+    
+    def __init__(self, service_name: str = "research-engine") -> None:
+        super().__init__()
+        self.service_name = service_name
+    
+    def format(self, record: logging.LogRecord) -> str:
+        """Format log record as JSON."""
+        from shared.logging.context import get_context
+        
+        # Get trace context
+        ctx = get_context()
+        
+        log_entry: dict[str, Any] = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "level": record.levelname,
+            "service": self.service_name,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        
+        # Add trace context if available
+        if ctx.trace_id:
+            log_entry["trace_id"] = ctx.trace_id
+        if ctx.span_id:
+            log_entry["span_id"] = ctx.span_id
+        if ctx.request_id:
+            log_entry["request_id"] = ctx.request_id
+        
+        # Add extra context
+        extra_context = {}
+        for key, value in record.__dict__.items():
+            if key not in (
+                "name", "msg", "args", "created", "filename", "funcName",
+                "levelname", "levelno", "lineno", "module", "msecs",
+                "pathname", "process", "processName", "relativeCreated",
+                "stack_info", "exc_info", "exc_text", "thread", "threadName",
+                "message", "taskName"
+            ):
+                extra_context[key] = value
+        
+        if extra_context:
+            log_entry["context"] = extra_context
+        
+        # Add exception info if present
+        if record.exc_info:
+            log_entry["exception"] = self.formatException(record.exc_info)
+        
+        return json.dumps(log_entry)
+
+
+class ConsoleFormatter(logging.Formatter):
+    """
+    Colored console formatter for development.
+    """
+    
+    COLORS = {
+        "DEBUG": "\033[36m",     # Cyan
+        "INFO": "\033[32m",      # Green
+        "WARNING": "\033[33m",   # Yellow
+        "ERROR": "\033[31m",     # Red
+        "CRITICAL": "\033[35m",  # Magenta
+    }
+    RESET = "\033[0m"
+    
+    def format(self, record: logging.LogRecord) -> str:
+        """Format log record with colors."""
+        from shared.logging.context import get_context
+        
+        ctx = get_context()
+        color = self.COLORS.get(record.levelname, "")
+        
+        # Build prefix
+        prefix_parts = []
+        if ctx.request_id:
+            prefix_parts.append(f"[{ctx.request_id[:8]}]")
+        if ctx.trace_id:
+            prefix_parts.append(f"<{ctx.trace_id[:8]}>")
+        
+        prefix = " ".join(prefix_parts)
+        if prefix:
+            prefix = f"{prefix} "
+        
+        timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        
+        return (
+            f"{color}[{timestamp}] {record.levelname:8}{self.RESET} "
+            f"{prefix}{record.name}: {record.getMessage()}"
+        )
+
+
+def setup_logging(config: LogConfig | None = None) -> None:
+    """
+    Setup logging with the given configuration.
+    
+    Args:
+        config: Logging configuration (uses defaults if not provided)
+    """
+    if config is None:
+        config = LogConfig()
+    
+    # Remove existing handlers
+    root_logger = logging.getLogger()
+    root_logger.handlers.clear()
+    
+    # Create handler
+    handler = logging.StreamHandler(sys.stdout)
+    
+    # Set formatter based on format type
+    if config.format == "json":
+        handler.setFormatter(JSONFormatter(service_name=config.service_name))
+    else:
+        handler.setFormatter(ConsoleFormatter())
+    
+    # Configure root logger
+    root_logger.addHandler(handler)
+    root_logger.setLevel(getattr(logging, config.level.value))
+    
+    # Set levels for noisy libraries
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("asyncio").setLevel(logging.WARNING)
+
+
+def get_logger(name: str) -> logging.Logger:
+    """
+    Get a logger with the given name.
+    
+    Args:
+        name: Logger name (usually __name__)
+        
+    Returns:
+        Configured logger
+    """
+    return logging.getLogger(name)

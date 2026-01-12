@@ -1,0 +1,109 @@
+[project]
+name = "research-engine"
+version = "0.1.0"
+description = "Kea: Distributed Autonomous Research Engine - A microservices-based AI system for deep research"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Kea Team"}
+]
+keywords = ["ai", "research", "mcp", "langgraph", "rag"]
+
+dependencies = [
+    # Core Framework
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    
+    # LangGraph & LLM
+    "langgraph>=0.2.0",
+    "langchain-core>=0.1.0",
+    "openai>=1.10.0",  # OpenRouter compatible
+    "httpx>=0.26.0",
+    
+    # Vector DB & RAG
+    "qdrant-client>=1.7.0",
+    
+    # Data Processing
+    "pandas>=2.1.0",
+    "duckdb>=0.9.0",
+    "pyarrow>=14.0.0",
+    
+    # Web Scraping
+    "playwright>=1.41.0",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=5.0.0",
+    
+    # Queue & Database
+    "redis>=5.0.0",
+    "sqlalchemy[asyncio]>=2.0.0",
+    "asyncpg>=0.29.0",
+    "alembic>=1.13.0",
+    
+    # Logging & Observability
+    "structlog>=24.1.0",
+    "opentelemetry-api>=1.22.0",
+    "opentelemetry-sdk>=1.22.0",
+    "opentelemetry-exporter-otlp>=1.22.0",
+    "prometheus-client>=0.19.0",
+    
+    # Utilities
+    "python-dotenv>=1.0.0",
+    "pyyaml>=6.0.0",
+    "tenacity>=8.2.0",
+    "aiofiles>=23.2.0",
+    
+    # Data Sources
+    "yfinance>=0.2.0",
+    "wbgapi>=1.0.0",  # World Bank
+    
+    # Machine Learning
+    "scikit-learn>=1.4.0",
+    "scipy>=1.12.0",
+    
+    # Visualization
+    "plotly>=5.18.0",
+    "matplotlib>=3.8.0",
+    "seaborn>=0.13.0",
+    
+    # Document Parsing
+    "pymupdf>=1.23.0",  # PDF
+    "python-docx>=1.0.0",
+    "openpyxl>=3.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.1.0",
+    "mypy>=1.8.0",
+    "pre-commit>=3.6.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["services", "mcp_servers", "shared", "workers"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

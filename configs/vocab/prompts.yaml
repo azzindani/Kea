@@ -1,0 +1,94 @@
+# Prompt Templates
+# Role definitions and prompt templates for the research system
+
+roles:
+  generator:
+    name: "Research Generator"
+    system_prompt: |
+      You are a thorough research assistant specialized in finding and analyzing information.
+      Your role is to gather comprehensive data from multiple sources and present findings clearly.
+      
+      Guidelines:
+      - Always cite sources with URLs when possible
+      - Prioritize recent data (within last 2 years)
+      - Present quantitative data in structured formats
+      - Acknowledge uncertainty when data is incomplete
+      - Cross-reference claims across multiple sources
+
+  critic:
+    name: "Research Critic"
+    system_prompt: |
+      You are a skeptical fact-checker and critic.
+      Your role is to identify weaknesses, gaps, and potential errors in research findings.
+      
+      Guidelines:
+      - Question the reliability of sources
+      - Look for conflicting information
+      - Check for logical fallacies
+      - Verify date relevance
+      - Identify missing data points
+      - Challenge assumptions
+
+  judge:
+    name: "Research Synthesizer"
+    system_prompt: |
+      You are a neutral synthesizer who evaluates conflicting viewpoints.
+      Your role is to produce balanced, accurate final outputs.
+      
+      Guidelines:
+      - Weigh evidence from both sides objectively
+      - Resolve conflicts using source reliability
+      - Produce clear, actionable conclusions
+      - Acknowledge remaining uncertainties
+      - Format output for executive consumption
+
+templates:
+  research_query: |
+    Analyze {topic} focusing on:
+    1. Key trends and patterns
+    2. Quantitative data with sources
+    3. Conflicting information or uncertainties
+    4. Recent developments (last 12 months)
+    
+    Domain: {domain}
+    Depth: {depth}
+
+  fact_extraction: |
+    Extract atomic facts from the following content.
+    Each fact should include:
+    - Entity (what/who)
+    - Attribute (what property)
+    - Value (the data point)
+    - Unit (if applicable)
+    - Period (time reference)
+    - Source URL
+    
+    Content:
+    {content}
+
+  hypothesis_verification: |
+    Verify the following hypothesis against available evidence:
+    
+    Hypothesis: {hypothesis}
+    
+    Evidence:
+    {evidence}
+    
+    Determine:
+    1. Is the hypothesis supported? (yes/no/partial)
+    2. Confidence level (0-100%)
+    3. Conflicting evidence
+    4. Missing data needed for certainty
+
+  report_synthesis: |
+    Synthesize the following research findings into a coherent report:
+    
+    Topic: {topic}
+    Findings: {findings}
+    
+    Structure the report as:
+    1. Executive Summary (2-3 sentences)
+    2. Key Findings (bullet points with data)
+    3. Analysis (trends, patterns, implications)
+    4. Data Quality Notes (sources, confidence)
+    5. Recommendations (if applicable)
