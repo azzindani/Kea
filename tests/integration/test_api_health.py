@@ -109,11 +109,11 @@ class TestMetrics:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_metrics_endpoint(self):
-        """Test /metrics endpoint."""
+        """Test /metrics endpoint (mounted ASGI app)."""
         if not await check_service_available(API_GATEWAY_URL):
             pytest.skip(f"API Gateway not running at {API_GATEWAY_URL}")
         
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
             response = await client.get(f"{API_GATEWAY_URL}/metrics")
         
         assert response.status_code == 200

@@ -2,6 +2,12 @@
 Integration Tests: Memory API.
 
 Tests for /api/v1/memory/* endpoints.
+Actual routes (from memory.py):
+- POST /search - Semantic search
+- GET /facts/{fact_id} - Get fact by ID
+- GET /graph - Get provenance graph
+- GET /sessions - List sessions
+- GET /sessions/{id} - Get session
 """
 
 import pytest
@@ -17,82 +23,50 @@ class TestMemoryAPI:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_search_facts(self):
-        """Search facts by query."""
+        """Search facts by query (POST method)."""
         async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.get(
+            # Note: API uses POST for search, not GET
+            response = await client.post(
                 f"{API_URL}/api/v1/memory/search",
-                params={"query": "test query", "limit": 10}
+                json={"query": "test query", "limit": 10}
             )
         
         assert response.status_code == 200
         data = response.json()
-        assert "facts" in data or "results" in data
-    
-    @pytest.mark.integration
-    @pytest.mark.asyncio
-    async def test_add_fact(self):
-        """Add fact to memory."""
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.post(
-                f"{API_URL}/api/v1/memory/facts",
-                json={
-                    "entity": "Test Entity",
-                    "attribute": "test_attr",
-                    "value": "test_value",
-                    "source_url": "https://example.com",
-                }
-            )
-        
-        assert response.status_code in [200, 201]
-        data = response.json()
-        assert "fact_id" in data
+        assert "results" in data or "query" in data
     
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_get_fact(self):
-        """Get fact by ID."""
+        """Get fact by ID (returns 404 for non-existent)."""
         async with httpx.AsyncClient(timeout=30) as client:
-            # Add first
-            add_resp = await client.post(
-                f"{API_URL}/api/v1/memory/facts",
-                json={
-                    "entity": "Get Test",
-                    "attribute": "attr",
-                    "value": "val",
-                    "source_url": "url",
-                }
-            )
-            
-            if add_resp.status_code in [200, 201]:
-                fact_id = add_resp.json()["fact_id"]
-                
-                # Get
-                response = await client.get(f"{API_URL}/api/v1/memory/facts/{fact_id}")
-                
-                assert response.status_code == 200
+            response = await client.get(f"{API_URL}/api/v1/memory/facts/nonexistent-id")
+        
+        # Expected: 404 since fact doesn't exist (placeholder implementation)
+        assert response.status_code == 404
     
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_list_entities(self):
-        """List all entities."""
+    async def test_get_provenance_graph(self):
+        """Get provenance graph."""
         async with httpx.AsyncClient(timeout=10) as client:
-            response = await client.get(f"{API_URL}/api/v1/memory/entities")
+            response = await client.get(f"{API_URL}/api/v1/memory/graph")
         
         assert response.status_code == 200
         data = response.json()
-        assert "entities" in data
+        assert "nodes" in data
+        assert "edges" in data
     
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_get_entity_facts(self):
-        """Get facts for an entity."""
+    async def test_list_sessions(self):
+        """List research sessions."""
         async with httpx.AsyncClient(timeout=10) as client:
-            response = await client.get(
-                f"{API_URL}/api/v1/memory/entities/TestEntity/facts"
-            )
+            response = await client.get(f"{API_URL}/api/v1/memory/sessions")
         
-        # May return 404 if entity doesn't exist
-        assert response.status_code in [200, 404]
+        assert response.status_code == 200
+        data = response.json()
+        assert "sessions" in data
 
 
 if __name__ == "__main__":

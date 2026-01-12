@@ -80,7 +80,7 @@ class TestJobsAPI:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_cancel_job(self):
-        """Cancel a job."""
+        """Cancel a job (uses DELETE method)."""
         async with httpx.AsyncClient(timeout=30) as client:
             # Create a job first
             create_resp = await client.post(
@@ -89,8 +89,8 @@ class TestJobsAPI:
             )
             job_id = create_resp.json()["job_id"]
             
-            # Cancel it
-            response = await client.post(f"{API_URL}/api/v1/jobs/{job_id}/cancel")
+            # Cancel it (DELETE, not POST)
+            response = await client.delete(f"{API_URL}/api/v1/jobs/{job_id}")
         
         assert response.status_code in [200, 400]  # 400 if already completed
 
