@@ -50,6 +50,7 @@ class ToolCallResponse(BaseModel):
     is_error: bool
     content: list[dict]
     duration_ms: float
+    result: str | None = None  # Text content for backward compatibility
 
 
 # ============================================================================
@@ -114,11 +115,16 @@ async def invoke_tool(request: ToolCallRequest):
         client = MCPToolClient()
         result = await client.invoke(request.tool_name, request.arguments)
         
+        # Extract text result for backward compatibility
+        content = result.get("content", [])
+        result_text = content[0].get("text", "") if content else ""
+        
         return ToolCallResponse(
             tool_name=request.tool_name,
             is_error=result.get("is_error", False),
-            content=result.get("content", []),
+            content=content,
             duration_ms=result.get("duration_ms", 0.0),
+            result=result_text,
         )
     except ImportError:
         # MCPToolClient not implemented yet, use placeholder
@@ -127,6 +133,7 @@ async def invoke_tool(request: ToolCallRequest):
             is_error=False,
             content=[{"type": "text", "text": "Tool invocation placeholder - MCPToolClient not implemented"}],
             duration_ms=0.0,
+            result="Tool invocation placeholder - MCPToolClient not implemented",
         )
     except Exception as e:
         logger.error(f"Tool invocation error: {e}")
@@ -135,6 +142,7 @@ async def invoke_tool(request: ToolCallRequest):
             is_error=True,
             content=[{"type": "text", "text": f"Error: {str(e)}"}],
             duration_ms=0.0,
+            result=f"Error: {str(e)}",
         )
 
 
