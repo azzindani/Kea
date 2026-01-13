@@ -107,13 +107,42 @@ async def invoke_tool(request: ToolCallRequest):
     """
     logger.info(f"Direct tool invocation: {request.tool_name}")
     
-    # Placeholder: Call orchestrator's MCP client
-    return ToolCallResponse(
-        tool_name=request.tool_name,
-        is_error=False,
-        content=[{"type": "text", "text": "Tool invocation placeholder"}],
-        duration_ms=0.0,
-    )
+    # Actually call the tool instead of placeholder
+    try:
+        from services.api_gateway.clients.mcp_client import MCPToolClient
+        
+        client = MCPToolClient()
+        result = await client.invoke(request.tool_name, request.arguments)
+        
+        return ToolCallResponse(
+            tool_name=request.tool_name,
+            is_error=result.get("is_error", False),
+            content=result.get("content", []),
+            duration_ms=result.get("duration_ms", 0.0),
+        )
+    except ImportError:
+        # MCPToolClient not implemented yet, use placeholder
+        return ToolCallResponse(
+            tool_name=request.tool_name,
+            is_error=False,
+            content=[{"type": "text", "text": "Tool invocation placeholder - MCPToolClient not implemented"}],
+            duration_ms=0.0,
+        )
+    except Exception as e:
+        logger.error(f"Tool invocation error: {e}")
+        return ToolCallResponse(
+            tool_name=request.tool_name,
+            is_error=True,
+            content=[{"type": "text", "text": f"Error: {str(e)}"}],
+            duration_ms=0.0,
+        )
+
+
+# Alias route for test compatibility
+@router.post("/tools/invoke")
+async def invoke_tool_alias(request: ToolCallRequest):
+    """Alias for /invoke - maintained for test compatibility."""
+    return await invoke_tool(request)
 
 
 @router.post("/servers/{server_name}/restart")

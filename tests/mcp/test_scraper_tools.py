@@ -49,8 +49,8 @@ class TestFetchUrl:
                 }
             )
         
-        # Should succeed
-        assert response.status_code in [200, 500]
+        # Should succeed (200) or error (500)
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
 
 
 class TestBatchScrape:
