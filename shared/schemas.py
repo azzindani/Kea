@@ -49,6 +49,7 @@ class ResearchState(BaseModel):
     facts: list["AtomicFact"] = Field(default_factory=list)
     sources: list["Source"] = Field(default_factory=list)
     artifacts: list[str] = Field(default_factory=list)  # Artifact IDs
+    tool_invocations: list[dict] = Field(default_factory=list)  # Tool call records
     
     # Consensus
     generator_output: str = ""
@@ -109,6 +110,7 @@ class JobType(str, Enum):
     MEMORY_FORK = "memory_fork"
     SHADOW_LAB = "shadow_lab"
     GRAND_SYNTHESIS = "grand_synthesis"
+    QUICK_ANSWER = "quick_answer"  # Simple fact-based answers
 
 
 class JobRequest(BaseModel):

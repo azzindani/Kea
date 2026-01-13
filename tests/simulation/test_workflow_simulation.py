@@ -109,7 +109,7 @@ class TestResearchWorkflowSimulation:
         analytics = AnalyticsServer()
         eda = await analytics._handle_eda_auto({
             "data_url": "https://raw.githubusercontent.com/azzindani/00_Data_Source/refs/heads/main/Diabetes_Indicators.csv",
-            "target_column": "Diabetes_binary",
+            "target_column": "Diabetes_012",  # Actual column name in dataset
         })
         assert not eda.isError
         print(eda.content[0].text[:500])
@@ -120,7 +120,7 @@ class TestResearchWorkflowSimulation:
         ml = MLServer()
         model = await ml._handle_auto_ml({
             "data_url": "https://raw.githubusercontent.com/azzindani/00_Data_Source/refs/heads/main/Diabetes_Indicators.csv",
-            "target_column": "Diabetes_binary",
+            "target_column": "Diabetes_012",  # Actual column name in dataset
             "task_type": "classification",
             "test_size": 0.3,
         })

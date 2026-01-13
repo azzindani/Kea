@@ -165,8 +165,8 @@ class TestGraphRAGSimulation:
         graph.add_fact(philippines, "nickel_production", "0.4M tons", "https://src2.com")
         
         # Add relationships
-        graph.add_relationship(indonesia, nickel, "produces")
-        graph.add_relationship(philippines, nickel, "produces")
+        graph.add_relation(indonesia, nickel, "produces")
+        graph.add_relation(philippines, nickel, "produces")
         
         # Query graph
         stats = graph.stats()

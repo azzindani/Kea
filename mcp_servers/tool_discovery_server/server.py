@@ -460,7 +460,7 @@ class ToolDiscoveryServer(MCPServerBase):
             scores["documentation"] = 0.4
         
         # License
-        license_info = info.get("license", "").lower()
+        license_info = (info.get("license") or "").lower()
         if any(l in license_info for l in ["mit", "bsd", "apache"]):
             scores["license"] = 1.0
         elif license_info:
@@ -492,7 +492,7 @@ class ToolDiscoveryServer(MCPServerBase):
         notes = {
             "maturity": f"v{info.get('version', 'N/A')}",
             "documentation": "Has docs" if scores["documentation"] > 0.6 else "Limited docs",
-            "license": info.get("license", "Unknown")[:20],
+            "license": (info.get("license") or "Unknown")[:20],
             "lightweight": f"{len(deps)} dependencies",
             "mcp_fit": "Good API patterns" if scores["mcp_fit"] > 0.7 else "Needs wrapper",
         }
