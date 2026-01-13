@@ -460,7 +460,7 @@ class ToolDiscoveryServer(MCPServerBase):
             scores["documentation"] = 0.4
         
         # License
-        license_info = info.get("license", "").lower()
+        license_info = (info.get("license") or "").lower()
         if any(l in license_info for l in ["mit", "bsd", "apache"]):
             scores["license"] = 1.0
         elif license_info:

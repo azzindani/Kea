@@ -460,419 +460,89 @@ kea/
 ├── pyproject.toml                            # Python dependencies (Poetry)
 ├── README.md                                 # This file
 └── Makefile                                  # Common development commands
-```
 
 ---
 
-## 📋 Development Plan
+## 📋 Development Status
 
-### Phase 0: Foundation Setup *(Week 1)*
-**Goal:** Establish project scaffolding, core abstractions, and logging infrastructure.
+### ✅ v1.0 Complete
+All foundation phases have been completed:
 
-| Task | Description | Priority |
-|:-----|:------------|:--------:|
-| Initialize project structure | Create all directories & `__init__.py` files | 🔴 Critical |
-| Setup `pyproject.toml` | Define dependencies (LangGraph, FastAPI, MCP SDK, etc.) | 🔴 Critical |
-| Create shared abstractions | Implement `shared/` modules for LLM, Queue, Storage, DB | 🔴 Critical |
-| **Setup logging infrastructure** | Implement `shared/logging/` with structured JSON logging | 🔴 Critical |
-| **Configure OpenTelemetry** | Setup trace/span context propagation | 🔴 Critical |
-| Environment configuration | Build `config.py` with local/production mode detection | 🔴 Critical |
-| Create base Pydantic schemas | Define state models, API schemas, and contracts | 🟡 High |
-| **MCP SDK base classes** | Implement `shared/mcp/` with protocol and transport | 🟡 High |
-
-**Deliverables:**
-- [ ] Working project structure with all directories
-- [ ] `pyproject.toml` with pinned dependencies
-- [ ] Shared abstractions for LLM, Queue, Storage, Database
-- [ ] **Structured logging with JSON output and trace correlation**
-- [ ] **MCP protocol types and base classes**
-- [ ] Environment-aware configuration system
+| Phase | Status | Key Deliverables |
+|:------|:------:|:-----------------|
+| **Phase 0-1** | ✅ | Project scaffolding, logging infrastructure |
+| **Phase 2** | ✅ | 14 MCP tools across 5 servers |
+| **Phase 3** | ✅ | Orchestrator with LangGraph, MCP Client |
+| **Phase 4** | ✅ | RAG Service with vector store |
+| **Phase 5** | ✅ | API Gateway with 8 route modules |
+| **Phase 6** | ✅ | 3 background workers |
+| **Phase 7** | ✅ | 79+ test files, pytest configuration |
+| **Phase 8** | ✅ | Docker deployment, Prometheus/Grafana |
 
 ---
 
-### Phase 1: Logging & Observability Infrastructure *(Week 1-2)*
-**Goal:** Establish comprehensive logging, metrics, and tracing before building features.
+## 🚀 v2.0 Roadmap (NEXT)
 
-| Task | Description | Priority |
-|:-----|:------------|:--------:|
-| Implement structured logger | JSON logging with configurable formatters | 🔴 Critical |
-| Context propagation | trace_id, span_id, request_id across services | � Critical |
-| Logging middleware | FastAPI middleware for request/response logging | 🔴 Critical |
-| MCP logging middleware | Tool call logging with timing and results | 🔴 Critical |
-| Metrics integration | Prometheus metrics for latency, errors, throughput | 🟡 High |
-| Log decorators | `@log_execution`, `@trace` for function logging | 🟡 High |
-| OpenTelemetry exporters | Jaeger/Zipkin trace export | 🟡 High |
-| Log aggregation config | Loki/Promtail configuration for deployment | 🟢 Medium |
-| Grafana dashboards | Pre-built dashboards for MCP, API, Orchestrator | � Medium |
+### Vision
+Transform Kea into a **self-adapting, scalable data engineering platform** for constrained environments (Kaggle/Colab).
 
-**Deliverables:**
-- [ ] Structured JSON logging across all services
-- [ ] Distributed tracing with OpenTelemetry
-- [ ] Prometheus metrics endpoint
-- [ ] Pre-built Grafana dashboards
-- [ ] Logging documentation (LOGGING_GUIDE.md)
+### v2.1: Hardware Detection & Job Queue
+- Hardware auto-detection (CPU, RAM, GPU, VRAM)
+- Adaptive parallelism engine
+- SQLite-backed job queue (no Redis dependency)
+- LLM failover (Nemotron → Gemini)
 
-**Log Schema Standard:**
-```json
-{
-  "timestamp": "2026-01-10T19:00:00.000Z",
-  "level": "INFO",
-  "service": "orchestrator",
-  "trace_id": "abc123",
-  "span_id": "def456",
-  "request_id": "req-789",
-  "message": "Tool execution completed",
-  "context": {
-    "tool_name": "web_scraper",
-    "mcp_server": "scraper_server",
-    "duration_ms": 1234,
-    "result_size_bytes": 5678
-  }
-}
-```
+### v2.2: HuggingFace Persistence
+- State persistence to HuggingFace repos
+- Job checkpoint save/load (cross-session)
+- Database push/pull for continuity
+
+### v2.3: Text Extraction & Parsers
+- PDF/OCR extraction tools
+- Adaptive parser factory (LLM-generated parsers)
+- Parser versioning & storage
+
+### v2.4: Database Building System
+- Streaming database builder (millions of docs)
+- DuckDB integration with auto-checkpoint
+- Memory-aware batch processing
+
+### v2.5: Scalable MCP Routing (1000+ Tools)
+- Hierarchical tool organization
+- Tool index with semantic search
+- Lazy loading for large tool registries
+
+### v2.6: Security Hardening
+- RestrictedPython sandbox
+- Module whitelist, resource limits
+- Network isolation, audit logging
 
 ---
 
-### Phase 2: MCP Tool Servers *(Week 2-3)*
-**Goal:** Build parallel-capable MCP tool servers for all "Hands" functionality.
+## 🔧 Model Configuration
 
-| Task | Description | Priority |
-|:-----|:------------|:--------:|
-| **MCP Server Base** | Implement `shared/mcp/server_base.py` with JSON-RPC 2.0 | 🔴 Critical |
-| **Scraper MCP Server** | Web scraping tools with Playwright/BeautifulSoup | 🔴 Critical |
-| **Python MCP Server** | Sandboxed Python execution with Pandas/DuckDB | 🔴 Critical |
-| **Search MCP Server** | Web search tools (Tavily, Brave, SerpAPI) | 🔴 Critical |
-| Vision MCP Server | Screenshot/OCR extraction with GPT-4o/Gemini | 🟡 High |
-| Analysis MCP Server | Statistical analysis and trend detection | 🟡 High |
-| Stealth infrastructure | Proxy rotation, UA spoofing, rate limiting | 🟡 High |
-| Sandbox isolation | Docker/E2B runners for code execution | 🟡 High |
-| MCP tool manifests | JSON Schema definitions for all tools | 🟡 High |
-| Template server | Boilerplate for adding new MCP servers | 🟢 Medium |
-
-**Deliverables:**
-- [ ] 5 working MCP servers (Scraper, Python, Search, Vision, Analysis)
-- [ ] Parallel execution capability (invoke multiple servers simultaneously)
-- [ ] Tool manifests with JSON Schema validation
-- [ ] Stealth infrastructure for web scraping
-- [ ] MCP development guide (MCP_GUIDE.md)
-
-**MCP Tool Example:**
-```python
-@mcp_tool(
-    name="browser_scrape",
-    description="Scrape webpage content using headless browser",
-    schema={
-        "type": "object",
-        "properties": {
-            "url": {"type": "string", "format": "uri"},
-            "wait_for": {"type": "string", "description": "CSS selector to wait for"},
-            "extract_tables": {"type": "boolean", "default": True}
-        },
-        "required": ["url"]
-    }
-)
-async def browser_scrape(url: str, wait_for: str = None, extract_tables: bool = True):
-    # Implementation with integrated logging
-    logger.info("Starting browser scrape", extra={"url": url})
-    ...
-```
-
----
-
-### Phase 3: Core Orchestrator with MCP Client *(Week 3-4)*
-**Goal:** Build the central "Brain" with LangGraph state machine and MCP client.
-
-| Task | Description | Priority |
-|:-----|:------------|:--------:|
-| Implement LangGraph graph | Build cyclic state machine with checkpointing | 🔴 Critical |
-| **MCP Client implementation** | Connect to MCP servers via JSON-RPC 2.0 | 🔴 Critical |
-| **Parallel executor** | Invoke multiple MCP tools concurrently | 🔴 Critical |
-| **Tool registry** | Dynamic tool discovery via `tools/list` | 🔴 Critical |
-| Create Intention Router | Classify queries into Path A/B/C/D | 🔴 Critical |
-| Build Planner node | Query decomposition into atomic facts | 🔴 Critical |
-| Build Keeper node | Context drift detection (cosine similarity) | � High |
-| Build Divergence Engine | Hypothesis verification & abductive reasoning | 🟡 High |
-| Build Synthesizer node | Report generation from validated facts | 🟡 High |
-| Implement Meta-Prompt Layer | Dynamic persona injection for workers | 🟡 High |
-| Build Consensus Engine | Generator/Critic/Judge adversarial loop | 🟢 Medium |
-
-**Deliverables:**
-- [ ] Working LangGraph state machine with OODA loop
-- [ ] **MCP Client with parallel tool invocation**
-- [ ] **Tool registry with hot-reload capability**
-- [ ] Intention Router with 4-path classification
-- [ ] All core nodes (Planner, Keeper, Divergence, Synthesizer)
-- [ ] Unit tests for each node and MCP client
-
----
-
-### Phase 4: RAG Service *(Week 4-5)*
-**Goal:** Build the "Memory Vault" for atomic facts and artifacts.
-
-| Task | Description | Priority |
-|:-----|:------------|:--------:|
-| Implement Vector Store | Qdrant/Chroma abstraction with embedding | 🔴 Critical |
-| Create Atomic Fact schema | Entity-Attribute-Value-Time-Source structure | 🔴 Critical |
-| Implement Artifact Store | S3/Local filesystem for Parquet/Blobs | 🔴 Critical |
-| Build GraphRAG layer | Relationship storage between facts | 🟡 High |
-| Create Session schema | Conversation Project manifest tracking | 🟡 High |
-| Implement semantic search | Query-to-fact similarity matching | 🟡 High |
-| Build Provenance Graph API | Node/Edge export for UI visualization | 🟢 Medium |
-| Add logging integration | Structured logging for all RAG operations | 🟢 Medium |
-
-**Deliverables:**
-- [ ] Vector store with atomic fact ingestion
-- [ ] Artifact store with Parquet/blob support
-- [ ] Semantic search with confidence scoring
-- [ ] Unit tests for all storage operations
-
----
-
-### Phase 5: API Gateway *(Week 5-6)*
-**Goal:** Build the "Front Door" with all API endpoints and MCP management.
-
-| Task | Description | Priority |
-|:-----|:------------|:--------:|
-| Setup FastAPI gateway | Base server with versioned routing | 🔴 Critical |
-| Implement Job Dispatcher | `/jobs` CRUD with polymorphic payloads | 🔴 Critical |
-| Implement Memory API | `/memory/search`, `/memory/graph` | 🔴 Critical |
-| **Implement MCP API** | `/mcp/servers`, `/mcp/tools`, `/mcp/invoke` | 🔴 Critical |
-| Implement Artifacts API | `/artifacts` download/preview | 🟡 High |
-| Implement HITL API | `/interventions` pause/resume | 🟡 High |
-| Implement System API | `/system/capabilities`, `/system/health` | 🟡 High |
-| Implement LLM Management | `/llm/providers`, `/llm/config` | 🟢 Medium |
-| Add JWT authentication | Bearer token middleware | 🟢 Medium |
-| Add API rate limiting | Request throttling middleware | 🟢 Medium |
-| **Request ID middleware** | Correlation ID propagation for distributed tracing | 🟢 Medium |
-
-**Deliverables:**
-- [ ] Full REST API with all endpoints documented
-- [ ] **MCP management API for tool discovery and invocation**
-- [ ] Authentication & authorization middleware
-- [ ] OpenAPI/Swagger documentation
-- [ ] Integration tests for all routes
-
----
-
-### Phase 6: Background Workers *(Week 6-7)*
-**Goal:** Implement async job processing with checkpointing.
-
-| Task | Description | Priority |
-|:-----|:------------|:--------:|
-| Setup Redis queue | Job enqueue/dequeue infrastructure | 🔴 Critical |
-| Implement Research Worker | Deep research job processor with MCP tools | 🔴 Critical |
-| Implement Synthesis Worker | Grand synthesis job processor | 🟡 High |
-| Implement Shadow Lab Worker | Recalculation job processor | 🟡 High |
-| Add LangGraph checkpointing | PostgreSQL state persistence | 🟡 High |
-| Implement crash recovery | Resume from last checkpoint | 🟡 High |
-| Add webhook notifications | Callback on job completion | 🟢 Medium |
-| **Worker logging** | Structured logging with job context | 🟢 Medium |
-
-**Deliverables:**
-- [ ] Background workers with Redis queue
-- [ ] Checkpointing and crash recovery
-- [ ] All job types processing correctly
-- [ ] Integration tests for job lifecycle
-
----
-
-### Phase 7: Integration & Testing *(Week 7-8)*
-**Goal:** End-to-end testing and hardening.
-
-| Task | Description | Priority |
-|:-----|:------------|:--------:|
-| Write unit tests | Cover all modules >80% | 🔴 Critical |
-| Write integration tests | Full job lifecycle flows | 🔴 Critical |
-| **MCP integration tests** | Parallel tool execution tests | 🔴 Critical |
-| **Logging pipeline tests** | End-to-end trace correlation tests | 🔴 Critical |
-| Write E2E tests | API gateway full scenarios | 🟡 High |
-| Setup CI/CD pipeline | GitHub Actions for testing | 🟡 High |
-| Performance testing | Load testing with Locust | 🟢 Medium |
-| Documentation | API reference & developer guide | 🟢 Medium |
-
-**Deliverables:**
-- [ ] >80% test coverage
-- [ ] **MCP parallel execution tests**
-- [ ] **Distributed tracing verification**
-- [ ] CI/CD pipeline with automated testing
-- [ ] Performance benchmarks
-- [ ] Complete documentation
-
-#### 🧪 Standardized Testing Environments
-
-> **Testing Philosophy:** We use **Real Simulation & Case-Based Testing** instead of traditional pytest. Tests are executable notebooks with actual API calls, real data scenarios, and observable outputs that demonstrate system behavior.
-
-All tests are designed to run in cloud notebook environments for reproducibility and GPU access:
-
-| Environment | Primary Use | GPU Access | Notes |
-|:------------|:------------|:-----------|:------|
-| **Kaggle Notebooks** | Integration & E2E simulations | ✅ Free T4/P100 | 30hr/week GPU quota, persistent datasets |
-| **Google Colab** | Component smoke tests | ✅ Free T4 | Easy sharing, quick iteration |
-| **Local (Hybrid)** | Development & debugging | ⚡ Optional | Fast feedback, full control |
-
-**Why Real Simulation Over Pytest?**
-
-| Aspect | Traditional Pytest | Real Simulation (Our Approach) |
-|:-------|:-------------------|:-------------------------------|
-| **Coverage** | Mocked responses | Actual API calls & real data |
-| **Debugging** | Stack traces | Visual outputs, logs, artifacts |
-| **Reproducibility** | Environment-dependent | Notebook cells = reproducible steps |
-| **Documentation** | Separate docs | Test IS the documentation |
-| **Observability** | Pass/Fail | Rich outputs, charts, intermediate states |
-
-**Execution Strategy:**
-
-```mermaid
-graph LR
-    %% --- STYLES ---
-    classDef local fill:#00b894,stroke:#333,stroke-width:2px,color:#fff;
-    classDef cloud fill:#0984e3,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef hybrid fill:#6c5ce7,stroke:#fff,stroke-width:2px,color:#fff;
-
-    %% --- TEST FLOW ---
-    Dev["🧑‍💻 Developer"] --> Local["💻 Local Simulation<br/>(Fast Feedback)"]:::local
-    Local --> Push["📤 Git Push"]
-    Push --> CI["⚙️ GitHub Actions<br/>(Lint + Smoke)"]
-    CI --> Kaggle["📊 Kaggle<br/>(Full Simulation)"]:::cloud
-    CI --> Colab["🔬 Colab<br/>(Component Tests)"]:::cloud
+```yaml
+# configs/models.yaml
+llm:
+  primary:
+    provider: "openrouter"
+    model: "nvidia/nemotron-3-nano-30b-a3b:free"
+    context_length: 32768
+  backup:
+    provider: "google"
+    model: "gemini-3-flash-preview"
     
-    Kaggle --> Report["📋 Execution Report<br/>(Artifacts + Logs)"]
-    Colab --> Report
-    
-    Report --> Merge["✅ Merge Ready"]
+embedding:
+  default: "Qwen/Qwen3-Embedding-0.6B"
+  fallback: "qwen/qwen3-embedding-8b"
+  
+reranker:
+  default: "Qwen/Qwen3-Reranker-0.6B"
+  
+vision:
+  embedding: "Qwen/Qwen3-VL-Embedding-2B"
+  reranker: "Qwen/Qwen3-VL-Reranker-2B"
 ```
-
-**Test Case Distribution:**
-
-| Test Scenario | Local | Colab | Kaggle |
-|:--------------|:-----:|:-----:|:------:|
-| MCP Server Simulation | ✅ Primary | ✅ | ⚪ |
-| Single Tool Execution | ✅ Primary | ✅ | ⚪ |
-| Multi-Tool Parallel Simulation | ⚪ | ✅ | ✅ Primary |
-| Full Research Pipeline | ⚪ | ⚪ | ✅ Primary |
-| LLM Integration Cases | ⚪ | ✅ | ✅ Primary |
-| End-to-End Scenarios | ⚪ | ⚪ | ✅ Primary |
-
-**Real Simulation Notebook Example:**
-
-```python
-# tests/simulations/research_pipeline_simulation.ipynb
-
-# ═══════════════════════════════════════════════════════════════
-# SIMULATION: Full Research Pipeline - Nickel Market Analysis
-# ═══════════════════════════════════════════════════════════════
-
-# Cell 1: Setup Environment
-from kea.services.orchestrator import Orchestrator
-from kea.mcp_servers import ScraperServer, PythonServer, SearchServer
-from kea.shared.logging import setup_simulation_logging
-
-setup_simulation_logging(level="DEBUG")
-print("✅ Environment Ready")
-
-# Cell 2: Initialize MCP Servers (Real Instances)
-scraper = ScraperServer.start()
-python_exec = PythonServer.start()
-search = SearchServer.start()
-
-orchestrator = Orchestrator(
-    mcp_servers=[scraper, python_exec, search]
-)
-print(f"✅ {len(orchestrator.tools)} tools registered")
-
-# Cell 3: Execute Real Research Query
-result = await orchestrator.research(
-    query="Analyze nickel mining trends in Indonesia 2024",
-    depth=2,
-    max_sources=5
-)
-
-# Cell 4: Inspect Intermediate States (Observable)
-print("📊 Research Stages:")
-for stage in result.execution_log:
-    print(f"  {stage.name}: {stage.duration_ms}ms - {stage.status}")
-
-# Cell 5: Validate Output Artifacts
-assert result.report is not None, "Report should be generated"
-assert len(result.sources) >= 3, "Should have at least 3 sources"
-assert result.data_artifacts, "Should have data artifacts"
-
-# Display actual outputs
-display(result.report[:500])  # Show report preview
-display(result.sources)       # Show sources table
-
-# Cell 6: Test Shadow Lab (Recalculation)
-recalc_result = await orchestrator.shadow_lab(
-    artifact_id=result.data_artifacts[0],
-    instruction="Recalculate with 15% growth assumption"
-)
-print(f"✅ Recalculation completed: {recalc_result.summary}")
-
-# Cell 7: Cleanup & Summary
-await orchestrator.shutdown()
-print("═" * 50)
-print("SIMULATION COMPLETE")
-print(f"  Total Duration: {result.total_duration_ms}ms")
-print(f"  Tools Invoked: {result.tool_invocations}")
-print(f"  Artifacts Generated: {len(result.data_artifacts)}")
-```
-
-**Case Categories:**
-
-| Category | Example Cases |
-|:---------|:--------------|
-| **Happy Path** | Complete research flow, successful scraping, valid analysis |
-| **Error Recovery** | Scraper timeout → retry, LLM rate limit → fallback |
-| **Edge Cases** | Empty search results, malformed HTML, conflicting sources |
-| **Performance** | Parallel 10-URL scrape, large DataFrame processing |
-| **Integration** | MCP → Orchestrator → RAG → API Gateway flow |
-
-**Hybrid Mode (Local + Cloud):**
-- **Local:** Quick component simulations during development
-- **Colab:** Validate individual MCP server behavior with real calls
-- **Kaggle:** Full end-to-end research simulations with GPU acceleration
-
----
-
-### Phase 8: Deployment *(Week 8-9)*
-**Goal:** Production-ready deployment with full observability.
-
-| Task | Description | Priority |
-|:-----|:------------|:--------:|
-| Create Dockerfiles | Multi-stage builds for all services + MCP servers | 🔴 Critical |
-| Setup docker-compose | Local full-stack development | 🔴 Critical |
-| **docker-compose.mcp.yml** | MCP servers standalone deployment | 🔴 Critical |
-| Create Kubernetes manifests | Production cluster deployment | 🟡 High |
-| **Deploy logging stack** | Loki + Promtail + Grafana | 🟡 High |
-| **Setup tracing** | Jaeger/Zipkin for distributed tracing | 🟡 High |
-| Setup monitoring | Prometheus + Grafana dashboards | 🟢 Medium |
-| Security hardening | Secret management, network policies | 🟢 Medium |
-| **MCP scaling** | Horizontal scaling for MCP servers | 🟢 Medium |
-
-**Deliverables:**
-- [ ] Docker images for all services and MCP servers
-- [ ] docker-compose for local development
-- [ ] **docker-compose.mcp.yml for isolated MCP testing**
-- [ ] Kubernetes manifests for production
-- [ ] **Logging stack deployment (Loki/Grafana)**
-- [ ] **Distributed tracing deployment**
-- [ ] Monitoring and alerting setup
-
----
-
-## 🎯 Milestone Summary
-
-| Milestone | Target | Key Deliverable |
-|:----------|:-------|:----------------|
-| **M0** | Week 1 | Project scaffolding & abstractions |
-| **M1** | Week 2 | **Logging infrastructure & observability** |
-| **M2** | Week 3 | **5 MCP Tool Servers operational** |
-| **M3** | Week 4 | Orchestrator with MCP Client & parallel execution |
-| **M4** | Week 5 | Memory vault with atomic facts |
-| **M5** | Week 6 | Full API gateway with MCP management |
-| **M6** | Week 7 | Async job processing with checkpoints |
-| **M7** | Week 8 | >80% test coverage, CI/CD |
-| **M8** | Week 9+ | Production deployment with full observability |
 
 ---
 
@@ -1897,18 +1567,23 @@ graph LR
 
 ## 🛡️ 10. Roadmap & Future Proofing
 
-### Phase 1: Foundation (Current)
-*   [x] Microservice Architecture.
-*   [x] Cyclic Research Graph (OODA Loop).
-*   [x] Atomic Fact Memory.
+### v1.0: Foundation ✅ Complete
+*   [x] Microservice Architecture
+*   [x] Cyclic Research Graph (OODA Loop)
+*   [x] Atomic Fact Memory
+*   [x] 14 MCP Tools, 8 API Routes, 3 Workers
 
-### Phase 2: Perception (Next)
-*   [ ] **Multimodal Input:** Allow users to upload a PDF/Image as the start of research.
-*   [ ] **Audio Output:** Generate an "Executive Podcast" summary of the research.
+### v2.0: Self-Adapting Platform 🚧 In Progress
+*   [ ] **Hardware Detection:** Auto-detect CPU/GPU/RAM, adaptive parallelism
+*   [ ] **Job Queue:** SQLite-backed persistence for Kaggle/Colab
+*   [ ] **HuggingFace Sync:** Cross-session state persistence
+*   [ ] **Database Building:** Stream millions of docs with auto-checkpoint
+*   [ ] **Adaptive Parsers:** LLM-generated parsers for unknown formats
+*   [ ] **1000+ Tools:** Hierarchical MCP routing with semantic search
 
-### Phase 3: Collaboration (Long Term)
-*   [ ] **Swarm Protocol:** Allow multiple "Kea" instances to talk to each other across different servers (e.g., a Finance Kea talking to a Legal Kea).
-*   [ ] **Human-in-the-Loop UI:** A dashboard to visualize the "Thought Graph" and manually prune branches.
+### v3.0: Collaboration (Long Term)
+*   [ ] **Swarm Protocol:** Multiple Kea instances (Finance ↔ Legal)
+*   [ ] **Human-in-the-Loop UI:** Thought Graph visualization
+*   [ ] **Multi-RAG Building:** Data collection agents
 
 ---
-
