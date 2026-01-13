@@ -161,45 +161,112 @@ class TestDataSourcesServerLive:
 class TestAnalyticsServerLive:
     """Live tests for analytics server."""
     
+    # Real CSV data URLs for testing
+    DATA_URLS = {
+        "sales": "https://raw.githubusercontent.com/azzindani/00_Data_Source/refs/heads/main/Adidas_US_Sales.csv",
+        "diabetes": "https://raw.githubusercontent.com/azzindani/00_Data_Source/refs/heads/main/Diabetes_Indicators.csv",
+        "bike_sales": "https://raw.githubusercontent.com/azzindani/00_Data_Source/refs/heads/main/Europe_Bike_Sales.csv",
+        "property": "https://raw.githubusercontent.com/azzindani/00_Data_Source/refs/heads/main/NYC_Property_Sales.csv",
+        "cardiovascular": "https://raw.githubusercontent.com/azzindani/00_Data_Source/refs/heads/main/Cardiovascular_Disease.csv",
+        "asthma": "https://raw.githubusercontent.com/azzindani/00_Data_Source/refs/heads/main/Asthma_Disease_Prediction.csv",
+        "loan": "https://raw.githubusercontent.com/azzindani/00_Data_Source/refs/heads/main/Loan_Default.csv",
+        "churn": "https://raw.githubusercontent.com/azzindani/00_Data_Source/refs/heads/main/Ecommerce_Customer_Churn.csv",
+    }
+    
     @pytest.mark.asyncio
     @pytest.mark.real_api
-    @pytest.mark.xfail(reason="EDA requires data_url with CSV file, not inline data")
     async def test_eda_auto_live(self, logger):
-        """Live EDA analysis (requires CSV URL)."""
-        pytest.skip("EDA requires data_url with CSV file, not inline data")
+        """Live EDA analysis with real CSV data."""
+        from mcp_servers.analytics_server.server import AnalyticsServer
+        
+        server = AnalyticsServer()
+        logger.info("Running automatic EDA on Adidas Sales data")
+        
+        result = await server._handle_eda_auto({
+            "data_url": self.DATA_URLS["sales"]
+        })
+        
+        content = result.content[0].text
+        logger.info(f"EDA: {len(content)} chars")
+        print(f"\n📊 EDA Results:\n{content[:1000]}...")
+        
+        assert "Dataset Overview" in content
+        assert not result.isError
     
     @pytest.mark.asyncio
     @pytest.mark.real_api
-    @pytest.mark.xfail(reason="Correlation requires data_url with CSV file") 
     async def test_correlation_live(self, logger):
-        """Live correlation analysis (requires CSV URL)."""
-        pytest.skip("Correlation requires data_url with CSV file")
-    
-    @pytest.mark.asyncio
-    @pytest.mark.real_api
-    async def test_correlation_live(self, logger):
-        """Live correlation analysis - requires actual CSV data_url."""
-        # Note: The server's _handle_correlation requires data_url with a CSV file
-        # This test would need a publicly accessible CSV URL
-        pytest.skip("Correlation requires data_url with CSV file")
+        """Live correlation analysis with real CSV data."""
+        from mcp_servers.analytics_server.server import AnalyticsServer
+        
+        server = AnalyticsServer()
+        logger.info("Running correlation on Diabetes data")
+        
+        result = await server._handle_correlation({
+            "data_url": self.DATA_URLS["diabetes"],
+            "method": "pearson"
+        })
+        
+        content = result.content[0].text
+        print(f"\n🔗 Correlations:\n{content[:800]}...")
+        
+        assert "Correlation Matrix" in content
+        assert not result.isError
 
 
 class TestMLServerLive:
     """Live tests for ML server."""
     
-    @pytest.mark.asyncio
-    @pytest.mark.real_api
-    @pytest.mark.xfail(reason="Clustering requires data_url with CSV file")
-    async def test_clustering_live(self, logger):
-        """Live clustering (requires CSV URL)."""
-        pytest.skip("Clustering requires data_url with CSV file")
+    # Real CSV data URLs for testing
+    DATA_URLS = {
+        "cardiovascular": "https://raw.githubusercontent.com/azzindani/00_Data_Source/refs/heads/main/Cardiovascular_Disease.csv",
+        "churn": "https://raw.githubusercontent.com/azzindani/00_Data_Source/refs/heads/main/Ecommerce_Customer_Churn.csv",
+        "loan": "https://raw.githubusercontent.com/azzindani/00_Data_Source/refs/heads/main/Loan_Default.csv",
+    }
     
     @pytest.mark.asyncio
     @pytest.mark.real_api
-    @pytest.mark.xfail(reason="Anomaly detection requires data_url with CSV file")
+    async def test_clustering_live(self, logger):
+        """Live clustering with real CSV data."""
+        from mcp_servers.ml_server.server import MLServer
+        
+        server = MLServer()
+        logger.info("Running K-means clustering on Customer Churn data")
+        
+        result = await server._handle_clustering({
+            "data_url": self.DATA_URLS["churn"],
+            "n_clusters": 3,
+            "method": "kmeans"
+        })
+        
+        content = result.content[0].text
+        logger.info(f"Clustering: {len(content)} chars")
+        print(f"\n🔮 Clustering Results:\n{content}")
+        
+        assert "Clustering Results" in content
+        assert "Cluster" in content
+        assert not result.isError
+    
+    @pytest.mark.asyncio
+    @pytest.mark.real_api
     async def test_anomaly_detection_live(self, logger):
-        """Live anomaly detection (requires CSV URL)."""
-        pytest.skip("Anomaly detection requires data_url with CSV file")
+        """Live anomaly detection with real CSV data."""
+        from mcp_servers.ml_server.server import MLServer
+        
+        server = MLServer()
+        logger.info("Running anomaly detection on Loan Default data")
+        
+        result = await server._handle_anomaly({
+            "data_url": self.DATA_URLS["loan"],
+            "method": "isolation_forest",
+            "contamination": 0.05
+        })
+        
+        content = result.content[0].text
+        print(f"\n🚨 Anomalies:\n{content}")
+        
+        assert "Anomaly Detection" in content
+        assert not result.isError
 
 
 # ============================================================================

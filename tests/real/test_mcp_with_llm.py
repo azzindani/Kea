@@ -176,10 +176,37 @@ Discuss:
     
     @pytest.mark.asyncio
     @pytest.mark.real_api
-    @pytest.mark.xfail(reason="EDA requires data_url with CSV file")
     async def test_eda_with_llm_insights(self, llm_provider, llm_config, logger):
-        """EDA results interpreted by LLM (requires CSV URL)."""
-        pytest.skip("EDA requires data_url with CSV file")
+        """EDA results interpreted by LLM with real CSV data."""
+        logger.info("Testing EDA + LLM insights")
+        
+        # 1. Run EDA with real CSV data
+        from mcp_servers.analytics_server.server import AnalyticsServer
+        
+        server = AnalyticsServer()
+        
+        # Use real data URL
+        data_url = "https://raw.githubusercontent.com/azzindani/00_Data_Source/refs/heads/main/Europe_Bike_Sales.csv"
+        
+        eda_result = await server._handle_eda_auto({"data_url": data_url})
+        eda_text = eda_result.content[0].text
+        
+        logger.info(f"EDA returned {len(eda_text)} chars")
+        print(f"\n📊 EDA Results:\n{eda_text[:800]}...")
+        
+        # 2. Have LLM provide insights
+        messages = [
+            LLMMessage(role=LLMRole.SYSTEM, content="You are a data scientist. Provide actionable insights from EDA."),
+            LLMMessage(role=LLMRole.USER, content=f"""Based on this exploratory data analysis of European Bike Sales:
+
+{eda_text}
+
+Provide 3 key insights and potential next steps for analysis.""")
+        ]
+        
+        content, _ = await print_stream(llm_provider, messages, llm_config, "EDA Insights")
+        
+        assert len(content) > 50, "Should generate insights"
 
 
 # ============================================================================
