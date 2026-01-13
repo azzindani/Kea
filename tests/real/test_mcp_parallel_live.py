@@ -142,10 +142,33 @@ class TestParallelExecutorIntegration:
     
     @pytest.mark.asyncio
     @pytest.mark.real_api
-    @pytest.mark.xfail(reason="execute_tools_parallel signature mismatch")
     async def test_parallel_executor_batch(self, logger):
         """Test parallel executor with batch of tasks."""
-        raise NotImplementedError("execute_tools_parallel signature mismatch")
+        from services.orchestrator.mcp.parallel_executor import execute_tools_parallel, ToolCall
+        from mcp_servers.search_server.tools.web_search import web_search_tool
+        
+        logger.info("Testing parallel executor")
+        
+        # Define a simple handler
+        async def tool_handler(tool_name: str, args: dict):
+            if tool_name == "web_search":
+                return await web_search_tool(args)
+            return None
+        
+        calls = [
+            ("web_search", {"query": "Python", "max_results": 2}),
+            ("web_search", {"query": "JavaScript", "max_results": 2}),
+        ]
+        
+        results = await execute_tools_parallel(calls, tool_handler, max_concurrent=2)
+        
+        print(f"\n⚡ Parallel Results: {len(results)} completed")
+        for i, result in enumerate(results):
+            if result and result.content:
+                print(f"   {i+1}. {len(result.content[0].text)} chars")
+        
+        assert len(results) == 2
+        assert all(r is not None for r in results)
 
 
 class TestConcurrentLLMCalls:
@@ -187,10 +210,25 @@ class TestBatchProcessing:
     
     @pytest.mark.asyncio
     @pytest.mark.real_api
-    @pytest.mark.xfail(reason="batch_scrape_tool not implemented")
     async def test_batch_scrape_parallel(self, logger):
         """Test batch URL scraping."""
-        raise NotImplementedError("batch_scrape_tool not implemented")
+        from mcp_servers.scraper_server.tools.batch_scrape import batch_scrape_tool
+        
+        logger.info("Testing batch scraping")
+        
+        result = await batch_scrape_tool({
+            "urls": [
+                "https://example.com",
+                "https://httpbin.org/html"
+            ],
+            "max_concurrent": 2
+        })
+        
+        content = result.content[0].text
+        print(f"\n📦 Batch Results:\n{content[:500]}")
+        
+        assert "Batch Scrape Results" in content
+        assert not result.isError
 
 
 if __name__ == "__main__":

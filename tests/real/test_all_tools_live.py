@@ -37,10 +37,26 @@ class TestScraperServerLive:
     
     @pytest.mark.asyncio
     @pytest.mark.real_api
-    @pytest.mark.xfail(reason="batch_scrape_tool not implemented")
     async def test_batch_scrape_live(self, logger):
         """Batch scrape multiple URLs."""
-        raise NotImplementedError("batch_scrape_tool not implemented")
+        from mcp_servers.scraper_server.tools.batch_scrape import batch_scrape_tool
+        
+        logger.info("Batch scraping 3 URLs")
+        result = await batch_scrape_tool({
+            "urls": [
+                "https://example.com",
+                "https://httpbin.org/html",
+                "https://httpbin.org/robots.txt"
+            ],
+            "max_concurrent": 3
+        })
+        
+        content = result.content[0].text
+        logger.info(f"Batch scrape: {len(content)} chars")
+        print(f"\n📦 Batch Scrape Results:\n{content[:1000]}...")
+        
+        assert "Batch Scrape Results" in content
+        assert not result.isError
 
 
 class TestSearchServerLive:
@@ -62,10 +78,23 @@ class TestSearchServerLive:
     
     @pytest.mark.asyncio
     @pytest.mark.real_api
-    @pytest.mark.xfail(reason="news_search_tool not implemented")
     async def test_news_search_live(self, logger):
         """Live news search."""
-        raise NotImplementedError("news_search_tool not implemented")
+        from mcp_servers.search_server.tools.news_search import news_search_tool
+        
+        logger.info("Searching news: artificial intelligence")
+        result = await news_search_tool({
+            "query": "artificial intelligence",
+            "days": 7,
+            "max_results": 5
+        })
+        
+        content = result.content[0].text
+        logger.info(f"News search: {len(content)} chars")
+        print(f"\n📰 News Results:\n{content[:800]}...")
+        
+        assert "News" in content or "news" in content.lower()
+        assert not result.isError
     
     @pytest.mark.asyncio
     @pytest.mark.real_api
@@ -409,17 +438,45 @@ class TestToolDiscoveryServerLive:
     
     @pytest.mark.asyncio
     @pytest.mark.real_api
-    @pytest.mark.xfail(reason="_handle_search_pypi not implemented")
     async def test_search_pypi_live(self, logger):
         """Live PyPI search."""
-        raise NotImplementedError("_handle_search_pypi not implemented")
+        from mcp_servers.tool_discovery_server.server import ToolDiscoveryServer
+        
+        server = ToolDiscoveryServer()
+        logger.info("Searching PyPI for: httpx")
+        
+        result = await server._handle_pypi_search({
+            "query": "httpx",
+            "max_results": 5
+        })
+        
+        content = result.content[0].text
+        logger.info(f"PyPI search: {len(content)} chars")
+        print(f"\n📦 PyPI Results:\n{content[:1000]}...")
+        
+        assert "httpx" in content.lower() or "PyPI" in content
+        assert not result.isError
     
     @pytest.mark.asyncio
     @pytest.mark.real_api
-    @pytest.mark.xfail(reason="_handle_eval_package not implemented")
     async def test_evaluate_package_live(self, logger):
         """Live package evaluation."""
-        raise NotImplementedError("_handle_eval_package not implemented")
+        from mcp_servers.tool_discovery_server.server import ToolDiscoveryServer
+        
+        server = ToolDiscoveryServer()
+        logger.info("Evaluating package: requests")
+        
+        result = await server._handle_evaluate({
+            "package_name": "requests",
+            "source": "pypi"
+        })
+        
+        content = result.content[0].text
+        logger.info(f"Package evaluation: {len(content)} chars")
+        print(f"\n🔍 Evaluation:\n{content[:1000]}...")
+        
+        assert "requests" in content.lower() or "Package" in content
+        assert not result.isError
 
 
 # ============================================================================

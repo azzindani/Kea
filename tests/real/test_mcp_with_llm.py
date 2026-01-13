@@ -84,10 +84,39 @@ Provide:
     
     @pytest.mark.asyncio
     @pytest.mark.real_api
-    @pytest.mark.xfail(reason="news_search_tool not implemented")
     async def test_news_search_and_synthesis(self, llm_provider, llm_config, logger):
         """News search results synthesized by LLM."""
-        raise NotImplementedError("news_search_tool not implemented")
+        logger.info("Testing news search + LLM synthesis")
+        
+        # 1. News search
+        from mcp_servers.search_server.tools.news_search import news_search_tool
+        
+        search_result = await news_search_tool({
+            "query": "artificial intelligence breakthroughs",
+            "days": 7,
+            "max_results": 5
+        })
+        news_text = search_result.content[0].text
+        
+        logger.info(f"News search returned {len(news_text)} chars")
+        print(f"\n📰 News Results:\n{news_text[:500]}...")
+        
+        # 2. Have LLM synthesize
+        messages = [
+            LLMMessage(role=LLMRole.SYSTEM, content="You are a news analyst. Synthesize news into key trends."),
+            LLMMessage(role=LLMRole.USER, content=f"""Analyze these recent news articles:
+
+{news_text}
+
+Provide:
+1. Main themes
+2. Key developments
+3. Outlook""")
+        ]
+        
+        content, _ = await print_stream(llm_provider, messages, llm_config, "News Synthesis")
+        
+        assert len(content) > 50, "Should generate synthesis"
 
 
 # ============================================================================
