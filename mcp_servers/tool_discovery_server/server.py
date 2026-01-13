@@ -492,7 +492,7 @@ class ToolDiscoveryServer(MCPServerBase):
         notes = {
             "maturity": f"v{info.get('version', 'N/A')}",
             "documentation": "Has docs" if scores["documentation"] > 0.6 else "Limited docs",
-            "license": info.get("license", "Unknown")[:20],
+            "license": (info.get("license") or "Unknown")[:20],
             "lightweight": f"{len(deps)} dependencies",
             "mcp_fit": "Good API patterns" if scores["mcp_fit"] > 0.7 else "Needs wrapper",
         }
