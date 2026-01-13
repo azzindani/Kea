@@ -87,7 +87,7 @@ Provide:
     @pytest.mark.xfail(reason="news_search_tool not implemented")
     async def test_news_search_and_synthesis(self, llm_provider, llm_config, logger):
         """News search results synthesized by LLM."""
-        pytest.skip("news_search_tool not implemented")
+        raise NotImplementedError("news_search_tool not implemented")
 
 
 # ============================================================================

@@ -145,7 +145,7 @@ class TestParallelExecutorIntegration:
     @pytest.mark.xfail(reason="execute_tools_parallel signature mismatch")
     async def test_parallel_executor_batch(self, logger):
         """Test parallel executor with batch of tasks."""
-        pytest.skip("execute_tools_parallel signature mismatch")
+        raise NotImplementedError("execute_tools_parallel signature mismatch")
 
 
 class TestConcurrentLLMCalls:
@@ -190,7 +190,7 @@ class TestBatchProcessing:
     @pytest.mark.xfail(reason="batch_scrape_tool not implemented")
     async def test_batch_scrape_parallel(self, logger):
         """Test batch URL scraping."""
-        pytest.skip("batch_scrape_tool not implemented")
+        raise NotImplementedError("batch_scrape_tool not implemented")
 
 
 if __name__ == "__main__":

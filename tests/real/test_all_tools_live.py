@@ -40,7 +40,7 @@ class TestScraperServerLive:
     @pytest.mark.xfail(reason="batch_scrape_tool not implemented")
     async def test_batch_scrape_live(self, logger):
         """Batch scrape multiple URLs."""
-        pytest.skip("batch_scrape_tool not implemented")
+        raise NotImplementedError("batch_scrape_tool not implemented")
 
 
 class TestSearchServerLive:
@@ -65,7 +65,7 @@ class TestSearchServerLive:
     @pytest.mark.xfail(reason="news_search_tool not implemented")
     async def test_news_search_live(self, logger):
         """Live news search."""
-        pytest.skip("news_search_tool not implemented")
+        raise NotImplementedError("news_search_tool not implemented")
     
     @pytest.mark.asyncio
     @pytest.mark.real_api
@@ -347,15 +347,19 @@ class TestQualitativeServerLive:
         server = QualitativeServer()
         
         result = await server._handle_triangulation({
+            "claim": "Revenue grew approximately 15%",
             "sources": [
-                {"name": "Reuters", "claim": "Revenue grew 15%", "credibility": 0.9},
-                {"name": "Bloomberg", "claim": "Revenue up 14-16%", "credibility": 0.9},
-                {"name": "Company Report", "claim": "Revenue increased 15.2%", "credibility": 0.95},
-            ]
+                {"text": "Reuters reports revenue grew 15%", "credibility": 0.9, "supports": True},
+                {"text": "Bloomberg says revenue up 14-16%", "credibility": 0.9, "supports": True},
+                {"text": "Company Report: Revenue increased 15.2%", "credibility": 0.95, "supports": True},
+            ],
+            "min_sources": 2
         })
         
         content = result.content[0].text
         print(f"\n🔺 Triangulation:\n{content}")
+        
+        assert "VERIFIED" in content or "Triangulation" in content
 
 
 class TestSecurityServerLive:
@@ -408,14 +412,14 @@ class TestToolDiscoveryServerLive:
     @pytest.mark.xfail(reason="_handle_search_pypi not implemented")
     async def test_search_pypi_live(self, logger):
         """Live PyPI search."""
-        pytest.skip("_handle_search_pypi not implemented")
+        raise NotImplementedError("_handle_search_pypi not implemented")
     
     @pytest.mark.asyncio
     @pytest.mark.real_api
     @pytest.mark.xfail(reason="_handle_eval_package not implemented")
     async def test_evaluate_package_live(self, logger):
         """Live package evaluation."""
-        pytest.skip("_handle_eval_package not implemented")
+        raise NotImplementedError("_handle_eval_package not implemented")
 
 
 # ============================================================================

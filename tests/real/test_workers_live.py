@@ -157,7 +157,7 @@ class TestWorkerQueue:
     async def test_queue_push_pop(self, logger):
         """Test queue operations."""
         logger.info("Testing queue operations")
-        pytest.skip("get_queue not exported from shared.queue")
+        raise NotImplementedError("get_queue not exported from shared.queue")
 
 
 if __name__ == "__main__":
