@@ -266,7 +266,7 @@ class TestQualitativeServerLive:
         Mountain View headquarters.
         """
         
-        result = await server._handle_entity_extract({"text": text})
+        result = await server._handle_entity_extractor({"text": text})
         
         content = result.content[0].text
         print(f"\n🏷️ Entities:\n{content}")
@@ -279,7 +279,7 @@ class TestQualitativeServerLive:
         
         server = QualitativeServer()
         
-        result = await server._handle_triangulate({
+        result = await server._handle_triangulation({
             "sources": [
                 {"name": "Reuters", "claim": "Revenue grew 15%", "credibility": 0.9},
                 {"name": "Bloomberg", "claim": "Revenue up 14-16%", "credibility": 0.9},
@@ -302,7 +302,7 @@ class TestSecurityServerLive:
         
         server = SecurityServer()
         
-        result = await server._handle_scan_url({
+        result = await server._handle_url_scan({
             "url": "https://example.com"
         })
         
@@ -369,7 +369,7 @@ class TestIntegrationLive:
         from mcp_servers.data_sources_server.server import DataSourcesServer
         data_server = DataSourcesServer()
         
-        stock_result = await data_server._handle_yahoo_finance({
+        stock_result = await data_server._handle_yfinance({
             "symbol": "MSFT",
             "period": "1mo"
         })

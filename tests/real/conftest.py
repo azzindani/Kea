@@ -96,6 +96,9 @@ async def stream_and_collect(provider, messages, config):
     
     Returns:
         tuple: (full_content, reasoning_content, chunks_list)
+        
+    Note: If content is empty but reasoning has content, content will be
+    set to reasoning (some free models put all output in reasoning field).
     """
     await rate_limit_wait()  # Rate limiting
     
@@ -106,15 +109,24 @@ async def stream_and_collect(provider, messages, config):
     async for chunk in provider.stream(messages, config):
         chunks.append(chunk)
         if chunk.is_reasoning:
-            reasoning_content += chunk.reasoning
+            reasoning_content += chunk.reasoning or ""
         else:
-            full_content += chunk.content
+            full_content += chunk.content or ""
+    
+    # Fallback: if content is empty but reasoning has content, use reasoning
+    if not full_content.strip() and reasoning_content.strip():
+        full_content = reasoning_content
     
     return full_content, reasoning_content, chunks
 
 
 async def print_stream(provider, messages, config, label="Response"):
-    """Stream and print LLM response in real-time (with rate limiting)."""
+    """
+    Stream and print LLM response in real-time (with rate limiting).
+    
+    Note: If content is empty but reasoning has content, content will be
+    set to reasoning (some free models put all output in reasoning field).
+    """
     await rate_limit_wait()  # Rate limiting
     
     print(f"\n{'='*60}")
@@ -128,13 +140,18 @@ async def print_stream(provider, messages, config, label="Response"):
         if chunk.is_reasoning:
             if not reasoning_content:
                 print("\n💭 Reasoning:")
-            print(chunk.reasoning, end="", flush=True)
-            reasoning_content += chunk.reasoning
+            print(chunk.reasoning or "", end="", flush=True)
+            reasoning_content += chunk.reasoning or ""
         else:
             if reasoning_content and not full_content:
                 print("\n\n📝 Response:")
-            print(chunk.content, end="", flush=True)
-            full_content += chunk.content
+            print(chunk.content or "", end="", flush=True)
+            full_content += chunk.content or ""
+    
+    # Fallback: if content is empty but reasoning has content, use reasoning
+    if not full_content.strip() and reasoning_content.strip():
+        full_content = reasoning_content
+        print(f"\n(Using reasoning as content)")
     
     print(f"\n{'='*60}\n")
     return full_content, reasoning_content
