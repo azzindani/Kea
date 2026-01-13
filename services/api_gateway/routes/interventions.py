@@ -106,6 +106,22 @@ async def create_intervention(request: CreateInterventionRequest):
     })
 
 
+# Route order matters - static paths before dynamic paths
+
+@router.get("/pending")
+async def list_pending_interventions():
+    """List all pending interventions requiring human action."""
+    pending = [
+        InterventionRequest(**{k: v for k, v in i.items() if k != "response"})
+        for i in _interventions.values()
+        if i["status"] == InterventionStatus.PENDING
+    ]
+    
+    pending.sort(key=lambda x: x.created_at)
+    
+    return {"pending": pending, "count": len(pending)}
+
+
 @router.get("/{intervention_id}", response_model=InterventionRequest)
 async def get_intervention(intervention_id: str):
     """Get intervention details."""
@@ -177,15 +193,3 @@ async def list_interventions(
     return {"interventions": results, "total": len(results)}
 
 
-@router.get("/pending")
-async def list_pending_interventions():
-    """List all pending interventions requiring human action."""
-    pending = [
-        InterventionRequest(**{k: v for k, v in i.items() if k != "response"})
-        for i in _interventions.values()
-        if i["status"] == InterventionStatus.PENDING
-    ]
-    
-    pending.sort(key=lambda x: x.created_at)
-    
-    return {"pending": pending, "count": len(pending)}

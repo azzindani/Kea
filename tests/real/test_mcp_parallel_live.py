@@ -144,26 +144,31 @@ class TestParallelExecutorIntegration:
     @pytest.mark.real_api
     async def test_parallel_executor_batch(self, logger):
         """Test parallel executor with batch of tasks."""
-        logger.info("Testing parallel executor batch")
+        from services.orchestrator.mcp.parallel_executor import execute_tools_parallel, ToolCall
+        from mcp_servers.search_server.tools.web_search import web_search_tool
         
-        from services.orchestrator.mcp.parallel_executor import execute_tools_parallel
-        from services.orchestrator.mcp.registry import ToolRegistry
+        logger.info("Testing parallel executor")
         
-        # Test tasks
-        tasks = [
-            {"server": "search_server", "tool": "web_search", "args": {"query": "test 1"}},
-            {"server": "search_server", "tool": "web_search", "args": {"query": "test 2"}},
+        # Define a simple handler
+        async def tool_handler(tool_name: str, args: dict):
+            if tool_name == "web_search":
+                return await web_search_tool(args)
+            return None
+        
+        calls = [
+            ("web_search", {"query": "Python", "max_results": 2}),
+            ("web_search", {"query": "JavaScript", "max_results": 2}),
         ]
         
-        # Execute in parallel
-        start = time.perf_counter()
-        results = await execute_tools_parallel(tasks, max_concurrent=2)
-        elapsed = time.perf_counter() - start
+        results = await execute_tools_parallel(calls, tool_handler, max_concurrent=2)
         
-        print(f"\n⚡ Batch execution: {elapsed:.2f}s for {len(tasks)} tasks")
-        print(f"   Results: {len(results)}")
+        print(f"\n⚡ Parallel Results: {len(results)} completed")
+        for i, result in enumerate(results):
+            if result and result.content:
+                print(f"   {i+1}. {len(result.content[0].text)} chars")
         
-        assert len(results) == len(tasks)
+        assert len(results) == 2
+        assert all(r is not None for r in results)
 
 
 class TestConcurrentLLMCalls:
@@ -207,29 +212,22 @@ class TestBatchProcessing:
     @pytest.mark.real_api
     async def test_batch_scrape_parallel(self, logger):
         """Test batch URL scraping."""
-        logger.info("Testing batch URL scraping")
+        from mcp_servers.scraper_server.tools.batch_scrape import batch_scrape_tool
         
-        from mcp_servers.scraper_server.tools.fetch_url import batch_scrape_tool
-        
-        urls = [
-            "https://example.com",
-            "https://example.org",
-        ]
-        
-        start = time.perf_counter()
+        logger.info("Testing batch scraping")
         
         result = await batch_scrape_tool({
-            "urls": urls,
+            "urls": [
+                "https://example.com",
+                "https://httpbin.org/html"
+            ],
             "max_concurrent": 2
         })
         
-        elapsed = time.perf_counter() - start
+        content = result.content[0].text
+        print(f"\n📦 Batch Results:\n{content[:500]}")
         
-        print(f"\n⚡ Batch scrape: {elapsed:.2f}s for {len(urls)} URLs")
-        
-        if not result.isError:
-            print(f"   Result: {len(result.content[0].text)} chars")
-        
+        assert "Batch Scrape Results" in content
         assert not result.isError
 
 

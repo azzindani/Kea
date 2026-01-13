@@ -88,26 +88,30 @@ Provide:
         """News search results synthesized by LLM."""
         logger.info("Testing news search + LLM synthesis")
         
-        # 1. Search news
-        from mcp_servers.search_server.tools.web_search import news_search_tool
+        # 1. News search
+        from mcp_servers.search_server.tools.news_search import news_search_tool
         
-        news_result = await news_search_tool({
-            "query": "artificial intelligence",
+        search_result = await news_search_tool({
+            "query": "artificial intelligence breakthroughs",
+            "days": 7,
             "max_results": 5
         })
-        news_text = news_result.content[0].text
+        news_text = search_result.content[0].text
         
         logger.info(f"News search returned {len(news_text)} chars")
-        print(f"\n📰 News Results:\n{news_text[:600]}...")
+        print(f"\n📰 News Results:\n{news_text[:500]}...")
         
         # 2. Have LLM synthesize
         messages = [
-            LLMMessage(role=LLMRole.SYSTEM, content="You are a news analyst. Synthesize current events concisely."),
-            LLMMessage(role=LLMRole.USER, content=f"""Based on these news headlines, write a brief analysis of current AI trends:
+            LLMMessage(role=LLMRole.SYSTEM, content="You are a news analyst. Synthesize news into key trends."),
+            LLMMessage(role=LLMRole.USER, content=f"""Analyze these recent news articles:
 
 {news_text}
 
-Focus on: key developments, industry impact, future implications.""")
+Provide:
+1. Main themes
+2. Key developments
+3. Outlook""")
         ]
         
         content, _ = await print_stream(llm_provider, messages, llm_config, "News Synthesis")
@@ -202,29 +206,18 @@ Discuss:
     @pytest.mark.asyncio
     @pytest.mark.real_api
     async def test_eda_with_llm_insights(self, llm_provider, llm_config, logger):
-        """EDA results interpreted by LLM."""
+        """EDA results interpreted by LLM with real CSV data."""
         logger.info("Testing EDA + LLM insights")
         
-        # 1. Run EDA
+        # 1. Run EDA with real CSV data
         from mcp_servers.analytics_server.server import AnalyticsServer
         
         server = AnalyticsServer()
         
-        # Sample dataset
-        data = {
-            "columns": ["age", "income", "score"],
-            "rows": [
-                [25, 50000, 85],
-                [35, 75000, 90],
-                [45, 95000, 78],
-                [28, 55000, 88],
-                [52, 120000, 72],
-                [31, 62000, 91],
-                [40, 85000, 80],
-            ]
-        }
+        # Use real data URL
+        data_url = "https://raw.githubusercontent.com/azzindani/00_Data_Source/refs/heads/main/Europe_Bike_Sales.csv"
         
-        eda_result = await server._handle_eda_auto({"data": data})
+        eda_result = await server._handle_eda_auto({"data_url": data_url})
         eda_text = eda_result.content[0].text
         
         logger.info(f"EDA returned {len(eda_text)} chars")
@@ -233,7 +226,7 @@ Discuss:
         # 2. Have LLM provide insights
         messages = [
             LLMMessage(role=LLMRole.SYSTEM, content="You are a data scientist. Provide actionable insights from EDA."),
-            LLMMessage(role=LLMRole.USER, content=f"""Based on this exploratory data analysis:
+            LLMMessage(role=LLMRole.USER, content=f"""Based on this exploratory data analysis of European Bike Sales:
 
 {eda_text}
 
@@ -309,7 +302,7 @@ class TestQualitativeWithLLM:
         The announcement was made at their headquarters in Cupertino, California.
         """
         
-        extract_result = await server._handle_entity_extract({"text": text})
+        extract_result = await server._handle_entity_extractor({"text": text})
         entities_text = extract_result.content[0].text
         
         logger.info(f"Extracted entities: {len(entities_text)} chars")

@@ -28,6 +28,29 @@ class AnalyticsServer(MCPServerBase):
     def __init__(self) -> None:
         super().__init__(name="analytics_server")
     
+    def _load_dataframe(self, args: dict):
+        """
+        Load DataFrame from either data_url or inline data.
+        
+        Supports:
+        - data_url: URL to CSV file
+        - data: {"columns": [...], "rows": [[...], ...]}
+        """
+        import pandas as pd
+        
+        if "data_url" in args and args["data_url"]:
+            return pd.read_csv(args["data_url"])
+        elif "data" in args and args["data"]:
+            data = args["data"]
+            if isinstance(data, dict) and "columns" in data and "rows" in data:
+                return pd.DataFrame(data["rows"], columns=data["columns"])
+            elif isinstance(data, list):
+                return pd.DataFrame(data)
+            else:
+                raise ValueError("Invalid data format. Expected {columns: [], rows: []} or list of dicts")
+        else:
+            raise ValueError("Either data_url or data must be provided")
+    
     def get_tools(self) -> list[Tool]:
         """Return available tools."""
         return [
@@ -38,9 +61,10 @@ class AnalyticsServer(MCPServerBase):
                     type="object",
                     properties={
                         "data_url": {"type": "string", "description": "URL to CSV data"},
+                        "data": {"type": "object", "description": "Inline data: {columns: [], rows: []}"},
                         "target_column": {"type": "string", "description": "Optional target variable for analysis"},
                     },
-                    required=["data_url"],
+                    required=[],
                 ),
             ),
             Tool(
@@ -76,10 +100,11 @@ class AnalyticsServer(MCPServerBase):
                     type="object",
                     properties={
                         "data_url": {"type": "string", "description": "URL to CSV data"},
+                        "data": {"type": "object", "description": "Inline data: {columns: [], rows: []}"},
                         "method": {"type": "string", "description": "Method: pearson, spearman, kendall"},
                         "threshold": {"type": "number", "description": "Only show correlations above threshold"},
                     },
-                    required=["data_url"],
+                    required=[],
                 ),
             ),
             Tool(
@@ -143,10 +168,8 @@ class AnalyticsServer(MCPServerBase):
         import pandas as pd
         import numpy as np
         
-        url = args["data_url"]
+        df = self._load_dataframe(args)
         target = args.get("target_column")
-        
-        df = pd.read_csv(url)
         
         result = "# 📊 Automatic EDA Report\n\n"
         
@@ -334,11 +357,9 @@ class AnalyticsServer(MCPServerBase):
         import pandas as pd
         import numpy as np
         
-        url = args["data_url"]
+        df = self._load_dataframe(args)
         method = args.get("method", "pearson")
         threshold = args.get("threshold", 0.0)
-        
-        df = pd.read_csv(url)
         numeric_df = df.select_dtypes(include=[np.number])
         
         corr = numeric_df.corr(method=method)

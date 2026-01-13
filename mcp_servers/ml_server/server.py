@@ -27,6 +27,29 @@ class MLServer(MCPServerBase):
     def __init__(self) -> None:
         super().__init__(name="ml_server")
     
+    def _load_dataframe(self, args: dict):
+        """
+        Load DataFrame from either data_url or inline data.
+        
+        Supports:
+        - data_url: URL to CSV file
+        - data: {"columns": [...], "rows": [[...], ...]}
+        """
+        import pandas as pd
+        
+        if "data_url" in args and args["data_url"]:
+            return pd.read_csv(args["data_url"])
+        elif "data" in args and args["data"]:
+            data = args["data"]
+            if isinstance(data, dict) and "columns" in data and "rows" in data:
+                return pd.DataFrame(data["rows"], columns=data["columns"])
+            elif isinstance(data, list):
+                return pd.DataFrame(data)
+            else:
+                raise ValueError("Invalid data format. Expected {columns: [], rows: []} or list of dicts")
+        else:
+            raise ValueError("Either data_url or data must be provided")
+    
     def get_tools(self) -> list[Tool]:
         """Return available tools."""
         return [
@@ -64,10 +87,11 @@ class MLServer(MCPServerBase):
                     type="object",
                     properties={
                         "data_url": {"type": "string", "description": "URL to CSV data"},
+                        "data": {"type": "object", "description": "Inline data: {columns: [], rows: []}"},
                         "n_clusters": {"type": "integer", "description": "Number of clusters (or 'auto')"},
                         "method": {"type": "string", "description": "Method: kmeans, dbscan, hierarchical"},
                     },
-                    required=["data_url"],
+                    required=[],
                 ),
             ),
             Tool(
@@ -77,10 +101,11 @@ class MLServer(MCPServerBase):
                     type="object",
                     properties={
                         "data_url": {"type": "string", "description": "URL to CSV data"},
+                        "data": {"type": "object", "description": "Inline data: {columns: [], rows: []}"},
                         "method": {"type": "string", "description": "Method: isolation_forest, lof, zscore"},
                         "contamination": {"type": "number", "description": "Expected proportion of outliers"},
                     },
-                    required=["data_url"],
+                    required=[],
                 ),
             ),
             Tool(
@@ -296,11 +321,9 @@ class MLServer(MCPServerBase):
         from sklearn.preprocessing import StandardScaler, LabelEncoder
         from sklearn.metrics import silhouette_score
         
-        url = args["data_url"]
+        df = self._load_dataframe(args)
         n_clusters = args.get("n_clusters", 3)
         method = args.get("method", "kmeans")
-        
-        df = pd.read_csv(url)
         
         # Prepare numeric data
         le = LabelEncoder()
@@ -352,11 +375,9 @@ class MLServer(MCPServerBase):
         from sklearn.ensemble import IsolationForest
         from sklearn.preprocessing import StandardScaler, LabelEncoder
         
-        url = args["data_url"]
+        df = self._load_dataframe(args)
         method = args.get("method", "isolation_forest")
         contamination = args.get("contamination", 0.1)
-        
-        df = pd.read_csv(url)
         
         # Prepare numeric data
         le = LabelEncoder()

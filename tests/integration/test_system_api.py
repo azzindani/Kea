@@ -2,6 +2,11 @@
 Integration Tests: System API.
 
 Tests for /api/v1/system/* endpoints.
+Actual routes (from system.py):
+- GET /health - System health
+- GET /capabilities - System capabilities
+- GET /config - Configuration
+- GET /metrics/summary - Metrics summary
 """
 
 import pytest
@@ -50,14 +55,15 @@ class TestSystemMetrics:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_get_metrics_summary(self):
-        """Get metrics summary."""
+        """Get metrics summary (correct path is /metrics/summary)."""
         async with httpx.AsyncClient(timeout=10) as client:
-            response = await client.get(f"{API_URL}/api/v1/system/metrics")
+            # Correct path is /metrics/summary, not /metrics
+            response = await client.get(f"{API_URL}/api/v1/system/metrics/summary")
         
         assert response.status_code == 200
         data = response.json()
         
-        assert "uptime_seconds" in data or isinstance(data, dict)
+        assert isinstance(data, dict)
 
 
 if __name__ == "__main__":

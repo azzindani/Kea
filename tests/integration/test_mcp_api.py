@@ -2,6 +2,12 @@
 Integration Tests: MCP API.
 
 Tests for /api/v1/mcp/* endpoints.
+Actual routes (from mcp.py):
+- GET /servers - List servers
+- GET /tools - List tools
+- GET /tools/{tool_name} - Get tool info
+- POST /invoke - Invoke tool
+- POST /servers/{name}/restart - Restart server
 """
 
 import pytest
@@ -64,10 +70,11 @@ class TestMCPToolInvocation:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_invoke_tool(self):
-        """Invoke a tool via API."""
+        """Invoke a tool via API (POST /invoke)."""
         async with httpx.AsyncClient(timeout=30) as client:
+            # Correct path is /invoke, not /tools/invoke
             response = await client.post(
-                f"{API_URL}/api/v1/mcp/tools/invoke",
+                f"{API_URL}/api/v1/mcp/invoke",
                 json={
                     "tool_name": "execute_code",
                     "arguments": {"code": "print(1+1)"},
@@ -79,7 +86,7 @@ class TestMCPToolInvocation:
         
         if response.status_code == 200:
             data = response.json()
-            assert "result" in data
+            assert "tool_name" in data or "content" in data
 
 
 if __name__ == "__main__":

@@ -19,12 +19,12 @@ class TestCompleteResearchE2E:
     async def test_quick_answer_flow(self):
         """Test quick answer research flow."""
         async with httpx.AsyncClient(timeout=120) as client:
-            # 1. Create job
+            # 1. Create job (using valid job_type enum)
             create_resp = await client.post(
                 f"{API_URL}/api/v1/jobs/",
                 json={
                     "query": "What is Python?",
-                    "job_type": "quick_answer",
+                    "job_type": "deep_research",  # Valid enum value
                     "depth": 1,
                 }
             )

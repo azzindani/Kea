@@ -41,8 +41,8 @@ class FactStore:
         results = await store.search("nickel production volume", limit=5)
     """
     
-    def __init__(self, vector_store: VectorStore | None = None) -> None:
-        self._vector_store = vector_store or create_vector_store()
+    def __init__(self, vector_store: VectorStore | None = None, use_memory: bool = False) -> None:
+        self._vector_store = vector_store or create_vector_store(use_memory=use_memory)
         self._facts: dict[str, AtomicFact] = {}  # In-memory cache
     
     async def add_fact(self, fact: AtomicFact) -> str:
@@ -154,6 +154,19 @@ class FactStore:
     async def get_entities(self) -> list[str]:
         """Get list of unique entities."""
         return list(set(f.entity for f in self._facts.values()))
+    
+    async def get_facts_by_entity(self, entity: str) -> list[AtomicFact]:
+        """
+        Get all facts for a specific entity.
+        
+        Args:
+            entity: Entity name to search for
+            
+        Returns:
+            List of facts for the entity
+        """
+        return [f for f in self._facts.values() if f.entity == entity]
+    
     
     def _fact_to_text(self, fact: AtomicFact) -> str:
         """Convert fact to searchable text."""
