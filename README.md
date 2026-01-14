@@ -1604,17 +1604,41 @@ graph LR
 *   [x] Atomic Fact Memory
 *   [x] 14 MCP Tools, 8 API Routes, 3 Workers
 
-### v2.0: Systemic AI Platform 🚧 In Progress
-*   [ ] **Core Hardening:** Resource monitor, graceful degradation
-*   [ ] **JIT Dependencies:** `uv` on-demand install, tool isolation
-*   [ ] **System Prompt Factory:** Dynamic prompts per domain
-*   [ ] **Agent Spawner:** Self-multiplying agents for massive tasks
-*   [ ] **HuggingFace Sync:** Cross-session persistence
-*   [ ] **1000+ Tool Routing:** Semantic index, lazy loading
+### v2.0: Systemic AI Platform ✅ Complete
+*   [x] **v2.1 Hardware Monitoring:** Resource detection, memory pressure tracking
+*   [x] **v2.2 Graceful Degradation:** Auto-throttle under pressure, circuit breakers
+*   [x] **v2.3 JIT Dependencies:** `uv` on-demand install, tool isolation
+*   [x] **v2.4 System Prompt Factory:** Dynamic prompts per domain/task
+*   [x] **v2.5 Agent Spawner:** Self-multiplying agents for massive tasks
+*   [x] **v2.6 HuggingFace Sync:** Cross-session persistence
+*   [x] **v2.7 Conversational Memory:** Intent detection, smart context injection
+*   [x] **v2.8 Curiosity Engine:** Auto-generate follow-up questions
 
-### v3.0: Swarm Intelligence (Long Term)
+### v3.0: Enterprise Kernel ✅ Complete
+*   [x] **Organization Module:** Department → Team → Agent hierarchy
+*   [x] **Work Unit System:** WorkBoard, Priority, dependencies
+*   [x] **Message Bus:** Inter-agent communication, request-response
+*   [x] **Supervisor Layer:** QualityGate, escalation, health monitoring
+*   [x] **Security Hardening:** ResourceGuard, KillSwitch, rate limiting
+
+```
+Organization
+├── Department (domain-specialized)
+│   ├── Team (coordinated agent pool)
+│   │   └── AgentInstance (role-based)
+│   └── WorkBoard (task management)
+└── Supervisor (oversight + escalation)
+```
+
+### v3.1: Distributed Operations 🛠️ Planned
+*   [ ] **Multi-Process Workers:** Process-based agent isolation
+*   [ ] **Redis Message Broker:** Pub/sub for MessageBus
+*   [ ] **Prometheus Metrics:** Full observability
+
+### v4.0: Swarm Intelligence (Long Term)
 *   [ ] **Multi-Kea Protocol:** Instances talk to each other (Finance ↔ Legal)
 *   [ ] **Knowledge Synthesis:** Build evolving knowledge bases
+*   [ ] **Kubernetes Orchestration:** Auto-scale agent pods
 *   [ ] **Multimodal:** Gemini Flash for vision/audio
 
 ---

@@ -64,6 +64,48 @@ from services.orchestrator.core.curiosity import (
     Fact,
     get_curiosity_engine,
 )
+from services.orchestrator.core.guards import (
+    ResourceGuard,
+    RateLimiter,
+    get_resource_guard,
+)
+from services.orchestrator.core.kill_switch import (
+    KillSwitch,
+    get_kill_switch,
+)
+# v3.0 Enterprise Kernel
+from services.orchestrator.core.organization import (
+    Organization,
+    Department,
+    Team,
+    Role,
+    RoleType,
+    AgentInstance,
+    get_organization,
+)
+from services.orchestrator.core.work_unit import (
+    WorkUnit,
+    WorkBoard,
+    WorkType,
+    WorkStatus,
+    Priority,
+    get_work_board,
+)
+from services.orchestrator.core.messaging import (
+    Message,
+    MessageBus,
+    MessageType,
+    get_message_bus,
+)
+from services.orchestrator.core.supervisor import (
+    Supervisor,
+    QualityGate,
+    ReviewResult,
+    HealthReport,
+    Escalation,
+    EscalationType,
+    get_supervisor,
+)
 
 __all__ = [
     # Graph
@@ -113,6 +155,41 @@ __all__ = [
     "QuestionType",
     "Fact",
     "get_curiosity_engine",
+    # Guards (Security)
+    "ResourceGuard",
+    "RateLimiter",
+    "get_resource_guard",
+    # Kill Switch (Emergency Controls)
+    "KillSwitch",
+    "get_kill_switch",
+    # v3.0 Organization
+    "Organization",
+    "Department",
+    "Team",
+    "Role",
+    "RoleType",
+    "AgentInstance",
+    "get_organization",
+    # v3.0 Work Units
+    "WorkUnit",
+    "WorkBoard",
+    "WorkType",
+    "WorkStatus",
+    "Priority",
+    "get_work_board",
+    # v3.0 Messaging
+    "Message",
+    "MessageBus",
+    "MessageType",
+    "get_message_bus",
+    # v3.0 Supervisor
+    "Supervisor",
+    "QualityGate",
+    "ReviewResult",
+    "HealthReport",
+    "Escalation",
+    "EscalationType",
+    "get_supervisor",
 ]
 
 

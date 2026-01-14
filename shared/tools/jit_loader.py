@@ -41,6 +41,7 @@ class JITLoader:
     - Cache installed packages
     - Fallback to pip if uv unavailable
     - GPU-aware package selection
+    - Security: Package whitelist validation
     
     Example:
         loader = JITLoader()
@@ -52,12 +53,16 @@ class JITLoader:
         import pymupdf
     """
     
+    # Regex for valid package names (alphanumeric, dash, underscore, optional extras)
+    VALID_PACKAGE_PATTERN = r'^[a-zA-Z0-9][a-zA-Z0-9._-]*(\[[a-zA-Z0-9,_-]+\])?$'
+    
     def __init__(self, config_path: str | None = None):
         self.config_path = config_path or self._find_config()
         self._config = self._load_config()
         self._installed: set[str] = set()
         self._has_uv: bool | None = None
         self._has_gpu: bool | None = None
+        self._allowed_packages: set[str] | None = None  # Lazy-computed whitelist
     
     def _find_config(self) -> str:
         """Find tools.yaml config file."""
@@ -136,10 +141,57 @@ class JITLoader:
         except ImportError:
             return False
     
+    def _get_allowed_packages(self) -> set[str]:
+        """Build whitelist of allowed packages from tools.yaml."""
+        if self._allowed_packages is not None:
+            return self._allowed_packages
+        
+        allowed = set()
+        tools = self._config.get("tools", {})
+        
+        for tool_config in tools.values():
+            allowed.update(tool_config.get("packages", []))
+            allowed.update(tool_config.get("optional", []))
+            allowed.update(tool_config.get("gpu_packages", []))
+        
+        self._allowed_packages = allowed
+        logger.debug(f"Built package whitelist with {len(allowed)} packages")
+        return allowed
+    
+    def _validate_package(self, package: str) -> bool:
+        """
+        Validate package name for security.
+        
+        Checks:
+        1. Package is in whitelist (from tools.yaml)
+        2. Package name matches safe pattern (no shell injection)
+        """
+        import re
+        
+        # Check whitelist
+        allowed = self._get_allowed_packages()
+        base_package = package.split("[")[0]  # Handle extras like pkg[extra]
+        
+        if base_package not in allowed and package not in allowed:
+            logger.warning(f"Package not in whitelist: {package}")
+            return False
+        
+        # Check pattern for shell safety
+        if not re.match(self.VALID_PACKAGE_PATTERN, package):
+            logger.warning(f"Invalid package name pattern: {package}")
+            return False
+        
+        return True
+    
     async def install_package(self, package: str) -> bool:
-        """Install a single package."""
+        """Install a single package with security validation."""
         if self.is_installed(package):
             return True
+        
+        # Security validation
+        if not self._validate_package(package):
+            logger.error(f"Security: Blocked install of non-whitelisted package: {package}")
+            return False
         
         logger.info(f"Installing package: {package}")
         
