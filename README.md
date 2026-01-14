@@ -484,38 +484,61 @@ All foundation phases have been completed:
 ## 🚀 v2.0 Roadmap (NEXT)
 
 ### Vision
-Transform Kea into a **self-adapting, scalable data engineering platform** for constrained environments (Kaggle/Colab).
+Transform Kea into a **systemic, self-adapting research automation engine** that operates like a corporation with 100K specialized employees.
 
-### v2.1: Hardware Detection & Job Queue
-- Hardware auto-detection (CPU, RAM, GPU, VRAM)
-- Adaptive parallelism engine
-- SQLite-backed job queue (no Redis dependency)
-- LLM failover (Nemotron → Gemini)
+### 🏗️ Core Architecture Principles
 
-### v2.2: HuggingFace Persistence
-- State persistence to HuggingFace repos
-- Job checkpoint save/load (cross-session)
-- Database push/pull for continuity
+| Principle | Description |
+|-----------|-------------|
+| **Systemic AI** | Not single persona—self-multiplying agent swarm with dynamic system prompts |
+| **ARM Modularity** | LangGraph core + optional MCP tool extensions (like ARM unified chips) |
+| **JIT Dependencies** | `uv` on-demand package install (no 1000-package requirements.txt) |
+| **Tool Isolation** | Each MCP server runs in own process (avoids dependency conflicts) |
+| **Hardware Efficiency** | Must run on VPS KVM2 / Colab Free / Kaggle |
+| **Text-First** | Multimodal via Gemini later, text focus now |
+| **Self-Evolution** | Build own knowledge base, store learned parsers to HuggingFace |
+| **Conversational** | Follow-up, not restart—detect intent (DEEPER/REVISE/NEW_TOPIC) |
+| **Smart Context** | Inject relevant facts + pointers, not entire datasets |
+| **Curiosity-Driven** | Proactive WHY questions, WHAT-IF scenarios, anomaly detection |
 
-### v2.3: Text Extraction & Parsers
-- PDF/OCR extraction tools
-- Adaptive parser factory (LLM-generated parsers)
-- Parser versioning & storage
+### v2.1: Core Orchestrator Hardening
+- Resource monitor (RAM/CPU tracking)
+- Graceful degradation under load
+- Better error recovery + checkpoints
 
-### v2.4: Database Building System
-- Streaming database builder (millions of docs)
-- DuckDB integration with auto-checkpoint
-- Memory-aware batch processing
+### v2.2: JIT Dependencies + Tool Isolation
+- `uv` integration for on-demand install
+- Tool dependency manifest (`configs/tools.yaml`)
+- Process isolation for conflicting deps
 
-### v2.5: Scalable MCP Routing (1000+ Tools)
-- Hierarchical tool organization
-- Tool index with semantic search
-- Lazy loading for large tool registries
+### v2.3: System Prompt Factory
+- Dynamic prompt generation per domain (finance/medical/legal)
+- Task-aware customization
+- Same LLM, different prompts = different specializations
 
-### v2.6: Security Hardening
-- RestrictedPython sandbox
-- Module whitelist, resource limits
-- Network isolation, audit logging
+### v2.4: Agent Spawner/Scaler
+- Task decomposition into subtasks
+- Parallel agent execution
+- Resource-aware scaling
+
+### v2.5: HuggingFace Persistence
+- Job checkpoints, database sync
+- Parser storage, config backup
+
+### v2.6: 1000+ Tool Routing
+- Tool semantic index
+- Hierarchical organization
+- Lazy loading
+
+### v2.7: Conversational Memory
+- Intent detection (FOLLOW_UP/DEEPER/REVISE/NEW_TOPIC)
+- Smart context injection (facts + pointers, not full data)
+- Confirmation prompts for expansive operations
+
+### v2.8: Curiosity Engine
+- WHY question generation (causal reasoning)
+- WHAT-IF scenario simulation
+- Anomaly detection and investigation prompts
 
 ---
 
@@ -527,7 +550,7 @@ llm:
   primary:
     provider: "openrouter"
     model: "nvidia/nemotron-3-nano-30b-a3b:free"
-    context_length: 32768
+    context_length: 256000  # 256K native
   backup:
     provider: "google"
     model: "gemini-3-flash-preview"
@@ -538,10 +561,17 @@ embedding:
   
 reranker:
   default: "Qwen/Qwen3-Reranker-0.6B"
-  
-vision:
-  embedding: "Qwen/Qwen3-VL-Embedding-2B"
-  reranker: "Qwen/Qwen3-VL-Reranker-2B"
+```
+
+```yaml
+# configs/tools.yaml
+jit_install: true
+package_manager: "uv"
+
+tool_deps:
+  pdf_extract: ["pymupdf", "pdfplumber"]
+  ml_train: ["scikit-learn", "xgboost"]
+  web_scrape: ["playwright"]
 ```
 
 ---
@@ -1573,17 +1603,17 @@ graph LR
 *   [x] Atomic Fact Memory
 *   [x] 14 MCP Tools, 8 API Routes, 3 Workers
 
-### v2.0: Self-Adapting Platform 🚧 In Progress
-*   [ ] **Hardware Detection:** Auto-detect CPU/GPU/RAM, adaptive parallelism
-*   [ ] **Job Queue:** SQLite-backed persistence for Kaggle/Colab
-*   [ ] **HuggingFace Sync:** Cross-session state persistence
-*   [ ] **Database Building:** Stream millions of docs with auto-checkpoint
-*   [ ] **Adaptive Parsers:** LLM-generated parsers for unknown formats
-*   [ ] **1000+ Tools:** Hierarchical MCP routing with semantic search
+### v2.0: Systemic AI Platform 🚧 In Progress
+*   [ ] **Core Hardening:** Resource monitor, graceful degradation
+*   [ ] **JIT Dependencies:** `uv` on-demand install, tool isolation
+*   [ ] **System Prompt Factory:** Dynamic prompts per domain
+*   [ ] **Agent Spawner:** Self-multiplying agents for massive tasks
+*   [ ] **HuggingFace Sync:** Cross-session persistence
+*   [ ] **1000+ Tool Routing:** Semantic index, lazy loading
 
-### v3.0: Collaboration (Long Term)
-*   [ ] **Swarm Protocol:** Multiple Kea instances (Finance ↔ Legal)
-*   [ ] **Human-in-the-Loop UI:** Thought Graph visualization
-*   [ ] **Multi-RAG Building:** Data collection agents
+### v3.0: Swarm Intelligence (Long Term)
+*   [ ] **Multi-Kea Protocol:** Instances talk to each other (Finance ↔ Legal)
+*   [ ] **Knowledge Synthesis:** Build evolving knowledge bases
+*   [ ] **Multimodal:** Gemini Flash for vision/audio
 
 ---
