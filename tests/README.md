@@ -3,14 +3,15 @@
 ## 📊 Test Summary
 
 | Category | Files | Tests | Purpose |
-|----------|:-----:|:-----:|---------|
-| **Unit** | 48 | 300+ | Fast, isolated tests |
-| **Real** | 11 | 100+ | Real LLM API calls |
-| **Integration** | 11 | ~50 | API endpoint tests |
-| **Simulation** | 3 | ~30 | Real external APIs |
-| **MCP** | 5 | ~25 | MCP tool tests |
-| **Stress** | 1 | ~5 | Load tests |
-| **Total** | **79** | **510+** | |
+|----------|:-----:|:-----:|---------| 
+| **Unit** | 63 | 400+ | Fast, isolated tests |
+| **Real** | 14 | 120+ | Real LLM API calls |
+| **Integration** | 13 | ~60 | API endpoint tests |
+| **Simulation** | 9 | ~50 | Real external APIs |
+| **MCP** | 7 | ~35 | MCP tool tests |
+| **Verify** | 4 | N/A | Standalone Python scripts |
+| **Stress** | 2 | ~10 | Load tests |
+| **Total** | **112+** | **675+** | |
 
 ---
 
@@ -978,5 +979,164 @@ os.environ["OPENROUTER_API_KEY"] = "sk-or-v1-..."
 
 ---
 
-**Total: 79 test files, 510+ tests, 100% component coverage** 🎉
+**Total: 112+ test files, 675+ tests, 100% component coverage** 🎉
 
+---
+
+## 🆕 v3.0 Enterprise Kernel Tests (Jan 2026)
+
+### New Unit Tests
+
+| File | Lines | Coverage |
+|------|-------|----------|
+| `test_consensus.py` | 115 | Adversarial consensus engine |
+| `test_degradation.py` | 150 | Graceful degradation levels |
+| `test_guards.py` | 145 | Resource guards, rate limiting |
+| `test_kill_switch.py` | 160 | Emergency stop, blacklisting |
+| `test_recovery.py` | 235 | Retry decorator, circuit breakers |
+| `test_router.py` | 130 | Intention routing |
+| `test_langgraph_nodes.py` | 190 | Divergence, keeper, planner, synthesizer |
+| `test_adversarial_agents.py` | 180 | Generator, critic, judge agents |
+| `test_isolation.py` | 110 | Tool sandboxing |
+| `test_logging_extended.py` | 210 | Logging middleware |
+| `test_qwen3_embeddings.py` | 175 | Embedding providers |
+| `test_organization.py` | 185 | Organization hierarchy |
+| `test_work_unit.py` | 210 | Work units, board |
+| `test_messaging.py` | 190 | Message bus |
+| `test_supervisor.py` | 210 | Quality gates, escalation |
+
+### New MCP Tests
+
+| File | Coverage |
+|------|----------|
+| `test_additional_servers.py` | 12 additional MCP servers |
+
+### New Simulation Tests
+
+| File | Purpose |
+|------|---------|
+| `test_v3_enterprise_simulation.py` | Full enterprise workflow simulation |
+| `test_degradation_recovery_simulation.py` | Degradation/recovery scenarios |
+| `test_security_simulation.py` | Security guard simulations |
+| `test_v2_integration.py` | v2.x component integration |
+
+### New Real Tests
+
+| File | Purpose |
+|------|---------|
+| `test_v3_enterprise_live.py` | Live enterprise kernel tests |
+
+---
+
+## 🐍 Standalone Python Tests (No Pytest Required)
+
+Located in `tests/verify/` - run directly with Python:
+
+### Quick Start
+
+```bash
+# Full system health check (fastest)
+python tests/verify/verify_all.py
+
+# v3.0 enterprise kernel verification
+python tests/verify/verify_enterprise_kernel.py
+
+# v2.x features verification
+python tests/verify/verify_v2_features.py
+
+# MCP servers simulation (real API calls)
+python tests/simulation/run_simulation.py
+```
+
+### Verify Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `verify_all.py` | Complete system health check - imports, MCP servers, functional tests |
+| `verify_enterprise_kernel.py` | Tests organization, work_unit, messaging, supervisor, guards, kill_switch |
+| `verify_v2_features.py` | Tests conversation, curiosity, degradation, recovery, prompt_factory |
+| `run_simulation.py` | Tests all 12 new MCP servers with real API calls |
+
+### Output Format
+
+```
+=======================================================
+🚀 KEA SYSTEM HEALTH CHECK
+=======================================================
+
+──────────────────────────────────────
+  CORE IMPORTS
+──────────────────────────────────────
+  ✅ organization
+  ✅ work_unit
+  ✅ messaging
+  ✅ supervisor
+
+📊 HEALTH CHECK SUMMARY
+=======================================================
+  Core Imports: ✅ HEALTHY
+  MCP Servers: ✅ HEALTHY
+  Functional Tests: ✅ HEALTHY
+
+  Result: 3/3 categories healthy
+  🎉 ALL SYSTEMS OPERATIONAL!
+```
+
+---
+
+## 📋 Run Commands Reference
+
+### Run All New Tests
+
+```bash
+# All new unit tests (v3.0)
+pytest tests/unit/test_consensus.py tests/unit/test_degradation.py tests/unit/test_guards.py tests/unit/test_kill_switch.py tests/unit/test_recovery.py tests/unit/test_router.py tests/unit/test_langgraph_nodes.py tests/unit/test_adversarial_agents.py tests/unit/test_isolation.py tests/unit/test_logging_extended.py tests/unit/test_qwen3_embeddings.py tests/unit/test_organization.py tests/unit/test_work_unit.py tests/unit/test_messaging.py tests/unit/test_supervisor.py -v
+
+# All new simulation tests
+pytest tests/simulation/test_v3_enterprise_simulation.py tests/simulation/test_degradation_recovery_simulation.py tests/simulation/test_security_simulation.py -v
+
+# All new MCP tests
+pytest tests/mcp/test_additional_servers.py -v
+
+# Standalone Python verification (no pytest)
+python tests/verify/verify_all.py
+```
+
+### By Category
+
+```bash
+# v3.0 Enterprise Kernel
+pytest tests/unit/test_organization.py tests/unit/test_work_unit.py tests/unit/test_messaging.py tests/unit/test_supervisor.py -v
+
+# Security & Guards
+pytest tests/unit/test_guards.py tests/unit/test_kill_switch.py tests/simulation/test_security_simulation.py -v
+
+# Recovery & Degradation
+pytest tests/unit/test_recovery.py tests/unit/test_degradation.py tests/simulation/test_degradation_recovery_simulation.py -v
+
+# Agents & Nodes
+pytest tests/unit/test_langgraph_nodes.py tests/unit/test_adversarial_agents.py tests/unit/test_consensus.py -v
+```
+
+### Full Test Suite
+
+```bash
+# All unit tests
+pytest tests/unit/ -v
+
+# All simulation tests
+pytest tests/simulation/ -v
+
+# All MCP tests
+pytest tests/mcp/ -v
+
+# Everything (except real which needs API)
+pytest tests/unit tests/integration tests/simulation tests/mcp -v
+
+# Standalone verification
+python tests/verify/verify_all.py
+python tests/verify/verify_enterprise_kernel.py
+python tests/verify/verify_v2_features.py
+```
+
+---
