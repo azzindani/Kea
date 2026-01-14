@@ -6,6 +6,7 @@ Provides:
 - transport: stdio and SSE transport implementations
 - server_base: Base class for MCP tool servers
 - client_base: MCP client for connecting to servers
+- tool_router: Semantic routing for 1000+ tools
 """
 
 from shared.mcp.protocol import (
@@ -25,6 +26,14 @@ from shared.mcp.protocol import (
     LogLevel,
     LogMessage,
 )
+from shared.mcp.tool_router import (
+    ToolIndex,
+    ToolRouter,
+    ToolDescriptor,
+    ToolCategory,
+    get_tool_index,
+    get_tool_router,
+)
 
 __all__ = [
     "JSONRPCRequest",
@@ -42,4 +51,12 @@ __all__ = [
     "InitializeResult",
     "LogLevel",
     "LogMessage",
+    # Tool Router
+    "ToolIndex",
+    "ToolRouter",
+    "ToolDescriptor",
+    "ToolCategory",
+    "get_tool_index",
+    "get_tool_router",
 ]
+
