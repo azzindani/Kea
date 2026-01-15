@@ -1140,3 +1140,68 @@ python tests/verify/verify_v2_features.py
 ```
 
 ---
+
+## 🆕 New Unit Tests (January 2026)
+
+### 14 New Test Files Added
+
+| File | Tests | Coverage Area |
+|------|:-----:|---------------|
+| `test_tenant_context.py` | 20 | Tenant isolation, cache keys, filters |
+| `test_hardware_detector.py` | 25 | CPU, RAM, GPU, environment detection |
+| `test_hardware_monitor.py` | 15 | Resource monitoring, overload detection |
+| `test_tool_isolation.py` | 20 | Subprocess isolation, lazy loading |
+| `test_jit_loader.py` | 12 | JIT package installation, security |
+| `test_conversations_manager.py` | 18 | Conversation CRUD, messages |
+| `test_sessions_manager.py` | 18 | JWT tokens, session management |
+| `test_mcp_transport.py` | 15 | MCP transport, tool router |
+| `test_users_manager.py` | 22 | User management, API keys |
+| `test_auth_middleware.py` | 15 | Authentication middleware |
+| `test_auth_routes.py` | 10 | Auth API endpoints |
+| `test_logging_context.py` | 12 | Log context, middleware |
+| `test_mcp_server_base.py` | 12 | MCP server base class |
+| `test_recovery_curiosity.py` | 18 | Recovery manager, curiosity engine |
+
+### How to Run New Tests
+
+```bash
+# Run all new tests
+pytest tests/unit/test_tenant_context.py \
+       tests/unit/test_hardware_detector.py \
+       tests/unit/test_hardware_monitor.py \
+       tests/unit/test_tool_isolation.py \
+       tests/unit/test_jit_loader.py \
+       tests/unit/test_conversations_manager.py \
+       tests/unit/test_sessions_manager.py \
+       tests/unit/test_mcp_transport.py \
+       tests/unit/test_users_manager.py \
+       tests/unit/test_auth_middleware.py \
+       tests/unit/api_gateway/test_auth_routes.py \
+       tests/unit/test_logging_context.py \
+       tests/unit/test_mcp_server_base.py \
+       tests/unit/test_recovery_curiosity.py -v
+
+# Run by category
+# Tenant/Hardware
+pytest tests/unit/test_tenant_context.py tests/unit/test_hardware_*.py -v
+
+# Authentication
+pytest tests/unit/test_auth_middleware.py tests/unit/test_users_manager.py tests/unit/test_sessions_manager.py -v
+
+# MCP
+pytest tests/unit/test_mcp_transport.py tests/unit/test_mcp_server_base.py -v
+
+# Conversations
+pytest tests/unit/test_conversations_manager.py -v
+```
+
+### Total Updated Test Count
+
+| Category | Previous | New | Total |
+|----------|:--------:|:---:|:-----:|
+| Unit | 675+ | 232 | **907+** |
+| Total | 675+ | 232 | **907+** |
+
+---
+
+*Last updated: January 2026*
