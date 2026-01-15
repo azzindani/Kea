@@ -1,0 +1,38 @@
+# Kubernetes ConfigMaps and Secrets Template
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kea-config
+  labels:
+    app: kea
+data:
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "WARNING"
+  LOG_FORMAT: "json"
+  REDIS_URL: "redis://redis:6379"
+  QDRANT_URL: "http://qdrant:6333"
+  RAG_SERVICE_URL: "http://rag-service:8001"
+  ORCHESTRATOR_URL: "http://orchestrator:8000"
+
+---
+# Create secrets with:
+# kubectl create secret generic kea-secrets \
+#   --from-literal=database-url='postgresql://...' \
+#   --from-literal=jwt-secret='your-32-char-secret' \
+#   --from-literal=openrouter-api-key='sk-or-...'
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kea-secrets
+  labels:
+    app: kea
+type: Opaque
+# DO NOT COMMIT ACTUAL SECRETS
+# Use external secrets manager or sealed-secrets
+data:
+  # Base64 encoded placeholder values
+  database-url: cG9zdGdyZXNxbDovL3VzZXI6cGFzc0Bwb3N0Z3Jlcy5kZWZhdWx0LnN2Yy5jbHVzdGVyLmxvY2FsL2tlYQ==
+  jwt-secret: eW91ci0zMi1jaGFyLXNlY3JldC1oZXJlLWNoYW5nZS1pdA==
+  openrouter-api-key: c2stb3IteW91ci1hcGkta2V5LWhlcmU=

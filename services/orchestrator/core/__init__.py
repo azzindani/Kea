@@ -7,6 +7,12 @@ Core components for the research orchestrator.
 - degradation: Graceful degradation under resource pressure
 - recovery: Error recovery with retry and circuit breaker
 - prompt_factory: Dynamic system prompt generation
+- query_classifier: Casual/utility/research query routing
+- modality: Multimodal input/output handling
+- compliance: ISO/SOC2/GDPR compliance framework
+- audit_trail: Immutable audit logging
+- context_cache: Multi-level context caching
+- approval_workflow: Human-in-the-loop workflows
 """
 
 from services.orchestrator.core.graph import (
@@ -106,6 +112,67 @@ from services.orchestrator.core.supervisor import (
     EscalationType,
     get_supervisor,
 )
+# v4.0 Kernel Improvements
+from services.orchestrator.core.query_classifier import (
+    QueryType,
+    QueryClassifier,
+    ClassificationResult,
+    get_classifier,
+    classify_and_handle,
+)
+from services.orchestrator.core.modality import (
+    ModalityType,
+    ModalityInput,
+    ModalityExtractor,
+    ModalityProcessor,
+    ModalityOutput,
+    OutputSocketRegistry,
+    get_modality_extractor,
+    get_modality_processor,
+    get_output_registry,
+)
+from services.orchestrator.core.modality_security import (
+    ModalityValidator,
+    URLValidator,
+    ValidationResult,
+    get_modality_validator,
+    get_url_validator,
+)
+from services.orchestrator.core.audit_trail import (
+    AuditEventType,
+    AuditEntry,
+    AuditTrail,
+    get_audit_trail,
+    audited,
+)
+from services.orchestrator.core.context_cache import (
+    CacheLevel,
+    ContextCache,
+    SemanticCache,
+    get_context_cache,
+    get_semantic_cache,
+    configure_cache,
+)
+from services.orchestrator.core.compliance import (
+    ComplianceStandard,
+    ComplianceEngine,
+    ComplianceReport,
+    ProceduralAgent,
+    Procedure,
+    get_compliance_engine,
+    get_procedural_agent,
+)
+from services.orchestrator.core.approval_workflow import (
+    ApprovalType,
+    ApprovalStatus,
+    ApprovalCategory,
+    ApprovalRequest,
+    ApprovalWorkflow,
+    HITLConfig,
+    get_approval_workflow,
+    get_hitl_config,
+    configure_hitl,
+)
 
 __all__ = [
     # Graph
@@ -190,6 +257,57 @@ __all__ = [
     "Escalation",
     "EscalationType",
     "get_supervisor",
+    # v4.0 Query Classifier
+    "QueryType",
+    "QueryClassifier",
+    "ClassificationResult",
+    "get_classifier",
+    "classify_and_handle",
+    # v4.0 Modality
+    "ModalityType",
+    "ModalityInput",
+    "ModalityExtractor",
+    "ModalityProcessor",
+    "ModalityOutput",
+    "OutputSocketRegistry",
+    "get_modality_extractor",
+    "get_modality_processor",
+    "get_output_registry",
+    # v4.0 Modality Security
+    "ModalityValidator",
+    "URLValidator",
+    "ValidationResult",
+    "get_modality_validator",
+    "get_url_validator",
+    # v4.0 Audit Trail
+    "AuditEventType",
+    "AuditEntry",
+    "AuditTrail",
+    "get_audit_trail",
+    "audited",
+    # v4.0 Context Cache
+    "CacheLevel",
+    "ContextCache",
+    "SemanticCache",
+    "get_context_cache",
+    "get_semantic_cache",
+    "configure_cache",
+    # v4.0 Compliance
+    "ComplianceStandard",
+    "ComplianceEngine",
+    "ComplianceReport",
+    "ProceduralAgent",
+    "Procedure",
+    "get_compliance_engine",
+    "get_procedural_agent",
+    # v4.0 Approval Workflow (HITL)
+    "ApprovalType",
+    "ApprovalStatus",
+    "ApprovalCategory",
+    "ApprovalRequest",
+    "ApprovalWorkflow",
+    "HITLConfig",
+    "get_approval_workflow",
+    "get_hitl_config",
+    "configure_hitl",
 ]
-
-

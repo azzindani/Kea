@@ -1,18 +1,66 @@
 """
 Orchestrator Service Client.
 
-HTTP client for calling the Orchestrator service.
+HTTP client for calling the Orchestrator service with production features:
+- Connection pooling
+- Retry with exponential backoff
+- Circuit breaker
 """
 
 from __future__ import annotations
 
+import asyncio
+import time
+from dataclasses import dataclass
+from enum import Enum
 from typing import Any, AsyncIterator
+
 import httpx
 
 from shared.logging import get_logger
 from shared.config import get_settings
+from shared.environment import get_environment_config
+
 
 logger = get_logger(__name__)
+
+
+class CircuitState(Enum):
+    """Circuit breaker state."""
+    CLOSED = "closed"
+    OPEN = "open"
+    HALF_OPEN = "half_open"
+
+
+@dataclass
+class CircuitBreaker:
+    """Circuit breaker for fault tolerance."""
+    failure_threshold: int = 5
+    reset_timeout: float = 30.0
+    state: CircuitState = CircuitState.CLOSED
+    failure_count: int = 0
+    last_failure: float = 0.0
+    
+    def record_success(self):
+        self.failure_count = 0
+        self.state = CircuitState.CLOSED
+    
+    def record_failure(self):
+        self.failure_count += 1
+        self.last_failure = time.time()
+        if self.failure_count >= self.failure_threshold:
+            self.state = CircuitState.OPEN
+            logger.warning(f"Circuit breaker opened")
+    
+    def can_execute(self) -> bool:
+        if self.state == CircuitState.CLOSED:
+            return True
+        if self.state == CircuitState.OPEN:
+            if time.time() - self.last_failure > self.reset_timeout:
+                self.state = CircuitState.HALF_OPEN
+                return True
+            return False
+        return True
 
 
 class OrchestratorClient:
@@ -20,34 +68,89 @@ class OrchestratorClient:
     HTTP client for the Orchestrator service.
     
     Features:
-    - Synchronous research requests
-    - Streaming research with SSE
-    - Tool invocation
-    - Health checks
-    
-    Example:
-        client = OrchestratorClient()
-        result = await client.start_research("What is AI?", depth=2)
+    - Connection pooling
+    - Retry with exponential backoff
+    - Circuit breaker
+    - Streaming support
     """
     
     def __init__(self, base_url: str | None = None) -> None:
         settings = get_settings()
+        env_config = get_environment_config()
+        
         self.base_url = base_url or f"http://localhost:{settings.api_port}"
-        self.timeout = httpx.Timeout(120.0, connect=10.0)
+        self.timeout = httpx.Timeout(
+            env_config.request_timeout_seconds,
+            connect=10.0,
+        )
+        self.max_retries = env_config.max_retries
+        self.retry_delay = env_config.retry_delay_seconds
+        
+        self._circuit = CircuitBreaker()
+        self._client: httpx.AsyncClient | None = None
+    
+    async def _get_client(self) -> httpx.AsyncClient:
+        """Get or create pooled client."""
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(
+                base_url=self.base_url,
+                timeout=self.timeout,
+                limits=httpx.Limits(max_connections=20),
+            )
+        return self._client
+    
+    async def close(self):
+        """Close client."""
+        if self._client:
+            await self._client.aclose()
+            self._client = None
+    
+    async def _request(
+        self,
+        method: str,
+        path: str,
+        **kwargs,
+    ) -> httpx.Response:
+        """Make request with retry and circuit breaker."""
+        if not self._circuit.can_execute():
+            raise Exception("Circuit breaker open")
+        
+        last_error = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                client = await self._get_client()
+                response = await client.request(method, path, **kwargs)
+                
+                if response.status_code >= 500:
+                    raise httpx.HTTPStatusError(
+                        f"Server error: {response.status_code}",
+                        request=response.request,
+                        response=response,
+                    )
+                
+                self._circuit.record_success()
+                return response
+                
+            except (httpx.TimeoutException, httpx.ConnectError, httpx.HTTPStatusError) as e:
+                last_error = e
+                self._circuit.record_failure()
+                
+                if attempt < self.max_retries:
+                    delay = self.retry_delay * (2 ** attempt)
+                    logger.warning(f"Retry {attempt + 1}: {e}")
+                    await asyncio.sleep(delay)
+        
+        raise last_error or Exception("Request failed")
     
     async def health_check(self) -> dict[str, Any]:
         """Check orchestrator health."""
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.get(f"{self.base_url}/health")
-            response.raise_for_status()
-            return response.json()
+        response = await self._request("GET", "/health")
+        return response.json()
     
     async def list_tools(self) -> list[dict[str, Any]]:
         """Get list of available MCP tools."""
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.get(f"{self.base_url}/tools")
-            response.raise_for_status()
-            return response.json().get("tools", [])
+        response = await self._request("GET", "/tools")
+        return response.json().get("tools", [])
     
     async def start_research(
         self,
@@ -55,60 +158,32 @@ class OrchestratorClient:
         depth: int = 2,
         max_sources: int = 10,
     ) -> dict[str, Any]:
-        """
-        Start a synchronous research job.
-        
-        Args:
-            query: Research query
-            depth: Research depth (1-5)
-            max_sources: Max sources to use
-            
-        Returns:
-            Research result with report, confidence, etc.
-        """
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(
-                f"{self.base_url}/research",
-                json={
-                    "query": query,
-                    "depth": depth,
-                    "max_sources": max_sources,
-                }
-            )
-            response.raise_for_status()
-            return response.json()
+        """Start a synchronous research job."""
+        response = await self._request(
+            "POST",
+            "/research",
+            json={"query": query, "depth": depth, "max_sources": max_sources},
+        )
+        return response.json()
     
     async def stream_research(
         self,
         query: str,
         depth: int = 2,
     ) -> AsyncIterator[dict[str, Any]]:
-        """
-        Stream research results via SSE.
+        """Stream research results via SSE."""
+        client = await self._get_client()
         
-        Args:
-            query: Research query
-            depth: Research depth
-            
-        Yields:
-            Event dicts with type and data
-        """
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            async with client.stream(
-                "GET",
-                f"{self.base_url}/research/stream",
-                params={"query": query, "depth": depth},
-            ) as response:
-                response.raise_for_status()
-                
-                async for line in response.aiter_lines():
-                    if not line or not line.startswith("data: "):
-                        continue
-                    
+        async with client.stream(
+            "GET",
+            "/research/stream",
+            params={"query": query, "depth": depth},
+        ) as response:
+            async for line in response.aiter_lines():
+                if line.startswith("data: "):
                     import json
                     try:
-                        data = json.loads(line[6:])
-                        yield data
+                        yield json.loads(line[6:])
                     except json.JSONDecodeError:
                         continue
     
@@ -117,20 +192,23 @@ class OrchestratorClient:
         tool_name: str,
         arguments: dict[str, Any],
     ) -> dict[str, Any]:
-        """
-        Call an MCP tool directly.
-        
-        Args:
-            tool_name: Name of the tool
-            arguments: Tool arguments
-            
-        Returns:
-            Tool result
-        """
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(
-                f"{self.base_url}/tools/{tool_name}",
-                json=arguments,
-            )
-            response.raise_for_status()
-            return response.json()
+        """Call an MCP tool directly."""
+        response = await self._request(
+            "POST",
+            f"/tools/{tool_name}",
+            json=arguments,
+        )
+        return response.json()
+
+
+# Singleton
+_client: OrchestratorClient | None = None
+
+
+async def get_orchestrator_client() -> OrchestratorClient:
+    """Get singleton client."""
+    global _client
+    if _client is None:
+        _client = OrchestratorClient()
+    return _client
+
