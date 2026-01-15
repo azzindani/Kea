@@ -4,14 +4,16 @@
 
 | Category | Files | Tests | Purpose |
 |----------|:-----:|:-----:|---------| 
-| **Unit** | 63 | 400+ | Fast, isolated tests |
-| **Real** | 14 | 120+ | Real LLM API calls |
+| **Unit** | 90 | 700+ | Fast, isolated tests |
+| **Real** | 12 | 120+ | Real LLM API calls |
 | **Integration** | 13 | ~60 | API endpoint tests |
-| **Simulation** | 9 | ~50 | Real external APIs |
-| **MCP** | 7 | ~35 | MCP tool tests |
+| **E2E** | 1 | ~10 | End-to-end user flows |
+| **Simulation** | 8 | ~50 | Real external APIs |
+| **MCP** | 6 | ~35 | MCP tool tests |
 | **Verify** | 4 | N/A | Standalone Python scripts |
-| **Stress** | 2 | ~10 | Load tests |
-| **Total** | **112+** | **675+** | |
+| **Stress** | 1 | ~10 | Load tests |
+| **Total** | **131** | **985+** | |
+
 
 ---
 
@@ -1197,10 +1199,16 @@ pytest tests/unit/test_conversations_manager.py -v
 
 ### Total Updated Test Count
 
-| Category | Previous | New | Total |
-|----------|:--------:|:---:|:-----:|
-| Unit | 675+ | 232 | **907+** |
-| Total | 675+ | 232 | **907+** |
+| Category | Files | Tests |
+|----------|:-----:|:-----:|
+| Unit | 90 | 700+ |
+| Real | 12 | 120+ |
+| Integration | 13 | ~60 |
+| E2E | 1 | ~10 |
+| Simulation | 8 | ~50 |
+| MCP | 6 | ~35 |
+| Stress | 1 | ~10 |
+| **Total** | **131** | **985+** |
 
 ---
 
