@@ -387,14 +387,14 @@ async def send_message(
             "user_message": MessageResponse(
                 message_id=user_msg.message_id,
                 conversation_id=user_msg.conversation_id,
-                role=user_msg.role.value,
+                role=user_msg.role.value if hasattr(user_msg.role, 'value') else str(user_msg.role),
                 content=user_msg.content,
                 created_at=user_msg.created_at.isoformat(),
             ),
             "assistant_message": MessageResponse(
                 message_id=assistant_msg.message_id,
                 conversation_id=assistant_msg.conversation_id,
-                role=assistant_msg.role.value,
+                role=assistant_msg.role.value if hasattr(assistant_msg.role, 'value') else str(assistant_msg.role),
                 content=assistant_msg.content,
                 created_at=assistant_msg.created_at.isoformat(),
                 sources=assistant_msg.sources,
@@ -422,14 +422,14 @@ async def send_message(
             "user_message": MessageResponse(
                 message_id=user_msg.message_id,
                 conversation_id=user_msg.conversation_id,
-                role=user_msg.role.value,
+                role=user_msg.role.value if hasattr(user_msg.role, 'value') else str(user_msg.role),
                 content=user_msg.content,
                 created_at=user_msg.created_at.isoformat(),
             ),
             "assistant_message": MessageResponse(
                 message_id=assistant_msg.message_id,
                 conversation_id=assistant_msg.conversation_id,
-                role=assistant_msg.role.value,
+                role=assistant_msg.role.value if hasattr(assistant_msg.role, 'value') else str(assistant_msg.role),
                 content=assistant_msg.content,
                 created_at=assistant_msg.created_at.isoformat(),
             ),
