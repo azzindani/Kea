@@ -120,17 +120,18 @@ class TestHFSyncIntegration:
         )
         sync = HuggingFaceSync(config)
         
-        # Mock the HF API calls
-        with patch.object(sync, '_ensure_initialized', new_callable=AsyncMock):
-            with patch.object(sync, '_upload_file', new_callable=AsyncMock, return_value=True):
-                with patch.object(sync, '_download_file', new_callable=AsyncMock) as mock_download:
-                    # Set up mock return value
-                    state = {"iteration": 5, "findings": ["fact1", "fact2"]}
-                    
-                    # Test upload
-                    upload_result = await sync.upload_checkpoint("test_job", state)
-                    # With mocked upload, should succeed
-                    assert upload_result is True or upload_result is False  # Implementation dependent
+        # Verify sync is enabled with valid config
+        assert sync.enabled is True
+        
+        # Test upload_checkpoint returns False when not initialized
+        # (Without actually calling HF API)
+        state = {"iteration": 5, "findings": ["fact1", "fact2"]}
+        
+        # Since we haven't called initialize(), the API won't be available
+        # but upload_checkpoint should handle this gracefully
+        result = await sync.upload_checkpoint("test_job", state)
+        # Result should be False without initialization
+        assert result is False
         
         print("\n✅ Checkpoint cycle mock test passed")
 
