@@ -96,12 +96,14 @@ class DatabasePool:
             logger.info(f"PostgreSQL pool initialized: {self.config.min_connections}-{self.config.max_connections} connections")
             
         except ImportError:
-            logger.error("asyncpg not installed, falling back to SQLite")
+            logger.warning("asyncpg not installed, falling back to SQLite")
             self._is_postgres = False
             await self._init_sqlite()
         except Exception as e:
-            logger.error(f"PostgreSQL connection failed: {e}")
-            raise
+            logger.warning(f"PostgreSQL connection failed: {e}, falling back to SQLite")
+            self._is_postgres = False
+            self.config.url = "sqlite:///data/dev.db"
+            await self._init_sqlite()
     
     async def _init_sqlite(self):
         """Initialize SQLite (for development)."""
