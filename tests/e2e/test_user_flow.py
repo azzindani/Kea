@@ -5,7 +5,7 @@ Real tests that exercise the full API from registration to research.
 """
 
 import pytest
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
 
 from services.api_gateway.main import app
 
@@ -13,7 +13,8 @@ from services.api_gateway.main import app
 @pytest.fixture
 async def async_client():
     """Create async HTTP client for testing."""
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
 
 

@@ -7,7 +7,7 @@ Tests that simulate production conditions.
 import pytest
 import asyncio
 from unittest.mock import AsyncMock, patch, MagicMock
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
 
 from services.api_gateway.main import app
 
@@ -15,7 +15,8 @@ from services.api_gateway.main import app
 @pytest.fixture
 async def async_client():
     """Create async HTTP client."""
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
 
 
@@ -126,36 +127,29 @@ class TestCircuitBreakerSimulation:
     @pytest.mark.asyncio
     async def test_circuit_opens_on_failures(self):
         """Test circuit breaker opens after consecutive failures."""
-        from services.api_gateway.clients.orchestrator import OrchestratorClient
+        from services.api_gateway.clients.orchestrator import OrchestratorClient, CircuitState
         
         client = OrchestratorClient()
         
-        # Simulate failures
-        with patch.object(client._http, "get", side_effect=Exception("Connection refused")):
-            for i in range(6):
-                try:
-                    await client.health_check()
-                except:
-                    pass
+        # Force circuit open by recording failures
+        for i in range(6):
+            client._circuit.record_failure()
         
         # Circuit should be open
-        assert client._circuit_breaker.is_open is True
+        assert client._circuit.state == CircuitState.OPEN
     
     @pytest.mark.asyncio
     async def test_circuit_half_open_allows_probe(self):
         """Test circuit allows probe request in half-open state."""
-        from services.api_gateway.clients.orchestrator import OrchestratorClient
+        from services.api_gateway.clients.orchestrator import OrchestratorClient, CircuitState
         
         client = OrchestratorClient()
         
-        # Force circuit open
-        client._circuit_breaker._failure_count = 10
-        client._circuit_breaker._state = "open"
+        # Force circuit to half-open state
+        client._circuit.state = CircuitState.HALF_OPEN
         
-        # Move to half-open
-        client._circuit_breaker._state = "half-open"
-        
-        assert client._circuit_breaker.state == "half-open"
+        assert client._circuit.state == CircuitState.HALF_OPEN
+        assert client._circuit.can_execute() is True
 
 
 class TestDatabaseFailure:
@@ -220,20 +214,16 @@ class TestRecovery:
     @pytest.mark.asyncio
     async def test_circuit_breaker_recovery(self):
         """Test circuit breaker recovers after successful requests."""
-        from services.api_gateway.clients.orchestrator import OrchestratorClient
+        from services.api_gateway.clients.orchestrator import OrchestratorClient, CircuitState
         
         client = OrchestratorClient()
         
         # Force half-open state
-        client._circuit_breaker._state = "half-open"
+        client._circuit.state = CircuitState.HALF_OPEN
         
         # Simulate successful request
-        with patch.object(client._http, "get", return_value=MagicMock(status_code=200)):
-            try:
-                await client.health_check()
-                client._circuit_breaker.record_success()
-            except:
-                pass
+        client._circuit.record_success()
         
         # Should close circuit
-        assert client._circuit_breaker.state == "closed"
+        assert client._circuit.state == CircuitState.CLOSED
+

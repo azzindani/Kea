@@ -262,10 +262,12 @@ class TestCuriosityEngineLive:
         engine = CuriosityEngine()
         
         question = CuriosityQuestion(
+            question_id="q_001",
             text="Why is Tesla's growth rate 5x higher than Ford's?",
             question_type=QuestionType.COMPARISON,
             priority=0.9,
-            entities=["Tesla", "Ford"],
+            entity="Tesla",
+            related_entities=["Ford"],
         )
         
         formatted = engine.format_for_user([question])
@@ -327,10 +329,10 @@ class TestConversationMemoryLive:
         
         # Build context for follow-up
         builder = SmartContextBuilder()
-        context = builder.build(session, "What about their competition?")
+        context = builder.build_context("What about their competition?", session)
         
         assert context is not None
-        print(f"\n✅ Context built with {len(context)} items")
+        print(f"\n✅ Context built with {len(context)} chars")
 
 
 if __name__ == "__main__":

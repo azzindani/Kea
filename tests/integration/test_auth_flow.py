@@ -5,7 +5,7 @@ Tests for register, login, logout, token refresh, and API key flow.
 """
 
 import pytest
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
 from unittest.mock import AsyncMock, patch
 
 from services.api_gateway.main import app
@@ -24,7 +24,8 @@ def test_user():
 @pytest.fixture
 async def async_client():
     """Create async HTTP client for testing."""
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
 
 

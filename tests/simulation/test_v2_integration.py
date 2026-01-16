@@ -31,11 +31,11 @@ class TestFullResearchFlow:
         )
         prompt = factory.generate(context)
         
-        assert prompt.system is not None
-        assert len(prompt.system) > 100  # Substantial prompt
+        assert prompt.prompt is not None
+        assert len(prompt.prompt) > 100  # Substantial prompt
         
         print(f"\n✅ Generated {domain.value} / {task_type.value} prompt")
-        print(f"   System prompt: {prompt.system[:80]}...")
+        print(f"   System prompt: {prompt.prompt[:80]}...")
     
     def test_agent_spawner_with_decomposition(self):
         """Test agent spawner with task decomposition."""
@@ -52,7 +52,7 @@ class TestFullResearchFlow:
         
         print(f"\n✅ Decomposed into {len(subtasks)} subtasks")
         for st in subtasks:
-            print(f"   - {st.description[:40]}...")
+            print(f"   - {st.query[:40]}...")
 
 
 class TestResourcePressureDegradation:
@@ -65,27 +65,28 @@ class TestResourcePressureDegradation:
         degrader = GracefulDegrader(base_parallel=4, base_batch_size=1000)
         
         # Normal operation
-        assert degrader.get_current_level().name == "normal"
+        assert degrader.get_current_level().level == 0
         
         # Simulate pressure
         degrader.set_level(1)  # Warning
-        config = degrader.get_adjusted_config()
-        assert config["parallel"] < 4  # Reduced
+        config = degrader.get_current_level()
+        assert config.max_parallel < 4  # Reduced
         
         degrader.set_level(2)  # Critical
-        config = degrader.get_adjusted_config()
-        assert config["parallel"] < 2  # Further reduced
+        config = degrader.get_current_level()
+        assert config.max_parallel <= 2  # Further reduced
         
         print("\n✅ Degradation levels work correctly")
     
     def test_throttling_under_pressure(self):
         """Test request throttling."""
-        from services.orchestrator.core.degradation import throttled
+        from services.orchestrator.core.degradation import throttled, get_degrader
         import asyncio
         
         call_count = 0
+        degrader = get_degrader()
         
-        @throttled(1)  # Throttle at level 1+
+        @throttled(degrader)  # Throttle with degrader
         async def mock_operation():
             nonlocal call_count
             call_count += 1

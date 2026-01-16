@@ -24,7 +24,7 @@ class TestAcademicServer:
         server = AcademicServer()
         
         # Check tool exists
-        tools = server.list_tools()
+        tools = server.get_tools()
         tool_names = [t.name for t in tools]
         
         assert any("search" in name.lower() or "paper" in name.lower() for name in tool_names) or len(tools) > 0
@@ -45,7 +45,7 @@ class TestAnalyticsServer:
         from mcp_servers.analytics_server.server import AnalyticsServer
         
         server = AnalyticsServer()
-        tools = server.list_tools()
+        tools = server.get_tools()
         
         assert len(tools) >= 1
         print(f"\n✅ Analytics server has {len(tools)} tools")
@@ -65,7 +65,7 @@ class TestBrowserAgentServer:
         from mcp_servers.browser_agent_server.server import BrowserAgentServer
         
         server = BrowserAgentServer()
-        tools = server.list_tools()
+        tools = server.get_tools()
         
         assert len(tools) >= 1
         print(f"\n✅ Browser agent has {len(tools)} tools")
@@ -85,7 +85,7 @@ class TestCrawlerServer:
         from mcp_servers.crawler_server.server import CrawlerServer
         
         server = CrawlerServer()
-        tools = server.list_tools()
+        tools = server.get_tools()
         
         assert len(tools) >= 1
         print(f"\n✅ Crawler has {len(tools)} tools")
@@ -105,7 +105,7 @@ class TestDataSourcesServer:
         from mcp_servers.data_sources_server.server import DataSourcesServer
         
         server = DataSourcesServer()
-        tools = server.list_tools()
+        tools = server.get_tools()
         
         assert len(tools) >= 1
         print(f"\n✅ Data sources has {len(tools)} tools")
@@ -125,7 +125,7 @@ class TestDocumentServer:
         from mcp_servers.document_server.server import DocumentServer
         
         server = DocumentServer()
-        tools = server.list_tools()
+        tools = server.get_tools()
         
         assert len(tools) >= 1
         print(f"\n✅ Document server has {len(tools)} tools")
@@ -145,7 +145,7 @@ class TestMLServer:
         from mcp_servers.ml_server.server import MLServer
         
         server = MLServer()
-        tools = server.list_tools()
+        tools = server.get_tools()
         
         assert len(tools) >= 1
         print(f"\n✅ ML server has {len(tools)} tools")
@@ -165,7 +165,7 @@ class TestQualitativeServer:
         from mcp_servers.qualitative_server.server import QualitativeServer
         
         server = QualitativeServer()
-        tools = server.list_tools()
+        tools = server.get_tools()
         
         assert len(tools) >= 1
         print(f"\n✅ Qualitative has {len(tools)} tools")
@@ -185,7 +185,7 @@ class TestRegulatoryServer:
         from mcp_servers.regulatory_server.server import RegulatoryServer
         
         server = RegulatoryServer()
-        tools = server.list_tools()
+        tools = server.get_tools()
         
         assert len(tools) >= 1
         print(f"\n✅ Regulatory has {len(tools)} tools")
@@ -205,7 +205,7 @@ class TestSecurityServer:
         from mcp_servers.security_server.server import SecurityServer
         
         server = SecurityServer()
-        tools = server.list_tools()
+        tools = server.get_tools()
         
         assert len(tools) >= 1
         print(f"\n✅ Security has {len(tools)} tools")
@@ -225,7 +225,7 @@ class TestToolDiscoveryServer:
         from mcp_servers.tool_discovery_server.server import ToolDiscoveryServer
         
         server = ToolDiscoveryServer()
-        tools = server.list_tools()
+        tools = server.get_tools()
         
         assert len(tools) >= 1
         print(f"\n✅ Tool discovery has {len(tools)} tools")
@@ -245,7 +245,7 @@ class TestVisualizationServer:
         from mcp_servers.visualization_server.server import VisualizationServer
         
         server = VisualizationServer()
-        tools = server.list_tools()
+        tools = server.get_tools()
         
         assert len(tools) >= 1
         print(f"\n✅ Visualization has {len(tools)} tools")
