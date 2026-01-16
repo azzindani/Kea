@@ -570,8 +570,9 @@ async def get_user_manager() -> UserManager:
     async with _user_manager_lock:
         # Double-check after acquiring lock
         if _user_manager is None:
-            _user_manager = UserManager()
-            await _user_manager.initialize()
+            manager = UserManager()
+            await manager.initialize()
+            _user_manager = manager  # Only assign after fully initialized
     return _user_manager
 
 
@@ -584,6 +585,7 @@ async def get_api_key_manager() -> APIKeyManager:
     async with _api_key_manager_lock:
         # Double-check after acquiring lock
         if _api_key_manager is None:
-            _api_key_manager = APIKeyManager()
-            await _api_key_manager.initialize()
+            manager = APIKeyManager()
+            await manager.initialize()
+            _api_key_manager = manager  # Only assign after fully initialized
     return _api_key_manager

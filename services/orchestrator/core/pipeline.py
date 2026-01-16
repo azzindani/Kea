@@ -69,7 +69,7 @@ class ConversationResearchPipeline:
         if is_feature_enabled("context_cache"):
             try:
                 from services.orchestrator.core.context_cache import get_context_cache
-                self._cache = await get_context_cache()
+                self._cache = get_context_cache()
                 logger.debug("Context cache enabled")
             except ImportError:
                 logger.warning("Context cache not available")

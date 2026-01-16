@@ -560,6 +560,7 @@ async def get_conversation_manager() -> ConversationManager:
     async with _conversation_manager_lock:
         # Double-check after acquiring lock
         if _conversation_manager is None:
-            _conversation_manager = ConversationManager()
-            await _conversation_manager.initialize()
+            manager = ConversationManager()
+            await manager.initialize()
+            _conversation_manager = manager  # Only assign after fully initialized
     return _conversation_manager
