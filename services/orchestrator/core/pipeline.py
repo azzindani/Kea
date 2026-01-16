@@ -265,7 +265,9 @@ class ConversationResearchPipeline:
             )
             
         except Exception as e:
+            import traceback
             logger.error(f"Research pipeline error: {e}")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
             return await self._fallback_research(content)
     
     async def _fallback_research(self, content: str) -> ResearchResult:
