@@ -326,11 +326,14 @@ class TestConversationIsolation:
     @pytest.mark.asyncio
     async def test_cannot_access_other_users_conversation(self, async_client):
         """Test that users cannot access each other's conversations."""
+        import uuid
+        unique_id = str(uuid.uuid4())[:8]
+        
         # User 1 creates conversation
         user1_response = await async_client.post(
             "/api/v1/auth/register",
             json={
-                "email": "user1@example.com",
+                "email": f"user1_{unique_id}@example.com",
                 "name": "User 1",
                 "password": "SecurePassword123!",
             },
@@ -348,7 +351,7 @@ class TestConversationIsolation:
         user2_response = await async_client.post(
             "/api/v1/auth/register",
             json={
-                "email": "user2@example.com",
+                "email": f"user2_{unique_id}@example.com",
                 "name": "User 2",
                 "password": "SecurePassword123!",
             },
