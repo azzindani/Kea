@@ -111,7 +111,9 @@ class ConversationResearchPipeline:
         
         if self._classifier:
             classification = self._classifier.classify(content)
-            query_type = classification.query_type.value
+            # Handle both enum and string query_type
+            qt = classification.query_type
+            query_type = qt.value if hasattr(qt, 'value') else str(qt)
             bypass_research = classification.bypass_graph
             
             logger.debug(f"Query classified as: {query_type}, bypass={bypass_research}")
@@ -350,7 +352,8 @@ class ConversationResearchPipeline:
         if self._classifier:
             yield {"type": "status", "data": "Classifying query..."}
             classification = self._classifier.classify(content)
-            yield {"type": "classification", "data": classification.query_type.value}
+            qt = classification.query_type
+            yield {"type": "classification", "data": qt.value if hasattr(qt, 'value') else str(qt)}
         
         # Check cache
         if self._cache:

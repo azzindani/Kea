@@ -55,9 +55,9 @@ class FactStore:
         Returns:
             Fact ID
         """
-        # Generate ID if not provided
+        # Generate ID if not provided - Qdrant requires UUID or integer
         if not fact.fact_id:
-            fact.fact_id = f"fact-{uuid.uuid4().hex[:12]}"
+            fact.fact_id = str(uuid.uuid4())
         
         # Build searchable content
         content = self._fact_to_text(fact)
