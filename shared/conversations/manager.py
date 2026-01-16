@@ -545,13 +545,21 @@ class ConversationManager:
 # Singleton
 # ============================================================================
 
+import asyncio
+
 _conversation_manager: ConversationManager | None = None
+_conversation_manager_lock = asyncio.Lock()
 
 
 async def get_conversation_manager() -> ConversationManager:
-    """Get singleton conversation manager."""
+    """Get singleton conversation manager with thread-safe initialization."""
     global _conversation_manager
-    if _conversation_manager is None:
-        _conversation_manager = ConversationManager()
-        await _conversation_manager.initialize()
+    if _conversation_manager is not None:
+        return _conversation_manager
+    
+    async with _conversation_manager_lock:
+        # Double-check after acquiring lock
+        if _conversation_manager is None:
+            _conversation_manager = ConversationManager()
+            await _conversation_manager.initialize()
     return _conversation_manager

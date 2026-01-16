@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
+import asyncio
 import os
 
 from shared.logging import get_logger
@@ -550,28 +551,39 @@ class APIKeyManager:
             return datetime.fromisoformat(value)
         return None
 
-
 # ============================================================================
 # Singleton instances
 # ============================================================================
 
 _user_manager: UserManager | None = None
 _api_key_manager: APIKeyManager | None = None
+_user_manager_lock = asyncio.Lock()
+_api_key_manager_lock = asyncio.Lock()
 
 
 async def get_user_manager() -> UserManager:
-    """Get singleton user manager."""
+    """Get singleton user manager with thread-safe initialization."""
     global _user_manager
-    if _user_manager is None:
-        _user_manager = UserManager()
-        await _user_manager.initialize()
+    if _user_manager is not None:
+        return _user_manager
+    
+    async with _user_manager_lock:
+        # Double-check after acquiring lock
+        if _user_manager is None:
+            _user_manager = UserManager()
+            await _user_manager.initialize()
     return _user_manager
 
 
 async def get_api_key_manager() -> APIKeyManager:
-    """Get singleton API key manager."""
+    """Get singleton API key manager with thread-safe initialization."""
     global _api_key_manager
-    if _api_key_manager is None:
-        _api_key_manager = APIKeyManager()
-        await _api_key_manager.initialize()
+    if _api_key_manager is not None:
+        return _api_key_manager
+    
+    async with _api_key_manager_lock:
+        # Double-check after acquiring lock
+        if _api_key_manager is None:
+            _api_key_manager = APIKeyManager()
+            await _api_key_manager.initialize()
     return _api_key_manager

@@ -118,6 +118,40 @@ async def list_conversations(
     )
 
 
+@router.get("/search")
+async def search_conversations(
+    q: str = Query(..., min_length=1),
+    limit: int = Query(20, ge=1, le=100),
+    user: User = Depends(get_current_user_required),
+):
+    """Search conversations by title or content."""
+    manager = await get_conversation_manager()
+    
+    conversations = await manager.search_conversations(
+        user_id=user.user_id,
+        query=q,
+        limit=limit,
+    )
+    
+    return {
+        "query": q,
+        "results": [
+            ConversationResponse(
+                conversation_id=c.conversation_id,
+                user_id=c.user_id,
+                title=c.title,
+                message_count=c.message_count,
+                is_archived=c.is_archived,
+                is_pinned=c.is_pinned,
+                created_at=c.created_at.isoformat(),
+                updated_at=c.updated_at.isoformat(),
+            )
+            for c in conversations
+        ],
+        "total": len(conversations),
+    }
+
+
 @router.post("", response_model=ConversationResponse)
 async def create_conversation(
     request: CreateConversationRequest,
@@ -401,38 +435,3 @@ async def send_message(
             ),
             "error": str(e),
         }
-
-
-
-@router.get("/search")
-async def search_conversations(
-    q: str = Query(..., min_length=1),
-    limit: int = Query(20, ge=1, le=100),
-    user: User = Depends(get_current_user_required),
-):
-    """Search conversations by title or content."""
-    manager = await get_conversation_manager()
-    
-    conversations = await manager.search_conversations(
-        user_id=user.user_id,
-        query=q,
-        limit=limit,
-    )
-    
-    return {
-        "query": q,
-        "results": [
-            ConversationResponse(
-                conversation_id=c.conversation_id,
-                user_id=c.user_id,
-                title=c.title,
-                message_count=c.message_count,
-                is_archived=c.is_archived,
-                is_pinned=c.is_pinned,
-                created_at=c.created_at.isoformat(),
-                updated_at=c.updated_at.isoformat(),
-            )
-            for c in conversations
-        ],
-        "total": len(conversations),
-    }
