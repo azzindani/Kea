@@ -5,6 +5,7 @@ Tests for ChatGPT-style conversation management.
 """
 
 import pytest
+import uuid
 from httpx import AsyncClient, ASGITransport
 
 from services.api_gateway.main import app
@@ -12,9 +13,10 @@ from services.api_gateway.main import app
 
 @pytest.fixture
 def test_user():
-    """Test user data."""
+    """Test user data with unique email."""
+    unique_id = str(uuid.uuid4())[:8]
     return {
-        "email": "conv_test@example.com",
+        "email": f"conv_test_{unique_id}@example.com",
         "name": "Conversation Tester",
         "password": "SecurePassword123!",
     }
@@ -35,7 +37,10 @@ async def auth_headers(async_client, test_user):
         "/api/v1/auth/register",
         json=test_user,
     )
-    token = response.json()["access_token"]
+    data = response.json()
+    if "access_token" not in data:
+        pytest.fail(f"Registration failed: {data}")
+    token = data["access_token"]
     return {"Authorization": f"Bearer {token}"}
 
 

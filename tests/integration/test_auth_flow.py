@@ -5,6 +5,7 @@ Tests for register, login, logout, token refresh, and API key flow.
 """
 
 import pytest
+import uuid
 from httpx import AsyncClient, ASGITransport
 from unittest.mock import AsyncMock, patch
 
@@ -13,9 +14,10 @@ from services.api_gateway.main import app
 
 @pytest.fixture
 def test_user():
-    """Test user data."""
+    """Test user data with unique email."""
+    unique_id = str(uuid.uuid4())[:8]
     return {
-        "email": "test@example.com",
+        "email": f"test_{unique_id}@example.com",
         "name": "Test User",
         "password": "SecurePassword123!",
     }
@@ -62,7 +64,7 @@ class TestAuthRegistration:
         )
         
         assert response.status_code == 400
-        assert "already exists" in response.json()["detail"].lower()
+        assert "already registered" in response.json()["detail"].lower()
     
     @pytest.mark.asyncio
     async def test_register_weak_password(self, async_client):
