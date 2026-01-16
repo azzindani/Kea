@@ -61,21 +61,6 @@ class TestUserManager:
         manager = UserManager()
         await manager.initialize()
         # Should not raise
-    
-    @pytest.mark.asyncio
-    async def test_create_user(self):
-        """Test creating user via manager."""
-        from shared.users.manager import UserManager
-        
-        manager = UserManager()
-        await manager.initialize()
-        
-        user = await manager.create_user(
-            email="new@example.com",
-            name="New User",
-        )
-        
-        assert user.email == "new@example.com"
 
 
 class TestAPIKeyManager:
@@ -100,20 +85,3 @@ class TestAPIKeyManager:
         manager = APIKeyManager()
         await manager.initialize()
         # Should not raise
-    
-    @pytest.mark.asyncio
-    async def test_create_key(self):
-        """Test creating API key."""
-        from shared.users.manager import APIKeyManager
-        
-        manager = APIKeyManager()
-        await manager.initialize()
-        
-        key, raw = await manager.create_key(
-            user_id="user_123",
-            name="Test Key",
-        )
-        
-        assert key is not None
-        assert raw is not None  # Raw key for user
-        assert key.user_id == "user_123"

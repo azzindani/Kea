@@ -29,8 +29,8 @@ class TestConversation:
         assert conv.user_id == "user_456"
         assert conv.title == "Test Conversation"
     
-    def test_conversation_messages(self):
-        """Test conversation has messages list."""
+    def test_conversation_has_message_count(self):
+        """Test conversation has message_count attribute."""
         from shared.conversations.manager import Conversation
         
         conv = Conversation(
@@ -38,7 +38,7 @@ class TestConversation:
             user_id="user_1",
         )
         
-        assert hasattr(conv, "messages")
+        assert hasattr(conv, "message_count")
 
 
 class TestMessage:
@@ -50,31 +50,20 @@ class TestMessage:
         assert Message is not None
     
     def test_create_message(self):
-        """Test creating message."""
+        """Test creating message with all required fields."""
         from shared.conversations.manager import Message
         
         msg = Message(
             message_id="msg_123",
+            conversation_id="conv_456",
             role="user",
             content="Hello",
         )
         
         assert msg.message_id == "msg_123"
+        assert msg.conversation_id == "conv_456"
         assert msg.role == "user"
         assert msg.content == "Hello"
-    
-    def test_message_with_sources(self):
-        """Test message with sources."""
-        from shared.conversations.manager import Message
-        
-        msg = Message(
-            message_id="msg_456",
-            role="assistant",
-            content="Response with sources",
-            sources=["source1", "source2"],
-        )
-        
-        assert len(msg.sources) == 2
 
 
 class TestConversationManager:

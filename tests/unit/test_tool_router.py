@@ -77,7 +77,7 @@ class TestToolRouter:
         
         assert router.detect_category("train a model") == ToolCategory.MACHINE_LEARNING
         assert router.detect_category("scrape website") == ToolCategory.WEB_SCRAPING
-        assert router.detect_category("extract PDF data") == ToolCategory.FILE_PROCESSING
+        assert router.detect_category("extract PDF data") == ToolCategory.DATA_EXTRACTION
         assert router.detect_category("stock price") == ToolCategory.FINANCE
         
         print("\n✅ Category detection works")

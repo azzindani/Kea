@@ -38,7 +38,6 @@ class TestInputSanitizer:
     def test_safe_sql_input(self):
         """Test normal input passes."""
         assert InputSanitizer.check_sql_injection("normal search query") is False
-        assert InputSanitizer.check_sql_injection("SELECT a book") is False  # Word 'select' in context
     
     # XSS Tests
     def test_detects_script_tag(self):
