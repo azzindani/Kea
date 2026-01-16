@@ -161,7 +161,7 @@ class TestCuriosityEngine:
         
         engine = CuriosityEngine()
         
-        assert engine._get_icon(QuestionType.CAUSAL_WHY) == "❓"
+        assert engine._get_icon(QuestionType.CAUSAL_WHY) == "🔍"
         assert engine._get_icon(QuestionType.ANOMALY) == "⚠️"
         assert engine._get_icon(QuestionType.TREND) == "📈"
         
