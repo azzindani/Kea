@@ -1,140 +1,132 @@
 """
-Unit Tests: Logging Context and Middleware.
-
-Tests for logging context and middleware.
+Tests for logging middleware.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
+from starlette.requests import Request
+from starlette.responses import Response
 
-from shared.logging.context import (
-    LogContext,
-    get_context,
-    set_context,
-)
 from shared.logging.middleware import (
-    LoggingMiddleware,
     RequestLoggingMiddleware,
+    RequestIDMiddleware,
 )
+from shared.logging.context import LogContext, set_context, reset_context
 
 
 class TestLogContext:
-    """Test LogContext class."""
+    """Tests for LogContext."""
     
-    def test_create_context(self):
-        """Test context creation."""
-        context = LogContext(
-            request_id="req-123",
-            user_id="user-456",
+    def test_log_context_creation(self):
+        """Test creating log context."""
+        ctx = LogContext(
+            trace_id="trace_123",
+            span_id="span_456",
+            request_id="req_789",
         )
-        
-        assert context.request_id == "req-123"
-        assert context.user_id == "user-456"
+        assert ctx.trace_id == "trace_123"
+        assert ctx.span_id == "span_456"
+        assert ctx.request_id == "req_789"
     
-    def test_default_context(self):
-        """Test default context values."""
-        context = LogContext()
-        
-        assert context.request_id is None
-        assert context.user_id is None
-    
-    def test_to_dict(self):
-        """Test context to dictionary."""
-        context = LogContext(
-            request_id="req-123",
-            user_id="user-456",
-            extra={"key": "value"},
+    def test_set_and_reset_context(self):
+        """Test setting and resetting context."""
+        ctx = LogContext(
+            trace_id="test_trace",
+            span_id="test_span",
         )
+        token = set_context(ctx)
+        assert token is not None
         
-        data = context.to_dict()
-        
-        assert data["request_id"] == "req-123"
-        assert data["user_id"] == "user-456"
-
-
-class TestGlobalContext:
-    """Test global context management."""
-    
-    def test_set_and_get_context(self):
-        """Test setting and getting context."""
-        context = LogContext(request_id="req-999")
-        
-        set_context(context)
-        retrieved = get_context()
-        
-        assert retrieved.request_id == "req-999"
-    
-    def test_get_default_context(self):
-        """Test getting default context."""
-        import shared.logging.context as module
-        module._context = None
-        
-        context = get_context()
-        
-        assert context is not None
-
-
-class TestLoggingMiddleware:
-    """Test LoggingMiddleware class."""
-    
-    @pytest.fixture
-    def middleware(self):
-        """Create middleware for testing."""
-        return LoggingMiddleware(app=MagicMock())
-    
-    def test_middleware_init(self, middleware):
-        """Test middleware initialization."""
-        assert middleware is not None
-    
-    @pytest.mark.asyncio
-    async def test_request_logged(self, middleware):
-        """Test request is logged."""
-        request = MagicMock()
-        request.url.path = "/api/v1/test"
-        request.method = "GET"
-        request.headers = {}
-        
-        call_next = AsyncMock(return_value=MagicMock(status_code=200))
-        
-        with patch("shared.logging.middleware.logger") as mock_logger:
-            response = await middleware.dispatch(request, call_next)
-            
-            call_next.assert_called()
+        reset_context(token)
 
 
 class TestRequestLoggingMiddleware:
-    """Test RequestLoggingMiddleware class."""
+    """Tests for RequestLoggingMiddleware."""
     
     @pytest.fixture
     def middleware(self):
-        """Create middleware for testing."""
         return RequestLoggingMiddleware(app=MagicMock())
     
     @pytest.mark.asyncio
-    async def test_request_id_generated(self, middleware):
-        """Test request ID is generated."""
-        request = MagicMock()
-        request.url.path = "/api/v1/test"
-        request.method = "POST"
-        request.headers.get.return_value = None
+    async def test_dispatch_adds_trace_headers(self, middleware):
+        """Test that dispatch adds trace headers to response."""
+        request = MagicMock(spec=Request)
+        request.headers = {}
+        request.method = "GET"
+        request.url.path = "/test"
+        request.query_params = {}
+        request.client = MagicMock()
+        request.client.host = "127.0.0.1"
         
-        call_next = AsyncMock(return_value=MagicMock(status_code=200))
+        response = Response(content="OK", status_code=200)
         
-        response = await middleware.dispatch(request, call_next)
+        async def call_next(req):
+            return response
         
-        # Response should have request ID header
-        assert response is not None
+        result = await middleware.dispatch(request, call_next)
+        
+        assert "X-Request-ID" in result.headers
+        assert "X-Trace-ID" in result.headers
     
     @pytest.mark.asyncio
-    async def test_existing_request_id_used(self, middleware):
-        """Test existing request ID is used."""
-        request = MagicMock()
-        request.url.path = "/api/v1/test"
+    async def test_dispatch_extracts_existing_trace_id(self, middleware):
+        """Test that dispatch uses existing trace ID if present."""
+        request = MagicMock(spec=Request)
+        request.headers = {
+            "X-Request-ID": "existing_req_id",
+            "X-Trace-ID": "existing_trace_id",
+        }
         request.method = "GET"
-        request.headers.get.return_value = "existing-req-id"
+        request.url.path = "/test"
+        request.query_params = {}
+        request.client = MagicMock()
+        request.client.host = "127.0.0.1"
         
-        call_next = AsyncMock(return_value=MagicMock(status_code=200))
+        response = Response(content="OK", status_code=200)
         
-        response = await middleware.dispatch(request, call_next)
+        async def call_next(req):
+            return response
         
-        assert response is not None
+        result = await middleware.dispatch(request, call_next)
+        
+        assert result.headers["X-Request-ID"] == "existing_req_id"
+        assert result.headers["X-Trace-ID"] == "existing_trace_id"
+
+
+class TestRequestIDMiddleware:
+    """Tests for RequestIDMiddleware."""
+    
+    @pytest.fixture
+    def middleware(self):
+        return RequestIDMiddleware(app=MagicMock())
+    
+    @pytest.mark.asyncio
+    async def test_dispatch_generates_request_id(self, middleware):
+        """Test that dispatch generates request ID."""
+        request = MagicMock(spec=Request)
+        request.headers = {}
+        
+        response = Response(content="OK", status_code=200)
+        
+        async def call_next(req):
+            return response
+        
+        result = await middleware.dispatch(request, call_next)
+        
+        assert "X-Request-ID" in result.headers
+        assert result.headers["X-Request-ID"].startswith("req-")
+    
+    @pytest.mark.asyncio
+    async def test_dispatch_preserves_existing_request_id(self, middleware):
+        """Test that dispatch preserves existing request ID."""
+        request = MagicMock(spec=Request)
+        request.headers = {"X-Request-ID": "my_req_id"}
+        
+        response = Response(content="OK", status_code=200)
+        
+        async def call_next(req):
+            return response
+        
+        result = await middleware.dispatch(request, call_next)
+        
+        assert result.headers["X-Request-ID"] == "my_req_id"

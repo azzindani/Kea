@@ -1,203 +1,201 @@
 """
-Unit Tests: Sessions Manager.
-
-Tests for session and JWT token management.
+Tests for session management.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
 from datetime import datetime, timedelta
+from unittest.mock import patch, MagicMock
 
 from shared.sessions.manager import (
-    SessionManager,
     Session,
-    TokenPair,
+    SessionManager,
+    JWTManager,
+    get_session_manager,
+    get_jwt_manager,
 )
 
 
 class TestSession:
-    """Test Session model."""
+    """Tests for Session dataclass."""
     
-    def test_create_session(self):
+    def test_session_creation(self):
         """Test session creation."""
         session = Session(
-            session_id="sess-123",
-            user_id="user-123",
+            session_id="sess_123",
+            user_id="user_456",
+            tenant_id="default",
         )
-        
-        assert session.session_id == "sess-123"
-        assert session.user_id == "user-123"
-    
-    def test_session_defaults(self):
-        """Test session default values."""
-        session = Session(
-            session_id="sess-123",
-            user_id="user-123",
-        )
-        
+        assert session.session_id == "sess_123"
+        assert session.user_id == "user_456"
         assert session.is_active is True
-        assert session.ip_address is None
     
-    def test_session_expiry(self):
-        """Test session expiry detection."""
-        # Expired session
+    def test_session_expiration(self):
+        """Test session expiration check."""
+        # Not expired
         session = Session(
-            session_id="sess-123",
-            user_id="user-123",
-            expires_at=datetime.utcnow() - timedelta(hours=1),
-        )
-        
-        assert session.is_expired is True
-    
-    def test_session_not_expired(self):
-        """Test session not expired."""
-        session = Session(
-            session_id="sess-123",
-            user_id="user-123",
+            session_id="sess_1",
+            user_id="user_1",
             expires_at=datetime.utcnow() + timedelta(hours=1),
         )
+        assert session.is_expired() is False
         
-        assert session.is_expired is False
-
-
-class TestTokenPair:
-    """Test TokenPair model."""
-    
-    def test_token_pair(self):
-        """Test token pair creation."""
-        pair = TokenPair(
-            access_token="access.token.here",
-            refresh_token="refresh.token.here",
-            token_type="bearer",
-            expires_in=3600,
+        # Expired
+        expired_session = Session(
+            session_id="sess_2",
+            user_id="user_2",
+            expires_at=datetime.utcnow() - timedelta(hours=1),
         )
-        
-        assert pair.access_token == "access.token.here"
-        assert pair.refresh_token == "refresh.token.here"
-        assert pair.token_type == "bearer"
-        assert pair.expires_in == 3600
+        assert expired_session.is_expired() is True
+    
+    def test_session_touch(self):
+        """Test updating last activity."""
+        session = Session(
+            session_id="sess_1",
+            user_id="user_1",
+        )
+        old_activity = session.last_activity
+        session.touch()
+        assert session.last_activity >= old_activity
+    
+    def test_session_to_dict(self):
+        """Test session serialization."""
+        session = Session(
+            session_id="sess_1",
+            user_id="user_1",
+            tenant_id="tenant_1",
+        )
+        data = session.to_dict()
+        assert data["session_id"] == "sess_1"
+        assert data["user_id"] == "user_1"
+        assert data["tenant_id"] == "tenant_1"
 
 
 class TestSessionManager:
-    """Test SessionManager class."""
+    """Tests for SessionManager."""
     
     @pytest.fixture
     def manager(self):
-        """Create manager for testing."""
-        with patch("shared.sessions.manager.get_settings") as mock:
-            mock.return_value.jwt_secret = "test-secret-key-32-chars-minimum!"
-            mock.return_value.jwt_algorithm = "HS256"
-            mock.return_value.access_token_expire_minutes = 30
-            mock.return_value.refresh_token_expire_days = 7
-            return SessionManager()
-    
-    def test_create_access_token(self, manager):
-        """Test creating access token."""
-        token = manager.create_access_token(
-            user_id="user-123",
-            email="test@example.com",
-        )
-        
-        assert token is not None
-        assert len(token) > 0
-    
-    def test_create_refresh_token(self, manager):
-        """Test creating refresh token."""
-        token = manager.create_refresh_token(
-            user_id="user-123",
-        )
-        
-        assert token is not None
-        assert len(token) > 0
-    
-    def test_create_token_pair(self, manager):
-        """Test creating token pair."""
-        pair = manager.create_token_pair(
-            user_id="user-123",
-            email="test@example.com",
-        )
-        
-        assert pair.access_token is not None
-        assert pair.refresh_token is not None
-        assert pair.token_type == "bearer"
-    
-    def test_verify_access_token(self, manager):
-        """Test verifying valid access token."""
-        token = manager.create_access_token(
-            user_id="user-123",
-            email="test@example.com",
-        )
-        
-        payload = manager.verify_access_token(token)
-        
-        assert payload is not None
-        assert payload["sub"] == "user-123"
-    
-    def test_verify_invalid_token(self, manager):
-        """Test verifying invalid token."""
-        result = manager.verify_access_token("invalid.token.here")
-        
-        assert result is None
-    
-    def test_verify_refresh_token(self, manager):
-        """Test verifying refresh token."""
-        token = manager.create_refresh_token(user_id="user-123")
-        
-        payload = manager.verify_refresh_token(token)
-        
-        assert payload is not None
-        assert payload["sub"] == "user-123"
-    
-    def test_refresh_tokens(self, manager):
-        """Test refreshing tokens."""
-        refresh_token = manager.create_refresh_token(user_id="user-123")
-        
-        new_pair = manager.refresh_tokens(refresh_token)
-        
-        assert new_pair is not None
-        assert new_pair.access_token is not None
-
-
-class TestSessionStorage:
-    """Test session storage operations."""
-    
-    @pytest.fixture
-    def manager(self):
-        """Create manager with mocked storage."""
-        with patch("shared.sessions.manager.get_settings") as mock:
-            mock.return_value.jwt_secret = "test-secret-key-32-chars-minimum!"
-            mock.return_value.jwt_algorithm = "HS256"
-            return SessionManager()
+        return SessionManager(session_hours=1)
     
     @pytest.mark.asyncio
     async def test_create_session(self, manager):
-        """Test creating session in storage."""
-        with patch.object(manager, "_db") as mock_db:
-            mock_db.execute = AsyncMock()
-            
-            session = await manager.create_session(
-                user_id="user-123",
-                ip_address="192.168.1.1",
-            )
-            
-            assert session.user_id == "user-123"
+        """Test session creation."""
+        session = await manager.create_session(
+            user_id="user_123",
+            tenant_id="default",
+            device_info="Chrome",
+            ip_address="127.0.0.1",
+        )
+        assert session.user_id == "user_123"
+        assert session.device_info == "Chrome"
+        assert session.ip_address == "127.0.0.1"
     
     @pytest.mark.asyncio
-    async def test_invalidate_session(self, manager):
-        """Test invalidating session."""
-        with patch.object(manager, "_db") as mock_db:
-            mock_db.execute = AsyncMock()
-            
-            await manager.invalidate_session("sess-123")
-            
-            mock_db.execute.assert_called()
+    async def test_get_session(self, manager):
+        """Test getting session by ID."""
+        session = await manager.create_session(user_id="user_1")
+        retrieved = await manager.get_session(session.session_id)
+        assert retrieved is not None
+        assert retrieved.user_id == "user_1"
     
     @pytest.mark.asyncio
-    async def test_invalidate_all_sessions(self, manager):
-        """Test invalidating all user sessions."""
-        with patch.object(manager, "_db") as mock_db:
-            mock_db.execute = AsyncMock()
-            
-            await manager.invalidate_all_sessions("user-123")
-            
-            mock_db.execute.assert_called()
+    async def test_get_nonexistent_session(self, manager):
+        """Test getting non-existent session."""
+        result = await manager.get_session("nonexistent")
+        assert result is None
+    
+    @pytest.mark.asyncio
+    async def test_end_session(self, manager):
+        """Test ending session."""
+        session = await manager.create_session(user_id="user_1")
+        await manager.end_session(session.session_id)
+        result = await manager.get_session(session.session_id)
+        assert result is None
+    
+    @pytest.mark.asyncio
+    async def test_get_user_sessions(self, manager):
+        """Test getting all sessions for a user."""
+        await manager.create_session(user_id="user_1")
+        await manager.create_session(user_id="user_1")
+        await manager.create_session(user_id="user_2")
+        
+        sessions = await manager.get_user_sessions("user_1")
+        assert len(sessions) == 2
+    
+    @pytest.mark.asyncio
+    async def test_refresh_session(self, manager):
+        """Test refreshing session."""
+        session = await manager.create_session(user_id="user_1")
+        old_expires = session.expires_at
+        
+        await manager.refresh_session(session.session_id)
+        refreshed = await manager.get_session(session.session_id)
+        
+        assert refreshed.expires_at > old_expires
+
+
+class TestJWTManager:
+    """Tests for JWTManager."""
+    
+    @pytest.fixture
+    def jwt_manager(self):
+        return JWTManager(
+            secret_key="test_secret_key_12345",
+            access_token_minutes=60,
+            refresh_token_days=7,
+        )
+    
+    def test_create_access_token(self, jwt_manager):
+        """Test access token creation."""
+        token = jwt_manager.create_access_token(
+            user_id="user_123",
+            tenant_id="default",
+            role="user",
+        )
+        assert token is not None
+        assert isinstance(token, str)
+    
+    def test_verify_access_token(self, jwt_manager):
+        """Test access token verification."""
+        token = jwt_manager.create_access_token(user_id="user_123")
+        payload = jwt_manager.verify_token(token)
+        
+        assert payload is not None
+        assert payload["sub"] == "user_123"
+        assert payload["type"] == "access"
+    
+    def test_create_refresh_token(self, jwt_manager):
+        """Test refresh token creation."""
+        token = jwt_manager.create_refresh_token(user_id="user_123")
+        assert token is not None
+        
+        payload = jwt_manager.verify_token(token)
+        assert payload["type"] == "refresh"
+    
+    def test_create_tokens(self, jwt_manager):
+        """Test creating both access and refresh tokens."""
+        tokens = jwt_manager.create_tokens(
+            user_id="user_123",
+            tenant_id="tenant_1",
+            role="admin",
+        )
+        assert "access_token" in tokens
+        assert "refresh_token" in tokens
+    
+    def test_invalid_token(self, jwt_manager):
+        """Test verifying invalid token."""
+        payload = jwt_manager.verify_token("invalid_token")
+        assert payload is None
+    
+    def test_expired_token(self, jwt_manager):
+        """Test verifying expired token."""
+        # Create manager with 0 minute expiry
+        short_jwt = JWTManager(
+            secret_key="test",
+            access_token_minutes=0,
+        )
+        token = short_jwt.create_access_token(user_id="user_1")
+        
+        # Token should be expired immediately
+        payload = short_jwt.verify_token(token)
+        assert payload is None

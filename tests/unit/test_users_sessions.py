@@ -1,215 +1,159 @@
 """
-Unit Tests: User and Session Management.
-
-Tests for user models, password hashing, and session management.
+Tests for users and sessions integration.
 """
 
 import pytest
 from datetime import datetime, timedelta
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, AsyncMock
 
-from shared.users.models import User, APIKey, UserRole
-from shared.sessions.manager import SessionManager, TokenPair
+from shared.users import User, UserRole
+from shared.users.manager import UserManager, APIKeyManager
+from shared.sessions.manager import Session, SessionManager, JWTManager
 
 
 class TestUserModel:
-    """Test User model."""
+    """Tests for User model."""
     
-    def test_create_user(self):
-        """Test user creation."""
+    def test_user_creation(self):
+        """Test creating user."""
         user = User(
+            user_id="user_123",
             email="test@example.com",
             name="Test User",
+            role=UserRole.USER,
+            tenant_id="default",
         )
-        
+        assert user.user_id == "user_123"
         assert user.email == "test@example.com"
-        assert user.name == "Test User"
         assert user.role == UserRole.USER
-        assert user.is_active is True
     
-    def test_user_id_generated(self):
-        """Test user ID is generated."""
-        user = User(email="test@example.com", name="Test")
-        
-        assert user.user_id is not None
-        assert len(user.user_id) == 36  # UUID format
+    def test_anonymous_user(self):
+        """Test creating anonymous user."""
+        user = User.anonymous()
+        assert user.role == UserRole.ANONYMOUS
+        assert user.email == ""
     
-    def test_password_hashing(self):
-        """Test password is hashed correctly."""
-        user = User(email="test@example.com", name="Test")
-        user.set_password("SecurePassword123!")
-        
-        assert user.password_hash != "SecurePassword123!"
-        assert user.password_hash.startswith("$2b$")  # bcrypt format
-    
-    def test_password_verification(self):
-        """Test password verification."""
-        user = User(email="test@example.com", name="Test")
-        user.set_password("SecurePassword123!")
-        
-        assert user.verify_password("SecurePassword123!") is True
-        assert user.verify_password("WrongPassword") is False
-    
-    def test_admin_role(self):
-        """Test admin role."""
-        user = User(
-            email="admin@example.com",
-            name="Admin",
-            role=UserRole.ADMIN,
-        )
-        
-        assert user.role == UserRole.ADMIN
-        assert user.is_admin is True
-    
-    def test_tenant_id(self):
-        """Test tenant ID assignment."""
-        user = User(
-            email="test@example.com",
-            name="Test",
-            tenant_id="tenant-123",
-        )
-        
-        assert user.tenant_id == "tenant-123"
-    
-    def test_to_dict(self):
-        """Test dictionary serialization."""
-        user = User(
-            email="test@example.com",
-            name="Test User",
-        )
-        
-        data = user.to_dict()
-        
-        assert data["email"] == "test@example.com"
-        assert data["name"] == "Test User"
-        assert "password_hash" not in data  # Should not expose
+    def test_user_roles(self):
+        """Test user role enum."""
+        assert UserRole.ANONYMOUS.value == "anonymous"
+        assert UserRole.USER.value == "user"
+        assert UserRole.ADMIN.value == "admin"
 
 
-class TestAPIKeyModel:
-    """Test API Key model."""
+class TestUserManager:
+    """Tests for UserManager."""
     
-    def test_create_api_key(self):
-        """Test API key creation."""
-        key = APIKey.create(
-            user_id="user-123",
-            name="Test Key",
+    @pytest.fixture
+    def manager(self):
+        return UserManager()
+    
+    @pytest.mark.asyncio
+    async def test_initialize(self, manager):
+        """Test manager initialization."""
+        await manager.initialize()
+        assert manager._use_postgres is False  # Should fallback to SQLite
+    
+    @pytest.mark.asyncio
+    async def test_create_user(self, manager):
+        """Test creating user."""
+        await manager.initialize()
+        
+        user = await manager.create_user(
+            email="newuser@example.com",
+            name="New User",
+            password="test123",
         )
         
-        assert key.user_id == "user-123"
-        assert key.name == "Test Key"
-        assert key.raw_key is not None
-        assert key.raw_key.startswith("kea_")
+        assert user.email == "newuser@example.com"
+        assert user.name == "New User"
     
-    def test_key_prefix_stored(self):
-        """Test key prefix is stored."""
-        key = APIKey.create(user_id="user-123", name="Test")
+    @pytest.mark.asyncio
+    async def test_get_by_email(self, manager):
+        """Test getting user by email."""
+        await manager.initialize()
         
-        assert key.key_prefix is not None
-        assert len(key.key_prefix) == 8
-        assert key.raw_key.startswith(f"kea_{key.key_prefix}")
-    
-    def test_key_hash_stored(self):
-        """Test key hash is stored."""
-        key = APIKey.create(user_id="user-123", name="Test")
-        
-        assert key.key_hash is not None
-        assert key.key_hash != key.raw_key
-    
-    def test_verify_key(self):
-        """Test API key verification."""
-        key = APIKey.create(user_id="user-123", name="Test")
-        raw_key = key.raw_key
-        
-        assert key.verify(raw_key) is True
-        assert key.verify("wrong_key") is False
-    
-    def test_key_expiration(self):
-        """Test expired key detection."""
-        key = APIKey.create(
-            user_id="user-123",
-            name="Test",
-            expires_at=datetime.utcnow() - timedelta(days=1),
+        await manager.create_user(
+            email="findme@example.com",
+            name="Find Me",
         )
         
-        assert key.is_expired is True
+        user = await manager.get_by_email("findme@example.com")
+        assert user is not None
+        assert user.name == "Find Me"
     
-    def test_key_not_expired(self):
-        """Test valid key detection."""
-        key = APIKey.create(
-            user_id="user-123",
-            name="Test",
-            expires_at=datetime.utcnow() + timedelta(days=30),
-        )
+    @pytest.mark.asyncio
+    async def test_get_nonexistent_user(self, manager):
+        """Test getting non-existent user."""
+        await manager.initialize()
         
-        assert key.is_expired is False
+        user = await manager.get_by_email("noone@example.com")
+        assert user is None
 
 
-class TestSessionManager:
-    """Test session management."""
+class TestSession:
+    """Tests for Session model."""
+    
+    def test_session_creation(self):
+        """Test session creation."""
+        session = Session(
+            session_id="sess_123",
+            user_id="user_456",
+        )
+        assert session.session_id == "sess_123"
+        assert session.user_id == "user_456"
+    
+    def test_session_expiration(self):
+        """Test session expiration."""
+        expired = Session(
+            session_id="sess_1",
+            user_id="user_1",
+            expires_at=datetime.utcnow() - timedelta(hours=1),
+        )
+        assert expired.is_expired() is True
+        
+        valid = Session(
+            session_id="sess_2",
+            user_id="user_2",
+            expires_at=datetime.utcnow() + timedelta(hours=1),
+        )
+        assert valid.is_expired() is False
+
+
+class TestJWTIntegration:
+    """Tests for JWT and session integration."""
+    
+    @pytest.fixture
+    def jwt_manager(self):
+        return JWTManager(secret_key="test_secret")
     
     @pytest.fixture
     def session_manager(self):
-        """Create session manager with mock settings."""
-        with patch("shared.sessions.manager.get_settings") as mock:
-            mock.return_value.jwt_secret = "test-secret-key-at-least-32-chars!"
-            mock.return_value.jwt_algorithm = "HS256"
-            return SessionManager()
+        return SessionManager()
     
-    def test_create_token_pair(self, session_manager):
-        """Test token pair creation."""
-        tokens = session_manager.create_token_pair(
-            user_id="user-123",
-            email="test@example.com",
+    @pytest.mark.asyncio
+    async def test_full_auth_flow(self, jwt_manager, session_manager):
+        """Test full authentication flow."""
+        # 1. Create session
+        session = await session_manager.create_session(
+            user_id="user_123",
+            device_info="Test Browser",
         )
+        assert session is not None
         
-        assert tokens.access_token is not None
-        assert tokens.refresh_token is not None
-        assert tokens.token_type == "bearer"
-    
-    def test_verify_access_token(self, session_manager):
-        """Test access token verification."""
-        tokens = session_manager.create_token_pair(
-            user_id="user-123",
-            email="test@example.com",
+        # 2. Create tokens
+        tokens = jwt_manager.create_tokens(
+            user_id="user_123",
+            tenant_id="default",
+            role="user",
         )
+        assert "access_token" in tokens
+        assert "refresh_token" in tokens
         
-        payload = session_manager.verify_access_token(tokens.access_token)
+        # 3. Verify access token
+        payload = jwt_manager.verify_token(tokens["access_token"])
+        assert payload["sub"] == "user_123"
         
-        assert payload is not None
-        assert payload["sub"] == "user-123"
-        assert payload["email"] == "test@example.com"
-    
-    def test_invalid_token_rejected(self, session_manager):
-        """Test invalid token is rejected."""
-        result = session_manager.verify_access_token("invalid.token.here")
-        
-        assert result is None
-    
-    def test_refresh_token_contains_different_claims(self, session_manager):
-        """Test refresh token has different expiry."""
-        tokens = session_manager.create_token_pair(
-            user_id="user-123",
-            email="test@example.com",
-        )
-        
-        access_payload = session_manager.verify_access_token(tokens.access_token)
-        refresh_payload = session_manager.verify_refresh_token(tokens.refresh_token)
-        
-        # Refresh token should have longer expiry
-        assert refresh_payload["exp"] > access_payload["exp"]
-
-
-class TestUserRole:
-    """Test user roles."""
-    
-    def test_user_role(self):
-        """Test default user role."""
-        assert UserRole.USER.value == "user"
-    
-    def test_admin_role(self):
-        """Test admin role."""
-        assert UserRole.ADMIN.value == "admin"
-    
-    def test_service_role(self):
-        """Test service account role."""
-        assert UserRole.SERVICE.value == "service"
+        # 4. End session
+        await session_manager.end_session(session.session_id)
+        ended = await session_manager.get_session(session.session_id)
+        assert ended is None

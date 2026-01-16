@@ -1,156 +1,184 @@
 """
-Unit Tests: Hardware Monitor and Executor Config.
-
-Tests for hardware monitoring and executor configuration.
+Tests for hardware resource monitoring.
 """
 
 import pytest
 from unittest.mock import patch, MagicMock
+from datetime import datetime
 
 from shared.hardware.monitor import (
-    HardwareMonitor,
-    ResourceUsage,
-    get_monitor,
-)
-from shared.hardware.executor_config import (
-    ExecutorConfig,
-    get_executor_config,
+    AlertLevel,
+    ResourceAlert,
+    ResourceSnapshot,
+    ResourceMonitor,
 )
 
 
-class TestResourceUsage:
-    """Test ResourceUsage dataclass."""
+class TestAlertLevel:
+    """Tests for AlertLevel enum."""
     
-    def test_default_values(self):
-        """Test default resource values."""
-        usage = ResourceUsage()
-        
-        assert usage.cpu_percent == 0.0
-        assert usage.memory_percent == 0.0
-        assert usage.memory_used_gb == 0.0
+    def test_alert_levels(self):
+        """Test alert level values."""
+        assert AlertLevel.INFO.value == "info"
+        assert AlertLevel.WARNING.value == "warning"
+        assert AlertLevel.CRITICAL.value == "critical"
+
+
+class TestResourceAlert:
+    """Tests for ResourceAlert dataclass."""
     
-    def test_custom_values(self):
-        """Test custom resource values."""
-        usage = ResourceUsage(
-            cpu_percent=75.0,
-            memory_percent=60.0,
-            memory_used_gb=12.0,
+    def test_alert_creation(self):
+        """Test creating resource alert."""
+        alert = ResourceAlert(
+            level=AlertLevel.WARNING,
+            resource="ram",
+            message="Memory usage high",
+            value=85.0,
+            threshold=75.0,
         )
-        
-        assert usage.cpu_percent == 75.0
-        assert usage.memory_percent == 60.0
+        assert alert.level == AlertLevel.WARNING
+        assert alert.resource == "ram"
+        assert alert.value > alert.threshold
+        assert alert.timestamp is not None
 
 
-class TestHardwareMonitor:
-    """Test HardwareMonitor class."""
+class TestResourceSnapshot:
+    """Tests for ResourceSnapshot dataclass."""
+    
+    def test_snapshot_creation(self):
+        """Test creating resource snapshot."""
+        snapshot = ResourceSnapshot(
+            timestamp=datetime.utcnow(),
+            ram_percent=50.0,
+            ram_available_gb=8.0,
+            cpu_percent=25.0,
+            gpu_memory_percent=0.0,
+            disk_free_gb=100.0,
+        )
+        assert snapshot.ram_percent == 50.0
+        assert snapshot.cpu_percent == 25.0
+
+
+class TestResourceMonitor:
+    """Tests for ResourceMonitor."""
     
     @pytest.fixture
     def monitor(self):
-        """Create monitor for testing."""
-        return HardwareMonitor()
+        return ResourceMonitor(
+            ram_warning_percent=75.0,
+            ram_critical_percent=90.0,
+            cpu_warning_percent=80.0,
+            check_interval_seconds=1.0,
+        )
     
     def test_monitor_init(self, monitor):
         """Test monitor initialization."""
-        assert monitor is not None
+        assert monitor.ram_warning == 75.0
+        assert monitor.ram_critical == 90.0
+        assert monitor.cpu_warning == 80.0
+        assert monitor.check_interval == 1.0
     
-    def test_get_usage(self, monitor):
-        """Test getting resource usage."""
-        with patch("shared.hardware.monitor.psutil") as mock:
-            mock.cpu_percent.return_value = 50.0
-            mock.virtual_memory.return_value = MagicMock(
-                percent=60.0,
-                used=8 * 1024**3,
-            )
-            
-            usage = monitor.get_usage()
-            
-            assert isinstance(usage, ResourceUsage)
+    def test_on_alert_callback(self, monitor):
+        """Test registering alert callback."""
+        callback = MagicMock()
+        monitor.on_alert(callback)
+        assert callback in monitor._callbacks
     
-    def test_is_overloaded_false(self, monitor):
-        """Test not overloaded with low usage."""
-        with patch.object(monitor, "get_usage") as mock:
-            mock.return_value = ResourceUsage(
-                cpu_percent=30.0,
-                memory_percent=40.0,
-            )
-            
-            assert monitor.is_overloaded() is False
+    def test_is_memory_critical_false(self, monitor):
+        """Test memory critical when no snapshot."""
+        assert monitor.is_memory_critical() is False
     
-    def test_is_overloaded_high_cpu(self, monitor):
-        """Test overloaded with high CPU."""
-        with patch.object(monitor, "get_usage") as mock:
-            mock.return_value = ResourceUsage(
-                cpu_percent=95.0,
-                memory_percent=40.0,
-            )
-            
-            assert monitor.is_overloaded() is True
+    def test_is_memory_warning_false(self, monitor):
+        """Test memory warning when no snapshot."""
+        assert monitor.is_memory_warning() is False
     
-    def test_is_overloaded_high_memory(self, monitor):
-        """Test overloaded with high memory."""
-        with patch.object(monitor, "get_usage") as mock:
-            mock.return_value = ResourceUsage(
-                cpu_percent=30.0,
-                memory_percent=95.0,
-            )
-            
-            assert monitor.is_overloaded() is True
-
-
-class TestExecutorConfig:
-    """Test ExecutorConfig class."""
-    
-    def test_default_config(self):
-        """Test default executor config."""
-        config = ExecutorConfig()
-        
-        assert config.max_workers >= 1
-        assert config.batch_size >= 1
-    
-    def test_from_hardware_profile(self):
-        """Test creating config from hardware profile."""
-        from shared.hardware.detector import HardwareProfile
-        
-        profile = HardwareProfile(
-            cpu_threads=8,
-            ram_available_gb=16.0,
+    def test_is_memory_critical_true(self, monitor):
+        """Test memory critical detection."""
+        monitor._last_snapshot = ResourceSnapshot(
+            timestamp=datetime.utcnow(),
+            ram_percent=95.0,
+            ram_available_gb=0.5,
+            cpu_percent=50.0,
         )
-        
-        config = ExecutorConfig.from_profile(profile)
-        
-        assert config.max_workers >= 1
+        assert monitor.is_memory_critical() is True
     
-    def test_constrained_mode(self):
-        """Test constrained mode config."""
-        config = ExecutorConfig.constrained()
-        
-        assert config.max_workers <= 2
-        assert config.batch_size <= 100
-
-
-class TestGlobalMonitor:
-    """Test global monitor singleton."""
+    def test_is_memory_warning_true(self, monitor):
+        """Test memory warning detection."""
+        monitor._last_snapshot = ResourceSnapshot(
+            timestamp=datetime.utcnow(),
+            ram_percent=80.0,
+            ram_available_gb=2.0,
+            cpu_percent=50.0,
+        )
+        assert monitor.is_memory_warning() is True
     
-    def test_get_monitor_singleton(self):
-        """Test get_monitor returns singleton."""
-        import shared.hardware.monitor as module
-        module._monitor = None
+    def test_get_current_snapshot(self, monitor):
+        """Test getting current snapshot."""
+        assert monitor.get_current_snapshot() is None
         
-        m1 = get_monitor()
-        m2 = get_monitor()
-        
-        assert m1 is m2
-
-
-class TestGetExecutorConfig:
-    """Test global executor config."""
+        snapshot = ResourceSnapshot(
+            timestamp=datetime.utcnow(),
+            ram_percent=50.0,
+            ram_available_gb=8.0,
+            cpu_percent=25.0,
+        )
+        monitor._last_snapshot = snapshot
+        assert monitor.get_current_snapshot() == snapshot
     
-    def test_get_executor_config_singleton(self):
-        """Test get_executor_config returns config."""
-        import shared.hardware.executor_config as module
-        module._config = None
+    def test_get_recommended_parallelism_normal(self, monitor):
+        """Test parallelism recommendation under normal load."""
+        monitor._last_snapshot = ResourceSnapshot(
+            timestamp=datetime.utcnow(),
+            ram_percent=50.0,
+            ram_available_gb=8.0,
+            cpu_percent=25.0,
+        )
+        result = monitor.get_recommended_parallelism(8)
+        assert result == 8
+    
+    def test_get_recommended_parallelism_warning(self, monitor):
+        """Test parallelism recommendation under warning."""
+        monitor._last_snapshot = ResourceSnapshot(
+            timestamp=datetime.utcnow(),
+            ram_percent=80.0,
+            ram_available_gb=2.0,
+            cpu_percent=50.0,
+        )
+        result = monitor.get_recommended_parallelism(8)
+        assert result == 4
+    
+    def test_get_recommended_parallelism_critical(self, monitor):
+        """Test parallelism recommendation under critical."""
+        monitor._last_snapshot = ResourceSnapshot(
+            timestamp=datetime.utcnow(),
+            ram_percent=95.0,
+            ram_available_gb=0.5,
+            cpu_percent=50.0,
+        )
+        result = monitor.get_recommended_parallelism(8)
+        assert result == 2
+    
+    @pytest.mark.asyncio
+    async def test_start_stop(self, monitor):
+        """Test starting and stopping monitor."""
+        await monitor.start()
+        assert monitor._running is True
         
-        c1 = get_executor_config()
-        c2 = get_executor_config()
+        await monitor.stop()
+        assert monitor._running is False
+    
+    def test_emit_alert(self, monitor):
+        """Test emitting alerts to callbacks."""
+        callback = MagicMock()
+        monitor.on_alert(callback)
         
-        assert c1 is c2
+        alert = ResourceAlert(
+            level=AlertLevel.WARNING,
+            resource="ram",
+            message="Test alert",
+            value=80.0,
+            threshold=75.0,
+        )
+        monitor._emit_alert(alert)
+        
+        callback.assert_called_once_with(alert)

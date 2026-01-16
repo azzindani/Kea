@@ -1,147 +1,170 @@
 """
-Unit Tests: Auth Middleware.
-
 Tests for authentication middleware.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
+from fastapi import Request, HTTPException
 
 from services.api_gateway.middleware.auth import (
     AuthMiddleware,
     get_current_user,
+    get_current_user_required,
+    require_role,
     get_optional_user,
-    require_admin,
+    create_auth_middleware,
 )
+from shared.users import User, UserRole
 
 
 class TestAuthMiddleware:
-    """Test AuthMiddleware class."""
+    """Tests for AuthMiddleware class."""
     
     @pytest.fixture
     def middleware(self):
-        """Create middleware for testing."""
-        return AuthMiddleware(app=MagicMock())
+        return AuthMiddleware(allow_anonymous=True)
     
-    def test_middleware_init(self, middleware):
+    @pytest.fixture
+    def strict_middleware(self):
+        return AuthMiddleware(allow_anonymous=False)
+    
+    def test_middleware_init(self):
         """Test middleware initialization."""
-        assert middleware is not None
+        middleware = AuthMiddleware(allow_anonymous=True)
+        assert middleware.allow_anonymous is True
+        
+        strict = AuthMiddleware(allow_anonymous=False)
+        assert strict.allow_anonymous is False
     
     @pytest.mark.asyncio
-    async def test_exempt_path_bypassed(self, middleware):
-        """Test exempt paths bypass auth."""
-        request = MagicMock()
-        request.url.path = "/health"
+    async def test_anonymous_access(self, middleware):
+        """Test anonymous access when allowed."""
+        request = MagicMock(spec=Request)
+        request.headers = {}
+        request.cookies = {}
+        request.state = MagicMock()
         
-        call_next = AsyncMock(return_value=MagicMock())
+        async def call_next(req):
+            return MagicMock()
         
-        response = await middleware.dispatch(request, call_next)
+        response = await middleware(request, call_next)
         
-        call_next.assert_called()
-    
-    @pytest.mark.asyncio
-    async def test_bearer_token_extracted(self, middleware):
-        """Test Bearer token extraction."""
-        request = MagicMock()
-        request.url.path = "/api/v1/conversations"
-        request.headers.get.return_value = "Bearer valid.token.here"
-        
-        with patch.object(middleware, "_validate_token") as mock:
-            mock.return_value = {"sub": "user-123"}
-            
-            call_next = AsyncMock(return_value=MagicMock())
-            await middleware.dispatch(request, call_next)
-    
-    @pytest.mark.asyncio
-    async def test_api_key_extracted(self, middleware):
-        """Test API key extraction."""
-        request = MagicMock()
-        request.url.path = "/api/v1/conversations"
-        request.headers.get.side_effect = lambda h: "kea_abc123" if h == "X-API-Key" else None
-        
-        with patch.object(middleware, "_validate_api_key") as mock:
-            mock.return_value = MagicMock()
-            
-            call_next = AsyncMock(return_value=MagicMock())
-            await middleware.dispatch(request, call_next)
+        # Should set anonymous user
+        assert request.state.user is not None
+        assert request.state.auth_method == "anonymous"
 
 
 class TestGetCurrentUser:
-    """Test get_current_user dependency."""
+    """Tests for get_current_user dependency."""
     
     @pytest.mark.asyncio
-    async def test_returns_user_from_state(self):
-        """Test returns user from request state."""
-        request = MagicMock()
-        request.state.user = MagicMock(user_id="user-123")
+    async def test_get_user_from_state(self):
+        """Test getting user from request state."""
+        user = User(
+            user_id="user_123",
+            email="test@example.com",
+            name="Test User",
+            role=UserRole.USER,
+        )
         
-        user = await get_current_user(request)
+        request = MagicMock(spec=Request)
+        request.state.user = user
+        request.headers = {}
         
-        assert user.user_id == "user-123"
+        result = await get_current_user(request)
+        assert result.user_id == "user_123"
     
     @pytest.mark.asyncio
-    async def test_raises_without_user(self):
-        """Test raises 401 without user."""
-        from fastapi import HTTPException
-        
-        request = MagicMock()
+    async def test_get_anonymous_user(self):
+        """Test getting anonymous user when not authenticated."""
+        request = MagicMock(spec=Request)
+        request.state = MagicMock()
         request.state.user = None
+        request.headers = {}
         
-        with pytest.raises(HTTPException) as exc:
-            await get_current_user(request)
+        result = await get_current_user(request)
+        assert result.role == UserRole.ANONYMOUS
+
+
+class TestRequireRole:
+    """Tests for require_role dependency."""
+    
+    @pytest.mark.asyncio
+    async def test_require_admin_role(self):
+        """Test requiring admin role."""
+        admin_user = User(
+            user_id="admin_1",
+            email="admin@example.com",
+            name="Admin",
+            role=UserRole.ADMIN,
+        )
         
-        assert exc.value.status_code == 401
+        checker = require_role(UserRole.ADMIN)
+        result = await checker(admin_user)
+        assert result.role == UserRole.ADMIN
+    
+    @pytest.mark.asyncio
+    async def test_require_admin_fails_for_user(self):
+        """Test that regular user fails admin check."""
+        regular_user = User(
+            user_id="user_1",
+            email="user@example.com",
+            name="User",
+            role=UserRole.USER,
+        )
+        
+        checker = require_role(UserRole.ADMIN)
+        
+        with pytest.raises(HTTPException) as exc_info:
+            await checker(regular_user)
+        
+        assert exc_info.value.status_code == 403
 
 
 class TestGetOptionalUser:
-    """Test get_optional_user dependency."""
+    """Tests for get_optional_user dependency."""
     
     @pytest.mark.asyncio
-    async def test_returns_user_if_present(self):
-        """Test returns user if present."""
-        request = MagicMock()
-        request.state.user = MagicMock(user_id="user-123")
+    async def test_returns_user_when_authenticated(self):
+        """Test returning user when authenticated."""
+        user = User(
+            user_id="user_1",
+            email="test@example.com",
+            name="Test",
+            role=UserRole.USER,
+        )
         
-        user = await get_optional_user(request)
+        request = MagicMock(spec=Request)
+        request.state.user = user
+        request.headers = {}
         
-        assert user.user_id == "user-123"
+        result = await get_optional_user(request)
+        assert result is not None
+        assert result.user_id == "user_1"
     
     @pytest.mark.asyncio
-    async def test_returns_none_if_absent(self):
-        """Test returns None if no user."""
-        request = MagicMock()
-        request.state.user = None
+    async def test_returns_none_for_anonymous(self):
+        """Test returning None for anonymous user."""
+        anon = User.anonymous()
         
-        user = await get_optional_user(request)
+        request = MagicMock(spec=Request)
+        request.state.user = anon
+        request.headers = {}
         
-        assert user is None
+        result = await get_optional_user(request)
+        assert result is None
 
 
-class TestRequireAdmin:
-    """Test require_admin dependency."""
+class TestCreateAuthMiddleware:
+    """Tests for create_auth_middleware factory."""
     
-    @pytest.mark.asyncio
-    async def test_passes_for_admin(self):
-        """Test passes for admin user."""
-        from shared.users.models import UserRole
-        
-        user = MagicMock()
-        user.role = UserRole.ADMIN
-        
-        result = await require_admin(user)
-        
-        assert result == user
+    def test_create_with_anonymous(self):
+        """Test creating middleware with anonymous allowed."""
+        middleware = create_auth_middleware(allow_anonymous=True)
+        assert isinstance(middleware, AuthMiddleware)
+        assert middleware.allow_anonymous is True
     
-    @pytest.mark.asyncio
-    async def test_raises_for_non_admin(self):
-        """Test raises 403 for non-admin."""
-        from fastapi import HTTPException
-        from shared.users.models import UserRole
-        
-        user = MagicMock()
-        user.role = UserRole.USER
-        
-        with pytest.raises(HTTPException) as exc:
-            await require_admin(user)
-        
-        assert exc.value.status_code == 403
+    def test_create_without_anonymous(self):
+        """Test creating middleware without anonymous."""
+        middleware = create_auth_middleware(allow_anonymous=False)
+        assert middleware.allow_anonymous is False

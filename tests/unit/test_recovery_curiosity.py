@@ -1,178 +1,236 @@
 """
-Unit Tests: Orchestrator Core - Recovery and Curiosity.
-
-Tests for recovery mechanisms and curiosity engine.
+Tests for error recovery and circuit breaker.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime
 
 from services.orchestrator.core.recovery import (
-    RecoveryManager,
-    RecoveryStrategy,
+    ErrorType,
+    RetryConfig,
+    RetryState,
+    classify_error,
+    calculate_delay,
+    retry,
+    CircuitBreaker,
+    CircuitOpenError,
+    with_circuit_breaker,
+    get_circuit_breaker,
 )
-from services.orchestrator.core.curiosity import (
-    CuriosityEngine,
-    CuriosityScore,
-)
 
 
-class TestRecoveryStrategy:
-    """Test RecoveryStrategy enum."""
+class TestErrorType:
+    """Tests for ErrorType enum."""
     
-    def test_retry_strategy(self):
-        """Test retry strategy."""
-        assert RecoveryStrategy.RETRY.value == "retry"
-    
-    def test_fallback_strategy(self):
-        """Test fallback strategy."""
-        assert RecoveryStrategy.FALLBACK.value == "fallback"
-    
-    def test_skip_strategy(self):
-        """Test skip strategy."""
-        assert RecoveryStrategy.SKIP.value == "skip"
+    def test_error_types(self):
+        """Test error type values."""
+        assert ErrorType.TRANSIENT.value == "transient"
+        assert ErrorType.PERMANENT.value == "permanent"
+        assert ErrorType.RESOURCE.value == "resource"
+        assert ErrorType.TIMEOUT.value == "timeout"
+        assert ErrorType.UNKNOWN.value == "unknown"
 
 
-class TestRecoveryManager:
-    """Test RecoveryManager class."""
+class TestRetryConfig:
+    """Tests for RetryConfig."""
     
-    @pytest.fixture
-    def manager(self):
-        """Create manager for testing."""
-        return RecoveryManager()
+    def test_default_config(self):
+        """Test default retry configuration."""
+        config = RetryConfig()
+        assert config.max_attempts == 3
+        assert config.base_delay == 1.0
+        assert config.max_delay == 60.0
+        assert config.jitter is True
     
-    def test_manager_init(self, manager):
-        """Test manager initialization."""
-        assert manager is not None
+    def test_custom_config(self):
+        """Test custom retry configuration."""
+        config = RetryConfig(
+            max_attempts=5,
+            base_delay=0.5,
+            max_delay=30.0,
+            jitter=False,
+        )
+        assert config.max_attempts == 5
+        assert config.base_delay == 0.5
+
+
+class TestClassifyError:
+    """Tests for classify_error function."""
+    
+    def test_classify_timeout(self):
+        """Test classifying timeout errors."""
+        import asyncio
+        error = asyncio.TimeoutError()
+        assert classify_error(error) == ErrorType.TIMEOUT
+    
+    def test_classify_connection_error(self):
+        """Test classifying connection errors."""
+        error = ConnectionError("Connection refused")
+        assert classify_error(error) == ErrorType.TRANSIENT
+    
+    def test_classify_value_error(self):
+        """Test classifying value errors as permanent."""
+        error = ValueError("Invalid input")
+        assert classify_error(error) == ErrorType.PERMANENT
+    
+    def test_classify_memory_error(self):
+        """Test classifying memory errors as resource."""
+        error = MemoryError()
+        assert classify_error(error) == ErrorType.RESOURCE
+
+
+class TestCalculateDelay:
+    """Tests for calculate_delay function."""
+    
+    def test_delay_increases_with_attempts(self):
+        """Test that delay increases exponentially."""
+        config = RetryConfig(base_delay=1.0, jitter=False)
+        
+        delay1 = calculate_delay(1, config, ErrorType.TRANSIENT)
+        delay2 = calculate_delay(2, config, ErrorType.TRANSIENT)
+        delay3 = calculate_delay(3, config, ErrorType.TRANSIENT)
+        
+        assert delay2 > delay1
+        assert delay3 > delay2
+    
+    def test_delay_capped_at_max(self):
+        """Test that delay is capped at max_delay."""
+        config = RetryConfig(base_delay=1.0, max_delay=5.0, jitter=False)
+        
+        delay = calculate_delay(10, config, ErrorType.TRANSIENT)
+        assert delay <= 5.0
+
+
+class TestRetryDecorator:
+    """Tests for retry decorator."""
     
     @pytest.mark.asyncio
-    async def test_recover_with_retry(self, manager):
-        """Test recovery with retry strategy."""
+    async def test_retry_succeeds_first_try(self):
+        """Test that successful function doesn't retry."""
         call_count = 0
         
-        async def failing_then_success():
+        @retry(max_attempts=3)
+        async def success_func():
+            nonlocal call_count
+            call_count += 1
+            return "success"
+        
+        result = await success_func()
+        assert result == "success"
+        assert call_count == 1
+    
+    @pytest.mark.asyncio
+    async def test_retry_on_failure(self):
+        """Test that function retries on failure."""
+        call_count = 0
+        
+        @retry(max_attempts=3, base_delay=0.01)
+        async def fail_then_succeed():
             nonlocal call_count
             call_count += 1
             if call_count < 2:
-                raise Exception("Temporary error")
+                raise ConnectionError("Transient error")
             return "success"
         
-        result = await manager.with_recovery(
-            failing_then_success,
-            strategy=RecoveryStrategy.RETRY,
-            max_attempts=3,
-        )
-        
+        result = await fail_then_succeed()
         assert result == "success"
         assert call_count == 2
     
     @pytest.mark.asyncio
-    async def test_recover_with_fallback(self, manager):
-        """Test recovery with fallback."""
-        async def failing_func():
-            raise Exception("Always fails")
+    async def test_retry_exhausted(self):
+        """Test that exception is raised after max attempts."""
+        call_count = 0
         
-        async def fallback_func():
-            return "fallback value"
+        @retry(max_attempts=3, base_delay=0.01)
+        async def always_fail():
+            nonlocal call_count
+            call_count += 1
+            raise ConnectionError("Always fails")
         
-        result = await manager.with_recovery(
-            failing_func,
-            strategy=RecoveryStrategy.FALLBACK,
-            fallback=fallback_func,
-        )
+        with pytest.raises(ConnectionError):
+            await always_fail()
         
-        assert result == "fallback value"
-    
-    @pytest.mark.asyncio
-    async def test_recover_with_skip(self, manager):
-        """Test recovery with skip strategy."""
-        async def failing_func():
-            raise Exception("Error")
-        
-        result = await manager.with_recovery(
-            failing_func,
-            strategy=RecoveryStrategy.SKIP,
-        )
-        
-        assert result is None
+        assert call_count == 3
 
 
-class TestCuriosityScore:
-    """Test CuriosityScore dataclass."""
-    
-    def test_create_score(self):
-        """Test score creation."""
-        score = CuriosityScore(
-            novelty=0.8,
-            uncertainty=0.6,
-            relevance=0.9,
-        )
-        
-        assert score.novelty == 0.8
-        assert score.uncertainty == 0.6
-    
-    def test_overall_score(self):
-        """Test overall score calculation."""
-        score = CuriosityScore(
-            novelty=0.8,
-            uncertainty=0.6,
-            relevance=1.0,
-        )
-        
-        overall = score.overall()
-        
-        assert 0 <= overall <= 1
-
-
-class TestCuriosityEngine:
-    """Test CuriosityEngine class."""
+class TestCircuitBreaker:
+    """Tests for CircuitBreaker."""
     
     @pytest.fixture
-    def engine(self):
-        """Create engine for testing."""
-        return CuriosityEngine()
+    def breaker(self):
+        return CircuitBreaker(
+            failure_threshold=3,
+            recovery_timeout=0.1,
+            half_open_requests=1,
+        )
     
-    def test_engine_init(self, engine):
-        """Test engine initialization."""
-        assert engine is not None
+    def test_initial_state_closed(self, breaker):
+        """Test that circuit starts closed."""
+        assert breaker.state == "closed"
     
-    @pytest.mark.asyncio
-    async def test_evaluate_query(self, engine):
-        """Test evaluating query curiosity."""
-        with patch.object(engine, "_calculate_novelty") as mock_novelty:
-            mock_novelty.return_value = 0.7
-            
-            with patch.object(engine, "_calculate_uncertainty") as mock_uncertainty:
-                mock_uncertainty.return_value = 0.5
-                
-                score = await engine.evaluate("What is quantum computing?")
-                
-                assert isinstance(score, CuriosityScore)
+    def test_opens_after_failures(self, breaker):
+        """Test that circuit opens after failure threshold."""
+        for _ in range(3):
+            breaker.record_failure(ConnectionError("Error"))
+        
+        assert breaker.state == "open"
     
-    @pytest.mark.asyncio
-    async def test_should_explore(self, engine):
-        """Test exploration decision."""
-        with patch.object(engine, "evaluate") as mock:
-            mock.return_value = CuriosityScore(
-                novelty=0.9,
-                uncertainty=0.8,
-                relevance=0.9,
-            )
-            
-            should = await engine.should_explore("Novel topic?")
-            
-            assert should is True
+    def test_record_success_resets_failures(self, breaker):
+        """Test that success resets failure count."""
+        breaker.record_failure(ConnectionError("Error"))
+        breaker.record_failure(ConnectionError("Error"))
+        breaker.record_success()
+        
+        assert breaker._failures == 0
+        assert breaker.state == "closed"
     
     @pytest.mark.asyncio
-    async def test_should_not_explore_low_score(self, engine):
-        """Test no exploration for low scores."""
-        with patch.object(engine, "evaluate") as mock:
-            mock.return_value = CuriosityScore(
-                novelty=0.1,
-                uncertainty=0.1,
-                relevance=0.2,
-            )
-            
-            should = await engine.should_explore("Boring topic")
-            
-            assert should is False
+    async def test_context_manager_success(self, breaker):
+        """Test circuit breaker as context manager with success."""
+        async with breaker:
+            pass  # Simulates successful operation
+        
+        assert breaker.state == "closed"
+    
+    @pytest.mark.asyncio
+    async def test_context_manager_failure(self, breaker):
+        """Test circuit breaker as context manager with failure."""
+        try:
+            async with breaker:
+                raise ConnectionError("Error")
+        except ConnectionError:
+            pass
+        
+        assert breaker._failures == 1
+
+
+class TestGetCircuitBreaker:
+    """Tests for get_circuit_breaker function."""
+    
+    def test_creates_new_breaker(self):
+        """Test that new breaker is created for new name."""
+        breaker = get_circuit_breaker("test_service")
+        assert isinstance(breaker, CircuitBreaker)
+    
+    def test_returns_same_breaker(self):
+        """Test that same breaker is returned for same name."""
+        breaker1 = get_circuit_breaker("my_service")
+        breaker2 = get_circuit_breaker("my_service")
+        assert breaker1 is breaker2
+
+
+class TestWithCircuitBreaker:
+    """Tests for with_circuit_breaker decorator."""
+    
+    @pytest.mark.asyncio
+    async def test_decorator_wraps_function(self):
+        """Test that decorator wraps function."""
+        breaker = CircuitBreaker()
+        
+        @with_circuit_breaker(breaker)
+        async def my_func():
+            return "result"
+        
+        result = await my_func()
+        assert result == "result"
