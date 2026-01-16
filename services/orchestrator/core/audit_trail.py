@@ -96,7 +96,7 @@ class AuditEntry:
         data = {
             "entry_id": self.entry_id,
             "timestamp": self.timestamp.isoformat(),
-            "event_type": self.event_type.value,
+            "event_type": self.event_type.value if hasattr(self.event_type, 'value') else str(self.event_type),
             "actor": self.actor,
             "action": self.action,
             "resource": self.resource,
@@ -116,7 +116,7 @@ class AuditEntry:
         return {
             "entry_id": self.entry_id,
             "timestamp": self.timestamp.isoformat(),
-            "event_type": self.event_type.value,
+            "event_type": self.event_type.value if hasattr(self.event_type, 'value') else str(self.event_type),
             "actor": self.actor,
             "action": self.action,
             "resource": self.resource,
@@ -242,7 +242,7 @@ class SQLiteBackend(AuditBackend):
                 """, (
                     entry.entry_id,
                     entry.timestamp.isoformat(),
-                    entry.event_type.value,
+                    entry.event_type.value if hasattr(entry.event_type, 'value') else str(entry.event_type),
                     entry.actor,
                     entry.action,
                     entry.resource,
@@ -522,7 +522,7 @@ class AuditTrail:
         
         await self.backend.write(entry)
         
-        logger.debug(f"Audit: {event_type.value} - {action[:50]}")
+        logger.debug(f"Audit: {event_type.value if hasattr(event_type, 'value') else str(event_type)} - {action[:50]}")
         
         return entry.entry_id
     
@@ -593,7 +593,7 @@ class AuditTrail:
                 writer.writerow({
                     "entry_id": entry.entry_id,
                     "timestamp": entry.timestamp.isoformat(),
-                    "event_type": entry.event_type.value,
+                    "event_type": entry.event_type.value if hasattr(entry.event_type, 'value') else str(entry.event_type),
                     "actor": entry.actor,
                     "action": entry.action,
                     "resource": entry.resource,
