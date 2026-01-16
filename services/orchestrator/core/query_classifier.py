@@ -344,7 +344,7 @@ class UtilityHandler(BaseHandler):
             if os.getenv("OPENROUTER_API_KEY"):
                 provider = OpenRouterProvider()
                 config = LLMConfig(
-                    model="google/gemini-2.0-flash-001",
+                    model="nvidia/nemotron-3-nano-30b-a3b:free",
                     temperature=0.3,
                     max_tokens=2000,
                 )

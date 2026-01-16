@@ -178,7 +178,7 @@ Be precise with numbers."""
                     "Content-Type": "application/json",
                 },
                 json={
-                    "model": "google/gemini-flash-1.5",  # Vision-capable free model
+                    "model": "google/gemini-2.0-flash-exp:free",  # Vision-capable free model
                     "messages": [
                         {
                             "role": "user",
