@@ -59,14 +59,24 @@ class UserManager:
         """Initialize PostgreSQL."""
         try:
             import asyncpg
+            import os
             
-            self._pool = await asyncpg.create_pool(self.database_url)
+            # Get pool configuration from environment or use defaults
+            min_connections = int(os.getenv("DATABASE_MIN_CONNECTIONS", "5"))
+            max_connections = int(os.getenv("DATABASE_MAX_CONNECTIONS", "20"))
+            
+            self._pool = await asyncpg.create_pool(
+                self.database_url,
+                min_size=min_connections,
+                max_size=max_connections,
+                command_timeout=60.0,
+            )
             
             async with self._pool.acquire() as conn:
                 await conn.execute(USERS_TABLE_SQL)
                 await conn.execute(API_KEYS_TABLE_SQL)
             
-            logger.info("PostgreSQL initialized for users")
+            logger.info(f"PostgreSQL initialized for users (pool: {min_connections}-{max_connections})")
             
         except Exception as e:
             logger.warning(f"PostgreSQL init failed, falling back to SQLite: {e}")
@@ -235,10 +245,8 @@ class UserManager:
         
         if self._use_postgres:
             set_clause = ", ".join(f"{k} = ${i+2}" for i, k in enumerate(updates.keys()))
-            values = [user_id] + [
-                v.isoformat() if isinstance(v, datetime) else v
-                for v in updates.values()
-            ]
+            # Keep datetime objects for PostgreSQL (asyncpg handles them natively)
+            values = [user_id] + list(updates.values())
             
             async with self._pool.acquire() as conn:
                 await conn.execute(
@@ -249,6 +257,7 @@ class UserManager:
             import aiosqlite
             
             set_clause = ", ".join(f"{k} = ?" for k in updates.keys())
+            # Convert datetime to isoformat only for SQLite
             values = [
                 v.isoformat() if isinstance(v, datetime) else v
                 for v in updates.values()

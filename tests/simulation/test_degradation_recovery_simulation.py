@@ -123,7 +123,7 @@ class TestRecoverySimulation:
             CircuitBreaker, CircuitOpenError
         )
         
-        breaker = CircuitBreaker(failure_threshold=3, recovery_timeout=0.5)
+        breaker = CircuitBreaker(failure_threshold=3, recovery_timeout=0.5, half_open_requests=2)
         
         # Record failures
         for i in range(3):
@@ -140,9 +140,13 @@ class TestRecoverySimulation:
         # Wait for recovery timeout to allow half-open
         await asyncio.sleep(0.6)
         
-        # State should transition to half-open on next check
-        # Record success should close it
-        breaker.record_success()
+        # State should transition to half_open on next check
+        assert breaker.state == "half_open"
+        
+        # Record enough successes to close the circuit (half_open_requests=2)
+        for _ in range(2):
+            breaker.record_success()
+        
         assert breaker.state == "closed"
         
         print("\n✅ Circuit breaker protection works")

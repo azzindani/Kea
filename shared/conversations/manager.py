@@ -57,14 +57,24 @@ class ConversationManager:
         """Initialize PostgreSQL."""
         try:
             import asyncpg
+            import os
             
-            self._pool = await asyncpg.create_pool(self.database_url)
+            # Get pool configuration from environment or use defaults
+            min_connections = int(os.getenv("DATABASE_MIN_CONNECTIONS", "5"))
+            max_connections = int(os.getenv("DATABASE_MAX_CONNECTIONS", "20"))
+            
+            self._pool = await asyncpg.create_pool(
+                self.database_url,
+                min_size=min_connections,
+                max_size=max_connections,
+                command_timeout=60.0,
+            )
             
             async with self._pool.acquire() as conn:
                 await conn.execute(CONVERSATIONS_TABLE_SQL)
                 await conn.execute(MESSAGES_TABLE_SQL)
             
-            logger.info("PostgreSQL initialized for conversations")
+            logger.info(f"PostgreSQL initialized for conversations (pool: {min_connections}-{max_connections})")
             
         except Exception as e:
             logger.warning(f"PostgreSQL failed, using SQLite: {e}")

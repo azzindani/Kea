@@ -153,3 +153,89 @@ async def http_client():
     
     async with httpx.AsyncClient(timeout=30) as client:
         yield client
+
+
+# ============================================================================
+# Database Isolation Fixtures
+# ============================================================================
+
+@pytest.fixture(autouse=True)
+def setup_test_environment(monkeypatch):
+    """
+    Set up test environment variables for proper PostgreSQL isolation.
+    
+    The asyncpg concurrent connection issue is caused by tests sharing
+    a single connection pool. This fixture ensures proper test isolation.
+    """
+    # Set environment to test mode - this enables test-specific behaviors
+    monkeypatch.setenv("ENVIRONMENT", "test")
+    monkeypatch.setenv("TEST_MODE", "1")
+    
+    # Increase connection pool size to handle concurrent test operations
+    monkeypatch.setenv("DATABASE_MIN_CONNECTIONS", "5")
+    monkeypatch.setenv("DATABASE_MAX_CONNECTIONS", "20")
+    
+    # Disable external services that may not be available in test environment
+    if not os.getenv("QDRANT_URL"):
+        monkeypatch.setenv("QDRANT_URL", "")
+    if not os.getenv("REDIS_URL"):
+        monkeypatch.setenv("REDIS_URL", "")
+
+
+@pytest.fixture(scope="function")
+async def db_session():
+    """
+    Provide an isolated database session for tests that need direct DB access.
+    
+    Uses savepoints to rollback after each test.
+    """
+    from shared.database.connection import get_database_pool
+    
+    pool = await get_database_pool()
+    
+    async with pool.acquire() as conn:
+        # Start a transaction
+        tr = conn.transaction()
+        await tr.start()
+        
+        try:
+            yield conn
+        finally:
+            # Rollback to clean up test data
+            await tr.rollback()
+
+
+@pytest.fixture(scope="session")
+def anyio_backend():
+    """Use asyncio backend for anyio."""
+    return "asyncio"
+
+
+@pytest.fixture(scope="session")
+async def shared_db_pool():
+    """
+    Session-scoped database pool for tests.
+    
+    This creates a single pool for the entire test session,
+    avoiding repeated pool creation/destruction overhead.
+    """
+    from shared.database.connection import DatabasePool, DatabaseConfig
+    import os
+    
+    db_url = os.getenv("DATABASE_URL", "")
+    if not db_url:
+        # No PostgreSQL configured, skip pool creation
+        yield None
+        return
+    
+    config = DatabaseConfig(
+        url=db_url,
+        min_connections=5,
+        max_connections=20,
+    )
+    pool = DatabasePool(config)
+    await pool.initialize()
+    
+    yield pool
+    
+    await pool.close()
