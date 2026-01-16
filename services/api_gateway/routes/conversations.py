@@ -409,7 +409,9 @@ async def send_message(
         }
         
     except Exception as e:
+        import traceback
         logger.error(f"Research pipeline error: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         
         # Fallback to simple response
         assistant_msg = await manager.add_message(
