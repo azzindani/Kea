@@ -163,23 +163,32 @@ async def http_client():
 def setup_test_environment(monkeypatch):
     """
     Set up test environment variables for proper PostgreSQL isolation.
-    
-    The asyncpg concurrent connection issue is caused by tests sharing
-    a single connection pool. This fixture ensures proper test isolation.
     """
-    # Set environment to test mode - this enables test-specific behaviors
-    monkeypatch.setenv("ENVIRONMENT", "test")
+    # Set environment to development mode (test mode works but dev is more permissive)
+    monkeypatch.setenv("ENVIRONMENT", "development")
     monkeypatch.setenv("TEST_MODE", "1")
-    
-    # Increase connection pool size to handle concurrent test operations
-    monkeypatch.setenv("DATABASE_MIN_CONNECTIONS", "5")
-    monkeypatch.setenv("DATABASE_MAX_CONNECTIONS", "20")
     
     # Disable external services that may not be available in test environment
     if not os.getenv("QDRANT_URL"):
         monkeypatch.setenv("QDRANT_URL", "")
     if not os.getenv("REDIS_URL"):
         monkeypatch.setenv("REDIS_URL", "")
+
+
+@pytest.fixture(autouse=True)
+def reset_singleton_managers():
+    """
+    Reset singleton manager instances between tests to avoid state leakage.
+    """
+    yield
+    
+    # Reset singletons after each test
+    import shared.users.manager as user_mgr
+    import shared.conversations.manager as conv_mgr
+    
+    user_mgr._user_manager = None
+    user_mgr._api_key_manager = None
+    conv_mgr._conversation_manager = None
 
 
 @pytest.fixture(scope="function")

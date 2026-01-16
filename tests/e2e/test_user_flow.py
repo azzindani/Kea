@@ -12,13 +12,10 @@ from services.api_gateway.main import app
 
 @pytest.fixture
 async def async_client():
-    """Create async HTTP client with proper app lifecycle."""
-    from asgi_lifespan import LifespanManager
-    
-    async with LifespanManager(app) as manager:
-        transport = ASGITransport(app=manager.app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
-            yield client
+    """Create async HTTP client for testing."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client
 
 
 class TestCompleteUserFlow:

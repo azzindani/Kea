@@ -267,7 +267,8 @@ class ConversationManager:
             values = []
             for i, (k, v) in enumerate(updates.items(), start=1):
                 set_parts.append(f"{k} = ${i}")
-                values.append(v.isoformat() if isinstance(v, datetime) else v)
+                # Keep datetime objects as-is for PostgreSQL (asyncpg handles them natively)
+                values.append(v)
             
             values.append(conversation_id)
             sql = f"UPDATE conversations SET {', '.join(set_parts)} WHERE conversation_id = ${len(values)}"
