@@ -364,8 +364,12 @@ class APIKeyManager:
     async def initialize(self):
         """Initialize (uses same DB as UserManager)."""
         if self._use_postgres:
-            import asyncpg
-            self._pool = await asyncpg.create_pool(self.database_url)
+            try:
+                import asyncpg
+                self._pool = await asyncpg.create_pool(self.database_url)
+            except Exception as e:
+                logger.warning(f"APIKeyManager PostgreSQL failed, using SQLite: {e}")
+                self._use_postgres = False
     
     async def create_key(
         self,
