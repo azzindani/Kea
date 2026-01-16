@@ -157,7 +157,7 @@ class QualityGate:
         else:
             overall_score = 1.0  # No checkers = pass
         
-        passed = overall_score >= self.threshold
+        passed = overall_score >= self.threshold - 1e-9  # Floating point tolerance
         
         # Generate feedback
         failed_checks = [c for c in checks if c.result == CheckResult.FAIL]
