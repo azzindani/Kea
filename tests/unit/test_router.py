@@ -1,148 +1,105 @@
 """
-Tests for Intention Router.
+Tests for IntentionRouter.
 """
 
 import pytest
+from unittest.mock import patch, AsyncMock
 
 
 class TestRouter:
-    """Tests for intention routing."""
+    """Tests for IntentionRouter."""
     
     def test_import_router(self):
-        """Test router module imports."""
-        from services.orchestrator.core.router import (
-            IntentionRouter,
-            Route,
-            RouteType,
-        )
-        
+        """Test that router can be imported."""
+        from services.orchestrator.core.router import IntentionRouter, PathType
         assert IntentionRouter is not None
-        print("\n✅ Router imports work")
     
     def test_create_router(self):
-        """Test router creation."""
+        """Test creating router instance."""
         from services.orchestrator.core.router import IntentionRouter
-        
         router = IntentionRouter()
-        
         assert router is not None
-        print("\n✅ IntentionRouter created")
+        assert router.system_prompt is not None
     
-    def test_route_types(self):
-        """Test route type enum."""
-        from services.orchestrator.core.router import RouteType
+    @pytest.mark.asyncio
+    async def test_route_returns_path(self):
+        """Test route returns a valid path."""
+        from services.orchestrator.core.router import IntentionRouter
         
-        # Common research paths
-        assert hasattr(RouteType, 'RESEARCH') or True  # May vary
-        
-        print("\n✅ RouteType enum exists")
+        with patch.dict('os.environ', {}, clear=True):
+            router = IntentionRouter()
+            path = await router.route("What is AI?")
+            
+            assert path in ["A", "B", "C", "D"]
     
-    def test_classify_simple_query(self):
-        """Test classifying simple research query."""
+    @pytest.mark.asyncio
+    async def test_route_complex_query(self):
+        """Test routing complex query."""
+        from services.orchestrator.core.router import IntentionRouter
+        
+        with patch.dict('os.environ', {}, clear=True):
+            router = IntentionRouter()
+            path = await router.route("Compare studies on climate change")
+            
+            # Should route to Path C (meta-analysis)
+            assert path == "C"
+    
+    @pytest.mark.asyncio
+    async def test_route_verification_query(self):
+        """Test routing verification query."""
+        from services.orchestrator.core.router import IntentionRouter
+        
+        with patch.dict('os.environ', {}, clear=True):
+            router = IntentionRouter()
+            path = await router.route("Verify the claims in this study")
+            
+            # Should route to Path B (verification)
+            assert path == "B"
+    
+    def test_heuristic_route_meta_analysis(self):
+        """Test heuristic routing for meta-analysis."""
         from services.orchestrator.core.router import IntentionRouter
         
         router = IntentionRouter()
+        path = router._heuristic_route("meta-analysis of studies", None)
         
-        query = "What is Tesla's revenue?"
-        route = router.classify(query)
-        
-        assert route is not None
-        
-        print(f"\n✅ Classified query: {route}")
+        assert path == "C"
     
-    def test_classify_complex_query(self):
-        """Test classifying complex multi-step query."""
+    def test_heuristic_route_verify(self):
+        """Test heuristic routing for verification."""
         from services.orchestrator.core.router import IntentionRouter
         
         router = IntentionRouter()
+        path = router._heuristic_route("verify this data", None)
         
-        query = "Compare Tesla, Ford, and GM financial performance over the last 5 years"
-        route = router.classify(query)
-        
-        assert route is not None
-        
-        print(f"\n✅ Classified complex query: {route}")
+        assert path == "B"
     
-    def test_classify_analysis_query(self):
-        """Test classifying analysis-heavy query."""
+    def test_heuristic_route_no_match(self):
+        """Test heuristic returns None when no match."""
         from services.orchestrator.core.router import IntentionRouter
         
         router = IntentionRouter()
+        path = router._heuristic_route("random question", None)
         
-        query = "Analyze the correlation between oil prices and airline stocks"
-        route = router.classify(query)
-        
-        assert route is not None
-        
-        print(f"\n✅ Classified analysis query: {route}")
-    
-    def test_get_recommended_tools(self):
-        """Test getting recommended tools for route."""
-        from services.orchestrator.core.router import IntentionRouter
-        
-        router = IntentionRouter()
-        
-        query = "Scrape the latest SEC filings for Apple"
-        route = router.classify(query)
-        
-        tools = router.get_recommended_tools(route)
-        
-        assert isinstance(tools, list)
-        
-        print(f"\n✅ Recommended tools: {tools}")
-    
-    def test_get_route_complexity(self):
-        """Test getting route complexity estimate."""
-        from services.orchestrator.core.router import IntentionRouter
-        
-        router = IntentionRouter()
-        
-        simple = "What is AAPL stock price?"
-        complex = "Create a comprehensive analysis of the EV market including all major players, market share, growth projections, and competitive dynamics"
-        
-        simple_complexity = router.estimate_complexity(simple)
-        complex_complexity = router.estimate_complexity(complex)
-        
-        # Complex should have higher complexity score
-        assert complex_complexity >= simple_complexity
-        
-        print(f"\n✅ Complexity: simple={simple_complexity}, complex={complex_complexity}")
-    
-    def test_route_to_dict(self):
-        """Test route serialization."""
-        from services.orchestrator.core.router import IntentionRouter, Route
-        
-        router = IntentionRouter()
-        
-        query = "Research something"
-        route = router.classify(query)
-        
-        if hasattr(route, 'to_dict'):
-            data = route.to_dict()
-            assert isinstance(data, dict)
-            print(f"\n✅ Route serialization: {data}")
-        else:
-            print("\n✅ Route created (no to_dict method)")
+        assert path is None
 
 
-class TestRoute:
-    """Tests for Route model."""
+class TestRouterNode:
+    """Tests for router_node function."""
     
-    def test_create_route(self):
-        """Test route creation."""
-        from services.orchestrator.core.router import Route, RouteType
+    def test_import_router_node(self):
+        """Test router_node can be imported."""
+        from services.orchestrator.core.router import router_node
+        assert router_node is not None
+    
+    @pytest.mark.asyncio
+    async def test_router_node_sets_path(self):
+        """Test router_node sets path in state."""
+        from services.orchestrator.core.router import router_node
         
-        route = Route(
-            route_type=RouteType.RESEARCH if hasattr(RouteType, 'RESEARCH') else list(RouteType)[0],
-            confidence=0.85,
-            recommended_tools=["web_search", "pdf_extract"],
-        )
-        
-        assert route.confidence == 0.85
-        assert len(route.recommended_tools) >= 1
-        
-        print("\n✅ Route created")
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v", "-s"])
+        with patch.dict('os.environ', {}, clear=True):
+            state = {"query": "Test query"}
+            result = await router_node(state)
+            
+            assert "path" in result
+            assert result["path"] in ["A", "B", "C", "D"]

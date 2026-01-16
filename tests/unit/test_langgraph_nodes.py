@@ -1,232 +1,125 @@
 """
-Tests for LangGraph Nodes.
-
-Tests divergence, keeper, planner, and synthesizer nodes.
+Tests for LangGraph nodes (planner, divergence, keeper, synthesizer).
 """
 
 import pytest
+from unittest.mock import patch, AsyncMock, MagicMock
 
 
 class TestDivergenceNode:
-    """Tests for Divergence Engine (Abductive Reasoning)."""
+    """Tests for divergence_node function."""
     
     def test_import_divergence(self):
-        """Test divergence module imports."""
-        from services.orchestrator.nodes.divergence import (
-            diverge,
-            DivergenceEngine,
-        )
-        
-        assert diverge is not None or DivergenceEngine is not None
-        print("\n✅ Divergence imports work")
+        """Test that divergence node can be imported."""
+        from services.orchestrator.nodes.divergence import divergence_node
+        assert divergence_node is not None
     
-    def test_generate_hypotheses(self):
-        """Test hypothesis generation."""
-        from services.orchestrator.nodes.divergence import DivergenceEngine
+    @pytest.mark.asyncio
+    async def test_divergence_without_api_key(self):
+        """Test divergence with no API key."""
+        from services.orchestrator.nodes.divergence import divergence_node
         
-        engine = DivergenceEngine()
-        
-        # Given observation
-        observation = "Tesla stock dropped 10% despite strong earnings"
-        
-        hypotheses = engine.generate_hypotheses(observation)
-        
-        assert isinstance(hypotheses, list)
-        assert len(hypotheses) >= 1
-        
-        print(f"\n✅ Generated {len(hypotheses)} hypotheses")
-    
-    def test_rank_hypotheses(self):
-        """Test hypothesis ranking by plausibility."""
-        from services.orchestrator.nodes.divergence import DivergenceEngine
-        
-        engine = DivergenceEngine()
-        
-        hypotheses = [
-            {"hypothesis": "Market correction", "evidence": ["Market-wide decline"]},
-            {"hypothesis": "CEO controversy", "evidence": []},
-        ]
-        
-        ranked = engine.rank_hypotheses(hypotheses)
-        
-        assert len(ranked) == len(hypotheses)
-        
-        print("\n✅ Hypothesis ranking works")
+        with patch.dict('os.environ', {}, clear=True):
+            state = {
+                "query": "Test query",
+                "facts": ["Fact 1"],
+                "hypotheses": ["Hypothesis 1"],
+            }
+            
+            result = await divergence_node(state)
+            
+            assert result["divergence_complete"] is True
+            assert "alternative_hypotheses" in result
 
 
 class TestKeeperNode:
-    """Tests for The Keeper (Context Guard)."""
+    """Tests for keeper_node function."""
     
     def test_import_keeper(self):
-        """Test keeper module imports."""
-        from services.orchestrator.nodes.keeper import (
-            keep,
-            ContextKeeper,
-        )
-        
-        assert keep is not None or ContextKeeper is not None
-        print("\n✅ Keeper imports work")
+        """Test that keeper node can be imported."""
+        from services.orchestrator.nodes.keeper import keeper_node
+        assert keeper_node is not None
     
-    def test_filter_context(self):
-        """Test context filtering."""
-        from services.orchestrator.nodes.keeper import ContextKeeper
+    @pytest.mark.asyncio
+    async def test_keeper_stops_at_max_iterations(self):
+        """Test keeper stops at max iterations."""
+        from services.orchestrator.nodes.keeper import keeper_node
         
-        keeper = ContextKeeper(max_tokens=1000)
+        state = {
+            "query": "Test query",
+            "iteration": 3,
+            "max_iterations": 3,
+            "facts": [],
+        }
         
-        context = [
-            {"type": "fact", "content": "Tesla revenue: $81B", "relevance": 0.9},
-            {"type": "fact", "content": "Apple revenue: $400B", "relevance": 0.1},
-            {"type": "fact", "content": "Tesla growth: 25%", "relevance": 0.85},
-        ]
+        result = await keeper_node(state)
         
-        filtered = keeper.filter(context, query="Tesla financials")
-        
-        # Should keep Tesla, drop Apple
-        assert len(filtered) <= len(context)
-        
-        print(f"\n✅ Filtered to {len(filtered)} items")
+        assert result["should_continue"] is False
     
-    def test_prioritize_recent(self):
-        """Test prioritizing recent context."""
-        from services.orchestrator.nodes.keeper import ContextKeeper
+    @pytest.mark.asyncio
+    async def test_keeper_continues_when_needed(self):
+        """Test keeper continues when more research needed."""
+        from services.orchestrator.nodes.keeper import keeper_node
         
-        keeper = ContextKeeper()
+        state = {
+            "query": "Test query",
+            "iteration": 0,
+            "max_iterations": 3,
+            "facts": [],
+        }
         
-        context = [
-            {"content": "Old data", "timestamp": "2020-01-01"},
-            {"content": "New data", "timestamp": "2024-01-01"},
-        ]
+        result = await keeper_node(state)
         
-        prioritized = keeper.prioritize(context)
-        
-        assert prioritized[0]["content"] == "New data"
-        
-        print("\n✅ Recent prioritization works")
+        assert result["should_continue"] is True
+        assert result["iteration"] == 1
 
 
 class TestPlannerNode:
-    """Tests for Planner & Decomposer."""
+    """Tests for planner_node function."""
     
     def test_import_planner(self):
-        """Test planner module imports."""
-        from services.orchestrator.nodes.planner import (
-            plan,
-            ResearchPlanner,
-        )
-        
-        assert plan is not None or ResearchPlanner is not None
-        print("\n✅ Planner imports work")
+        """Test that planner node can be imported."""
+        from services.orchestrator.nodes.planner import planner_node
+        assert planner_node is not None
     
-    def test_decompose_query(self):
-        """Test query decomposition."""
-        from services.orchestrator.nodes.planner import ResearchPlanner
+    @pytest.mark.asyncio
+    async def test_planner_without_api_key(self):
+        """Test planner uses query as-is without API key."""
+        from services.orchestrator.nodes.planner import planner_node
         
-        planner = ResearchPlanner()
-        
-        query = "Compare Tesla and Ford financial performance and market position"
-        
-        steps = planner.decompose(query)
-        
-        assert isinstance(steps, list)
-        assert len(steps) >= 2  # Should break into multiple steps
-        
-        print(f"\n✅ Decomposed into {len(steps)} steps")
-    
-    def test_create_execution_plan(self):
-        """Test execution plan creation."""
-        from services.orchestrator.nodes.planner import ResearchPlanner
-        
-        planner = ResearchPlanner()
-        
-        query = "Research Tesla stock performance"
-        
-        plan = planner.create_plan(query)
-        
-        assert plan is not None
-        assert hasattr(plan, "steps") or isinstance(plan, dict)
-        
-        print("\n✅ Execution plan created")
-    
-    def test_estimate_complexity(self):
-        """Test complexity estimation."""
-        from services.orchestrator.nodes.planner import ResearchPlanner
-        
-        planner = ResearchPlanner()
-        
-        simple = "What is AAPL price?"
-        complex = "Create comprehensive market analysis of EV industry"
-        
-        simple_score = planner.estimate_complexity(simple)
-        complex_score = planner.estimate_complexity(complex)
-        
-        assert complex_score > simple_score
-        
-        print(f"\n✅ Complexity: simple={simple_score}, complex={complex_score}")
+        with patch.dict('os.environ', {}, clear=True):
+            state = {"query": "What is machine learning?"}
+            
+            result = await planner_node(state)
+            
+            assert "sub_queries" in result
+            assert result["sub_queries"] == ["What is machine learning?"]
+            assert result["status"] == "planning_complete"
 
 
 class TestSynthesizerNode:
-    """Tests for Report Synthesizer."""
+    """Tests for synthesizer_node function."""
     
     def test_import_synthesizer(self):
-        """Test synthesizer module imports."""
-        from services.orchestrator.nodes.synthesizer import (
-            synthesize,
-            ReportSynthesizer,
-        )
-        
-        assert synthesize is not None or ReportSynthesizer is not None
-        print("\n✅ Synthesizer imports work")
+        """Test that synthesizer node can be imported."""
+        from services.orchestrator.nodes.synthesizer import synthesizer_node
+        assert synthesizer_node is not None
     
-    def test_combine_sources(self):
-        """Test combining multiple sources."""
-        from services.orchestrator.nodes.synthesizer import ReportSynthesizer
+    @pytest.mark.asyncio
+    async def test_synthesizer_without_api_key(self):
+        """Test synthesizer fallback without API key."""
+        from services.orchestrator.nodes.synthesizer import synthesizer_node
         
-        synthesizer = ReportSynthesizer()
-        
-        sources = [
-            {"source": "SEC Filing", "data": {"revenue": "$81B"}},
-            {"source": "News Article", "data": {"sentiment": "positive"}},
-        ]
-        
-        combined = synthesizer.combine(sources)
-        
-        assert combined is not None
-        
-        print("\n✅ Sources combined")
-    
-    def test_generate_report(self):
-        """Test report generation."""
-        from services.orchestrator.nodes.synthesizer import ReportSynthesizer
-        
-        synthesizer = ReportSynthesizer()
-        
-        data = {
-            "query": "Tesla analysis",
-            "facts": ["Revenue: $81B", "Growth: 25%"],
-            "analysis": "Strong performance",
-        }
-        
-        report = synthesizer.generate(data)
-        
-        assert report is not None
-        assert isinstance(report, str) or hasattr(report, "content")
-        
-        print("\n✅ Report generated")
-    
-    def test_format_output(self):
-        """Test output formatting."""
-        from services.orchestrator.nodes.synthesizer import ReportSynthesizer
-        
-        synthesizer = ReportSynthesizer()
-        
-        content = "Tesla showed strong growth..."
-        
-        formatted = synthesizer.format(content, style="markdown")
-        
-        assert formatted is not None
-        
-        print("\n✅ Output formatted")
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v", "-s"])
+        with patch.dict('os.environ', {}, clear=True):
+            state = {
+                "query": "Test query",
+                "facts": ["Fact 1", "Fact 2"],
+                "sources": ["Source 1"],
+            }
+            
+            result = await synthesizer_node(state)
+            
+            assert "report" in result
+            assert "confidence" in result
+            assert result["status"] == "complete"
+            assert "2" in result["report"]  # Facts count

@@ -1,224 +1,142 @@
 """
-Tests for Adversarial Collaboration Agents.
-
-Tests generator (optimist), critic (pessimist), and judge (synthesizer) agents.
+Tests for adversarial agents (Generator, Critic, Judge).
 """
 
 import pytest
+from unittest.mock import patch, AsyncMock, MagicMock
 
 
 class TestGeneratorAgent:
-    """Tests for Generator (The Optimist)."""
+    """Tests for GeneratorAgent."""
     
     def test_import_generator(self):
-        """Test generator module imports."""
-        from services.orchestrator.agents.generator import (
-            Generator,
-            generate,
-        )
-        
-        assert Generator is not None or generate is not None
-        print("\n✅ Generator imports work")
+        """Test that generator can be imported."""
+        from services.orchestrator.agents.generator import GeneratorAgent
+        assert GeneratorAgent is not None
     
     def test_create_generator(self):
-        """Test generator creation."""
-        from services.orchestrator.agents.generator import Generator
-        
-        gen = Generator()
-        
-        assert gen is not None
-        print("\n✅ Generator created")
+        """Test creating generator instance."""
+        from services.orchestrator.agents.generator import GeneratorAgent
+        generator = GeneratorAgent()
+        assert generator.name == "Generator"
+        assert generator.role == "The Optimist"
     
-    def test_generate_optimistic_view(self):
-        """Test generating optimistic perspective."""
-        from services.orchestrator.agents.generator import Generator
+    @pytest.mark.asyncio
+    async def test_fallback_generate(self):
+        """Test fallback generation without LLM."""
+        from services.orchestrator.agents.generator import GeneratorAgent
+        generator = GeneratorAgent()
         
-        gen = Generator()
+        result = generator._fallback_generate(
+            query="Test query",
+            facts=["Fact 1", "Fact 2"],
+            sources=["Source 1"]
+        )
         
-        topic = "Tesla's future growth"
-        facts = ["Revenue grew 25%", "Market leader in EVs"]
-        
-        perspective = gen.generate(topic, facts)
-        
-        assert perspective is not None
-        assert hasattr(perspective, "content") or isinstance(perspective, dict)
-        
-        print("\n✅ Optimistic perspective generated")
+        assert "Test query" in result
+        assert "2 collected facts" in result
     
-    def test_confidence_score(self):
-        """Test confidence scoring."""
-        from services.orchestrator.agents.generator import Generator
+    @pytest.mark.asyncio
+    async def test_generate_without_api_key(self):
+        """Test generate uses fallback when no API key."""
+        from services.orchestrator.agents.generator import GeneratorAgent
+        generator = GeneratorAgent()
         
-        gen = Generator()
+        with patch.dict('os.environ', {}, clear=True):
+            result = await generator.generate(
+                query="What is AI?",
+                facts=["AI is artificial intelligence"],
+                sources=["wiki"]
+            )
         
-        claim = "Tesla will dominate EV market"
-        evidence = ["Market share: 60%", "Brand strength", "Supercharger network"]
-        
-        score = gen.score_confidence(claim, evidence)
-        
-        assert 0 <= score <= 1
-        
-        print(f"\n✅ Confidence score: {score:.2f}")
+        assert result is not None
+        assert isinstance(result, str)
 
 
 class TestCriticAgent:
-    """Tests for Critic (The Pessimist)."""
+    """Tests for CriticAgent."""
     
     def test_import_critic(self):
-        """Test critic module imports."""
-        from services.orchestrator.agents.critic import (
-            Critic,
-            critique,
-        )
-        
-        assert Critic is not None or critique is not None
-        print("\n✅ Critic imports work")
+        """Test that critic can be imported."""
+        from services.orchestrator.agents.critic import CriticAgent
+        assert CriticAgent is not None
     
     def test_create_critic(self):
-        """Test critic creation."""
-        from services.orchestrator.agents.critic import Critic
-        
-        critic = Critic()
-        
-        assert critic is not None
-        print("\n✅ Critic created")
+        """Test creating critic instance."""
+        from services.orchestrator.agents.critic import CriticAgent
+        critic = CriticAgent()
+        assert critic.name == "Critic"
+        assert critic.role == "The Pessimist"
     
-    def test_generate_critique(self):
-        """Test generating critical perspective."""
-        from services.orchestrator.agents.critic import Critic
+    def test_fallback_critique(self):
+        """Test fallback critique without LLM."""
+        from services.orchestrator.agents.critic import CriticAgent
+        critic = CriticAgent()
         
-        critic = Critic()
+        result = critic._fallback_critique("This is an answer with sources.")
         
-        claim = "Tesla will grow 50% next year"
-        evidence = ["Past growth 25%", "Competition increasing"]
-        
-        critique = critic.critique(claim, evidence)
-        
-        assert critique is not None
-        
-        print("\n✅ Critique generated")
+        assert "Critique" in result
+        assert "Present" in result  # Source mentioned
     
-    def test_find_weaknesses(self):
-        """Test finding weaknesses in argument."""
-        from services.orchestrator.agents.critic import Critic
+    @pytest.mark.asyncio
+    async def test_critique_without_api_key(self):
+        """Test critique uses fallback when no API key."""
+        from services.orchestrator.agents.critic import CriticAgent
+        critic = CriticAgent()
         
-        critic = Critic()
+        with patch.dict('os.environ', {}, clear=True):
+            result = await critic.critique(
+                answer="AI is very useful",
+                facts=["AI fact"],
+                sources=["source"]
+            )
         
-        argument = {
-            "claim": "Stock will rise",
-            "evidence": ["One analyst said so"],
-        }
-        
-        weaknesses = critic.find_weaknesses(argument)
-        
-        assert isinstance(weaknesses, list)
-        
-        print(f"\n✅ Found {len(weaknesses)} weaknesses")
-    
-    def test_suggest_alternatives(self):
-        """Test suggesting alternative interpretations."""
-        from services.orchestrator.agents.critic import Critic
-        
-        critic = Critic()
-        
-        interpretation = "Revenue drop indicates company failure"
-        
-        alternatives = critic.suggest_alternatives(interpretation)
-        
-        assert isinstance(alternatives, list)
-        
-        print(f"\n✅ Suggested {len(alternatives)} alternatives")
+        assert result is not None
+        assert "Critique" in result
 
 
 class TestJudgeAgent:
-    """Tests for Judge (The Synthesizer)."""
+    """Tests for JudgeAgent."""
     
     def test_import_judge(self):
-        """Test judge module imports."""
-        from services.orchestrator.agents.judge import (
-            Judge,
-            judge,
-        )
-        
-        assert Judge is not None or judge is not None
-        print("\n✅ Judge imports work")
+        """Test that judge can be imported."""
+        from services.orchestrator.agents.judge import JudgeAgent
+        assert JudgeAgent is not None
     
     def test_create_judge(self):
-        """Test judge creation."""
-        from services.orchestrator.agents.judge import Judge
-        
-        j = Judge()
-        
-        assert j is not None
-        print("\n✅ Judge created")
+        """Test creating judge instance."""
+        from services.orchestrator.agents.judge import JudgeAgent
+        judge = JudgeAgent()
+        assert judge.name == "Judge"
+        assert judge.role == "The Synthesizer"
     
-    def test_evaluate_perspectives(self):
-        """Test evaluating opposing perspectives."""
-        from services.orchestrator.agents.judge import Judge
+    def test_fallback_judge(self):
+        """Test fallback judgment without LLM."""
+        from services.orchestrator.agents.judge import JudgeAgent
+        judge = JudgeAgent()
         
-        j = Judge()
+        result = judge._fallback_judge(
+            generator_output="Generated answer",
+            critic_feedback="Critique feedback"
+        )
         
-        optimist = {"view": "Strong growth ahead", "confidence": 0.8}
-        pessimist = {"view": "Headwinds ahead", "confidence": 0.6}
-        
-        evaluation = j.evaluate(optimist, pessimist)
-        
-        assert evaluation is not None
-        
-        print("\n✅ Perspectives evaluated")
+        assert result["verdict"] == "Accept"
+        assert result["confidence"] == 0.5
+        assert "final_answer" in result
     
-    def test_synthesize_verdict(self):
-        """Test synthesizing final verdict."""
-        from services.orchestrator.agents.judge import Judge
+    @pytest.mark.asyncio
+    async def test_judge_without_api_key(self):
+        """Test judge uses fallback when no API key."""
+        from services.orchestrator.agents.judge import JudgeAgent
+        judge = JudgeAgent()
         
-        j = Judge()
+        with patch.dict('os.environ', {}, clear=True):
+            result = await judge.judge(
+                query="Test query",
+                generator_output="Generator's answer",
+                critic_feedback="Critic's feedback"
+            )
         
-        perspectives = [
-            {"agent": "generator", "claim": "Bullish", "score": 0.8},
-            {"agent": "critic", "claim": "Bearish", "score": 0.6},
-        ]
-        
-        verdict = j.synthesize(perspectives)
-        
-        assert verdict is not None
-        assert hasattr(verdict, "conclusion") or "conclusion" in str(verdict)
-        
-        print("\n✅ Verdict synthesized")
-    
-    def test_balance_views(self):
-        """Test balancing conflicting views."""
-        from services.orchestrator.agents.judge import Judge
-        
-        j = Judge()
-        
-        views = [
-            {"position": "pro", "strength": 0.9},
-            {"position": "con", "strength": 0.7},
-        ]
-        
-        balanced = j.balance(views)
-        
-        assert balanced is not None
-        
-        print("\n✅ Views balanced")
-    
-    def test_identify_consensus(self):
-        """Test identifying areas of consensus."""
-        from services.orchestrator.agents.judge import Judge
-        
-        j = Judge()
-        
-        claims = [
-            {"agent": "A", "claims": ["Tesla is an EV company", "Revenue is high"]},
-            {"agent": "B", "claims": ["Tesla is an EV company", "Growth may slow"]},
-        ]
-        
-        consensus = j.find_consensus(claims)
-        
-        assert isinstance(consensus, list)
-        
-        print(f"\n✅ Found {len(consensus)} consensus points")
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v", "-s"])
+        assert result is not None
+        assert "verdict" in result
+        assert "confidence" in result

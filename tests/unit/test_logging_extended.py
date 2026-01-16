@@ -1,242 +1,124 @@
 """
-Tests for Logging Decorators and Middleware.
+Tests for logging decorators and extended logging.
 """
 
 import pytest
+from unittest.mock import patch, MagicMock
 
 
 class TestLoggingDecorators:
-    """Tests for logging decorators."""
+    """Tests for log_execution decorator."""
     
     def test_import_decorators(self):
-        """Test decorators module imports."""
-        from shared.logging.decorators import (
-            log_function,
-            log_async_function,
-            timed,
-            trace,
-        )
-        
-        assert log_function is not None
-        print("\n✅ Decorator imports work")
-    
-    def test_log_function_decorator(self):
-        """Test function logging decorator."""
-        from shared.logging.decorators import log_function
-        
-        @log_function
-        def test_func(x, y):
-            return x + y
-        
-        result = test_func(1, 2)
-        
-        assert result == 3
-        print("\n✅ log_function decorator works")
+        """Test that decorators can be imported."""
+        from shared.logging.decorators import log_execution
+        assert log_execution is not None
     
     @pytest.mark.asyncio
-    async def test_log_async_function_decorator(self):
-        """Test async function logging decorator."""
-        from shared.logging.decorators import log_async_function
+    async def test_log_execution_async(self):
+        """Test log_execution with async function."""
+        from shared.logging.decorators import log_execution
         
-        @log_async_function
-        async def async_test_func(x):
-            return x * 2
+        @log_execution(log_timing=True)
+        async def async_func():
+            return "result"
         
-        result = await async_test_func(5)
-        
-        assert result == 10
-        print("\n✅ log_async_function decorator works")
+        result = await async_func()
+        assert result == "result"
     
-    def test_timed_decorator(self):
-        """Test timing decorator."""
-        from shared.logging.decorators import timed
-        import time
+    def test_log_execution_sync(self):
+        """Test log_execution with sync function."""
+        from shared.logging.decorators import log_execution
         
-        @timed
-        def slow_func():
-            time.sleep(0.01)
-            return "done"
+        @log_execution(log_timing=True)
+        def sync_func():
+            return "sync result"
         
-        result = slow_func()
-        
-        assert result == "done"
-        print("\n✅ timed decorator works")
+        result = sync_func()
+        assert result == "sync result"
     
-    def test_trace_decorator(self):
-        """Test tracing decorator."""
-        from shared.logging.decorators import trace
+    @pytest.mark.asyncio
+    async def test_log_execution_with_args(self):
+        """Test log_execution logs arguments."""
+        from shared.logging.decorators import log_execution
         
-        @trace(name="test_operation")
-        def traced_func():
-            return "traced"
+        @log_execution(log_args=True, log_result=True)
+        async def func_with_args(x, y):
+            return x + y
         
-        result = traced_func()
-        
-        assert result == "traced"
-        print("\n✅ trace decorator works")
+        result = await func_with_args(1, 2)
+        assert result == 3
 
 
 class TestLoggingContext:
-    """Tests for logging context."""
+    """Tests for LogContext."""
     
     def test_import_context(self):
-        """Test context module imports."""
-        from shared.logging.context import (
-            LogContext,
-            get_context,
-            set_context,
-        )
-        
+        """Test that context can be imported."""
+        from shared.logging.context import LogContext, set_context, get_context
         assert LogContext is not None
-        print("\n✅ Context imports work")
+        assert set_context is not None
     
     def test_create_context(self):
         """Test creating log context."""
         from shared.logging.context import LogContext
         
         ctx = LogContext(
-            request_id="req_123",
-            user_id="user_456",
-            operation="research",
+            trace_id="trace_123",
+            span_id="span_456",
+            request_id="req_789",
         )
         
-        assert ctx.request_id == "req_123"
-        print("\n✅ LogContext created")
-    
-    def test_context_propagation(self):
-        """Test context propagation."""
-        from shared.logging.context import set_context, get_context
-        
-        set_context("session_id", "sess_789")
-        
-        value = get_context("session_id")
-        
-        assert value == "sess_789"
-        print("\n✅ Context propagation works")
+        assert ctx.trace_id == "trace_123"
+        assert ctx.span_id == "span_456"
+        assert ctx.request_id == "req_789"
 
 
 class TestLoggingMiddleware:
     """Tests for logging middleware."""
     
     def test_import_middleware(self):
-        """Test middleware module imports."""
+        """Test that middleware can be imported."""
         from shared.logging.middleware import (
-            LoggingMiddleware,
             RequestLoggingMiddleware,
+            RequestIDMiddleware,
         )
-        
-        assert LoggingMiddleware is not None
-        print("\n✅ Middleware imports work")
-    
-    def test_create_middleware(self):
-        """Test middleware creation."""
-        from shared.logging.middleware import LoggingMiddleware
-        
-        middleware = LoggingMiddleware()
-        
-        assert middleware is not None
-        print("\n✅ Middleware created")
-
-
-class TestMCPMiddleware:
-    """Tests for MCP-specific logging middleware."""
-    
-    def test_import_mcp_middleware(self):
-        """Test MCP middleware imports."""
-        from shared.logging.mcp_middleware import (
-            MCPLoggingMiddleware,
-            log_mcp_request,
-        )
-        
-        assert MCPLoggingMiddleware is not None or log_mcp_request is not None
-        print("\n✅ MCP middleware imports work")
-    
-    def test_log_tool_call(self):
-        """Test logging MCP tool calls."""
-        from shared.logging.mcp_middleware import MCPLoggingMiddleware
-        
-        middleware = MCPLoggingMiddleware()
-        
-        # Test logging a tool call
-        middleware.log_tool_call(
-            tool_name="web_search",
-            arguments={"query": "Tesla"},
-            server="search_server",
-        )
-        
-        print("\n✅ Tool call logged")
+        assert RequestLoggingMiddleware is not None
+        assert RequestIDMiddleware is not None
 
 
 class TestStructuredLogging:
     """Tests for structured logging."""
     
     def test_import_structured(self):
-        """Test structured logging imports."""
-        from shared.logging.structured import (
-            StructuredLogger,
-            LogEntry,
-        )
-        
-        assert StructuredLogger is not None
-        print("\n✅ Structured logging imports work")
+        """Test that structured logging can be imported."""
+        from shared.logging.structured import get_logger
+        assert get_logger is not None
     
-    def test_create_structured_logger(self):
-        """Test structured logger creation."""
-        from shared.logging.structured import StructuredLogger
+    def test_create_logger(self):
+        """Test creating structured logger."""
+        from shared.logging.structured import get_logger
         
-        logger = StructuredLogger("test_module")
-        
+        logger = get_logger("test.module")
         assert logger is not None
-        print("\n✅ StructuredLogger created")
-    
-    def test_log_with_metadata(self):
-        """Test logging with metadata."""
-        from shared.logging.structured import StructuredLogger
-        
-        logger = StructuredLogger("test")
-        
-        logger.info(
-            "Operation completed",
-            extra={
-                "duration_ms": 150,
-                "items_processed": 100,
-            }
-        )
-        
-        print("\n✅ Metadata logging works")
 
 
 class TestMetrics:
-    """Tests for logging metrics."""
+    """Tests for metrics module."""
     
     def test_import_metrics(self):
-        """Test metrics module imports."""
-        from shared.logging.metrics import (
-            counter,
-            gauge,
-            histogram,
-            record_metric,
+        """Test that metrics can be imported."""
+        from shared.logging.metrics import record_api_request
+        assert record_api_request is not None
+    
+    def test_record_api_request(self):
+        """Test recording API request metric."""
+        from shared.logging.metrics import record_api_request
+        
+        # Should not raise
+        record_api_request(
+            method="GET",
+            endpoint="/api/test",
+            status_code=200,
+            duration=0.1,
         )
-        
-        assert record_metric is not None
-        print("\n✅ Metrics imports work")
-    
-    def test_record_counter(self):
-        """Test recording counter metric."""
-        from shared.logging.metrics import counter
-        
-        counter("api_requests_total", 1, labels={"endpoint": "/research"})
-        
-        print("\n✅ Counter recorded")
-    
-    def test_record_histogram(self):
-        """Test recording histogram metric."""
-        from shared.logging.metrics import histogram
-        
-        histogram("request_duration_seconds", 0.5, labels={"method": "GET"})
-        
-        print("\n✅ Histogram recorded")
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v", "-s"])

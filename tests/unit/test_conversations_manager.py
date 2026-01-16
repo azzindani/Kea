@@ -1,195 +1,140 @@
 """
-Unit Tests: Conversations Manager.
-
-Tests for conversation and message management.
+Tests for conversations manager.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
 from datetime import datetime
-
-from shared.conversations.models import (
-    Conversation,
-    Message,
-    MessageRole,
-)
-from shared.conversations.manager import ConversationManager
+from unittest.mock import patch, AsyncMock, MagicMock
 
 
 class TestConversation:
-    """Test Conversation model."""
+    """Tests for Conversation model."""
+    
+    def test_import_conversation(self):
+        """Test that Conversation can be imported."""
+        from shared.conversations.manager import Conversation
+        assert Conversation is not None
     
     def test_create_conversation(self):
-        """Test conversation creation."""
+        """Test creating conversation."""
+        from shared.conversations.manager import Conversation
+        
         conv = Conversation(
-            user_id="user-123",
+            conversation_id="conv_123",
+            user_id="user_456",
             title="Test Conversation",
         )
         
-        assert conv.user_id == "user-123"
+        assert conv.conversation_id == "conv_123"
+        assert conv.user_id == "user_456"
         assert conv.title == "Test Conversation"
-        assert conv.conversation_id is not None
     
-    def test_conversation_defaults(self):
-        """Test conversation default values."""
-        conv = Conversation(user_id="user-123")
+    def test_conversation_messages(self):
+        """Test conversation has messages list."""
+        from shared.conversations.manager import Conversation
         
-        assert conv.is_pinned is False
-        assert conv.is_archived is False
-        assert conv.messages == []
-    
-    def test_conversation_timestamps(self):
-        """Test conversation timestamps."""
-        conv = Conversation(user_id="user-123")
+        conv = Conversation(
+            conversation_id="conv_1",
+            user_id="user_1",
+        )
         
-        assert conv.created_at is not None
-        assert conv.updated_at is not None
+        assert hasattr(conv, "messages")
 
 
 class TestMessage:
-    """Test Message model."""
+    """Tests for Message model."""
     
-    def test_create_user_message(self):
-        """Test user message creation."""
+    def test_import_message(self):
+        """Test that Message can be imported."""
+        from shared.conversations.manager import Message
+        assert Message is not None
+    
+    def test_create_message(self):
+        """Test creating message."""
+        from shared.conversations.manager import Message
+        
         msg = Message(
-            conversation_id="conv-123",
-            role=MessageRole.USER,
-            content="Hello!",
+            message_id="msg_123",
+            role="user",
+            content="Hello",
         )
         
-        assert msg.role == MessageRole.USER
-        assert msg.content == "Hello!"
-    
-    def test_create_assistant_message(self):
-        """Test assistant message creation."""
-        msg = Message(
-            conversation_id="conv-123",
-            role=MessageRole.ASSISTANT,
-            content="Hi there!",
-        )
-        
-        assert msg.role == MessageRole.ASSISTANT
+        assert msg.message_id == "msg_123"
+        assert msg.role == "user"
+        assert msg.content == "Hello"
     
     def test_message_with_sources(self):
         """Test message with sources."""
+        from shared.conversations.manager import Message
+        
         msg = Message(
-            conversation_id="conv-123",
-            role=MessageRole.ASSISTANT,
-            content="Based on research...",
-            sources=[
-                {"url": "https://example.com", "title": "Source 1"},
-            ],
+            message_id="msg_456",
+            role="assistant",
+            content="Response with sources",
+            sources=["source1", "source2"],
         )
         
-        assert len(msg.sources) == 1
-    
-    def test_message_id_generated(self):
-        """Test message ID is generated."""
-        msg = Message(
-            conversation_id="conv-123",
-            role=MessageRole.USER,
-            content="Test",
-        )
-        
-        assert msg.message_id is not None
+        assert len(msg.sources) == 2
 
 
 class TestConversationManager:
-    """Test ConversationManager class."""
+    """Tests for ConversationManager."""
     
-    @pytest.fixture
-    def manager(self):
-        """Create manager for testing."""
-        return ConversationManager()
+    def test_import_manager(self):
+        """Test that ConversationManager can be imported."""
+        from shared.conversations.manager import (
+            ConversationManager,
+            get_conversation_manager,
+        )
+        assert ConversationManager is not None
+        assert get_conversation_manager is not None
     
-    @pytest.mark.asyncio
-    async def test_create_conversation(self, manager):
-        """Test creating conversation."""
-        with patch.object(manager, "_db") as mock_db:
-            mock_db.execute = AsyncMock()
-            
-            conv = await manager.create(
-                user_id="user-123",
-                title="New Chat",
-            )
-            
-            assert conv.user_id == "user-123"
-            assert conv.title == "New Chat"
+    def test_create_manager(self):
+        """Test creating conversation manager."""
+        from shared.conversations.manager import ConversationManager
+        
+        manager = ConversationManager()
+        assert manager is not None
     
     @pytest.mark.asyncio
-    async def test_get_conversation(self, manager):
+    async def test_manager_initialize(self):
+        """Test manager initialization."""
+        from shared.conversations.manager import ConversationManager
+        
+        manager = ConversationManager()
+        await manager.initialize()
+        # Should not raise
+    
+    @pytest.mark.asyncio
+    async def test_create_conversation(self):
+        """Test creating conversation via manager."""
+        from shared.conversations.manager import ConversationManager
+        
+        manager = ConversationManager()
+        await manager.initialize()
+        
+        conv = await manager.create_conversation(
+            user_id="user_123",
+            title="Test",
+        )
+        
+        assert conv.user_id == "user_123"
+    
+    @pytest.mark.asyncio
+    async def test_get_conversation(self):
         """Test getting conversation."""
-        with patch.object(manager, "_db") as mock_db:
-            mock_db.fetchone = AsyncMock(return_value={
-                "conversation_id": "conv-123",
-                "user_id": "user-123",
-                "title": "Test",
-                "is_pinned": False,
-                "is_archived": False,
-                "created_at": datetime.utcnow(),
-                "updated_at": datetime.utcnow(),
-            })
-            
-            conv = await manager.get("conv-123", "user-123")
-            
-            assert conv is not None
-    
-    @pytest.mark.asyncio
-    async def test_list_conversations(self, manager):
-        """Test listing conversations."""
-        with patch.object(manager, "_db") as mock_db:
-            mock_db.fetchall = AsyncMock(return_value=[
-                {
-                    "conversation_id": "conv-1",
-                    "user_id": "user-123",
-                    "title": "Chat 1",
-                    "is_pinned": False,
-                    "is_archived": False,
-                    "created_at": datetime.utcnow(),
-                    "updated_at": datetime.utcnow(),
-                },
-            ])
-            
-            convs = await manager.list(user_id="user-123")
-            
-            assert len(convs) >= 0
-    
-    @pytest.mark.asyncio
-    async def test_add_message(self, manager):
-        """Test adding message to conversation."""
-        with patch.object(manager, "_db") as mock_db:
-            mock_db.execute = AsyncMock()
-            
-            msg = await manager.add_message(
-                conversation_id="conv-123",
-                role=MessageRole.USER,
-                content="Hello!",
-            )
-            
-            assert msg.content == "Hello!"
-    
-    @pytest.mark.asyncio
-    async def test_delete_conversation(self, manager):
-        """Test deleting conversation."""
-        with patch.object(manager, "_db") as mock_db:
-            mock_db.execute = AsyncMock()
-            
-            result = await manager.delete("conv-123", "user-123")
-            
-            mock_db.execute.assert_called()
-
-
-class TestMessageRole:
-    """Test MessageRole enum."""
-    
-    def test_user_role(self):
-        """Test user role value."""
-        assert MessageRole.USER.value == "user"
-    
-    def test_assistant_role(self):
-        """Test assistant role value."""
-        assert MessageRole.ASSISTANT.value == "assistant"
-    
-    def test_system_role(self):
-        """Test system role value."""
-        assert MessageRole.SYSTEM.value == "system"
+        from shared.conversations.manager import ConversationManager
+        
+        manager = ConversationManager()
+        await manager.initialize()
+        
+        # Create first
+        conv = await manager.create_conversation(
+            user_id="user_1",
+            title="Test",
+        )
+        
+        # Then get
+        retrieved = await manager.get_conversation(conv.conversation_id)
+        assert retrieved is not None
+        assert retrieved.user_id == "user_1"

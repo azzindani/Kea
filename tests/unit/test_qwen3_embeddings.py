@@ -1,201 +1,97 @@
 """
-Tests for Embedding Providers (Qwen3).
+Tests for Qwen3 embedding providers.
 """
 
 import pytest
+from unittest.mock import patch, AsyncMock, MagicMock
 
 
-class TestQwen3Embedding:
-    """Tests for Qwen3 Embedding Provider."""
+class TestEmbeddingProvider:
+    """Tests for EmbeddingProvider base class."""
     
     def test_import_embedding(self):
-        """Test embedding module imports."""
+        """Test that embedding classes can be imported."""
         from shared.embedding.qwen3_embedding import (
-            Qwen3Embedder,
-            get_embedder,
+            EmbeddingProvider,
+            OpenRouterEmbedding,
+            LocalEmbedding,
+            create_embedding_provider,
         )
-        
-        assert Qwen3Embedder is not None or get_embedder is not None
-        print("\n✅ Qwen3 embedding imports work")
+        assert EmbeddingProvider is not None
+        assert OpenRouterEmbedding is not None
+        assert LocalEmbedding is not None
+
+
+class TestOpenRouterEmbedding:
+    """Tests for OpenRouterEmbedding."""
     
     def test_create_embedder(self):
-        """Test embedder creation."""
-        from shared.embedding.qwen3_embedding import Qwen3Embedder
+        """Test creating OpenRouter embedding instance."""
+        from shared.embedding.qwen3_embedding import OpenRouterEmbedding
+        embedder = OpenRouterEmbedding(api_key="test_key", dimension=512)
         
-        embedder = Qwen3Embedder()
-        
-        assert embedder is not None
-        print("\n✅ Qwen3Embedder created")
+        assert embedder.dimension == 512
+        assert embedder.model == "qwen/qwen3-embedding-8b"
     
-    def test_embed_text(self):
-        """Test text embedding."""
-        from shared.embedding.qwen3_embedding import Qwen3Embedder
+    def test_default_dimension(self):
+        """Test default dimension."""
+        from shared.embedding.qwen3_embedding import OpenRouterEmbedding
+        embedder = OpenRouterEmbedding()
         
-        embedder = Qwen3Embedder()
-        
-        text = "Tesla is an electric vehicle company"
-        
-        # Note: May need model loaded to actually embed
-        try:
-            embedding = embedder.embed(text)
-            assert len(embedding) > 0
-            print(f"\n✅ Embedded to {len(embedding)} dimensions")
-        except Exception as e:
-            print(f"\n⏭️ Skipped (model not loaded): {e}")
+        assert embedder.dimension == 1024
     
-    def test_embed_batch(self):
-        """Test batch embedding."""
-        from shared.embedding.qwen3_embedding import Qwen3Embedder
+    @pytest.mark.asyncio
+    async def test_embed_requires_api_key(self):
+        """Test that embed raises error without API key."""
+        from shared.embedding.qwen3_embedding import OpenRouterEmbedding
         
-        embedder = Qwen3Embedder()
-        
-        texts = ["Tesla", "Ford", "GM"]
-        
-        try:
-            embeddings = embedder.embed_batch(texts)
-            assert len(embeddings) == len(texts)
-            print(f"\n✅ Batch embedded {len(texts)} texts")
-        except Exception as e:
-            print(f"\n⏭️ Skipped (model not loaded): {e}")
+        with patch.dict('os.environ', {}, clear=True):
+            embedder = OpenRouterEmbedding(api_key="")
+            
+            with pytest.raises(ValueError, match="OPENROUTER_API_KEY"):
+                await embedder.embed(["test text"])
 
 
-class TestQwen3Reranker:
-    """Tests for Qwen3 Reranker."""
+class TestLocalEmbedding:
+    """Tests for LocalEmbedding."""
     
-    def test_import_reranker(self):
-        """Test reranker module imports."""
-        from shared.embedding.qwen3_reranker import (
-            Qwen3Reranker,
-            get_reranker,
+    def test_create_local_embedder(self):
+        """Test creating local embedding instance."""
+        from shared.embedding.qwen3_embedding import LocalEmbedding
+        embedder = LocalEmbedding(dimension=768)
+        
+        assert embedder.dimension == 768
+        assert embedder._model is None  # Lazy loaded
+    
+    def test_default_model_name(self):
+        """Test default model name."""
+        from shared.embedding.qwen3_embedding import LocalEmbedding
+        embedder = LocalEmbedding()
+        
+        assert "Qwen" in embedder.model_name
+
+
+class TestCreateEmbeddingProvider:
+    """Tests for create_embedding_provider factory."""
+    
+    def test_create_openrouter_provider(self):
+        """Test creating OpenRouter provider."""
+        from shared.embedding.qwen3_embedding import (
+            create_embedding_provider,
+            OpenRouterEmbedding,
         )
         
-        assert Qwen3Reranker is not None or get_reranker is not None
-        print("\n✅ Qwen3 reranker imports work")
+        provider = create_embedding_provider(use_local=False, dimension=512)
+        assert isinstance(provider, OpenRouterEmbedding)
+        assert provider.dimension == 512
     
-    def test_create_reranker(self):
-        """Test reranker creation."""
-        from shared.embedding.qwen3_reranker import Qwen3Reranker
-        
-        reranker = Qwen3Reranker()
-        
-        assert reranker is not None
-        print("\n✅ Qwen3Reranker created")
-    
-    def test_rerank_documents(self):
-        """Test document reranking."""
-        from shared.embedding.qwen3_reranker import Qwen3Reranker
-        
-        reranker = Qwen3Reranker()
-        
-        query = "Tesla revenue"
-        documents = [
-            "Tesla reported $81B revenue",
-            "Apple is a tech company",
-            "Tesla is growing fast",
-        ]
-        
-        try:
-            reranked = reranker.rerank(query, documents)
-            assert len(reranked) == len(documents)
-            print(f"\n✅ Reranked {len(documents)} documents")
-        except Exception as e:
-            print(f"\n⏭️ Skipped (model not loaded): {e}")
-
-
-class TestQwen3VLEmbedding:
-    """Tests for Qwen3 Vision-Language Embedding."""
-    
-    def test_import_vl_embedding(self):
-        """Test VL embedding module imports."""
-        from shared.embedding.qwen3_vl_embedding import (
-            Qwen3VLEmbedder,
+    def test_create_local_provider(self):
+        """Test creating local provider."""
+        from shared.embedding.qwen3_embedding import (
+            create_embedding_provider,
+            LocalEmbedding,
         )
         
-        assert Qwen3VLEmbedder is not None
-        print("\n✅ Qwen3 VL embedding imports work")
-    
-    def test_create_vl_embedder(self):
-        """Test VL embedder creation."""
-        from shared.embedding.qwen3_vl_embedding import Qwen3VLEmbedder
-        
-        embedder = Qwen3VLEmbedder()
-        
-        assert embedder is not None
-        print("\n✅ Qwen3VLEmbedder created")
-    
-    def test_embed_text_with_vl(self):
-        """Test text embedding with VL model."""
-        from shared.embedding.qwen3_vl_embedding import Qwen3VLEmbedder
-        
-        embedder = Qwen3VLEmbedder()
-        
-        text = "A photo of a Tesla car"
-        
-        try:
-            embedding = embedder.embed_text(text)
-            assert len(embedding) > 0
-            print(f"\n✅ VL embedded text to {len(embedding)} dimensions")
-        except Exception as e:
-            print(f"\n⏭️ Skipped (model not loaded): {e}")
-
-
-class TestQwen3VLReranker:
-    """Tests for Qwen3 Vision-Language Reranker."""
-    
-    def test_import_vl_reranker(self):
-        """Test VL reranker module imports."""
-        from shared.embedding.qwen3_vl_reranker import (
-            Qwen3VLReranker,
-        )
-        
-        assert Qwen3VLReranker is not None
-        print("\n✅ Qwen3 VL reranker imports work")
-    
-    def test_create_vl_reranker(self):
-        """Test VL reranker creation."""
-        from shared.embedding.qwen3_vl_reranker import Qwen3VLReranker
-        
-        reranker = Qwen3VLReranker()
-        
-        assert reranker is not None
-        print("\n✅ Qwen3VLReranker created")
-
-
-class TestEmbeddingProviderFactory:
-    """Tests for embedding provider factory."""
-    
-    def test_import_factory(self):
-        """Test factory imports."""
-        from shared.embedding import (
-            get_embedding_provider,
-            EmbeddingProvider,
-        )
-        
-        assert get_embedding_provider is not None or EmbeddingProvider is not None
-        print("\n✅ Factory imports work")
-    
-    def test_get_default_provider(self):
-        """Test getting default provider."""
-        from shared.embedding import get_embedding_provider
-        
-        try:
-            provider = get_embedding_provider()
-            assert provider is not None
-            print("\n✅ Default provider obtained")
-        except Exception as e:
-            print(f"\n⏭️ Skipped: {e}")
-    
-    def test_get_specific_provider(self):
-        """Test getting specific provider by name."""
-        from shared.embedding import get_embedding_provider
-        
-        try:
-            provider = get_embedding_provider("qwen3")
-            assert provider is not None
-            print("\n✅ Specific provider obtained")
-        except Exception as e:
-            print(f"\n⏭️ Skipped: {e}")
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v", "-s"])
+        provider = create_embedding_provider(use_local=True, dimension=768)
+        assert isinstance(provider, LocalEmbedding)
+        assert provider.dimension == 768

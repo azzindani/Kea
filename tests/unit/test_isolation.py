@@ -1,116 +1,133 @@
 """
-Tests for Tool Isolation.
+Tests for tool isolation and lazy loading.
 """
 
 import pytest
+from unittest.mock import patch, MagicMock, AsyncMock
 
 
-class TestToolIsolation:
-    """Tests for tool isolation and sandboxing."""
+class TestToolIsolator:
+    """Tests for ToolIsolator class."""
     
     def test_import_isolation(self):
-        """Test isolation module imports."""
+        """Test that isolation classes can be imported."""
         from shared.tools.isolation import (
-            ToolSandbox,
-            IsolatedExecutor,
+            ToolIsolator,
+            LazyToolLoader,
+            IsolatedResult,
+            get_isolator,
+            get_lazy_loader,
         )
-        
-        assert ToolSandbox is not None or IsolatedExecutor is not None
-        print("\n✅ Isolation imports work")
+        assert ToolIsolator is not None
+        assert LazyToolLoader is not None
     
-    def test_create_sandbox(self):
-        """Test sandbox creation."""
-        from shared.tools.isolation import ToolSandbox
+    def test_create_isolator(self):
+        """Test creating tool isolator."""
+        from shared.tools.isolation import ToolIsolator
         
-        sandbox = ToolSandbox(
-            memory_limit_mb=512,
-            timeout_seconds=30,
-        )
-        
-        assert sandbox is not None
-        print("\n✅ Sandbox created")
+        isolator = ToolIsolator(timeout=60.0)
+        assert isolator.timeout == 60.0
     
-    def test_isolated_execution(self):
-        """Test isolated code execution."""
-        from shared.tools.isolation import IsolatedExecutor
+    def test_default_timeout(self):
+        """Test default timeout value."""
+        from shared.tools.isolation import ToolIsolator
         
-        executor = IsolatedExecutor()
-        
-        code = "result = 2 + 2"
-        
-        result = executor.execute(code)
-        
-        assert result is not None
-        
-        print(f"\n✅ Isolated execution: {result}")
-    
-    def test_memory_limit_enforcement(self):
-        """Test memory limit is enforced."""
-        from shared.tools.isolation import ToolSandbox
-        
-        sandbox = ToolSandbox(memory_limit_mb=10)
-        
-        # This test may need adjustment based on actual implementation
-        assert sandbox.memory_limit_mb == 10
-        
-        print("\n✅ Memory limit configured")
-    
-    def test_timeout_enforcement(self):
-        """Test timeout is enforced."""
-        from shared.tools.isolation import ToolSandbox
-        
-        sandbox = ToolSandbox(timeout_seconds=5)
-        
-        assert sandbox.timeout_seconds == 5
-        
-        print("\n✅ Timeout configured")
-    
-    def test_resource_cleanup(self):
-        """Test resources are cleaned up after execution."""
-        from shared.tools.isolation import ToolSandbox
-        
-        sandbox = ToolSandbox()
-        
-        # Execute something
-        sandbox.run("x = 1")
-        
-        # Cleanup
-        sandbox.cleanup()
-        
-        # Should be clean
-        print("\n✅ Resource cleanup works")
-    
-    def test_capture_output(self):
-        """Test stdout/stderr capture."""
-        from shared.tools.isolation import IsolatedExecutor
-        
-        executor = IsolatedExecutor()
-        
-        code = 'print("Hello from sandbox")'
-        
-        result = executor.execute(code, capture_output=True)
-        
-        if hasattr(result, "stdout"):
-            assert "Hello" in result.stdout or True
-        
-        print("\n✅ Output capture works")
-    
-    def test_restrict_imports(self):
-        """Test dangerous imports are restricted."""
-        from shared.tools.isolation import ToolSandbox
-        
-        sandbox = ToolSandbox(
-            allowed_imports=["math", "json"],
-        )
-        
-        # Should allow math
-        assert "math" in sandbox.allowed_imports
-        
-        # Should not allow os/subprocess by default
-        assert "os" not in (sandbox.allowed_imports or []) or True
-        
-        print("\n✅ Import restrictions work")
+        isolator = ToolIsolator()
+        assert isolator.timeout == 120.0
 
 
-if __name__ == "__main__":
-    pytest.main([__file__, "-v", "-s"])
+class TestIsolatedResult:
+    """Tests for IsolatedResult dataclass."""
+    
+    def test_create_success_result(self):
+        """Test creating success result."""
+        from shared.tools.isolation import IsolatedResult
+        
+        result = IsolatedResult(
+            success=True,
+            result={"data": "value"},
+            error=None,
+            stdout="output",
+            stderr=""
+        )
+        
+        assert result.success is True
+        assert result.result == {"data": "value"}
+    
+    def test_create_error_result(self):
+        """Test creating error result."""
+        from shared.tools.isolation import IsolatedResult
+        
+        result = IsolatedResult(
+            success=False,
+            result=None,
+            error="Something failed",
+            stdout="",
+            stderr="error output"
+        )
+        
+        assert result.success is False
+        assert result.error == "Something failed"
+
+
+class TestLazyToolLoader:
+    """Tests for LazyToolLoader class."""
+    
+    def test_loader_init(self):
+        """Test lazy loader initialization."""
+        from shared.tools.isolation import LazyToolLoader
+        
+        loader = LazyToolLoader()
+        assert loader.loaded_servers() == []
+    
+    def test_is_loaded_initially_false(self):
+        """Test is_loaded returns false initially."""
+        from shared.tools.isolation import LazyToolLoader
+        
+        loader = LazyToolLoader()
+        assert loader.is_loaded("any_server") is False
+    
+    def test_loaded_servers_empty(self):
+        """Test loaded_servers initially empty."""
+        from shared.tools.isolation import LazyToolLoader
+        
+        loader = LazyToolLoader()
+        assert len(loader.loaded_servers()) == 0
+    
+    def test_unload_nonexistent_server(self):
+        """Test unloading non-existent server doesn't raise."""
+        from shared.tools.isolation import LazyToolLoader
+        
+        loader = LazyToolLoader()
+        # Should not raise
+        loader.unload("nonexistent_server")
+
+
+class TestGetIsolator:
+    """Tests for get_isolator singleton."""
+    
+    def test_get_isolator(self):
+        """Test getting global isolator."""
+        from shared.tools.isolation import get_isolator, ToolIsolator
+        
+        isolator = get_isolator()
+        assert isinstance(isolator, ToolIsolator)
+    
+    def test_get_isolator_same_instance(self):
+        """Test get_isolator returns same instance."""
+        from shared.tools.isolation import get_isolator
+        
+        isolator1 = get_isolator()
+        isolator2 = get_isolator()
+        assert isolator1 is isolator2
+
+
+class TestGetLazyLoader:
+    """Tests for get_lazy_loader singleton."""
+    
+    def test_get_lazy_loader(self):
+        """Test getting global lazy loader."""
+        from shared.tools.isolation import get_lazy_loader, LazyToolLoader
+        
+        loader = get_lazy_loader()
+        assert isinstance(loader, LazyToolLoader)
