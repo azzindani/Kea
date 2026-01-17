@@ -166,22 +166,41 @@ async def researcher_node(state: GraphState) -> GraphState:
     
     logger.info(f"Sub-queries to research: {len(sub_queries)}")
     
-    # Use MCP Client
+    # Use MCP Client with direct fallback
     try:
         from services.orchestrator.mcp.client import get_mcp_orchestrator
+        from mcp_servers.search_server.tools.web_search import web_search_tool
+        
         client = get_mcp_orchestrator()
+        use_direct = len(client.tool_names) == 0  # No MCP tools registered
         
         # Execute search for each sub-query
         for i, sub_query in enumerate(sub_queries[:5], 1):  # Up to 5 searches
-            logger.info(f"\n🔍 Tool Call {i}: web_search (MCP)")
+            if use_direct:
+                logger.info(f"\n🔍 Tool Call {i}: web_search (DIRECT - MCP not configured)")
+            else:
+                logger.info(f"\n🔍 Tool Call {i}: web_search (MCP)")
             logger.info(f"   Query: {sub_query[:80]}...")
             
             try:
-                # Call tool via orchestrator
-                result = await client.call_tool("web_search", {
-                    "query": sub_query, 
-                    "max_results": 5
-                })
+                # Try MCP first, fallback to direct
+                if use_direct:
+                    result = await web_search_tool({
+                        "query": sub_query, 
+                        "max_results": 5
+                    })
+                else:
+                    result = await client.call_tool("web_search", {
+                        "query": sub_query, 
+                        "max_results": 5
+                    })
+                    # Check if MCP returned "Tool not found" and fallback
+                    if result.isError and "Tool not found" in str(result.content):
+                        logger.info("   ⚠️ MCP tool not found, using direct call")
+                        result = await web_search_tool({
+                            "query": sub_query, 
+                            "max_results": 5
+                        })
                 
                 # Parse search results into facts
                 if result and hasattr(result, "content"):
