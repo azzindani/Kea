@@ -1,15 +1,23 @@
 #!/usr/bin/env python3
 """
-Kea Stress Test Runner.
+Kea Stress Test Runner (API-Based).
 
-Can be run directly or via pytest:
-    
+Runs stress tests via API Gateway endpoints, properly exercising
+the full microservices stack with authentication.
+
+Usage:
     # Via pytest (recommended)
     python -m pytest tests/stress/stress_test.py --query=1 -v -s --log-cli-level=DEBUG
     
     # Direct execution
     python tests/stress/stress_test.py --query=1 -v
     python tests/stress/stress_test.py --list
+    
+Prerequisites:
+    1. Start API Gateway: python -m services.api_gateway.main
+    2. Start Orchestrator: python -m services.orchestrator.main  
+    3. Start RAG Service: python -m services.rag_service.main
+    4. Set OPENROUTER_API_KEY environment variable
 """
 
 from __future__ import annotations
@@ -25,6 +33,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pytest
 
 # Add project root to path
@@ -33,6 +42,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from tests.stress.queries import QUERIES, get_query, StressQuery
 from tests.stress.metrics import MetricsCollector, QueryMetrics
+from tests.stress.conftest import AuthenticatedAPIClient, API_GATEWAY_URL, ORCHESTRATOR_URL
 
 from shared.hardware.detector import detect_hardware, HardwareProfile
 from shared.logging import get_logger
@@ -53,6 +63,12 @@ MAX_ERROR_RATE = 0.20  # Stop if error rate exceeds 20%
 
 # Output directory
 DEFAULT_OUTPUT_DIR = "tests/stress/results"
+
+# Polling interval for job status
+JOB_POLL_INTERVAL = 2.0  # seconds
+
+# Maximum time to wait for job completion
+JOB_TIMEOUT = 600  # 10 minutes
 
 
 # =============================================================================
@@ -76,14 +92,17 @@ def pytest_addoption(parser):
 
 
 # =============================================================================
-# Stress Test Runner
+# Stress Test Runner (API-Based)
 # =============================================================================
 
 class StressTestRunner:
     """
-    Runs stress tests against Kea research pipeline.
+    Runs stress tests against Kea research pipeline via API.
     
     Key principle: 10,000 documents = 10,000 tool iterations ≠ 10,000 LLM calls
+    
+    This version uses the API Gateway instead of direct imports,
+    properly exercising the full microservices stack.
     """
     
     def __init__(
@@ -95,18 +114,17 @@ class StressTestRunner:
         
         self.metrics = MetricsCollector()
         self.hardware: HardwareProfile | None = None
-        self.pipeline = None
-        self.llm_provider = None
+        self.api_client: AuthenticatedAPIClient | None = None
         
         self._initialized = False
     
     async def initialize(self) -> None:
-        """Initialize Kea services."""
+        """Initialize Kea services via API."""
         if self._initialized:
             return
         
         logger.info("="*60)
-        logger.info("INITIALIZING KEA STRESS TEST")
+        logger.info("INITIALIZING KEA STRESS TEST (API MODE)")
         logger.info("="*60)
         
         # Detect hardware
@@ -115,31 +133,52 @@ class StressTestRunner:
                    f"{self.hardware.ram_total_gb:.1f}GB RAM, "
                    f"env={self.hardware.environment}")
         
-        # Initialize LLM provider
+        # Initialize authenticated API client
         try:
-            from shared.llm.openrouter import OpenRouterProvider
-            self.llm_provider = OpenRouterProvider()
-            logger.info("LLM Provider: OpenRouter initialized")
+            self.api_client = AuthenticatedAPIClient(API_GATEWAY_URL)
+            await self.api_client.initialize()
+            logger.info(f"API Client: Authenticated as user {self.api_client.user_id}")
         except Exception as e:
-            logger.error(f"Failed to initialize LLM provider: {e}")
+            logger.error(f"Failed to authenticate with API Gateway: {e}")
             raise
         
-        # Initialize research pipeline
-        try:
-            from services.orchestrator.core.pipeline import get_research_pipeline
-            # get_research_pipeline is async and returns initialized pipeline
-            self.pipeline = await get_research_pipeline()
-            logger.info("Research Pipeline: Initialized")
-        except Exception as e:
-            logger.warning(f"Failed to initialize full pipeline: {e}")
-            logger.info("Will run in degraded mode")
+        # Verify services are healthy
+        await self._check_services()
         
         self._initialized = True
         logger.info("="*60)
     
+    async def _check_services(self) -> None:
+        """Verify required services are running."""
+        # Check API Gateway health
+        try:
+            response = await self.api_client.get("/health")
+            if response.status_code != 200:
+                raise Exception(f"API Gateway unhealthy: {response.text}")
+            logger.info("API Gateway: Healthy")
+        except Exception as e:
+            logger.error(f"API Gateway health check failed: {e}")
+            raise
+        
+        # Check Orchestrator health
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                response = await client.get(f"{ORCHESTRATOR_URL}/health")
+                if response.status_code != 200:
+                    raise Exception(f"Orchestrator unhealthy: {response.text}")
+                logger.info("Orchestrator: Healthy")
+        except Exception as e:
+            logger.error(f"Orchestrator health check failed: {e}")
+            raise
+    
+    async def cleanup(self) -> None:
+        """Cleanup resources."""
+        if self.api_client:
+            await self.api_client.close()
+    
     async def run_query(self, query: StressQuery) -> QueryMetrics:
         """
-        Run a single stress test query.
+        Run a single stress test query via API.
         
         Returns metrics for the query execution.
         """
@@ -158,8 +197,8 @@ class StressTestRunner:
         self.metrics.start_query(query.id, query.name)
         
         try:
-            # Execute the research
-            result = await self._execute_research(query)
+            # Execute via API
+            result = await self._execute_via_api(query)
             
             # End metrics
             metrics = self.metrics.end_query(success=True)
@@ -185,23 +224,66 @@ class StressTestRunner:
         
         return metrics
     
-    async def _execute_research(self, query: StressQuery) -> dict:
+    async def _execute_via_api(self, query: StressQuery) -> dict:
         """
-        Execute the research query through Kea pipeline.
+        Execute query via API Gateway Jobs endpoint.
+        
+        Uses async job creation and polling.
         """
-        if not self.pipeline:
-            logger.warning("Pipeline not available, running simulation")
-            return await self._simulate_execution(query)
+        # Create job via API
+        logger.info("Creating research job via API...")
         
-        # Use the real pipeline
-        conversation_id = f"stress_test_{query.id}_{int(time.time())}"
-        user_id = "stress_tester"
-        
-        result = await self.pipeline.process_message(
-            conversation_id=conversation_id,
-            content=query.prompt,
-            user_id=user_id,
+        response = await self.api_client.post(
+            "/api/v1/jobs/",
+            json={
+                "query": query.prompt,
+                "job_type": "deep_research",
+                "depth": 2,
+                "max_sources": 10,
+            },
         )
+        
+        if response.status_code != 200:
+            raise Exception(f"Failed to create job: {response.text}")
+        
+        job_data = response.json()
+        job_id = job_data["job_id"]
+        logger.info(f"Job created: {job_id}")
+        
+        # Poll for job completion
+        start_time = time.time()
+        last_status = None
+        
+        while True:
+            elapsed = time.time() - start_time
+            if elapsed > JOB_TIMEOUT:
+                raise TimeoutError(f"Job {job_id} timed out after {JOB_TIMEOUT}s")
+            
+            response = await self.api_client.get(f"/api/v1/jobs/{job_id}")
+            status_data = response.json()
+            current_status = status_data["status"]
+            
+            if current_status != last_status:
+                logger.info(f"Job status: {current_status} (progress: {status_data.get('progress', 0):.0%})")
+                last_status = current_status
+            
+            if current_status == "completed":
+                break
+            elif current_status == "failed":
+                error = status_data.get("error", "Unknown error")
+                raise Exception(f"Job failed: {error}")
+            elif current_status == "cancelled":
+                raise Exception("Job was cancelled")
+            
+            await asyncio.sleep(JOB_POLL_INTERVAL)
+        
+        # Get job result
+        response = await self.api_client.get(f"/api/v1/jobs/{job_id}/result")
+        
+        if response.status_code != 200:
+            raise Exception(f"Failed to get job result: {response.text}")
+        
+        result = response.json()
         
         # ============================================================
         # PRINT FULL RESULTS
@@ -212,140 +294,92 @@ class StressTestRunner:
         logger.info("="*70)
         
         # Print the actual report content
-        if hasattr(result, 'content') and result.content:
-            # Print report in chunks for readability
-            content = result.content
+        if result.get("report"):
+            content = result["report"]
             logger.info(f"\n{content}\n")
         
         # Print confidence
-        confidence = getattr(result, 'confidence', 0.0)
+        confidence = result.get("confidence", 0.0)
         logger.info(f"CONFIDENCE: {confidence:.0%}")
         
-        # Print sources
-        sources = getattr(result, 'sources', [])
-        logger.info(f"\nSOURCES ({len(sources)} total):")
-        for i, src in enumerate(sources[:10], 1):
-            if isinstance(src, dict):
-                logger.info(f"  {i}. {src.get('url', src.get('title', str(src)[:80]))}")
-            else:
-                logger.info(f"  {i}. {str(src)[:80]}")
+        # Print sources count
+        sources_count = result.get("sources_count", 0)
+        logger.info(f"SOURCES: {sources_count} total")
         
-        # Print facts if available
-        facts = getattr(result, 'facts', [])
-        if facts:
-            logger.info(f"\nFACTS EXTRACTED ({len(facts)} total):")
-            for i, fact in enumerate(facts[:10], 1):
-                if isinstance(fact, dict):
-                    logger.info(f"  {i}. {fact.get('text', str(fact))[:100]}")
-                else:
-                    logger.info(f"  {i}. {str(fact)[:100]}")
+        # Print facts count
+        facts_count = result.get("facts_count", 0)
+        logger.info(f"FACTS EXTRACTED: {facts_count} total")
         
         logger.info("="*70)
         logger.info("")
         
         # Track metrics from result
-        # Count LLM calls based on what we know happened (planner + generator + critic + judge = 4)
-        self.metrics.record_llm_call(tokens_in=500, tokens_out=1000)  # router
-        self.metrics.record_llm_call(tokens_in=200, tokens_out=300)   # planner  
-        self.metrics.record_llm_call(tokens_in=500, tokens_out=1000)  # generator
-        self.metrics.record_llm_call(tokens_in=600, tokens_out=800)   # critic
-        self.metrics.record_llm_call(tokens_in=800, tokens_out=500)   # judge
+        # Estimate LLM calls based on typical pipeline: router + planner + generator + critic + judge
+        for _ in range(5):
+            self.metrics.record_llm_call(tokens_in=500, tokens_out=800)
         
-        # Track tool calls (3 iterations of researcher)
-        for _ in range(len(facts) if facts else 3):
+        # Track tool calls based on facts gathered
+        for _ in range(max(facts_count, 3)):
             self.metrics.record_tool_call("web_search", duration_ms=100)
         
         return {
-            "content": result.content if hasattr(result, 'content') else str(result),
+            "job_id": job_id,
+            "report": result.get("report"),
             "confidence": confidence,
-            "sources_count": len(sources),
-            "facts_count": len(facts),
+            "sources_count": sources_count,
+            "facts_count": facts_count,
         }
     
-    async def _simulate_execution(self, query: StressQuery) -> dict:
+    async def run_query_streaming(self, query: StressQuery) -> QueryMetrics:
         """
-        Simulate execution when full pipeline is not available.
+        Run query using SSE streaming endpoint (alternative method).
+        
+        Uses Orchestrator's /research/stream endpoint directly.
         """
-        from shared.llm.provider import LLMMessage, LLMConfig, LLMRole
+        await self.initialize()
         
-        # Phase 1: Planning (1 LLM call)
-        logger.info("Phase 1: Planning...")
+        logger.info("")
+        logger.info("="*60)
+        logger.info(f"QUERY {query.id}: {query.name} (STREAMING)")
+        logger.info("="*60)
         
-        planning_prompt = f"""You are a research planner. Analyze this query and create an execution plan:
-
-{query.prompt}
-
-Output a JSON plan with:
-- steps: List of research steps
-- tools_needed: List of tools to use
-- estimated_iterations: Number of tool calls per step
-"""
+        self.metrics.start_query(query.id, query.name)
         
-        messages = [
-            LLMMessage(role=LLMRole.SYSTEM, content="You are a research planner."),
-            LLMMessage(role=LLMRole.USER, content=planning_prompt),
-        ]
-        config = LLMConfig(
-            model="nvidia/nemotron-3-nano-30b-a3b:free",
-            temperature=0.3,
-            max_tokens=2000,
-        )
-        
-        response = await self.llm_provider.complete(messages, config)
-        self.metrics.record_llm_call(
-            tokens_in=response.usage.prompt_tokens,
-            tokens_out=response.usage.completion_tokens,
-        )
-        
-        logger.debug(f"Planning response: {response.content[:200]}...")
-        
-        # Rate limit
-        await asyncio.sleep(LLM_DELAY_SECONDS)
-        
-        # Phase 2: Tool Iterations (simulate)
-        logger.info(f"Phase 2: Executing ~{query.expected_tool_iterations} tool iterations...")
-        
-        batch_size = 100
-        num_batches = query.expected_tool_iterations // batch_size
-        
-        for batch in range(min(num_batches, 10)):  # Cap at 10 batches for simulation
-            for i in range(batch_size):
-                self.metrics.record_tool_call(
-                    tool_name="fetch_url" if i % 3 == 0 else "pdf_extract" if i % 3 == 1 else "vectorize",
-                    duration_ms=50 + (i % 100),
-                )
+        try:
+            async with httpx.AsyncClient(timeout=300.0) as client:
+                async with client.stream(
+                    "GET",
+                    f"{ORCHESTRATOR_URL}/research/stream",
+                    params={"query": query.prompt, "depth": 2, "max_sources": 10},
+                ) as response:
+                    async for line in response.aiter_lines():
+                        if line.startswith("data:"):
+                            data = json.loads(line[5:].strip())
+                            event_type = data.get("type")
+                            
+                            if event_type == "status":
+                                logger.debug(f"Status: {data.get('message')}")
+                            elif event_type == "tool_call":
+                                self.metrics.record_tool_call(
+                                    data.get("tool", "unknown"),
+                                    duration_ms=data.get("duration_ms", 100),
+                                )
+                            elif event_type == "llm_call":
+                                self.metrics.record_llm_call(
+                                    tokens_in=data.get("tokens_in", 0),
+                                    tokens_out=data.get("tokens_out", 0),
+                                )
+                            elif event_type == "done":
+                                logger.info("Stream completed")
+                                break
             
-            logger.debug(f"  Batch {batch + 1}/{num_batches}: {(batch + 1) * batch_size} iterations")
+            metrics = self.metrics.end_query(success=True)
             
-            # Periodic checkpoint
-            if (batch + 1) % 10 == 0:
-                checkpoint_msg = [
-                    LLMMessage(role=LLMRole.USER, content=f"Checkpoint: {(batch + 1) * batch_size} items processed.")
-                ]
-                response = await self.llm_provider.complete(checkpoint_msg, config)
-                self.metrics.record_llm_call(
-                    tokens_in=response.usage.prompt_tokens,
-                    tokens_out=response.usage.completion_tokens,
-                )
-                await asyncio.sleep(LLM_DELAY_SECONDS)
+        except Exception as e:
+            logger.error(f"Streaming query failed: {e}")
+            metrics = self.metrics.end_query(success=False, error=e)
         
-        # Phase 3: Synthesis
-        logger.info("Phase 3: Synthesizing results...")
-        
-        synthesis_prompt = f"""Based on the research data gathered, synthesize a comprehensive answer to:
-
-{query.prompt}
-
-Provide a detailed response with key findings."""
-        
-        messages = [LLMMessage(role=LLMRole.USER, content=synthesis_prompt)]
-        response = await self.llm_provider.complete(messages, config)
-        self.metrics.record_llm_call(
-            tokens_in=response.usage.prompt_tokens,
-            tokens_out=response.usage.completion_tokens,
-        )
-        
-        return {"content": response.content, "simulated": True}
+        return metrics
     
     def generate_report(self) -> dict:
         """Generate final test report."""
@@ -354,12 +388,17 @@ Provide a detailed response with key findings."""
         return {
             "test_run_id": f"stress_{int(time.time())}",
             "generated_at": datetime.utcnow().isoformat(),
+            "mode": "api",  # Indicate API-based execution
             "hardware_profile": {
                 "cpu_cores": self.hardware.cpu_cores if self.hardware else 0,
                 "cpu_threads": self.hardware.cpu_threads if self.hardware else 0,
                 "ram_total_gb": self.hardware.ram_total_gb if self.hardware else 0,
                 "gpu_count": self.hardware.gpu_count if self.hardware else 0,
                 "environment": self.hardware.environment if self.hardware else "unknown",
+            },
+            "api_config": {
+                "gateway_url": API_GATEWAY_URL,
+                "orchestrator_url": ORCHESTRATOR_URL,
             },
             "summary": summary,
             "pass": summary.get("success_rate", 0) >= (1 - MAX_ERROR_RATE),
@@ -403,9 +442,9 @@ class TestStressQueries:
     
     @pytest.mark.stress
     @pytest.mark.asyncio
-    async def test_query(self, runner, query_ids):
+    async def test_query(self, runner, query_ids, services_available):
         """
-        Run stress test query(s).
+        Run stress test query(s) via API.
         
         Usage:
             pytest tests/stress/stress_test.py --query=1 -v -s --log-cli-level=DEBUG
@@ -452,6 +491,9 @@ class TestStressQueries:
             else:
                 logger.error(f"❌ Query {query_id} FAILED: {metrics.error_message}")
                 pytest.fail(f"Query {query_id} failed: {metrics.error_message}")
+        
+        # Cleanup
+        await runner.cleanup()
 
 
 # =============================================================================
@@ -480,7 +522,7 @@ def list_queries() -> None:
 async def main_cli() -> None:
     """CLI entry point for direct execution."""
     parser = argparse.ArgumentParser(
-        description="Kea Stress Test Runner",
+        description="Kea Stress Test Runner (API-Based)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -490,6 +532,13 @@ Examples:
   # Direct execution:
   python stress_test.py --query=1 -v
   python stress_test.py --list
+
+Prerequisites:
+  1. Start all services:
+     python -m services.api_gateway.main
+     python -m services.orchestrator.main
+     python -m services.rag_service.main
+  2. Set OPENROUTER_API_KEY environment variable
         """,
     )
     
@@ -497,6 +546,7 @@ Examples:
     parser.add_argument("--list", "-l", action="store_true", help="List queries")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     parser.add_argument("--output", "-o", type=str, default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument("--stream", action="store_true", help="Use SSE streaming endpoint")
     
     args = parser.parse_args()
     
@@ -514,21 +564,28 @@ Examples:
     
     runner = StressTestRunner(output_dir=args.output)
     
-    for qid in query_ids:
-        query = get_query(qid)
-        if query is None:
-            print(f"Error: Query {qid} not found")
-            sys.exit(1)
+    try:
+        for qid in query_ids:
+            query = get_query(qid)
+            if query is None:
+                print(f"Error: Query {qid} not found")
+                sys.exit(1)
+            
+            if args.stream:
+                await runner.run_query_streaming(query)
+            else:
+                await runner.run_query(query)
         
-        await runner.run_query(query)
-    
-    report = runner.generate_report()
-    report_path = Path(args.output) / "stress_test_report.json"
-    with open(report_path, "w") as f:
-        json.dump(report, f, indent=2)
-    
-    print(f"\nReport: {report_path}")
-    print(f"Pass: {'✅' if report['pass'] else '❌'}")
+        report = runner.generate_report()
+        report_path = Path(args.output) / "stress_test_report.json"
+        with open(report_path, "w") as f:
+            json.dump(report, f, indent=2)
+        
+        print(f"\nReport: {report_path}")
+        print(f"Pass: {'✅' if report['pass'] else '❌'}")
+        
+    finally:
+        await runner.cleanup()
 
 
 if __name__ == "__main__":
