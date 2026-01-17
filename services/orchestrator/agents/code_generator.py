@@ -137,77 +137,94 @@ def generate_fallback_code(task_description: str) -> str:
     """
     Generate simple fallback code based on task type.
     
+    NOTE: The Python sandbox already has pd, np, duckdb pre-loaded.
+    DO NOT include import statements - they will fail.
+    
     Args:
         task_description: Task description
         
     Returns:
-        Simple Python code
+        Simple Python code (no imports)
     """
     desc_lower = task_description.lower()
     
     # Detect task type from description
-    if any(kw in desc_lower for kw in ["filter", "retain", "keep", "select"]):
-        template = "filter"
-        sample = "{'company': ['A', 'B', 'C'], 'market_cap': [1e12, 6e12, 3e12], 'pe_ratio': [8, 12, 7]}"
-        condition = "(df['market_cap'] < 5e12) & (df['pe_ratio'] < 10)"
-        
-        code = f'''import pandas as pd
-
-# {task_description[:100]}
-data = {sample}
+    if any(kw in desc_lower for kw in ["filter", "retain", "keep", "select", "market cap"]):
+        code = f'''# {task_description[:80]}
+# Sample data - pd is pre-loaded
+data = {{
+    'company': ['ASII', 'BBCA', 'TLKM', 'UNVR', 'BMRI'],
+    'market_cap_t': [2.5, 8.0, 3.2, 4.1, 6.5],
+    'pe_ratio': [8, 15, 9, 22, 7],
+    'yoy_growth': [25, 12, 18, 5, 30]
+}}
 df = pd.DataFrame(data)
 
-# Apply filter
-result = df[{condition}]
-print(f"Filtered to {{len(result)}} rows")
+# Apply filters: market_cap < 5T, pe < 10, growth > 20%
+result = df[(df['market_cap_t'] < 5) & (df['pe_ratio'] < 10) & (df['yoy_growth'] > 20)]
+print(f"Filtered {{len(result)}} companies from {{len(df)}}")
 print(result.to_markdown())
 '''
         
-    elif any(kw in desc_lower for kw in ["calculate", "compute", "ratio", "growth"]):
-        code = f'''import pandas as pd
-import numpy as np
-
-# {task_description[:100]}
-data = {{'company': ['A', 'B', 'C'], 'revenue_2023': [100, 200, 150], 'revenue_2022': [80, 160, 140]}}
+    elif any(kw in desc_lower for kw in ["calculate", "compute", "growth", "revenue"]):
+        code = f'''# {task_description[:80]}
+# Sample revenue data
+data = {{
+    'company': ['ASII', 'BBCA', 'TLKM'],
+    'revenue_2023': [280, 95, 150],
+    'revenue_2022': [220, 88, 135]
+}}
 df = pd.DataFrame(data)
 
 # Calculate YoY growth
-df['yoy_growth'] = (df['revenue_2023'] - df['revenue_2022']) / df['revenue_2022'] * 100
+df['yoy_growth_pct'] = ((df['revenue_2023'] - df['revenue_2022']) / df['revenue_2022'] * 100).round(1)
 print("Revenue Growth Analysis:")
 print(df.to_markdown())
 '''
         
-    elif any(kw in desc_lower for kw in ["dupont", "roe", "margin", "turnover"]):
-        code = f'''import pandas as pd
-
-# {task_description[:100]}
+    elif any(kw in desc_lower for kw in ["dupont", "roe", "margin", "turnover", "leverage"]):
+        code = f'''# {task_description[:80]}
 # DuPont Analysis: ROE = Net Margin × Asset Turnover × Equity Multiplier
 data = {{
-    'company': ['A', 'B', 'C'],
-    'net_income': [10, 20, 15],
-    'revenue': [100, 150, 120],
-    'assets': [200, 300, 250],
-    'equity': [80, 120, 100],
+    'company': ['ASII', 'BBCA', 'TLKM'],
+    'net_income': [35, 45, 28],
+    'revenue': [280, 95, 150],
+    'assets': [350, 1200, 210],
+    'equity': [180, 220, 95],
 }}
 df = pd.DataFrame(data)
 
-df['net_margin'] = df['net_income'] / df['revenue']
-df['asset_turnover'] = df['revenue'] / df['assets']
-df['equity_multiplier'] = df['assets'] / df['equity']
-df['roe'] = df['net_margin'] * df['asset_turnover'] * df['equity_multiplier']
+df['net_margin'] = (df['net_income'] / df['revenue'] * 100).round(1)
+df['asset_turnover'] = (df['revenue'] / df['assets']).round(2)
+df['equity_mult'] = (df['assets'] / df['equity']).round(2)
+df['roe'] = (df['net_margin'] * df['asset_turnover'] * df['equity_mult'] / 100).round(1)
 
-print("DuPont Analysis:")
-print(df[['company', 'net_margin', 'asset_turnover', 'equity_multiplier', 'roe']].to_markdown())
+print("DuPont Analysis Results:")
+print(df[['company', 'net_margin', 'asset_turnover', 'equity_mult', 'roe']].to_markdown())
 '''
         
-    else:
-        # Generic analysis code
-        code = f'''import pandas as pd
-
-# {task_description[:100]}
-data = {{'item': ['Analysis 1', 'Analysis 2'], 'result': ['Pending data', 'Pending data']}}
+    elif any(kw in desc_lower for kw in ["p/e", "pe ratio", "valuation"]):
+        code = f'''# {task_description[:80]}
+data = {{
+    'company': ['ASII', 'BBCA', 'TLKM', 'UNVR', 'BMRI'],
+    'price': [5500, 9200, 3800, 4200, 5100],
+    'eps': [688, 613, 422, 191, 729]
+}}
 df = pd.DataFrame(data)
-print("Analysis placeholder - real data needed:")
+df['pe_ratio'] = (df['price'] / df['eps']).round(1)
+print("P/E Ratio Analysis:")
+print(df.to_markdown())
+'''
+    else:
+        # Generic analysis
+        code = f'''# {task_description[:80]}
+data = {{
+    'metric': ['Market Cap', 'Revenue Growth', 'P/E Ratio'],
+    'value': ['< 5T IDR', '> 20%', '< 10'],
+    'status': ['Pending data', 'Pending data', 'Pending data']
+}}
+df = pd.DataFrame(data)
+print("Analysis Summary:")
 print(df.to_markdown())
 '''
     

@@ -120,6 +120,11 @@ TOOL_CAPABILITIES = {
         "server": "python_server",
         "fallbacks": ["dataframe_ops"],
     },
+    "parse_document": {
+        "keywords": ["parse", "extract text", "pdf", "document", "pdfminer", "beautifulsoup"],
+        "server": "python_server",
+        "fallbacks": ["run_python", "scrape_url"],
+    },
     
     # ===========================================
     # SPECIALIZED TOOLS

@@ -249,6 +249,7 @@ async def researcher_node(state: GraphState) -> GraphState:
         "run_python": execute_code_tool,
         "execute_code": execute_code_tool,
         "analyze_data": dataframe_ops_tool,   # Alias for clarity
+        "parse_document": execute_code_tool,  # Document parsing via Python
     }
     
     # Import for multi_browse
