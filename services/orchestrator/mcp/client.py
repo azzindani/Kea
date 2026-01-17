@@ -63,10 +63,31 @@ class MCPOrchestrator:
         result = await orchestrator.call_tool("fetch_url", {"url": "https://example.com"})
     """
     
+    
+    # Singleton instance
+    _instance: MCPOrchestrator | None = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(MCPOrchestrator, cls).__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+    
     def __init__(self) -> None:
+        if getattr(self, "_initialized", False):
+            return
+            
         self._servers: dict[str, MCPServerConnection] = {}
         self._tool_registry: dict[str, str] = {}  # tool_name -> server_name
+        self._initialized = True
     
+    @classmethod
+    def get_instance(cls) -> MCPOrchestrator:
+        """Get the singleton instance."""
+        if cls._instance is None:
+            cls._instance = MCPOrchestrator()
+        return cls._instance
+        
     @property
     def tools(self) -> list[Tool]:
         """Get all available tools from all servers."""
@@ -254,21 +275,60 @@ class MCPOrchestrator:
         return final_results
     
     async def stop_servers(self) -> None:
-        """Stop all MCP server processes."""
+        """
+        Stop all MCP server processes.
+        
+        Prioritizes graceful termination, falls back to kill.
+        """
         for name, server in self._servers.items():
             try:
                 if server.client:
-                    await server.client.close()
+                    # Best effort to close client
+                    try:
+                        await asyncio.wait_for(server.client.close(), timeout=2.0)
+                    except Exception:
+                        pass
                 
                 if server.process:
+                    # Graceful terminate
                     server.process.terminate()
-                    server.process.wait(timeout=5)
+                    try:
+                        server.process.wait(timeout=5)
+                        logger.info(f"Gracefully stopped MCP server: {name}")
+                    except subprocess.TimeoutExpired:
+                        # Force kill
+                        logger.warning(f"Force killing hung server: {name}")
+                        server.process.kill()
+                        server.process.wait()
                 
                 server.is_connected = False
-                logger.info(f"Stopped MCP server: {name}")
                 
             except Exception as e:
                 logger.error(f"Error stopping {name}: {e}")
         
         self._servers.clear()
         self._tool_registry.clear()
+
+
+# ============================================================================
+# Singleton Accessor
+# ============================================================================
+
+_orchestrator_instance: MCPOrchestrator | None = None
+
+
+def get_mcp_orchestrator() -> MCPOrchestrator:
+    """
+    Get or create global MCP orchestrator instance.
+    
+    Returns:
+        MCPOrchestrator instance
+    """
+    global _orchestrator_instance
+    if _orchestrator_instance is None:
+        _orchestrator_instance = MCPOrchestrator()
+    return _orchestrator_instance
+
+
+
+

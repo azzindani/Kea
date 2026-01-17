@@ -127,10 +127,11 @@ class CrawlerServer(MCPServerBase):
         from bs4 import BeautifulSoup
         
         start_url = args["start_url"]
-        max_depth = min(args.get("max_depth", 2), 5)
-        max_pages = min(args.get("max_pages", 20), 100)
+        # Allow unlimited depth - user/LLM can specify any value
+        max_depth = args.get("max_depth", 5)  # Default 5, no upper limit
+        max_pages = args.get("max_pages", 100)  # Default 100, can go to 1000+
         same_domain = args.get("same_domain", True)
-        delay = args.get("delay", 1.0)
+        delay = args.get("delay", 0.5)  # Faster default
         
         base_domain = urlparse(start_url).netloc
         

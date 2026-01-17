@@ -14,38 +14,30 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field
 
 from services.orchestrator.core.graph import compile_research_graph, GraphState
-from services.orchestrator.mcp.client import MCPOrchestrator
+from services.orchestrator.mcp.client import get_mcp_orchestrator
 from shared.config import get_settings
-from shared.schemas import JobRequest, JobResponse, ResearchStatus
-from shared.logging import setup_logging, get_logger, LogConfig
+from shared.logging import get_logger
 from shared.logging.middleware import RequestLoggingMiddleware
-
+from shared.schemas import ResearchStatus
 
 logger = get_logger(__name__)
 
 # Global state
-mcp_orchestrator: MCPOrchestrator | None = None
+mcp_orchestrator = None
 research_graph = None
-
+server_configs = []
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan manager."""
-    global mcp_orchestrator, research_graph
+    """Lifecycle manager for the FastAPI app."""
+    global mcp_orchestrator, research_graph, server_configs
     
     settings = get_settings()
-    
-    # Setup logging
-    setup_logging(LogConfig(
-        level=settings.log_level,
-        format=settings.log_format,
-        service_name="orchestrator",
-    ))
     
     logger.info("Starting Orchestrator service")
     
     # Initialize MCP orchestrator
-    mcp_orchestrator = MCPOrchestrator()
+    mcp_orchestrator = get_mcp_orchestrator()
     
     # Start MCP servers based on config
     server_configs = [

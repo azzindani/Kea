@@ -407,9 +407,9 @@ class BrowserAgentServer(MCPServerBase):
         import httpx
         from bs4 import BeautifulSoup
         
-        urls = args["urls"][:10]  # Max 10
+        urls = args["urls"][:50]  # Allow up to 50 URLs
         extract = args.get("extract", "summary")
-        max_concurrent = min(args.get("max_concurrent", 3), 5)
+        max_concurrent = min(args.get("max_concurrent", 10), 20)  # Up to 20 parallel
         
         result = f"# 🌐 Multi-Site Browse\n\n"
         result += f"**URLs**: {len(urls)}\n"

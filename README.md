@@ -17,46 +17,45 @@ Kea adopts the **Model Context Protocol (MCP)** as its universal tool calling in
 
 ```mermaid
 graph TD
-    %% --- STYLES ---
-    classDef orchestrator fill:#2d3436,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef mcp fill:#0984e3,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef tool fill:#00b894,stroke:#333,stroke-width:2px,color:#fff;
-    classDef transport fill:#fdcb6e,stroke:#333,stroke-width:2px,color:#333;
-
-    %% --- THE BRAIN ---
-    Orchestrator["🧠 Orchestrator<br/>(MCP Client)"]:::orchestrator
-
-    %% --- MCP TRANSPORT LAYER ---
-    subgraph MCPLayer ["MCP Transport Layer (JSON-RPC 2.0)"]
-        Router{{"🔀 MCP Router<br/>(Parallel Dispatcher)"}}:::mcp
-        
-        Router -->|stdio| MCP1["🕷️ Scraper Server"]:::mcp
-        Router -->|stdio| MCP2["🐍 Python Server"]:::mcp
-        Router -->|stdio| MCP3["👁️ Vision Server"]:::mcp
-        Router -->|SSE| MCP4["📊 Analysis Server"]:::mcp
-        Router -->|stdio| MCP5["🔍 Search Server"]:::mcp
-    end
-
-    %% --- TOOL IMPLEMENTATIONS ---
-    subgraph Tools ["Tool Implementations"]
-        MCP1 --> T1["Playwright<br/>BeautifulSoup"]:::tool
-        MCP2 --> T2["Pandas<br/>DuckDB"]:::tool
-        MCP3 --> T3["GPT-4o Vision<br/>Gemini Vision"]:::tool
-        MCP4 --> T4["Statistical<br/>ML Models"]:::tool
-        MCP5 --> T5["Tavily<br/>Brave Search"]:::tool
-    end
-
-    %% --- CONNECTIONS ---
-    Orchestrator -->|"tools/list"| Router
-    Orchestrator -->|"tools/call (parallel)"| Router
+    Orchestrator["Orchestrator - MCP Client<br/>(services/orchestrator/mcp/client.py)"]
+    Router["MCP Router - Parallel Dispatcher<br/>(services/orchestrator/mcp/parallel_executor.py)"]
     
-    %% --- RESPONSE FLOW ---
-    T1 -->|Result| MCP1
-    T2 -->|Result| MCP2
-    T3 -->|Result| MCP3
-    T4 -->|Result| MCP4
-    T5 -->|Result| MCP5
+    Orchestrator --> Router
+    
+    subgraph Core[Core Servers]
+        S1["scraper_server<br/>(mcp_servers/scraper_server)"]
+        S2["search_server<br/>(mcp_servers/search_server)"]
+        S3["python_server<br/>(mcp_servers/python_server)"]
+        S4["vision_server<br/>(mcp_servers/vision_server)"]
+    end
+    
+    subgraph Data[Data and Analytics]
+        D1["data_sources_server<br/>(mcp_servers/data_sources_server)"]
+        D2["analytics_server<br/>(mcp_servers/analytics_server)"]
+        D3["ml_server<br/>(mcp_servers/ml_server)"]
+        D4["visualization_server<br/>(mcp_servers/visualization_server)"]
+    end
+    
+    subgraph Domain[Domain-Specific]
+        X1["academic_server<br/>(mcp_servers/academic_server)"]
+        X2["regulatory_server<br/>(mcp_servers/regulatory_server)"]
+        X3["document_server<br/>(mcp_servers/document_server)"]
+        X4["qualitative_server<br/>(mcp_servers/qualitative_server)"]
+    end
+    
+    subgraph Utility[Utility Servers]
+        U1["crawler_server<br/>(mcp_servers/crawler_server)"]
+        U2["browser_agent_server<br/>(mcp_servers/browser_agent_server)"]
+        U3["security_server<br/>(mcp_servers/security_server)"]
+        U4["tool_discovery_server<br/>(mcp_servers/tool_discovery_server)"]
+    end
+    
+    Router --> Core
+    Router --> Data
+    Router --> Domain
+    Router --> Utility
 ```
+
 
 ### MCP Message Flow
 
@@ -165,381 +164,162 @@ roles:
 
 ```
 kea/
-├── 📁 services/                              # Microservices (The Core)
+├── 📁 services/                                # Microservices (The Core)
 │   │
-│   ├── 📁 orchestrator/                      # 🧠 The Brain - Main Orchestrator (MCP Client)
-│   │   ├── __init__.py
-│   │   ├── main.py                           # FastAPI entrypoint
-│   │   ├── config.py                         # Environment & mode detection
-│   │   ├── 📁 core/
-│   │   │   ├── __init__.py
-│   │   │   ├── graph.py                      # LangGraph cyclic state machine
-│   │   │   ├── router.py                     # Intention Router (Path A/B/C/D)
-│   │   │   └── consensus.py                  # Adversarial Collaboration Engine
-│   │   ├── 📁 mcp/                           # ⚡ MCP Client Implementation
-│   │   │   ├── __init__.py
-│   │   │   ├── client.py                     # MCP Client (JSON-RPC 2.0)
-│   │   │   ├── registry.py                   # Tool registry & discovery
-│   │   │   ├── parallel_executor.py          # Parallel tool invocation manager
-│   │   │   └── session_manager.py            # MCP session lifecycle
-│   │   ├── 📁 nodes/                         # LangGraph Nodes
-│   │   │   ├── __init__.py
-│   │   │   ├── planner.py                    # 📝 Planner & Decomposer
-│   │   │   ├── keeper.py                     # 🛡️ The Keeper (Context Guard)
-│   │   │   ├── divergence.py                 # ✨ Divergence Engine (Abductive)
-│   │   │   ├── synthesizer.py                # ✍️ Report Synthesizer
-│   │   │   └── architect.py                  # 🏗️ Meta-Prompt Layer
-│   │   ├── 📁 agents/                        # Specialized Worker Agents
-│   │   │   ├── __init__.py
-│   │   │   ├── generator.py                  # 🤠 The Optimist
-│   │   │   ├── critic.py                     # 🧐 The Pessimist
-│   │   │   └── judge.py                      # ⚖️ The Synthesizer
-│   │   └── 📁 state/
-│   │       ├── __init__.py
-│   │       └── models.py                     # Pydantic state schemas
+│   ├── 📁 orchestrator/                        # 🧠 The Brain - Main Orchestrator
+│   │   ├── main.py                             # FastAPI entrypoint
+│   │   │
+│   │   ├── 📁 core/                            # Core Research Pipeline
+│   │   │   ├── pipeline.py                     # ConversationResearchPipeline (entry point)
+│   │   │   ├── graph.py                        # LangGraph cyclic state machine
+│   │   │   ├── router.py                       # Intention Router (Path A/B/C/D)
+│   │   │   ├── query_classifier.py             # Query intent classification
+│   │   │   ├── consensus.py                    # Adversarial Collaboration Engine
+│   │   │   ├── context_cache.py                # L1/L2 caching for research
+│   │   │   ├── audit_trail.py                  # SQLite audit logging
+│   │   │   ├── agent_spawner.py                # TaskDecomposer & parallel agents
+│   │   │   ├── prompt_factory.py               # Dynamic system prompts (7 domains)
+│   │   │   ├── conversation.py                 # Intent detection (DEEPER/REVISE/NEW)
+│   │   │   ├── curiosity.py                    # WHY/WHAT-IF generation
+│   │   │   ├── degradation.py                  # GracefulDegrader for low resources
+│   │   │   ├── recovery.py                     # @retry, CircuitBreaker
+│   │   │   ├── supervisor.py                   # Agent supervision
+│   │   │   ├── compliance.py                   # Regulatory compliance checks
+│   │   │   ├── approval_workflow.py            # Human-in-the-loop approvals
+│   │   │   ├── kill_switch.py                  # Emergency stop
+│   │   │   ├── modality.py                     # Multi-modal routing
+│   │   │   └── checkpointing.py                # Job state persistence
+│   │   │
+│   │   ├── 📁 mcp/                             # ⚡ MCP Client Implementation
+│   │   │   ├── client.py                       # MCPOrchestrator (tool calls)
+│   │   │   ├── registry.py                     # Tool registry & discovery
+│   │   │   └── parallel_executor.py            # Parallel tool invocation
+│   │   │
+│   │   ├── 📁 nodes/                           # LangGraph Nodes (LLM-connected)
+│   │   │   ├── planner.py                      # 📝 Query decomposition (uses LLM)
+│   │   │   ├── keeper.py                       # 🛡️ Context drift guard
+│   │   │   ├── divergence.py                   # ✨ Abductive reasoning
+│   │   │   └── synthesizer.py                  # ✍️ Report generation
+│   │   │
+│   │   └── 📁 agents/                          # Consensus Agents (LLM-connected)
+│   │       ├── generator.py                    # 🤠 The Optimist
+│   │       ├── critic.py                       # 🧐 The Pessimist
+│   │       └── judge.py                        # ⚖️ The Synthesizer
 │   │
-│   ├── 📁 rag_service/                       # 💾 The Memory Vault
-│   │   ├── __init__.py
-│   │   ├── main.py                           # FastAPI/gRPC entrypoint
-│   │   ├── config.py
-│   │   ├── 📁 core/
-│   │   │   ├── __init__.py
-│   │   │   ├── vector_store.py               # Qdrant/Chroma abstraction
-│   │   │   ├── graph_store.py                # GraphRAG relationships
-│   │   │   └── artifact_store.py             # S3/Parquet blob storage
-│   │   ├── 📁 schemas/
-│   │   │   ├── __init__.py
-│   │   │   ├── atomic_fact.py                # Atomic Fact Schema
-│   │   │   └── session.py                    # Conversation Project Schema
-│   │   └── 📁 api/
-│   │       ├── __init__.py
-│   │       ├── search.py                     # Semantic search endpoints
-│   │       ├── provenance.py                 # Provenance graph endpoints
-│   │       └── artifacts.py                  # Artifact download/preview
+│   ├── 📁 rag_service/                         # 💾 The Memory Vault
+│   │   ├── main.py                             # FastAPI entrypoint
+│   │   └── 📁 core/
+│   │       ├── vector_store.py                 # Qdrant abstraction
+│   │       └── artifact_store.py               # Blob storage
 │   │
-│   └── 📁 api_gateway/                       # 🚪 The Front Door
-│       ├── __init__.py
-│       ├── main.py                           # FastAPI gateway
-│       ├── config.py
-│       ├── 📁 routes/
-│       │   ├── __init__.py
-│       │   ├── jobs.py                       # /api/v1/jobs (Job Dispatcher)
-│       │   ├── memory.py                     # /api/v1/memory (Knowledge Brain)
-│       │   ├── artifacts.py                  # /api/v1/artifacts
-│       │   ├── interventions.py              # /api/v1/interventions (HITL)
-│       │   ├── system.py                     # /api/v1/system (Capabilities)
-│       │   ├── llm.py                        # /api/v1/llm (Provider Management)
-│       │   └── mcp.py                        # /api/v1/mcp (Tool Management)
-│       ├── 📁 middleware/
-│       │   ├── __init__.py
-│       │   ├── auth.py                       # JWT Bearer Token
-│       │   ├── rate_limit.py                 # API rate limiting
-│       │   └── request_id.py                 # Request correlation IDs
-│       └── 📁 schemas/
-│           ├── __init__.py
-│           ├── job.py                        # Job request/response models
-│           └── response.py                   # Standard API responses
+│   └── 📁 api_gateway/                         # 🚪 The Front Door
+│       ├── main.py                             # FastAPI gateway
+│       ├── 📁 routes/                          # 8 route modules
+│       │   ├── jobs.py                         # /api/v1/jobs
+│       │   ├── memory.py                       # /api/v1/memory
+│       │   ├── research.py                     # /api/v1/research
+│       │   └── ...
+│       └── 📁 middleware/
+│           ├── auth.py                         # JWT authentication
+│           └── rate_limit.py                   # API rate limiting
 │
-├── 📁 mcp_servers/                           # 🔌 MCP Tool Servers (Parallel Hands)
-│   │
-│   ├── 📁 scraper_server/                    # 🕷️ Web Scraping MCP Server
-│   │   ├── __init__.py
-│   │   ├── server.py                         # MCP server entrypoint (stdio/SSE)
-│   │   ├── config.py
-│   │   ├── 📁 tools/
-│   │   │   ├── __init__.py
-│   │   │   ├── fetch_url.py                  # Simple HTTP fetch
-│   │   │   ├── browser_scrape.py             # Playwright headless scraping
-│   │   │   ├── batch_scrape.py               # Parallel URL batch processing
-│   │   │   └── pdf_extract.py                # PDF text/table extraction
-│   │   ├── 📁 stealth/
-│   │   │   ├── __init__.py
-│   │   │   ├── proxy_rotator.py              # Residential proxy management
-│   │   │   ├── ua_rotator.py                 # User-Agent spoofing
-│   │   │   ├── fingerprint.py                # Browser fingerprint randomization
-│   │   │   └── rate_limiter.py               # Domain-level throttling
-│   │   └── manifest.json                     # MCP tool definitions
-│   │
-│   ├── 📁 python_server/                     # 🐍 Python Execution MCP Server
-│   │   ├── __init__.py
-│   │   ├── server.py                         # MCP server entrypoint
-│   │   ├── config.py
-│   │   ├── 📁 tools/
-│   │   │   ├── __init__.py
-│   │   │   ├── execute_code.py               # Sandboxed Python execution
-│   │   │   ├── dataframe_ops.py              # Pandas DataFrame operations
-│   │   │   ├── sql_query.py                  # DuckDB SQL queries
-│   │   │   └── statistical.py                # Statistical analysis functions
-│   │   ├── 📁 sandbox/
-│   │   │   ├── __init__.py
-│   │   │   ├── docker_runner.py              # Docker container isolation
-│   │   │   ├── e2b_runner.py                 # E2B cloud sandbox
-│   │   │   └── local_runner.py               # Local subprocess (dev only)
-│   │   └── manifest.json                     # MCP tool definitions
-│   │
-│   ├── 📁 vision_server/                     # �️ Vision/OCR MCP Server
-│   │   ├── __init__.py
-│   │   ├── server.py                         # MCP server entrypoint
-│   │   ├── config.py
-│   │   ├── 📁 tools/
-│   │   │   ├── __init__.py
-│   │   │   ├── screenshot_extract.py         # Screenshot → structured data
-│   │   │   ├── chart_reader.py               # Chart/graph interpretation
-│   │   │   ├── table_ocr.py                  # Table structure extraction
-│   │   │   └── document_vision.py            # Full document understanding
-│   │   └── manifest.json                     # MCP tool definitions
-│   │
-│   ├── 📁 search_server/                     # 🔍 Web Search MCP Server
-│   │   ├── __init__.py
-│   │   ├── server.py                         # MCP server entrypoint
-│   │   ├── config.py
-│   │   ├── 📁 tools/
-│   │   │   ├── __init__.py
-│   │   │   ├── web_search.py                 # Tavily/Brave/SerpAPI search
-│   │   │   ├── news_search.py                # News-specific search
-│   │   │   ├── academic_search.py            # Semantic Scholar/arXiv
-│   │   │   └── site_search.py                # Domain-restricted search
-│   │   └── manifest.json                     # MCP tool definitions
-│   │
-│   ├── 📁 analysis_server/                   # 📊 Analysis MCP Server
-│   │   ├── __init__.py
-│   │   ├── server.py                         # MCP server entrypoint (SSE for streaming)
-│   │   ├── config.py
-│   │   ├── 📁 tools/
-│   │   │   ├── __init__.py
-│   │   │   ├── meta_analysis.py              # Cross-source meta-analysis
-│   │   │   ├── trend_detection.py            # Time-series trend analysis
-│   │   │   ├── anomaly_detection.py          # Outlier/anomaly detection
-│   │   │   └── comparative.py                # Comparative analysis tools
-│   │   └── manifest.json                     # MCP tool definitions
-│   │
-│   └── 📁 _template_server/                  # 📝 Template for new MCP servers
-│       ├── __init__.py
-│       ├── server.py                         # Boilerplate MCP server
-│       ├── config.py
-│       ├── 📁 tools/
-│       │   ├── __init__.py
-│       │   └── example_tool.py               # Example tool implementation
-│       └── manifest.json                     # MCP tool schema template
+├── 📁 mcp_servers/                             # 🔌 17 MCP Tool Servers
+│   ├── 📁 scraper_server/                      # 🕷️ Web scraping (fetch, browser, PDF)
+│   ├── 📁 python_server/                       # 🐍 Code execution (sandbox)
+│   ├── 📁 search_server/                       # 🔍 Web search (Tavily, Brave)
+│   ├── 📁 vision_server/                       # 👁️ OCR & chart reading
+│   ├── 📁 analysis_server/                     # 📊 Statistical analysis
+│   ├── 📁 academic_server/                     # 📚 Semantic Scholar, arXiv
+│   ├── 📁 document_server/                     # 📄 Document processing
+│   ├── 📁 crawler_server/                      # 🕸️ Site crawling
+│   ├── 📁 data_sources_server/                 # 📡 External APIs
+│   ├── 📁 regulatory_server/                   # ⚖️ Legal/regulatory data
+│   ├── 📁 analytics_server/                    # 📈 Data analytics
+│   ├── 📁 ml_server/                           # 🤖 ML model inference
+│   ├── 📁 qualitative_server/                  # 📋 Qualitative analysis
+│   ├── 📁 browser_agent_server/                # 🌐 Browser automation
+│   ├── 📁 security_server/                     # 🔒 Security scanning
+│   ├── 📁 visualization_server/                # 📉 Chart generation
+│   └── 📁 tool_discovery_server/               # 🔎 Dynamic tool discovery
 │
-├── 📁 shared/                                # Shared Utilities & Contracts
-│   ├── __init__.py
-│   ├── 📁 mcp/                               # 🔌 MCP SDK & Utilities
-│   │   ├── __init__.py
-│   │   ├── protocol.py                       # JSON-RPC 2.0 message types
-│   │   ├── transport.py                      # stdio/SSE transport abstractions
-│   │   ├── server_base.py                    # Base MCP server class
-│   │   ├── client_base.py                    # Base MCP client class
-│   │   └── schemas.py                        # Tool/Resource/Prompt schemas
-│   ├── 📁 llm/
-│   │   ├── __init__.py
-│   │   ├── provider.py                       # LLM provider abstraction
-│   │   ├── openai.py
-│   │   ├── gemini.py
-│   │   └── anthropic.py
-│   ├── 📁 queue/
-│   │   ├── __init__.py
-│   │   ├── base.py                           # Queue abstraction
-│   │   ├── redis_queue.py                    # Production Redis queue
-│   │   └── memory_queue.py                   # Local threading queue
-│   ├── 📁 storage/
-│   │   ├── __init__.py
-│   │   ├── base.py                           # Storage abstraction
-│   │   ├── s3.py                             # S3/MinIO storage
-│   │   └── local.py                          # Local filesystem
-│   ├── 📁 database/
-│   │   ├── __init__.py
-│   │   ├── base.py                           # DB abstraction
-│   │   ├── postgres.py                       # Production PostgreSQL
-│   │   └── sqlite.py                         # Local SQLite
-│   └── 📁 logging/                           # 📊 Standardized Logging Infrastructure
-│       ├── __init__.py
-│       ├── config.py                         # Logging configuration
-│       ├── structured.py                     # Structured JSON logging
-│       ├── context.py                        # Context propagation (trace_id, span_id)
-│       ├── formatters.py                     # Log formatters (JSON, Console, File)
-│       ├── handlers.py                       # Custom log handlers
-│       ├── middleware.py                     # FastAPI/MCP logging middleware
-│       ├── decorators.py                     # @log_execution, @trace decorators
-│       ├── metrics.py                        # Prometheus metrics integration
-│       └── exporters.py                      # OpenTelemetry exporters (Jaeger, Zipkin)
+├── 📁 shared/                                  # Shared Utilities
+│   ├── 📁 llm/                                 # LLM Provider (OpenRouter, Gemini)
+│   │   ├── provider.py                         # Abstract LLM interface
+│   │   └── openrouter.py                       # OpenRouter implementation
+│   ├── 📁 mcp/                                 # MCP Protocol SDK
+│   │   ├── protocol.py                         # JSON-RPC 2.0 types
+│   │   └── tool_router.py                      # 1000+ tool routing
+│   ├── 📁 hardware/                            # Hardware detection
+│   │   └── detector.py                         # CPU/RAM/GPU detection
+│   ├── 📁 logging/                             # Structured logging
+│   │   ├── structured.py                       # JSON/Console formatters
+│   │   └── metrics.py                          # Prometheus metrics
+│   ├── 📁 database/                            # Database abstraction
+│   ├── 📁 storage/                             # S3/local storage
+│   ├── 📁 embedding/                           # Embedding models
+│   ├── 📁 conversations/                       # Conversation management
+│   ├── 📁 tools/                               # JIT tool loader
+│   └── environment.py                          # Environment config
 │
-├── 📁 workers/                               # Background Job Workers
-│   ├── __init__.py
-│   ├── research_worker.py                    # Deep Research job processor
-│   ├── synthesis_worker.py                   # Grand Synthesis job processor
-│   └── shadow_lab_worker.py                  # Shadow Lab job processor
+├── 📁 workers/                                 # Background Workers
+│   ├── research_worker.py                      # Deep Research processor
+│   ├── synthesis_worker.py                     # Grand Synthesis processor
+│   └── shadow_lab_worker.py                    # Recalculation processor
 │
-├── 📁 tests/                                 # Test Suite
-│   ├── 📁 unit/
-│   │   ├── 📁 orchestrator/
-│   │   │   ├── test_router.py
-│   │   │   ├── test_planner.py
-│   │   │   ├── test_keeper.py
-│   │   │   ├── test_consensus.py
-│   │   │   └── test_mcp_client.py            # MCP client tests
-│   │   ├── 📁 mcp_servers/
-│   │   │   ├── test_scraper_server.py
-│   │   │   ├── test_python_server.py
-│   │   │   ├── test_vision_server.py
-│   │   │   └── test_search_server.py
-│   │   ├── 📁 rag_service/
-│   │   │   ├── test_vector_store.py
-│   │   │   └── test_artifact_store.py
-│   │   └── 📁 shared/
-│   │       ├── test_logging.py               # Logging infrastructure tests
-│   │       └── test_mcp_protocol.py          # MCP protocol tests
-│   ├── 📁 integration/
-│   │   ├── test_job_lifecycle.py             # Full job flow (submit → complete)
-│   │   ├── test_memory_fork.py               # Path A: Incremental research
-│   │   ├── test_shadow_lab.py                # Path B: Recalculation
-│   │   ├── test_grand_synthesis.py           # Path C: Meta-analysis
-│   │   ├── test_deep_research.py             # Path D: Zero-shot
-│   │   ├── test_mcp_parallel.py              # Parallel MCP tool execution
-│   │   └── test_logging_pipeline.py          # End-to-end logging tests
-│   ├── 📁 e2e/
-│   │   ├── test_api_gateway.py               # Full API flow tests
-│   │   ├── test_human_intervention.py        # HITL workflow tests
-│   │   └── test_checkpoint_recovery.py       # Crash recovery tests
-│   ├── 📁 fixtures/
-│   │   ├── sample_documents/                 # Test PDFs, CSVs
-│   │   ├── mock_responses/                   # Mocked LLM/API responses
-│   │   ├── parquet_samples/                  # Sample artifact files
-│   │   └── mcp_mocks/                        # Mocked MCP server responses
-│   └── conftest.py                           # Pytest fixtures & configuration
+├── 📁 tests/                                   # Test Suite
+│   ├── 📁 unit/                                # Unit tests
+│   ├── 📁 integration/                         # Integration tests
+│   ├── 📁 stress/                              # Stress tests
+│   └── conftest.py                             # Pytest configuration
 │
-├── 📁 scripts/                               # Utility Scripts
-│   ├── setup_local.py                        # Local development setup
-│   ├── run_tests.py                          # Test runner with coverage
-│   ├── migrate_db.py                         # Database migration script
-│   ├── start_mcp_servers.py                  # Launch all MCP servers
-│   └── log_viewer.py                         # CLI log viewer/analyzer
+├── 📁 configs/                                 # Configuration Files
+│   ├── mcp_servers.yaml                        # MCP server registry
+│   ├── tools.yaml                              # Tool dependencies (JIT)
+│   └── logging.yaml                            # Logging configuration
 │
-├── 📁 deployment/                            # Deployment Configurations
-│   ├── 📁 docker/
-│   │   ├── Dockerfile.orchestrator
-│   │   ├── Dockerfile.rag
-│   │   ├── Dockerfile.gateway
-│   │   ├── Dockerfile.mcp-scraper
-│   │   ├── Dockerfile.mcp-python
-│   │   ├── Dockerfile.mcp-vision
-│   │   ├── Dockerfile.mcp-search
-│   │   └── Dockerfile.mcp-analysis
-│   ├── docker-compose.yml                    # Full stack local
-│   ├── docker-compose.dev.yml                # Development overrides
-│   ├── docker-compose.mcp.yml                # MCP servers only
-│   ├── 📁 k8s/                               # Kubernetes manifests
-│   │   ├── orchestrator.yaml
-│   │   ├── rag-service.yaml
-│   │   ├── mcp-servers.yaml                  # MCP server deployments
-│   │   ├── logging-stack.yaml                # Loki/Promtail/Grafana
-│   │   └── ingress.yaml
-│   └── 📁 logging/                           # Logging Infrastructure Configs
-│       ├── promtail-config.yaml              # Log collection
-│       ├── loki-config.yaml                  # Log aggregation
-│       ├── grafana-dashboards/               # Pre-built dashboards
-│       │   ├── mcp-tools.json
-│       │   ├── orchestrator.json
-│       │   └── api-gateway.json
-│       └── alerting-rules.yaml               # Alert definitions
-│
-├── 📁 docs/                                  # Extended Documentation
-│   ├── ARCHITECTURE.md                       # Detailed architecture (mirror)
-│   ├── API_REFERENCE.md                      # Full API documentation
-│   ├── MCP_GUIDE.md                          # MCP tool development guide
-│   ├── LOGGING_GUIDE.md                      # Logging standards & usage
-│   ├── DEVELOPMENT.md                        # Developer guide
-│   └── DEPLOYMENT.md                         # Production deployment guide
-│
-├── 📁 configs/                               # Configuration Files
-│   ├── mcp_servers.yaml                      # MCP server registry
-│   ├── logging.yaml                          # Logging configuration
-│   └── rate_limits.yaml                      # Rate limiting rules
-│
-├── .env.example                              # Environment template
-├── pyproject.toml                            # Python dependencies (Poetry)
-├── README.md                                 # This file
-└── Makefile                                  # Common development commands
+├── docker-compose.yml                          # Full stack local
+├── pyproject.toml                              # Python dependencies
+└── README.md                                   # This file
+
+```
 
 ---
 
 ## 📋 Development Status
 
-### ✅ v1.0 Complete
-All foundation phases have been completed:
+### ✅ Current State (v2.8)
 
-| Phase | Status | Key Deliverables |
-|:------|:------:|:-----------------|
-| **Phase 0-1** | ✅ | Project scaffolding, logging infrastructure |
-| **Phase 2** | ✅ | 14 MCP tools across 5 servers |
-| **Phase 3** | ✅ | Orchestrator with LangGraph, MCP Client |
-| **Phase 4** | ✅ | RAG Service with vector store |
-| **Phase 5** | ✅ | API Gateway with 8 route modules |
-| **Phase 6** | ✅ | 3 background workers |
-| **Phase 7** | ✅ | 79+ test files, pytest configuration |
-| **Phase 8** | ✅ | Docker deployment, Prometheus/Grafana |
+All core components implemented and functional:
 
----
+| Component | Status | Description |
+|:----------|:------:|:------------|
+| **Orchestrator** | ✅ | LangGraph state machine, research pipeline |
+| **17 MCP Servers** | ✅ | Scraper, Python, Search, Vision, Analysis, + 12 more |
+| **LLM Integration** | ✅ | OpenRouter, query classification, agent personas |
+| **Hardware Adaptation** | ✅ | Auto-detect CPU/RAM/GPU, graceful degradation |
+| **Agent System** | ✅ | Generator/Critic/Judge consensus, agent spawning |
+| **Conversational Memory** | ✅ | Intent detection (DEEPER/REVISE/NEW), context injection |
+| **Curiosity Engine** | ✅ | WHY questions, WHAT-IF scenarios |
+| **Audit Trail** | ✅ | SQLite logging, checkpointing |
+| **API Gateway** | ✅ | 8 route modules, JWT auth, rate limiting |
+| **Test Suite** | ✅ | Unit, integration, stress tests |
 
-## 🚀 v2.0 Roadmap (NEXT)
+### Known Limitations
 
-### Vision
-Transform Kea into a **systemic, self-adapting research automation engine** that operates like a corporation with 100K specialized employees.
+1. **Hybrid Tool Implementation**: While the architecture is MCP-first, the core research loop currently uses direct imports for critical tools (Search) for performance optimization.
+2. **Environment Specificity**: MCP Server auto-start in `main.py` assumes a standard environment; Docker setups may require adjusting `mcp_servers.yaml`.
 
-### 🏗️ Core Architecture Principles
+### 🏗️ Architecture Principles
 
 | Principle | Description |
 |-----------|-------------|
-| **Systemic AI** | Not single persona—self-multiplying agent swarm with dynamic system prompts |
-| **ARM Modularity** | LangGraph core + optional MCP tool extensions (like ARM unified chips) |
-| **JIT Dependencies** | `uv` on-demand package install (no 1000-package requirements.txt) |
-| **Tool Isolation** | Each MCP server runs in own process (avoids dependency conflicts) |
-| **Hardware Efficiency** | Must run on VPS KVM2 / Colab Free / Kaggle |
-| **Text-First** | Multimodal via Gemini later, text focus now |
-| **Self-Evolution** | Build own knowledge base, store learned parsers to HuggingFace |
-| **Conversational** | Follow-up, not restart—detect intent (DEEPER/REVISE/NEW_TOPIC) |
-| **Smart Context** | Inject relevant facts + pointers, not entire datasets |
-| **Curiosity-Driven** | Proactive WHY questions, WHAT-IF scenarios, anomaly detection |
-
-### v2.1: Core Orchestrator Hardening ✅ COMPLETE
-- `shared/hardware/` - Resource monitor (RAM/CPU/GPU tracking)
-- `services/orchestrator/core/degradation.py` - GracefulDegrader, throttling
-- `services/orchestrator/core/recovery.py` - @retry, CircuitBreaker
-
-### v2.2: JIT Dependencies + Tool Isolation ✅ COMPLETE
-- `shared/tools/jit_loader.py` - `uv` integration for on-demand install
-- `configs/tools.yaml` - Tool dependency manifest (30+ tools)
-- `shared/tools/isolation.py` - Process isolation, LazyToolLoader
-
-### v2.3: System Prompt Factory ✅ COMPLETE
-- `services/orchestrator/core/prompt_factory.py`
-- 7 domains (Finance/Medical/Legal/Engineering/Academic/Data/General)
-- 8 task types (Research/Analysis/Summarize/Compare/Extract/Validate/Forecast/Explain)
-
-### v2.4: Agent Spawner/Scaler ✅ COMPLETE
-- `services/orchestrator/core/agent_spawner.py`
-- TaskDecomposer with entity/aspect/comparison strategies
-- Parallel agent execution with semaphore control
-
-### v2.5: HuggingFace Persistence ✅ COMPLETE
-- `shared/storage/hf_sync.py`
-- Job checkpoints, parser storage, config backup
-
-### v2.6: 1000+ Tool Routing ✅ COMPLETE
-- `shared/mcp/tool_router.py`
-- ToolIndex with 12 categories, semantic matching
-- Lazy loading integration
-
-### v2.7: Conversational Memory ✅ COMPLETE
-- `services/orchestrator/core/conversation.py`
-- 7 intents (FOLLOW_UP/DEEPER/REVISE/NEW_TOPIC/COMPARE/CLARIFY/CONFIRM)
-- SmartContextBuilder with fact relevance scoring
-
-### v2.8: Curiosity Engine ✅ COMPLETE
-- `services/orchestrator/core/curiosity.py`
-- WHY question generation (causal reasoning)
-- WHAT-IF scenario simulation
-- Anomaly detection across research facts
+| **Systemic AI** | Self-multiplying agent swarm with dynamic system prompts |
+| **ARM Modularity** | LangGraph core + optional MCP tool extensions |
+| **JIT Dependencies** | `uv` on-demand package install |
+| **Tool Isolation** | Each MCP server runs in own process |
+| **Hardware Efficiency** | Runs on VPS KVM2 / Colab / Kaggle |
+| **Conversational** | Follow-up, not restart—detect intent |
+| **Smart Context** | Inject relevant facts + pointers |
 
 ---
 
@@ -641,45 +421,33 @@ The system follows a **Hub-and-Spoke Microservices Pattern**. The central Orches
 
 ```mermaid
 graph TD
-    %% --- STYLES ---
-    classDef brain fill:#2d3436,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef router fill:#0984e3,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef memory fill:#6c5ce7,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef tool fill:#00b894,stroke:#333,stroke-width:2px,color:#fff;
-
-    %% --- ACTORS ---
-    User(("User / API")) -->|Query| Gateway["API Gateway & Rate Limiter"]
-    Gateway --> Router{"Intention Router"}
-
-    %% --- THE ROUTING LAYER ---
-    Router --"Simple Q"--> FastRAG["⚡ Fast RAG / Memory"]
-    Router --"Methodology Q"--> Provenance["🔍 Provenance Graph"]
-    Router --"Recalculation"--> ShadowLab["🧮 Shadow Lab (Sandbox)"]
-    Router --"Deep Research"--> Orchestrator["🧠 Main Orchestrator"]
-
-    %% --- THE DEEP RESEARCH LOOP ---
-    subgraph CognitiveCore ["The Cognitive Core"]
-        Orchestrator --> Planner["📝 Planner & Decomposer"]
-        Planner --> Keeper["🛡️ The Keeper (Context Guard)"]
-        Keeper --> Divergence["✨ Divergence Engine (Analysis)"]
-        Divergence --> Synthesizer["✍️ Report Synthesizer"]
+    User[User / API] --> Gateway["API Gateway<br/>(services/api_gateway/main.py)"]
+    Gateway --> Router{"Intention Router<br/>(services/orchestrator/core/router.py)"}
+    
+    Router -->|Simple| FastRAG["Fast RAG Memory<br/>(services/rag_service)"]
+    Router -->|Methodology| Provenance[Provenance Graph]
+    Router -->|Recalculate| ShadowLab["Shadow Lab<br/>(workers/shadow_lab_worker.py)"]
+    Router -->|Deep Research| Orchestrator["Main Orchestrator<br/>(services/orchestrator/core/pipeline.py)"]
+    
+    subgraph CognitiveCore[The Cognitive Core]
+        Orchestrator --> Planner["Planner and Decomposer<br/>(services/orchestrator/nodes/planner.py)"]
+        Planner --> Keeper["The Keeper<br/>(services/orchestrator/nodes/keeper.py)"]
+        Keeper --> Divergence["Divergence Engine<br/>(services/orchestrator/nodes/divergence.py)"]
+        Divergence --> Synthesizer["Report Synthesizer<br/>(services/orchestrator/nodes/synthesizer.py)"]
     end
-
-    %% --- THE TOOLS LAYER (The Muscle) ---
-    subgraph Tools ["Tool Microservices"]
-        Scraper["🕷️ Robotic Scraper"]:::tool
-        Analyst["🐍 Python Analyst"]:::tool
-        Meta["📊 Meta-Analysis"]:::tool
+    
+    subgraph Tools[Tool Microservices]
+        Scraper["Robotic Scraper<br/>(mcp_servers/scraper_server)"]
+        Analyst["Python Analyst<br/>(mcp_servers/python_server)"]
+        Meta[Meta-Analysis]
     end
-
-    %% --- THE MEMORY LAYER (The Vault) ---
-    subgraph MemoryVault ["The Triple-Vault Memory"]
-        Atomic["Atomic Facts DB"]:::memory
-        Episodic["Episodic Logs"]:::memory
-        Artifacts["Parquet/Blob Store"]:::memory
+    
+    subgraph MemoryVault[Triple-Vault Memory]
+        Atomic["Atomic Facts DB<br/>(services/rag_service/core/vector_store.py)"]
+        Episodic[Episodic Logs]
+        Artifacts["Parquet Store<br/>(services/rag_service/core/artifact_store.py)"]
     end
-
-    %% --- CONNECTIONS ---
+    
     Orchestrator <--> Scraper
     Orchestrator <--> Analyst
     Divergence <--> Atomic
@@ -691,7 +459,23 @@ graph TD
 
 ## 🚦 2. Pipeline Routing Logic
 
-Kea does not treat every query the same. It uses an **Intention Router** to determine the most efficient execution path.
+Kea uses a **two-stage routing system** to efficiently handle queries:
+
+### Pre-Routing Classification (`query_classifier.py`)
+
+Before research routing, queries are classified into types:
+
+| Type | Action | Example |
+|------|--------|---------|
+| **CASUAL** | Direct response (bypass graph) | "Hello", "Thank you" |
+| **UTILITY** | Route to utility handler | "Translate this", "Summarize" |
+| **RESEARCH** | Route to Path A/B/C/D | Complex research queries |
+| **MULTIMODAL** | Handle attachments | Queries with images/files |
+| **UNSAFE** | Block with safe response | Harmful content |
+
+### Research Routing (`router.py`)
+
+For RESEARCH queries, the **Intention Router** selects the optimal execution path:
 
 ### Path A: The "Memory Fork" (Incremental Research)
 *   **Trigger:** User asks a question partially covered by previous research.
@@ -722,48 +506,35 @@ Kea does not treat every query the same. It uses an **Intention Router** to dete
 
 ```mermaid
 graph TD
-    %% --- STYLES ---
-    classDef trigger fill:#2d3436,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef decision fill:#0984e3,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef action fill:#00b894,stroke:#333,stroke-width:2px,color:#fff;
-    classDef output fill:#6c5ce7,stroke:#fff,stroke-width:2px,color:#fff;
-
-    %% --- MAIN FLOW ---
-    User(("User Input")):::trigger --> Router{"Intention Classifier<br/>(LLM Router)"}:::decision
-
-    %% --- PATH A: THE MEMORY FORK (Incremental) ---
-    subgraph PathA ["Path A: Incremental Research"]
-        Router --"Follow-up / Update"--> VectorCheck["🔍 Check Atomic Facts DB"]
-        VectorCheck --"Data Found"--> CacheHit["✅ Retrieve from Memory"]
-        VectorCheck --"Data Missing"--> GapDetector{"Gap Analysis"}
-        GapDetector -->|Only Search Missing| DeltaPlan["📉 Delta Planner"]
+    User[User Input] --> Router{Intention Classifier}
+    
+    subgraph PathA[Path A: Incremental Research]
+        Router -->|Follow-up| VectorCheck[Check Atomic Facts DB]
+        VectorCheck -->|Found| CacheHit[Retrieve from Memory]
+        VectorCheck -->|Missing| GapDetector{Gap Analysis}
+        GapDetector --> DeltaPlan[Delta Planner]
     end
-
-    %% --- PATH B: THE SHADOW LAB (Recalculation) ---
-    subgraph PathB ["Path B: Shadow Lab"]
-        Router --"Recalculate / Modify"--> Loader["📂 Load .parquet Artifact"]
-        Loader --> Sandbox["🐍 Python Sandbox<br/>(Execute New Formula)"]
+    
+    subgraph PathB[Path B: Shadow Lab]
+        Router -->|Recalculate| Loader[Load parquet Artifact]
+        Loader --> Sandbox[Python Sandbox]
     end
-
-    %% --- PATH C: THE GRAND SYNTHESIS (Meta-Analysis) ---
-    subgraph PathC ["Path C: Grand Synthesis"]
-        Router --"Compare / Combine"--> Librarian["📚 Librarian<br/>(Fetch Job Manifests)"]
-        Librarian --> Alchemist["⚗️ The Alchemist<br/>(Schema Alignment & Merge)"]
+    
+    subgraph PathC[Path C: Grand Synthesis]
+        Router -->|Compare| Librarian[Fetch Job Manifests]
+        Librarian --> Alchemist[Schema Alignment]
     end
-
-    %% --- PATH D: DEEP RESEARCH (Fallback) ---
-    subgraph PathD ["Path D: Zero-Shot Research"]
-        Router --"New Topic"--> Planner["🧠 Full OODA Loop Planner"]
+    
+    subgraph PathD[Path D: Deep Research]
+        Router -->|New Topic| Planner[Full OODA Loop]
     end
-
-    %% --- CONVERGENCE ---
-    CacheHit --> Synthesizer
-    DeltaPlan --> Scraper["🕷️ Robotic Scraper"]
+    
+    CacheHit --> Synthesizer[Final Synthesis]
+    DeltaPlan --> Scraper[Robotic Scraper]
     Scraper --> Synthesizer
     Sandbox --> Synthesizer
-    Alchemist --> Synthesizer["✍️ Final Synthesis"]:::output
+    Alchemist --> Synthesizer
     Planner --> Scraper
-
 ```
 
 ---
@@ -775,17 +546,17 @@ graph TD
 
 ```mermaid
 sequenceDiagram
-    participant Scraper as Robotic Scraper
+    participant Scraper as Robotic Scraper<br/>(mcp_servers/scraper_server)
     participant Quarantine as Quarantine Zone
-    participant Keeper as The Keeper
-    participant Brain as Orchestrator
+    participant Keeper as The Keeper<br/>(services/orchestrator/nodes/keeper.py)
+    participant Brain as Orchestrator<br/>(services/orchestrator/core/graph.py)
 
     Scraper->>Quarantine: Ingest Raw Text (Chunked)
     loop Every Chunk
         Quarantine->>Keeper: Send Vector(Chunk)
-        Keeper->>Keeper: Calc Cosine Similarity(User_Intent, Chunk)
-        alt Similarity < 0.75 (Drift Detected)
-            Keeper-->>Quarantine: 🔥 INCINERATE (Ignore)
+        Keeper->>Keeper: Calc Cosine Similarity
+        alt Similarity < 0.75
+            Keeper-->>Quarantine: INCINERATE (Ignore)
         else Similarity > 0.75
             Keeper->>Brain: Release to Context
         end
@@ -798,16 +569,16 @@ sequenceDiagram
 ```mermaid
 graph LR
     Hypothesis(Expected: Revenue UP) --Collision--> Reality(Observed: Revenue DOWN)
-    Reality --> Trigger{Divergence Type?}
+    Reality --> Trigger{"Divergence Type?<br/>(services/orchestrator/nodes/divergence.py)"}
     
-    Trigger --"Numbers Wrong?"--> AgentA[Data Scientist: Normalize Units]
-    Trigger --"Missing Factor?"--> AgentB[News Scout: Find Disruptions]
-    Trigger --"Bias?"--> AgentC[Judge: Check Source Credibility]
+    Trigger --"Numbers Wrong?"--> AgentA["Data Scientist: Normalize Units<br/>(services/orchestrator/agents/generator.py)"]
+    Trigger --"Missing Factor?"--> AgentB["News Scout: Find Disruptions<br/>(services/orchestrator/agents/generator.py)"]
+    Trigger --"Bias?"--> AgentC["Judge: Check Source Credibility<br/>(services/orchestrator/agents/judge.py)"]
     
     AgentA --> Synthesis
     AgentB --> Synthesis
     AgentC --> Synthesis
-    Synthesis --> FinalReport[Explained Contradiction]
+    Synthesis --> FinalReport["Explained Contradiction<br/>(services/orchestrator/nodes/synthesizer.py)"]
 ```
 
 ---
@@ -843,10 +614,10 @@ To optimize for **cost** and **accuracy**, Kea uses a hierarchical model strateg
 
 ```mermaid
 sequenceDiagram
-    participant Planner as 📝 Planner
-    participant Architect as 🏗️ Architect (Small LLM)
+    participant Planner as 📝 Planner<br/>(services/orchestrator/nodes/planner.py)
+    participant Architect as 🏗️ Architect (Small LLM)<br/>(services/orchestrator/core/prompt_factory.py)
     participant Worker as 👷 Worker (Large LLM)
-    participant Tool as 🛠️ Python Tool
+    participant Tool as 🛠️ Python Tool<br/>(mcp_servers/python_server)
 
     Planner->>Architect: Send Task Context
     Note over Architect: Generates strict <br/>System Prompt
@@ -875,16 +646,16 @@ graph TD
     classDef role fill:#fff,stroke:#333,stroke-width:2px;
     classDef decision fill:#0984e3,stroke:#fff,stroke-width:2px,color:#fff;
 
-    Start((Start)) --> Generator["🤠 Generator (Gather Data)"]:::role
+    Start((Start)) --> Generator["🤠 Generator (Gather Data)<br/>(services/orchestrator/agents/generator.py)"]:::role
     Generator --> Output["Draft Report"]
-    Output --> Critic["🧐 Critic (Audit & Attack)"]:::role
+    Output --> Critic["🧐 Critic (Audit & Attack)<br/>(services/orchestrator/agents/critic.py)"]:::role
     
     Critic --> Review{Pass Audit?}:::decision
     
     Review --"No (Flaws Found)"--> Feedback["📝 Correction Instructions"]
     Feedback --> Generator
     
-    Review --"Yes (Verified)"--> Judge["⚖️ Judge (Final Polish)"]:::role
+    Review --"Yes (Verified)"--> Judge["⚖️ Judge (Final Polish)<br/>(services/orchestrator/agents/judge.py)"]:::role
     Judge --> Final((Final Output))
 ```
 
@@ -918,21 +689,21 @@ graph TD
 
     %% --- 1. OBSERVE (The Senses) ---
     subgraph Phase1 ["Phase 1: OBSERVE (Execution)"]
-        Planner("📝 Current Plan"):::act --> Trigger("🚀 Trigger Agents"):::act
-        Trigger --> Scraper("🕷️ Robotic Scraper"):::observe
+        Planner("📝 Current Plan<br/>(services/orchestrator/nodes/planner.py)"):::act --> Trigger("🚀 Trigger Agents"):::act
+        Trigger --> Scraper("🕷️ Robotic Scraper<br/>(mcp_servers/scraper_server)"):::observe
         Scraper --> RawData["📄 Raw Ingested Data"]:::observe
     end
 
     %% --- 2. ORIENT (The Context) ---
     subgraph Phase2 ["Phase 2: ORIENT (Context Check)"]
-        RawData --> Keeper{"🛡️ The Keeper"}:::orient
+        RawData --> Keeper{"🛡️ The Keeper<br/>(services/orchestrator/nodes/keeper.py)"}:::orient
         Keeper --"Drift Detected<br/>(Irrelevant)"--> Incinerator("🔥 Prune Branch"):::fail
         Keeper --"Context Valid"--> ContextData["✅ Contextualized Facts"]:::orient
     end
 
     %% --- 3. DECIDE (The Hypothesis) ---
     subgraph Phase3 ["Phase 3: DECIDE (Divergence Check)"]
-        ContextData --> Divergence{"✨ Divergence Engine"}:::decide
+        ContextData --> Divergence{"✨ Divergence Engine<br/>(services/orchestrator/nodes/divergence.py)"}:::decide
         Divergence --"Hypothesis Confirmed"--> Success["🏁 Validated Fact"]:::decide
         Divergence --"Hypothesis FAILED"--> Collision("💥 Collision Detected"):::decide
     end
@@ -944,15 +715,48 @@ graph TD
         Abductive --"Missing Factor?"--> NewFactor["➕ Add Variable: Weather/Strike"]:::act
         Abductive --"Bad Data?"--> NewSource["🔄 Switch Source: Gov vs News"]:::act
         
-        NewFactor --> RePlan("🔄 Reformulate Plan"):::act
+        NewFactor --> RePlan("🔄 Reformulate Plan<br/>(services/orchestrator/nodes/planner.py)"):::act
         NewSource --> RePlan
     end
 
     %% --- THE LOOP ---
     RePlan -.->|Recursive Loop| Planner
-    Success --> Synthesizer("✍️ Final Synthesis")
+    Success --> Synthesizer("✍️ Final Synthesis<br/>(services/orchestrator/nodes/synthesizer.py)")
+`````
+---
 
-```
+### 4.4. Conversational Memory (`conversation.py`)
+
+Kea maintains session continuity with **Intent Detection** and **Smart Context Injection**:
+
+| Intent | Description | Example |
+|--------|-------------|---------|
+| **FOLLOW_UP** | Continue current topic | "What about China?" |
+| **DEEPER** | Explore aspect deeper | "Tell me more about regulations" |
+| **REVISE** | Correct or update | "Actually, use 2024 data" |
+| **NEW_TOPIC** | Switch to different topic | "Now research renewable energy" |
+| **COMPARE** | Compare entities | "How does this compare to Tesla?" |
+| **CLARIFY** | Ask for explanation | "What do you mean by EBITDA?" |
+| **CONFIRM** | Confirm action | "Yes, proceed with the analysis" |
+
+**SmartContextBuilder**: Only injects relevant facts + recent turns (not entire history).
+
+---
+
+### 4.5. Curiosity Engine (`curiosity.py`)
+
+Auto-generates exploratory questions to deepen research:
+
+| Question Type | Purpose | Example |
+|--------------|---------|---------|
+| **CAUSAL_WHY** | Understand causes | "Why did revenue decline in Q3?" |
+| **COUNTERFACTUAL** | Explore alternatives | "What if interest rates stayed at 3%?" |
+| **SCENARIO** | Project outcomes | "What if demand grows 15% YoY?" |
+| **ANOMALY** | Flag inconsistencies | "Volume up 10% but revenue down - why?" |
+| **COMPARISON** | Cross-entity insights | "How does Vale compare to Rio Tinto?" |
+| **TREND** | Identify patterns | "Is this decline part of a larger trend?" |
+| **GAP** | Find missing info | "What data is missing for a complete picture?" |
+
 ---
 
 ## 💾 5. Memory & Data Structures
@@ -984,10 +788,10 @@ graph LR
     classDef db fill:#6c5ce7,stroke:#fff,stroke-width:2px,color:#fff;
 
     %% --- INGESTION ---
-    RawDoc["📄 Raw Document<br/>(PDF / HTML)"]:::raw --> Atomizer["⚛️ The Atomizer Agent<br/>(LLM Extractor)"]:::process
+    RawDoc["📄 Raw Document<br/>(PDF / HTML)"]:::raw --> Atomizer["⚛️ The Atomizer Agent<br/>(services/rag_service/core/vector_store.py)"]:::process
 
     %% --- THE SCHEMA TRANSFORMATION ---
-    Atomizer --> FactJSON["🧩 Atomic Fact (JSON)"]:::schema
+    Atomizer --> FactJSON["🧩 Atomic Fact (JSON)<br/>(shared/schemas.py)"]:::schema
     
     subgraph SchemaDetail ["The Schema Structure"]
         FactJSON --"Entity: Adaro"--> F1["Entity"]
@@ -1594,51 +1398,63 @@ graph LR
 | `/api/v1/llm/models` | `GET` | List available models for a specific provider. |
 | `/api/v1/llm/config` | `POST` | Update active model per Role (e.g., "Planner" = GPT-4o). |
 | `/api/v1/llm/usage` | `GET` | Get token usage statistics and cost estimation. |
----
 
-## 🛡️ 10. Roadmap & Future Proofing
+#### **7. Conversations**
+*Multi-turn conversation management with memory.*
 
-### v1.0: Foundation ✅ Complete
-*   [x] Microservice Architecture
-*   [x] Cyclic Research Graph (OODA Loop)
-*   [x] Atomic Fact Memory
-*   [x] 14 MCP Tools, 8 API Routes, 3 Workers
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/api/v1/conversations` | `POST` | Start new conversation session. |
+| `/api/v1/conversations/{id}` | `GET` | Get conversation history and context. |
+| `/api/v1/conversations/{id}/message` | `POST` | Send message with intent detection. |
 
-### v2.0: Systemic AI Platform ✅ Complete
-*   [x] **v2.1 Hardware Monitoring:** Resource detection, memory pressure tracking
-*   [x] **v2.2 Graceful Degradation:** Auto-throttle under pressure, circuit breakers
-*   [x] **v2.3 JIT Dependencies:** `uv` on-demand install, tool isolation
-*   [x] **v2.4 System Prompt Factory:** Dynamic prompts per domain/task
-*   [x] **v2.5 Agent Spawner:** Self-multiplying agents for massive tasks
-*   [x] **v2.6 HuggingFace Sync:** Cross-session persistence
-*   [x] **v2.7 Conversational Memory:** Intent detection, smart context injection
-*   [x] **v2.8 Curiosity Engine:** Auto-generate follow-up questions
+#### **8. MCP Tools**
+*Managing MCP servers and tool execution.*
 
-### v3.0: Enterprise Kernel ✅ Complete
-*   [x] **Organization Module:** Department → Team → Agent hierarchy
-*   [x] **Work Unit System:** WorkBoard, Priority, dependencies
-*   [x] **Message Bus:** Inter-agent communication, request-response
-*   [x] **Supervisor Layer:** QualityGate, escalation, health monitoring
-*   [x] **Security Hardening:** ResourceGuard, KillSwitch, rate limiting
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/api/v1/mcp/servers` | `GET` | List active MCP servers. |
+| `/api/v1/mcp/tools` | `GET` | List all available tools across servers. |
+| `/api/v1/mcp/tools/{name}/call` | `POST` | Execute a specific tool. |
 
-```
-Organization
-├── Department (domain-specialized)
-│   ├── Team (coordinated agent pool)
-│   │   └── AgentInstance (role-based)
-│   └── WorkBoard (task management)
-└── Supervisor (oversight + escalation)
-```
+#### **9. Authentication & Users**
+*User management and authentication.*
 
-### v3.1: Distributed Operations 🛠️ Planned
-*   [ ] **Multi-Process Workers:** Process-based agent isolation
-*   [ ] **Redis Message Broker:** Pub/sub for MessageBus
-*   [ ] **Prometheus Metrics:** Full observability
-
-### v4.0: Swarm Intelligence (Long Term)
-*   [ ] **Multi-Kea Protocol:** Instances talk to each other (Finance ↔ Legal)
-*   [ ] **Knowledge Synthesis:** Build evolving knowledge bases
-*   [ ] **Kubernetes Orchestration:** Auto-scale agent pods
-*   [ ] **Multimodal:** Gemini Flash for vision/audio
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/api/v1/auth/token` | `POST` | Get JWT token. |
+| `/api/v1/users` | `GET/POST` | List/Create users. |
+| `/api/v1/users/{id}` | `GET/PATCH/DELETE` | User CRUD operations. |
 
 ---
+
+## 🛡️ 10. Roadmap
+
+### ✅ Completed (v1.0 - v3.0)
+- Microservice Architecture, LangGraph cyclic state machine
+- 16 MCP Servers, 12 API Routes, 3 Background Workers
+- Hardware detection, graceful degradation, circuit breakers
+- JIT dependencies with `uv`, tool isolation
+- System Prompt Factory (7 domains, 8 task types)
+- Agent Spawner, Conversational Memory, Curiosity Engine
+- Organization module, Work Units, Message Bus, Supervisor
+- Security: ResourceGuard, KillSwitch, rate limiting
+
+### ✅ Completed (v3.0)
+- Wire `graph.py` to real `nodes/` and `agents/` modules
+- Connect MCP Orchestrator to researcher node
+- Full end-to-end research pipeline
+
+### 🚧 In Progress (v3.1)
+- [ ] Refine MCP Lifecycle Management for Docker
+- [ ] Optimization of Hybrid Tool Calling
+
+### 🔮 Future (v4.0+)
+- [ ] Multi-process agent isolation
+- [ ] Redis message broker for MessageBus
+- [ ] Multi-Kea distributed operations
+- [ ] Kubernetes auto-scaling
+- [ ] Multimodal (Gemini Flash)
+
+---
+
