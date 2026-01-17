@@ -2,6 +2,7 @@
 LangGraph Research State Machine.
 
 Implements the cyclic research flow with checkpointing.
+This is the PRODUCTION version that uses real LLM and MCP implementations.
 """
 
 from __future__ import annotations
@@ -15,6 +16,14 @@ from pydantic import BaseModel, Field
 
 from shared.schemas import ResearchState, ResearchStatus, QueryPath
 from shared.logging import get_logger
+
+# Import real implementations
+from services.orchestrator.nodes.planner import planner_node as real_planner_node
+from services.orchestrator.nodes.keeper import keeper_node as real_keeper_node
+from services.orchestrator.agents.generator import GeneratorAgent
+from services.orchestrator.agents.critic import CriticAgent
+from services.orchestrator.agents.judge import JudgeAgent
+from services.orchestrator.core.router import IntentionRouter
 
 
 logger = get_logger(__name__)
@@ -79,7 +88,7 @@ class GraphState(TypedDict, total=False):
 
 async def router_node(state: GraphState) -> GraphState:
     """
-    Route query to appropriate execution path.
+    Route query to appropriate execution path using real LLM router.
     
     Paths:
     A - Memory Fork (incremental research)
@@ -89,17 +98,13 @@ async def router_node(state: GraphState) -> GraphState:
     """
     logger.info("Router: Analyzing query", extra={"query": state.get("query", "")[:100]})
     
-    query = state.get("query", "").lower()
+    router = IntentionRouter()
+    context = {
+        "prior_research": state.get("prior_research"),
+        "data_to_verify": state.get("data_to_verify"),
+    }
     
-    # Simple routing logic (in production, use LLM classification)
-    if "recalculate" in query or "what if" in query:
-        path = "B"  # SHADOW_LAB
-    elif "compare" in query and "across" in query:
-        path = "C"  # GRAND_SYNTHESIS
-    elif "update" in query or "latest" in query:
-        path = "A"  # MEMORY_FORK
-    else:
-        path = "D"  # DEEP_RESEARCH
+    path = await router.route(state.get("query", ""), context)
     
     logger.info(f"Router: Selected path {path}")
     
@@ -112,113 +117,109 @@ async def router_node(state: GraphState) -> GraphState:
 
 async def planner_node(state: GraphState) -> GraphState:
     """
-    Decompose query into sub-queries and hypotheses.
+    Decompose query into sub-queries and hypotheses using real LLM.
+    Delegates to services/orchestrator/nodes/planner.py
     """
-    logger.info("Planner: Decomposing query")
+    logger.info("Planner: Decomposing query (REAL LLM)")
     
-    query = state.get("query", "")
+    # Call real planner that uses OpenRouter LLM
+    updated_state = await real_planner_node(dict(state))
     
-    # Generate sub-queries (in production, use LLM)
-    sub_queries = [
-        f"Find recent data about: {query}",
-        f"Identify key metrics for: {query}",
-        f"Find expert sources on: {query}",
-    ]
+    # Increment iteration
+    updated_state["iteration"] = state.get("iteration", 0) + 1
     
-    hypotheses = [
-        f"The data about {query} will show clear trends",
-        f"Multiple reliable sources will confirm the findings",
-    ]
-    
-    return {
-        **state,
-        "sub_queries": sub_queries,
-        "hypotheses": hypotheses,
-        "iteration": state.get("iteration", 0) + 1,
-    }
+    return {**state, **updated_state}
 
 
 async def researcher_node(state: GraphState) -> GraphState:
     """
     Execute research using MCP tools.
     
-    This node would use the MCP orchestrator to:
+    Uses the MCP orchestrator to:
     1. Search the web
     2. Fetch and scrape URLs
     3. Extract data with Python
     4. Analyze with vision tools
     """
-    logger.info("Researcher: Executing research")
+    logger.info("Researcher: Executing research (MCP Tools)")
     
     sub_queries = state.get("sub_queries", [])
+    facts = state.get("facts", [])
+    sources = state.get("sources", [])
     
-    # Placeholder: In production, this calls MCP tools
-    facts = [
-        {
-            "entity": "example",
-            "attribute": "value",
-            "value": "100",
-            "source": "https://example.com",
-        }
-    ]
+    # Import MCP client for tool calls
+    try:
+        from services.orchestrator.mcp.client import MCPOrchestrator
+        
+        orchestrator = MCPOrchestrator()
+        
+        # Execute search for each sub-query
+        for sub_query in sub_queries[:3]:  # Limit to 3 to avoid rate limits
+            try:
+                result = await orchestrator.call_tool(
+                    "web_search",
+                    {"query": sub_query, "max_results": 5}
+                )
+                logger.info(f"Researcher: Tool call completed for {sub_query[:50]}")
+                
+                # Parse search results into facts
+                if result and hasattr(result, "content"):
+                    for content in result.content:
+                        if hasattr(content, "text"):
+                            facts.append({
+                                "text": content.text[:500],
+                                "query": sub_query,
+                                "source": "web_search",
+                            })
+                            
+            except Exception as e:
+                logger.warning(f"Research tool error: {e}")
+                
+    except Exception as e:
+        logger.error(f"MCP Orchestrator error: {e}")
+        # Fallback: generate placeholder facts
+        facts.append({
+            "text": f"Research in progress for: {sub_queries[0] if sub_queries else 'query'}",
+            "source": "fallback",
+        })
     
-    sources = [
-        {
-            "url": "https://example.com",
-            "title": "Example Source",
-            "domain": "example.com",
-        }
-    ]
+    logger.info(f"Researcher: Collected {len(facts)} facts")
     
     return {
         **state,
-        "facts": state.get("facts", []) + facts,
-        "sources": state.get("sources", []) + sources,
+        "facts": facts,
+        "sources": sources,
     }
 
 
 async def keeper_node(state: GraphState) -> GraphState:
     """
-    Check for context drift and verify progress.
-    
-    Decides if research should continue or pivot.
+    Check for context drift and verify progress using real implementation.
+    Delegates to services/orchestrator/nodes/keeper.py
     """
-    logger.info("Keeper: Checking context drift")
+    logger.info("Keeper: Checking context drift (REAL)")
     
-    iteration = state.get("iteration", 0)
-    max_iterations = state.get("max_iterations", 3)
-    facts = state.get("facts", [])
+    # Call real keeper that checks context drift with embeddings
+    updated_state = await real_keeper_node(dict(state))
     
-    # Determine if we should continue
-    should_continue = (
-        iteration < max_iterations
-        and len(facts) < 10  # Not enough facts yet
-    )
-    
-    return {
-        **state,
-        "should_continue": should_continue,
-    }
+    return {**state, **updated_state}
 
 
 async def generator_node(state: GraphState) -> GraphState:
     """
-    Generate initial answer from facts (Optimist role).
+    Generate initial answer from facts using real LLM (Optimist role).
+    Delegates to services/orchestrator/agents/generator.py
     """
-    logger.info("Generator: Creating initial answer")
+    logger.info("Generator: Creating initial answer (REAL LLM)")
     
     facts = state.get("facts", [])
+    sources = state.get("sources", [])
     query = state.get("query", "")
     
-    # Placeholder: In production, use LLM
-    output = f"## Research Findings for: {query}\n\n"
-    output += f"Based on {len(facts)} facts gathered:\n\n"
+    generator = GeneratorAgent()
+    output = await generator.generate(query, facts, sources)
     
-    for fact in facts[:5]:
-        output += f"- {fact.get('entity')}: {fact.get('value')}\n"
-    
-    output += "\n### Analysis\n"
-    output += "The data suggests positive trends..."
+    logger.info(f"Generator: Answer generated ({len(output)} chars)")
     
     return {
         **state,
@@ -228,17 +229,20 @@ async def generator_node(state: GraphState) -> GraphState:
 
 async def critic_node(state: GraphState) -> GraphState:
     """
-    Critique the generator's output (Pessimist role).
+    Critique the generator's output using real LLM (Pessimist role).
+    Delegates to services/orchestrator/agents/critic.py
     """
-    logger.info("Critic: Reviewing answer")
+    logger.info("Critic: Reviewing answer (REAL LLM)")
     
     generator_output = state.get("generator_output", "")
+    facts = state.get("facts", [])
+    sources = state.get("sources", [])
     
-    # Placeholder: In production, use LLM with critic persona
-    feedback = "## Critical Review\n\n"
-    feedback += "- Source reliability: Could be improved\n"
-    feedback += "- Data recency: Needs verification\n"
-    feedback += "- Missing context: Some gaps identified\n"
+    # Use real Critic agent with LLM
+    critic = CriticAgent()
+    feedback = await critic.critique(generator_output, facts, sources)
+    
+    record_llm_call("critic", success=True)
     
     return {
         **state,
@@ -248,21 +252,25 @@ async def critic_node(state: GraphState) -> GraphState:
 
 async def judge_node(state: GraphState) -> GraphState:
     """
-    Synthesize generator/critic into final verdict.
+    Synthesize generator/critic into final verdict using real LLM.
+    Delegates to services/orchestrator/agents/judge.py
     """
-    logger.info("Judge: Making final decision")
+    logger.info("Judge: Making final decision (REAL LLM)")
     
+    query = state.get("query", "")
     generator_output = state.get("generator_output", "")
     critic_feedback = state.get("critic_feedback", "")
     
-    # Placeholder: In production, use LLM with judge persona
-    verdict = "APPROVED_WITH_CAVEATS"
-    confidence = 0.75
+    # Use real Judge agent with LLM
+    judge = JudgeAgent()
+    result = await judge.judge(query, generator_output, critic_feedback)
+    
+    record_llm_call("judge", success=True)
     
     return {
         **state,
-        "judge_verdict": verdict,
-        "confidence": confidence,
+        "judge_verdict": result.get("verdict", "Accept"),
+        "confidence": result.get("confidence", 0.5),
     }
 
 
