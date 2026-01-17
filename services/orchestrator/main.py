@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 
 from services.orchestrator.core.graph import compile_research_graph, GraphState
 from services.orchestrator.mcp.client import get_mcp_orchestrator
-from services.orchestrator.config import get_settings
+from shared.config import get_settings
 from shared.logging import get_logger
 from shared.middleware import RequestLoggingMiddleware
 from shared.schemas import ResearchStatus
