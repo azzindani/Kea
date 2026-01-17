@@ -187,12 +187,22 @@ async def researcher_node(state: GraphState) -> GraphState:
     # Tool registry for dynamic routing
     from services.orchestrator.mcp.client import get_mcp_orchestrator
     from mcp_servers.search_server.tools.web_search import web_search_tool
+    from mcp_servers.scraper_server.tools.fetch_url import fetch_url_tool
+    from mcp_servers.python_server.tools.execute_code import execute_code_tool
     
     # Direct tool implementations (fallback when MCP not configured)
     direct_tools = {
+        # Search tools
         "web_search": web_search_tool,
         "news_search": web_search_tool,  # Same tool, different intent
-        # Add more direct tool mappings as needed
+        # Scraping tools
+        "scrape_url": fetch_url_tool,
+        "fetch_url": fetch_url_tool,
+        # Data tools
+        "fetch_data": lambda args: web_search_tool({"query": args.get("query", ""), "max_results": 10}),  # Fallback to web search
+        # Python execution
+        "run_python": execute_code_tool,
+        "execute_code": execute_code_tool,
     }
     
     client = get_mcp_orchestrator()

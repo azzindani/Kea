@@ -79,40 +79,44 @@ def analyze_execution_progress(state: dict[str, Any]) -> dict[str, Any]:
     micro_tasks = execution_plan.get("micro_tasks", [])
     total_tasks = len(micro_tasks)
     
-    # Count completed and failed
+    # Count completed and failed from actual invocations
+    # Note: success=True means the tool (or fallback) succeeded
     completed_tasks = sum(1 for inv in tool_invocations if inv.get("success", False))
-    failed_tasks = sum(1 for inv in tool_invocations if not inv.get("success", True))
+    failed_tasks = sum(1 for inv in tool_invocations if not inv.get("success", True) and inv.get("error"))
     
-    # Identify tasks to retry (failed but have fallbacks unused)
+    # Unique task IDs that succeeded
+    completed_task_ids = {inv.get("task_id") for inv in tool_invocations if inv.get("success", False)}
+    
+    # Identify tasks to retry (failed with no success in any attempt)
     should_retry = []
-    for inv in tool_invocations:
-        if not inv.get("success", True):
-            task_id = inv.get("task_id")
-            # Check if this task has unused fallbacks
+    failed_task_ids = {inv.get("task_id") for inv in tool_invocations if not inv.get("success", True) and inv.get("error")}
+    for task_id in failed_task_ids:
+        if task_id not in completed_task_ids:
+            # This task failed and hasn't succeeded yet
             for task in micro_tasks:
                 if task.get("task_id") == task_id:
                     if task.get("fallback_tools"):
                         should_retry.append(task_id)
                     break
     
-    # Determine next phase
+    # Determine phases from ACTUAL tools used (including fallbacks)
     phases = execution_plan.get("phases", [])
     completed_phases = set()
+    
     for inv in tool_invocations:
         if inv.get("success"):
-            task_id = inv.get("task_id")
-            for task in micro_tasks:
-                if task.get("task_id") == task_id:
-                    # Determine phase from tool
-                    tool = task.get("tool", "")
-                    if tool in ["web_search", "news_search", "fetch_data"]:
-                        completed_phases.add("data_collection")
-                    elif tool in ["scrape_url", "parse_document"]:
-                        completed_phases.add("extraction")
-                    elif tool in ["run_python"]:
-                        completed_phases.add("analysis")
-                    elif tool in ["build_graph"]:
-                        completed_phases.add("synthesis")
+            # Use the actual tool that ran (may be fallback)
+            actual_tool = inv.get("tool", "")
+            
+            # Map tool to phase
+            if actual_tool in ["web_search", "news_search", "fetch_data"]:
+                completed_phases.add("data_collection")
+            elif actual_tool in ["scrape_url", "fetch_url", "parse_document"]:
+                completed_phases.add("extraction")
+            elif actual_tool in ["run_python", "execute_code"]:
+                completed_phases.add("analysis")
+            elif actual_tool in ["build_graph"]:
+                completed_phases.add("synthesis")
     
     next_phase = None
     for phase in ["data_collection", "extraction", "analysis", "synthesis"]:
@@ -124,6 +128,7 @@ def analyze_execution_progress(state: dict[str, Any]) -> dict[str, Any]:
         "completed_tasks": completed_tasks,
         "total_tasks": total_tasks,
         "failed_tasks": failed_tasks,
+        "completed_task_ids": list(completed_task_ids),
         "next_phase": next_phase,
         "should_retry": should_retry,
     }
