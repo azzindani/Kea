@@ -1,10 +1,19 @@
 # Orchestrator Service ("The Brain")
 
-The Orchestrator is the central cognitive engine of Kea. It implements the "Agentic OODA Loop" using **LangGraph** to manage state, recursion, and decision-making. It is responsible for breaking down user queries, coordinating MCP tools, and synthesizing final yields.
+The **Orchestrator** is the central cognitive engine of Kea. It implements the **Agentic OODA Loop** (Observe, Orient, Decide, Act) using **LangGraph** to manage state, recursion, and decision-making. 
 
-## 🏗️ Architecture
+It is responsible for breaking down user queries, coordinating MCP tools, and synthesizing final yields.
 
-The Orchestrator operates as a cyclic state machine:
+---
+
+## 🏗️ Architecture Overview
+
+The Orchestrator operates as a **Cyclic State Machine**, allowing it to "Think Fast" (Router) and "Think Slow" (Deep Research Loop).
+
+1.  **Planning Layer**: Decomposes complex queries into atomic micro-tasks.
+2.  **Execution Layer**: Distributes tasks to MCP Tools (Scraper, Analyst).
+3.  **Control Layer**: The "Keeper" monitors for context drift and hallucinations.
+4.  **Consensus Layer**: Adversarial Agents (Generator vs Critic) verify the final output.
 
 ```mermaid
 graph TD
@@ -29,61 +38,87 @@ graph TD
     Synthesizer --> End[Final Report]
 ```
 
-## 🧩 Codebase Reference
+---
 
-### 1. Service Entry & Configuration
-| File | Description | Key Classes/Functions |
-|:-----|:------------|:----------------------|
-| `main.py` | FastAPI entry point for the service. Handles lifecycle events (startup/shutdown) and global exception handlers. | `create_app()`, `startup_event()` |
-| `__init__.py` | Package initializer. | - |
+## 📁 Codebase Structure & Reference
 
-### 2. Core Logic (`/core`)
-The nervous system of the orchestrator.
+| File / Directory | Component | Description | Key Classes/Functions |
+|:-----------------|:----------|:------------|:----------------------|
+| **`main.py`** | **Entry Point** | FastAPI app for the service. Manages lifecycle events. | `create_app()`, `startup_event()` |
+| **`core/`** | **Nervous System** | Core pipeline logic and state definitions. | |
+| ├── `graph.py` | State Machine | Defines the LangGraph nodes (Planner, Researcher) and edges. | `compile_research_graph()` |
+| ├── `router.py` | Classifier | Determines if a query needs Research or simple Chat. | `IntentionRouter.route()` |
+| ├── `pipeline.py` | Runner | Manages the async event loop for a single job. | `ConversationResearchPipeline.run()` |
+| **`nodes/`** | **Graph Nodes** | Deterministic steps in the state machine. | |
+| ├── `planner.py` | Strategy | Breaks query into micro-tasks (Plan JSON). | `planner_node()` |
+| ├── `researcher.py` | Muscle | Iterates plan and calls MCP tools. | `researcher_node()` |
+| ├── `keeper.py` | Controller | Checks sufficiency and context drift. | `keeper_node()` |
+| ├── `synthesizer.py`| Output | Formats final markdown report. | `synthesizer_node()` |
+| **`agents/`** | **Personas** | LLM Agents for the Consensus Engine. | |
+| ├── `generator.py` | Optimist | Drafts initial answer. | `GeneratorAgent` |
+| ├── `critic.py` | Pessimist | Audits draft for fallacies. | `CriticAgent` |
+| ├── `judge.py` | Arbiter | Decides to Approve or Revise. | `JudgeAgent` |
+| **`mcp/`** | **Integration** | Infrastructure to talk to tool servers. | `MCPOrchestrator` |
 
-| File | Description | Key Classes/Functions |
-|:-----|:------------|:----------------------|
-| `graph.py` | **The Main Loop**. Defines the LangGraph state machine, wiring nodes (Planner, Researcher, etc.) and edges (conditions). | `GraphState`, `build_research_graph()`, `compile_research_graph()` |
-| `pipeline.py` | High-level execution manager. It instantiates the graph and runs the async event loop for a single research job. | `ConversationResearchPipeline.run()` |
-| `router.py` | The "Intention Classifier". Decides if a user query is a simple question, a deep research task, or a shadow lab calculation. | `IntentionRouter.route()` |
-| `query_classifier.py`| Helper for `router.py`, handling the specific prompt engineering for intent detection. | `classify_query()` |
-| `consensus.py` | Implements the **Adversarial Collaboration** logic (Generator vs. Critic). | `ConsensusEngine` |
-| `context_cache.py` | Manages L1/L2 caching to prevent re-researching known facts. | `ContextCache` |
+---
 
-### 3. Graph Nodes (`/nodes`)
-Deterministic steps in the LangGraph state machine.
+## 🔬 Deep Dive: Key Subsystems
 
-| File | Description | Key Responsibility |
-|:-----|:------------|:-------------------|
-| `planner.py` | **Strategy Layer**. Decomposes a vague user request (e.g., "Analyze mining") into a structured list of 10-50 micro-tasks. | Output: `ExecutionPlan` (JSON) |
-| `researcher.py` | **Execution Layer**. The "Muscle". Iterates through the plan, calls MCP tools (Scraper, Search), and collects raw facts. | Action: `client.call_tool()` |
-| `keeper.py` | **Control Layer**. The "Traffic Cop". Checks for context drift, verifies if enough data is collected, and triggers the `should_continue` loop. | Decision: `researcher` vs `generator` |
-| `synthesizer.py` | **Output Layer**. Takes the Judge's approved draft and formats it into the final Markdown report with citations. | Output: `Final Report` |
-| `divergence.py` | **Abductive Reasoner**. Analyzes conflicting data (e.g., source A says X, source B says Y) to find the truth. | Action: Spawns specific verification tasks |
+### 1. The Cyclic State Graph (`core/graph.py`)
+Unlike linear chains (LangChain), Kea uses a **Graph**. This allows the system to:
+*   **Loop**: Go back to the Researcher if the data is insufficient.
+*   **Fork**: Spawn parallel research paths if the hypothesis splits.
+*   **Correct**: The Critic node can reject a draft and force a rewrite.
 
-### 4. Agents (`/agents`)
-LLM Personas used within the Consensus Engine.
+### 2. The Keeper Protocol (`nodes/keeper.py`)
+The Keeper is the "Traffic Cop" of the brain. It prevents the infinite loop problem common in autonomous agents.
+*   **Drift Detection**: Scores current facts against the original User Intent vector.
+*   **Sufficiency Check**: Determines if we have enough facts to answer the question without hallucination.
+*   **Yield Control**: Decides when to stop researching and start writing.
 
-| File | Description | Persona Traits |
-|:-----|:------------|:---------------|
-| `generator.py` | **The Optimist**. Drafts the initial answer based on available facts. Tries to answer even with partial data. | "Helpful Assistant" |
-| `critic.py` | **The Pessimist**. Audits the draft. Looks for logical fallacies, missing dates, and weak sources. Returns a list of flaws. | "Forensic Auditor" |
-| `judge.py` | **The Arbiter**. Reviews both Draft and Critique. Decides to either "Approve" (move to Synthesis) or "Revise" (loop back to Generator). | "Impartial Judge" |
-| `supervisor.py`| **The Manager**. Monitors agent health and task distribution (used in advanced multi-agent scenarios). | "Project Manager" |
+### 3. Adversarial Collaboration (`agents/`)
+To maximize accuracy, we use a multi-persona boardroom simulation:
+*   **Generator**: "I have found these facts, here is the conclusion."
+*   **Critic**: "You missed the date on the second fact. Source B is unreliable."
+*   **Judge**: "Objection sustained. Generator, re-write section 2."
 
-### 5. MCP Integration (`/mcp`)
-The interface to the Tool Servers.
+---
 
-| File | Description | Key Classes/Functions |
-|:-----|:------------|:----------------------|
-| `client.py` | **The Singleton Client**. connects to all 17 MCP servers via stdio. Handles connection pooling and retry logic. | `MCPOrchestrator`, `get_mcp_orchestrator()` |
-| `registry.py` | **Service Discovery**. Maintains the dynamic list of available tools and their schemas. | `ToolRegistry` |
-| `parallel_executor.py`| **Batch Processor**. Enables running multiple tool calls (e.g., 5 searches) in parallel asyncio tasks. | `execute_batch()` |
+## 🔌 API Node Reference (Internal)
+
+While the Orchestrator is usually called via `main.py`, the core Logic Units (Nodes) are distinct inputs/outputs.
+
+### 1. Planning Layer
+| Node | Input | Output | Description |
+|:-----|:------|:-------|:------------|
+| `router` | `Query` (str) | `Path` (str) | Classifies intent (RESEARCH vs CHAT). |
+| `planner` | `Query` (str) | `ExecutionPlan` (JSON) | Generates step-by-step checklist. |
+
+### 2. Execution Layer
+| Node | Input | Output | Description |
+|:-----|:------|:-------|:------------|
+| `researcher` | `Plan` | `Facts` (List[str]) | Executes tools and gathers data. |
+| `keeper` | `Facts` | `Decision` (Continue/Stop) | Validates data sufficiency. |
+
+### 3. Consensus Layer
+| Node | Input | Output | Description |
+|:-----|:------|:-------|:------------|
+| `generator` | `Facts` | `Draft` (Markdown) | Writes the first draft. |
+| `critic` | `Draft` | `Feedback` (List[str]) | Finds errors in the draft. |
+| `judge` | `Feedback` | `Verdict` (Approve/Revise) | Final decision maker. |
+
+### 4. Output Layer
+| Node | Input | Output | Description |
+|:-----|:------|:-------|:------------|
+| `synthesizer` | `Draft` | `Report` (Markdown) | Final polish and formatting. |
+
+---
 
 ## 🚀 Usage
 
-The orchestrator is typically invoked via the API Gateway, but can be run standalone for testing:
+To run the Orchestrator service in isolation (for development):
 
 ```bash
-# Run the main service
+# Start the service
 python -m services.orchestrator.main
 ```

@@ -1,45 +1,104 @@
 # RAG Service ("The Memory")
 
-The RAG Service manages the "Triple Vault" memory architecture of Kea. It provides fast retrieval of atomic facts, storage of complex artifacts, and semantic search capabilities to ground the agents.
+The **RAG Service** is the persistent memory system of Kea. It implements a "Triple Vault" architecture to store varying granularities of information:
+1.  **Atomic Facts**: Precision-recall for verification.
+2.  **Semantic Vectors**: Fuzzy search for exploration.
+3.  **Raw Artifacts**: Heavy file storage for source documents.
 
-## 🏗️ Architecture
+---
 
-The memory system is divided into three distinct tiers:
+## 🏗️ Architecture Overview
 
-1.  **Atomic Facts (Vector Store)**: Stores discrete "Fact Objects" (Entity-Attribute-Value) for rapid semantic retrieval.
-2.  **Episodic Logs**: Stores sequential conversation history and audit trails.
-3.  **Artifact Store**: Stores heavy files (PDFs, Parquet, CSVs) generated during Deep Research.
+The system abstracts retrieval complexity behind a unified facade known as the **FactStore**.
 
-## 🧩 Codebase Reference
+```mermaid
+graph TD
+    User[Orchestrator] -->|Search| API[FastAPI Entrypoint]
+    
+    API --> FactStore[FactStore Facade]
+    
+    FactStore -->|Metadata| Qdrant[Vector DB]
+    FactStore -->|Blobs| Artifacts[ArtifactStore]
+    
+    subgraph Triple Vault
+        Qdrant
+        Artifacts
+        Graph[Provenance Graph]
+    end
+    
+    Qdrant -.->|ID Link| Graph
+    Graph -.->|Source Link| Artifacts
+```
 
-### 1. Service Entry
-| File | Description | Key Classes/Functions |
-|:-----|:------------|:----------------------|
-| `main.py` | FastAPI application for the RAG service. Defines routes for adding/searching facts and health checks. Manages global lifecycle of stores. | `app`, `add_fact()`, `search_facts()` |
+---
 
-### 2. Core Logic (`/core`)
-| File | Description | Key Classes/Functions |
-|:-----|:------------|:----------------------|
-| `vector_store.py` | **Vector DB Interface**. Abstract wrapper around Qdrant/Chroma. Handles embedding generation and similarity search. | `VectorStore` |
-| `artifact_store.py` | **Blob Storage**. Manages heavy binary files (Parquet, PDFs). Abstracts S3 or local file system operations. | `ArtifactStore` |
-| `fact_store.py` | **Logic Layer**. Connects the API to the Vector Store. Handles the conversion of raw text into `AtomicFact` objects. | `FactStore` |
-| `graph_rag.py` | **Knowledge Graph**. (Future) Module for connecting facts via relationships (edges) to allow graph traversal. | `KnowledgeGraph` |
+## 📁 Codebase Structure & Reference
 
-### 3. API Routes
-The service exposes the following endpoints:
+| File / Directory | Component | Description | Key Classes/Functions |
+|:-----------------|:----------|:------------|:----------------------|
+| **`main.py`** | **Entry Point** | FastAPI service definition and route handlers. | `lifespan()`, `add_fact()` |
+| **`core/`** | **Logic** | Storage abstractions. | |
+| ├── `fact_store.py` | Facade | The high-level API for adding/searching facts. Ties vector + graph together. | `FactStore` |
+| ├── `vector_store.py`| Vector DB | Adapter for Qdrant/Chroma. Handles embedding generation. | `create_vector_store()` |
+| ├── `artifact_store.py`| Object DB | Adapter for S3/LocalFS. Handles large file I/O. | `ArtifactStore` |
+| **`api/`** | **Routes** | (Legacy) Split route modules. | - |
+| **`schemas/`** | **Models** | Pydantic data models for API contracts. | `AtomicFact`, `FactResponse` |
 
-| Endpoint | Method | Description | Payload Example |
-|:---------|:-------|:------------|:----------------|
-| `/facts` | `POST` | Ingest a new atomic fact. | `{ "entity": "Adaro", "attribute": "Revenue", "value": "$5B" }` |
-| `/facts/search`| `POST` | Semantic search for facts. | `{ "query": "mining revenue", "limit": 5 }` |
-| `/facts/{id}` | `GET` | Retrieve a specific fact by ID. | - |
-| `/entities` | `GET` | List all unique entities in the database. | - |
+---
+
+## 🔬 Deep Dive: The Triple Vault
+
+### 1. Atomic Fact Vault (Qdrant)
+Instead of chunking text blindly, Kea stores **Atomic Facts**.
+*   **Structure**: Entity-Attribute-Value (EAV).
+*   **Example**: `{"entity": "Nvidia", "attribute": "Revenue 2024", "value": "$60B"}`.
+*   **Benefit**: Eliminates "lost in the middle" hallucination issues common in long-context retrieval.
+
+### 2. Artifact Vault (Blob Store)
+Stores the "Ground Truth" documents.
+*   **Content**: PDFs, HTML snapshots, CSVs.
+*   **Linkage**: Every Atomic Fact has a `source_id` pointing to a file in the Artifact Vault, enabling "Click-to-Verify" citations.
+
+### 3. Provenance Graph (NetworkX)
+(In-Memory / Experimental) Tracks the derivation chain.
+*   **Usage**: "How do we know Nvidia revenue is $60B?" -> "Derived from Artifact #123 (Quarterly Report), page 5."
+
+---
+
+## 🔌 API Endpoint Structure
+
+### 1. Fact Management
+Core CRUD for the atomic knowledge base.
+
+| Endpoint | Method | Description |
+|:---------|:-------|:------------|
+| `/facts` | `POST` | Insert a new atomic fact. |
+| `/facts/search` | `POST` | Semantic search (Vector + Keyword) for facts. |
+| `/facts/{id}` | `GET` | Retrieve a specific fact by UUID. |
+| `/facts/{id}` | `DELETE` | Remove a fact (e.g., if proven false). |
+
+### 2. Entity Exploration
+ Browsing the knowledge graph.
+
+| Endpoint | Method | Description |
+|:---------|:-------|:------------|
+| `/entities` | `GET` | List all unique entities (e.g., "Tesla", "Musk"). |
+| `/entities/{id}` | `GET` | Get all facts associated with an entity. |
+
+### 3. System
+Service health and monitoring.
+
+| Endpoint | Method | Description |
+|:---------|:-------|:------------|
+| `/health` | `GET` | Check connection to Vector DB and Artifact Store. |
+
+---
 
 ## 🚀 Usage
 
-This service usually runs as a sidecar or a separate microservice:
+To start the RAG service independently:
 
 ```bash
-# Start the RAG API
-python -m services.rag_service.main
+# Run on port 8001
+uvicorn services.rag_service.main:app --port 8001
 ```

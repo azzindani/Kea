@@ -1,49 +1,72 @@
-# Shared Libraries
+# Shared Libraries ("The Foundation")
 
-This directory contains common utilities, schemas, and configurations used across all Kea microservices. It is the "glue" that holds the distributed system together.
+This directory contains the **Core Infrastructure** and **Type Definitions** used by all microservices. It ensures consistency across the distributed system (e.g., that the Orchestrator speaks the same API language as the Gateway).
 
-## ⚠️ Dependency Rule
-Code in `shared` must **never** import from `services` or `workers`. It must remain a pure dependency leaf to prevent circular imports.
+---
 
-## 🧩 Codebase Reference
+## 🏗️ Architecture Role
 
-### 1. Core Data Structures (`schemas.py`)
-Defines the Pydantic models exchanged between services.
+The `shared/` library acts as the "Standard Library" of Kea.
+1.  **Configuration**: Centralized `.env` loading via Pydantic Settings.
+2.  **Schemas**: The canonical source of truth for all API contracts.
+3.  **Observability**: Unified JSON logging and Tracing.
+4.  **Hardware**: Abstractions for interacting with LLM providers.
 
-| Class | Description | Usage |
-|:------|:------------|:------|
-| `GraphState` | **The Context**. TypedDict holding the entire state of a research job (query, facts, plan). | Orchestrator |
-| `AtomicFact` | **The Knowledge**. Entity-Attribute-Value model for storing discrete information. | RAG Service |
-| `ToolInvocation`| **The Audit**. Record of a tool call, its inputs, outputs, and success status. | Keeper / Logger |
-| `ResearchStatus`| **The Progress**. Enum (QUEUED, RUNNING, COMPLETED, FAILED). | API Gateway |
+---
 
-### 2. Configuration (`environment.py`)
-Centralized configuration management.
+## 📁 Codebase Structure & Reference
 
-| Class/Function | Description |
-|:---------------|:------------|
-| `EnvironmentConfig` | Singleton loading `.env` variables. |
-| `get_settings()` | Returns typed settings object (Database URL, Redis Host, API Keys). |
-| `is_production()` | Helper to toggle debug modes and security checks. |
+| File / Directory | Component | Description | Key Classes/Functions |
+|:-----------------|:----------|:------------|:----------------------|
+| **`schemas.py`** | **Contracts** | **Critical**. Defines the Pydantic models exchanged between services. | `AtomicFact`, `ResearchState`, `JobRequest` |
+| **`config.py`** | **Settings** | Strongly-typed configuration manager. Reads env vars. | `Settings`, `get_settings()` |
+| **`logging/`** | **Observability**| JSON-structured logger with request ID propagation. | `get_logger()`, `RequestLoggingMiddleware` |
+| **`mcp/`** | **Protocol** | The JSON-RPC 2.0 client implementation. | `MCPOrchestrator`, `ToolRegistry` |
+| **`llm/`** | **AI** | Provider abstractions (OpenAI, Anthropic). | `ChatModel`, `get_provider()` |
+| **`users/`** | **Auth** | User and Tenant management logic. | `UserManager`, `ApiKeyManager` |
 
-### 3. Sub-Modules
-Specialized utility packages.
+---
 
-| Directory | Description | Key Components |
-|:----------|:------------|:---------------|
-| `logging/` | **Structured Logging**. Ensures all logs are JSON-formatted with trace IDs for observability (Grafana/Loki). | `get_logger()`, `setup_logging()` |
-| `llm/` | **LLM Abstraction**. Unified interface for OpenAI, Anthropic, Gemini, and OpenRouter. Handles retries and cost tracking. | `LLMProvider`, `OpenRouter` |
-| `mcp/` | **MCP Protocol SDK**. Shared logic for parsing JSON-RPC messages and routing tool calls. | `ToolRouter`, `JSONRPCMessage` |
-| `hardware/` | **Resource Awareness**. Detects available CPU cores, RAM, and GPU (CUDA/MPS) to optimize worker counts. | `HardwareDetector` |
-| `database/` | **Persistence**. Async wrappers for PostgreSQL (asyncpg) and Redis. Manages connection pools. | `get_db_pool()`, `run_query()` |
+## 🔬 Deep Dive: The Lingua Franca
 
-## 🚀 Usage
+### 1. Research State (`schemas.ResearchState`)
+This is the object passed around the Orchestrator's graph.
+*   **Attributes**: `query`, `facts` (List), `hypotheses` (List), `report` (Markdown).
+*   **Usage**: It allows the Planner to write a plan that the Researcher can read, and the Researcher to write facts that the Generator can read.
 
-Import these directly in your services:
-
+### 2. Atomic Fact (`schemas.AtomicFact`)
+The unit of knowledge in Kea.
 ```python
-from shared.schemas import GraphState
-from shared.logging import get_logger
-
-logger = get_logger(__name__)
+class AtomicFact(BaseModel):
+    fact_id: str
+    entity: str        # "Nvidia"
+    attribute: str     # "Revenue 2024"
+    value: str         # "$60 Billion"
+    confidence: float  # 0.95
 ```
+
+### 3. Job Polymorphism (`schemas.JobType`)
+Defines the valid modes of operation:
+*   `DEEP_RESEARCH`: Standard crawl.
+*   `SHADOW_LAB`: Recalculation (Sandbox).
+*   `GRAND_SYNTHESIS`: Meta-study.
+
+---
+
+## 🔌 Core Type Reference
+
+These are the primary data structures developer interact with.
+
+### Research Primitives
+| Class | Description | Fields |
+|:------|:------------|:-------|
+| `ResearchStatus` | Enum for job lifecycle. | `PENDING`, `RUNNING`, `COMPLETED` |
+| `Source` | Provenance metadata. | `url`, `reliability_score`, `accessed_at` |
+| `ToolInvocation` | Audit log for agent actions. | `tool_name`, `arguments`, `result` |
+
+### API Contracts
+| Class | Description | Fields |
+|:------|:------------|:-------|
+| `JobRequest` | Input for `POST /jobs`. | `query`, `depth`, `max_sources` |
+| `JobResponse` | Output for `GET /jobs/{id}`. | `job_id`, `progress`, `report` |
+| `FactResponse` | Output for `GET /facts`. | `entity`, `attribute`, `value`, `source_url` |
