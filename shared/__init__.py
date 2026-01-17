@@ -7,4 +7,5 @@ Shared utilities and abstractions:
 - queue: Queue abstraction (Redis, in-memory)
 - storage: Storage abstraction (S3, local)
 - database: Database abstraction (PostgreSQL, SQLite)
+- hardware: Hardware detection and resource monitoring
 """

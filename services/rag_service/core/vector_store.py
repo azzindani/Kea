@@ -170,19 +170,31 @@ class QdrantVectorStore(VectorStore):
         
         query_embedding = await self._get_embedding(query)
         
-        results = client.search(
-            collection_name=self.collection_name,
-            query_vector=query_embedding,
-            limit=limit,
-            query_filter=filter,
-        )
+        # Use query_points for newer qdrant-client versions, fallback to search
+        try:
+            # Try newer API first (qdrant-client >= 1.10)
+            from qdrant_client.http.models import QueryRequest
+            results = client.query_points(
+                collection_name=self.collection_name,
+                query=query_embedding,
+                limit=limit,
+                query_filter=filter,
+            ).points
+        except (AttributeError, ImportError):
+            # Fallback to older search API
+            results = client.search(
+                collection_name=self.collection_name,
+                query_vector=query_embedding,
+                limit=limit,
+                query_filter=filter,
+            )
         
         return [
             SearchResult(
                 id=str(r.id),
-                content=r.payload.get("content", ""),
-                score=r.score,
-                metadata={k: v for k, v in r.payload.items() if k != "content"},
+                content=r.payload.get("content", "") if r.payload else "",
+                score=r.score if hasattr(r, 'score') else 0.0,
+                metadata={k: v for k, v in (r.payload or {}).items() if k != "content"},
             )
             for r in results
         ]

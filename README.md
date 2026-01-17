@@ -501,44 +501,45 @@ Transform Kea into a **systemic, self-adapting research automation engine** that
 | **Smart Context** | Inject relevant facts + pointers, not entire datasets |
 | **Curiosity-Driven** | Proactive WHY questions, WHAT-IF scenarios, anomaly detection |
 
-### v2.1: Core Orchestrator Hardening
-- Resource monitor (RAM/CPU tracking)
-- Graceful degradation under load
-- Better error recovery + checkpoints
+### v2.1: Core Orchestrator Hardening ✅ COMPLETE
+- `shared/hardware/` - Resource monitor (RAM/CPU/GPU tracking)
+- `services/orchestrator/core/degradation.py` - GracefulDegrader, throttling
+- `services/orchestrator/core/recovery.py` - @retry, CircuitBreaker
 
-### v2.2: JIT Dependencies + Tool Isolation
-- `uv` integration for on-demand install
-- Tool dependency manifest (`configs/tools.yaml`)
-- Process isolation for conflicting deps
+### v2.2: JIT Dependencies + Tool Isolation ✅ COMPLETE
+- `shared/tools/jit_loader.py` - `uv` integration for on-demand install
+- `configs/tools.yaml` - Tool dependency manifest (30+ tools)
+- `shared/tools/isolation.py` - Process isolation, LazyToolLoader
 
-### v2.3: System Prompt Factory
-- Dynamic prompt generation per domain (finance/medical/legal)
-- Task-aware customization
-- Same LLM, different prompts = different specializations
+### v2.3: System Prompt Factory ✅ COMPLETE
+- `services/orchestrator/core/prompt_factory.py`
+- 7 domains (Finance/Medical/Legal/Engineering/Academic/Data/General)
+- 8 task types (Research/Analysis/Summarize/Compare/Extract/Validate/Forecast/Explain)
 
-### v2.4: Agent Spawner/Scaler
-- Task decomposition into subtasks
-- Parallel agent execution
-- Resource-aware scaling
+### v2.4: Agent Spawner/Scaler ✅ COMPLETE
+- `services/orchestrator/core/agent_spawner.py`
+- TaskDecomposer with entity/aspect/comparison strategies
+- Parallel agent execution with semaphore control
 
-### v2.5: HuggingFace Persistence
-- Job checkpoints, database sync
-- Parser storage, config backup
+### v2.5: HuggingFace Persistence ✅ COMPLETE
+- `shared/storage/hf_sync.py`
+- Job checkpoints, parser storage, config backup
 
-### v2.6: 1000+ Tool Routing
-- Tool semantic index
-- Hierarchical organization
-- Lazy loading
+### v2.6: 1000+ Tool Routing ✅ COMPLETE
+- `shared/mcp/tool_router.py`
+- ToolIndex with 12 categories, semantic matching
+- Lazy loading integration
 
-### v2.7: Conversational Memory
-- Intent detection (FOLLOW_UP/DEEPER/REVISE/NEW_TOPIC)
-- Smart context injection (facts + pointers, not full data)
-- Confirmation prompts for expansive operations
+### v2.7: Conversational Memory ✅ COMPLETE
+- `services/orchestrator/core/conversation.py`
+- 7 intents (FOLLOW_UP/DEEPER/REVISE/NEW_TOPIC/COMPARE/CLARIFY/CONFIRM)
+- SmartContextBuilder with fact relevance scoring
 
-### v2.8: Curiosity Engine
+### v2.8: Curiosity Engine ✅ COMPLETE
+- `services/orchestrator/core/curiosity.py`
 - WHY question generation (causal reasoning)
 - WHAT-IF scenario simulation
-- Anomaly detection and investigation prompts
+- Anomaly detection across research facts
 
 ---
 
@@ -1603,17 +1604,41 @@ graph LR
 *   [x] Atomic Fact Memory
 *   [x] 14 MCP Tools, 8 API Routes, 3 Workers
 
-### v2.0: Systemic AI Platform 🚧 In Progress
-*   [ ] **Core Hardening:** Resource monitor, graceful degradation
-*   [ ] **JIT Dependencies:** `uv` on-demand install, tool isolation
-*   [ ] **System Prompt Factory:** Dynamic prompts per domain
-*   [ ] **Agent Spawner:** Self-multiplying agents for massive tasks
-*   [ ] **HuggingFace Sync:** Cross-session persistence
-*   [ ] **1000+ Tool Routing:** Semantic index, lazy loading
+### v2.0: Systemic AI Platform ✅ Complete
+*   [x] **v2.1 Hardware Monitoring:** Resource detection, memory pressure tracking
+*   [x] **v2.2 Graceful Degradation:** Auto-throttle under pressure, circuit breakers
+*   [x] **v2.3 JIT Dependencies:** `uv` on-demand install, tool isolation
+*   [x] **v2.4 System Prompt Factory:** Dynamic prompts per domain/task
+*   [x] **v2.5 Agent Spawner:** Self-multiplying agents for massive tasks
+*   [x] **v2.6 HuggingFace Sync:** Cross-session persistence
+*   [x] **v2.7 Conversational Memory:** Intent detection, smart context injection
+*   [x] **v2.8 Curiosity Engine:** Auto-generate follow-up questions
 
-### v3.0: Swarm Intelligence (Long Term)
+### v3.0: Enterprise Kernel ✅ Complete
+*   [x] **Organization Module:** Department → Team → Agent hierarchy
+*   [x] **Work Unit System:** WorkBoard, Priority, dependencies
+*   [x] **Message Bus:** Inter-agent communication, request-response
+*   [x] **Supervisor Layer:** QualityGate, escalation, health monitoring
+*   [x] **Security Hardening:** ResourceGuard, KillSwitch, rate limiting
+
+```
+Organization
+├── Department (domain-specialized)
+│   ├── Team (coordinated agent pool)
+│   │   └── AgentInstance (role-based)
+│   └── WorkBoard (task management)
+└── Supervisor (oversight + escalation)
+```
+
+### v3.1: Distributed Operations 🛠️ Planned
+*   [ ] **Multi-Process Workers:** Process-based agent isolation
+*   [ ] **Redis Message Broker:** Pub/sub for MessageBus
+*   [ ] **Prometheus Metrics:** Full observability
+
+### v4.0: Swarm Intelligence (Long Term)
 *   [ ] **Multi-Kea Protocol:** Instances talk to each other (Finance ↔ Legal)
 *   [ ] **Knowledge Synthesis:** Build evolving knowledge bases
+*   [ ] **Kubernetes Orchestration:** Auto-scale agent pods
 *   [ ] **Multimodal:** Gemini Flash for vision/audio
 
 ---

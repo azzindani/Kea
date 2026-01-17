@@ -93,20 +93,20 @@ async def router_node(state: GraphState) -> GraphState:
     
     # Simple routing logic (in production, use LLM classification)
     if "recalculate" in query or "what if" in query:
-        path = QueryPath.SHADOW_LAB.value
+        path = "B"  # SHADOW_LAB
     elif "compare" in query and "across" in query:
-        path = QueryPath.GRAND_SYNTHESIS.value
+        path = "C"  # GRAND_SYNTHESIS
     elif "update" in query or "latest" in query:
-        path = QueryPath.MEMORY_FORK.value
+        path = "A"  # MEMORY_FORK
     else:
-        path = QueryPath.DEEP_RESEARCH.value
+        path = "D"  # DEEP_RESEARCH
     
     logger.info(f"Router: Selected path {path}")
     
     return {
         **state,
         "path": path,
-        "status": ResearchStatus.RUNNING.value,
+        "status": "running",
     }
 
 
@@ -293,7 +293,7 @@ async def synthesizer_node(state: GraphState) -> GraphState:
     return {
         **state,
         "report": report,
-        "status": ResearchStatus.COMPLETED.value,
+        "status": "completed",
     }
 
 

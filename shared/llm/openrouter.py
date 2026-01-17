@@ -78,7 +78,7 @@ class OpenRouterProvider(LLMProvider):
         """Build the request body."""
         body: dict[str, Any] = {
             "model": config.model or DEFAULT_MODEL,
-            "messages": [{"role": m.role.value, "content": m.content} for m in messages],
+            "messages": [{"role": m.role.value if hasattr(m.role, 'value') else str(m.role), "content": m.content} for m in messages],
             "temperature": config.temperature,
             "top_p": config.top_p,
             "frequency_penalty": config.frequency_penalty,

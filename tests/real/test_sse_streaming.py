@@ -106,8 +106,9 @@ class TestSSEStreamingLive:
         
         response = await llm_provider.complete(messages, llm_config)
         
-        print(f"\n📝 Response: {response.content}")
-        assert len(response.content) > 0
+        print(f"\n📝 Response: {response.content or response.reasoning[:100] if response.reasoning else 'empty'}")
+        # Some models (reasoning models) may put content in reasoning field
+        assert len(response.content) > 0 or len(response.reasoning or "") > 0
         print(f"✅ Non-streaming complete works")
 
 

@@ -172,6 +172,9 @@ class MCPServer(ABC):
         Args:
             transport: Transport to use (defaults to StdioTransport)
         """
+        # JIT: Auto-install dependencies for this server
+        await self._ensure_dependencies()
+        
         self._transport = transport or StdioTransport()
         
         if isinstance(self._transport, StdioTransport):
@@ -187,6 +190,24 @@ class MCPServer(ABC):
             request = JSONRPCRequest(**message)
             response = await self.handle_request(request)
             await self._transport.send(response)
+    
+    async def _ensure_dependencies(self) -> None:
+        """JIT install dependencies for this server if configured."""
+        try:
+            from shared.tools import get_jit_loader
+            
+            loader = get_jit_loader()
+            success = await loader.ensure_server(self.name)
+            
+            if success:
+                # Log but don't import logger at module level (avoid circular)
+                pass
+        except ImportError:
+            # JIT loader not available, that's OK
+            pass
+        except Exception:
+            # Don't fail server startup due to JIT issues
+            pass
     
     async def stop(self) -> None:
         """Stop the server."""

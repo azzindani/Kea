@@ -68,7 +68,7 @@ _providers = {
         "enabled": True,
         "models": [
             "nvidia/nemotron-3-nano-30b-a3b:free",
-            "google/gemini-flash-1.5",
+            "deepseek/deepseek-r1-0528:free",
             "anthropic/claude-3.5-sonnet",
             "openai/gpt-4o",
         ],
@@ -122,8 +122,8 @@ async def list_models(provider: str | None = None):
             pricing_output=0.0,
         ),
         LLMModel(
-            id="google/gemini-flash-1.5",
-            name="Gemini Flash 1.5",
+            id="google/gemini-2.0-flash-exp:free",
+            name="Gemini Flash 2.0",
             provider="openrouter",
             context_length=1000000,
             supports_vision=True,
