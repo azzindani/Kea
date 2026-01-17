@@ -17,49 +17,43 @@ Kea adopts the **Model Context Protocol (MCP)** as its universal tool calling in
 
 ```mermaid
 graph TD
-    %% --- STYLES ---
-    classDef orchestrator fill:#2d3436,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef mcp fill:#0984e3,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef tool fill:#00b894,stroke:#333,stroke-width:2px,color:#fff;
-
-    %% --- THE BRAIN ---
-    Orchestrator["🧠 Orchestrator<br/>(MCP Client)"]:::orchestrator
-
-    %% --- MCP ROUTER ---
-    Router{{"🔀 MCP Router<br/>(Parallel Dispatcher)"}}:::mcp
-    Orchestrator -->|"tools/call"| Router
-
-    %% --- CORE SERVERS ---
-    subgraph Core ["Core Servers"]
-        Router --> S1["�️ scraper_server"]:::mcp
-        Router --> S2["� search_server"]:::mcp
-        Router --> S3["� python_server"]:::mcp
-        Router --> S4["�️ vision_server"]:::mcp
+    Orchestrator[Orchestrator - MCP Client]
+    Router[MCP Router - Parallel Dispatcher]
+    
+    Orchestrator --> Router
+    
+    subgraph Core[Core Servers]
+        S1[scraper_server]
+        S2[search_server]
+        S3[python_server]
+        S4[vision_server]
     end
-
-    %% --- DATA SERVERS ---
-    subgraph Data ["Data & Analytics"]
-        Router --> D1["📡 data_sources_server"]:::mcp
-        Router --> D2["📈 analytics_server"]:::mcp
-        Router --> D3["🤖 ml_server"]:::mcp
-        Router --> D4["📉 visualization_server"]:::mcp
+    
+    subgraph Data[Data and Analytics]
+        D1[data_sources_server]
+        D2[analytics_server]
+        D3[ml_server]
+        D4[visualization_server]
     end
-
-    %% --- DOMAIN SERVERS ---
-    subgraph Domain ["Domain-Specific"]
-        Router --> X1["📚 academic_server"]:::mcp
-        Router --> X2["⚖️ regulatory_server"]:::mcp
-        Router --> X3["📄 document_server"]:::mcp
-        Router --> X4["📋 qualitative_server"]:::mcp
+    
+    subgraph Domain[Domain-Specific]
+        X1[academic_server]
+        X2[regulatory_server]
+        X3[document_server]
+        X4[qualitative_server]
     end
-
-    %% --- UTILITY SERVERS ---
-    subgraph Utility ["Utility"]
-        Router --> U1["🕸️ crawler_server"]:::mcp
-        Router --> U2["🌐 browser_agent_server"]:::mcp
-        Router --> U3["🔒 security_server"]:::mcp
-        Router --> U4["🔎 tool_discovery_server"]:::mcp
+    
+    subgraph Utility[Utility Servers]
+        U1[crawler_server]
+        U2[browser_agent_server]
+        U3[security_server]
+        U4[tool_discovery_server]
     end
+    
+    Router --> Core
+    Router --> Data
+    Router --> Domain
+    Router --> Utility
 ```
 
 
@@ -427,45 +421,33 @@ The system follows a **Hub-and-Spoke Microservices Pattern**. The central Orches
 
 ```mermaid
 graph TD
-    %% --- STYLES ---
-    classDef brain fill:#2d3436,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef router fill:#0984e3,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef memory fill:#6c5ce7,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef tool fill:#00b894,stroke:#333,stroke-width:2px,color:#fff;
-
-    %% --- ACTORS ---
-    User(("User / API")) -->|Query| Gateway["API Gateway & Rate Limiter"]
-    Gateway --> Router{"Intention Router"}
-
-    %% --- THE ROUTING LAYER ---
-    Router --"Simple Q"--> FastRAG["⚡ Fast RAG / Memory"]
-    Router --"Methodology Q"--> Provenance["🔍 Provenance Graph"]
-    Router --"Recalculation"--> ShadowLab["🧮 Shadow Lab (Sandbox)"]
-    Router --"Deep Research"--> Orchestrator["🧠 Main Orchestrator"]
-
-    %% --- THE DEEP RESEARCH LOOP ---
-    subgraph CognitiveCore ["The Cognitive Core"]
-        Orchestrator --> Planner["📝 Planner & Decomposer"]
-        Planner --> Keeper["🛡️ The Keeper (Context Guard)"]
-        Keeper --> Divergence["✨ Divergence Engine (Analysis)"]
-        Divergence --> Synthesizer["✍️ Report Synthesizer"]
+    User[User / API] --> Gateway[API Gateway]
+    Gateway --> Router{Intention Router}
+    
+    Router -->|Simple| FastRAG[Fast RAG Memory]
+    Router -->|Methodology| Provenance[Provenance Graph]
+    Router -->|Recalculate| ShadowLab[Shadow Lab]
+    Router -->|Deep Research| Orchestrator[Main Orchestrator]
+    
+    subgraph CognitiveCore[The Cognitive Core]
+        Orchestrator --> Planner[Planner and Decomposer]
+        Planner --> Keeper[The Keeper]
+        Keeper --> Divergence[Divergence Engine]
+        Divergence --> Synthesizer[Report Synthesizer]
     end
-
-    %% --- THE TOOLS LAYER (The Muscle) ---
-    subgraph Tools ["Tool Microservices"]
-        Scraper["🕷️ Robotic Scraper"]:::tool
-        Analyst["🐍 Python Analyst"]:::tool
-        Meta["📊 Meta-Analysis"]:::tool
+    
+    subgraph Tools[Tool Microservices]
+        Scraper[Robotic Scraper]
+        Analyst[Python Analyst]
+        Meta[Meta-Analysis]
     end
-
-    %% --- THE MEMORY LAYER (The Vault) ---
-    subgraph MemoryVault ["The Triple-Vault Memory"]
-        Atomic["Atomic Facts DB"]:::memory
-        Episodic["Episodic Logs"]:::memory
-        Artifacts["Parquet/Blob Store"]:::memory
+    
+    subgraph MemoryVault[Triple-Vault Memory]
+        Atomic[Atomic Facts DB]
+        Episodic[Episodic Logs]
+        Artifacts[Parquet Store]
     end
-
-    %% --- CONNECTIONS ---
+    
     Orchestrator <--> Scraper
     Orchestrator <--> Analyst
     Divergence <--> Atomic
@@ -524,48 +506,35 @@ For RESEARCH queries, the **Intention Router** selects the optimal execution pat
 
 ```mermaid
 graph TD
-    %% --- STYLES ---
-    classDef trigger fill:#2d3436,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef decision fill:#0984e3,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef action fill:#00b894,stroke:#333,stroke-width:2px,color:#fff;
-    classDef output fill:#6c5ce7,stroke:#fff,stroke-width:2px,color:#fff;
-
-    %% --- MAIN FLOW ---
-    User(("User Input")):::trigger --> Router{"Intention Classifier<br/>(LLM Router)"}:::decision
-
-    %% --- PATH A: THE MEMORY FORK (Incremental) ---
-    subgraph PathA ["Path A: Incremental Research"]
-        Router --"Follow-up / Update"--> VectorCheck["🔍 Check Atomic Facts DB"]
-        VectorCheck --"Data Found"--> CacheHit["✅ Retrieve from Memory"]
-        VectorCheck --"Data Missing"--> GapDetector{"Gap Analysis"}
-        GapDetector -->|Only Search Missing| DeltaPlan["📉 Delta Planner"]
+    User[User Input] --> Router{Intention Classifier}
+    
+    subgraph PathA[Path A: Incremental Research]
+        Router -->|Follow-up| VectorCheck[Check Atomic Facts DB]
+        VectorCheck -->|Found| CacheHit[Retrieve from Memory]
+        VectorCheck -->|Missing| GapDetector{Gap Analysis}
+        GapDetector --> DeltaPlan[Delta Planner]
     end
-
-    %% --- PATH B: THE SHADOW LAB (Recalculation) ---
-    subgraph PathB ["Path B: Shadow Lab"]
-        Router --"Recalculate / Modify"--> Loader["📂 Load .parquet Artifact"]
-        Loader --> Sandbox["🐍 Python Sandbox<br/>(Execute New Formula)"]
+    
+    subgraph PathB[Path B: Shadow Lab]
+        Router -->|Recalculate| Loader[Load parquet Artifact]
+        Loader --> Sandbox[Python Sandbox]
     end
-
-    %% --- PATH C: THE GRAND SYNTHESIS (Meta-Analysis) ---
-    subgraph PathC ["Path C: Grand Synthesis"]
-        Router --"Compare / Combine"--> Librarian["📚 Librarian<br/>(Fetch Job Manifests)"]
-        Librarian --> Alchemist["⚗️ The Alchemist<br/>(Schema Alignment & Merge)"]
+    
+    subgraph PathC[Path C: Grand Synthesis]
+        Router -->|Compare| Librarian[Fetch Job Manifests]
+        Librarian --> Alchemist[Schema Alignment]
     end
-
-    %% --- PATH D: DEEP RESEARCH (Fallback) ---
-    subgraph PathD ["Path D: Zero-Shot Research"]
-        Router --"New Topic"--> Planner["🧠 Full OODA Loop Planner"]
+    
+    subgraph PathD[Path D: Deep Research]
+        Router -->|New Topic| Planner[Full OODA Loop]
     end
-
-    %% --- CONVERGENCE ---
-    CacheHit --> Synthesizer
-    DeltaPlan --> Scraper["🕷️ Robotic Scraper"]
+    
+    CacheHit --> Synthesizer[Final Synthesis]
+    DeltaPlan --> Scraper[Robotic Scraper]
     Scraper --> Synthesizer
     Sandbox --> Synthesizer
-    Alchemist --> Synthesizer["✍️ Final Synthesis"]:::output
+    Alchemist --> Synthesizer
     Planner --> Scraper
-
 ```
 
 ---
@@ -585,9 +554,9 @@ sequenceDiagram
     Scraper->>Quarantine: Ingest Raw Text (Chunked)
     loop Every Chunk
         Quarantine->>Keeper: Send Vector(Chunk)
-        Keeper->>Keeper: Calc Cosine Similarity(User_Intent, Chunk)
-        alt Similarity < 0.75 (Drift Detected)
-            Keeper-->>Quarantine: 🔥 INCINERATE (Ignore)
+        Keeper->>Keeper: Calc Cosine Similarity
+        alt Similarity < 0.75
+            Keeper-->>Quarantine: INCINERATE (Ignore)
         else Similarity > 0.75
             Keeper->>Brain: Release to Context
         end

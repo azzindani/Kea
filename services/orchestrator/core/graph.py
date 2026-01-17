@@ -238,11 +238,10 @@ async def critic_node(state: GraphState) -> GraphState:
     facts = state.get("facts", [])
     sources = state.get("sources", [])
     
-    # Use real Critic agent with LLM
     critic = CriticAgent()
     feedback = await critic.critique(generator_output, facts, sources)
     
-    record_llm_call("critic", success=True)
+    logger.info(f"Critic: Critique complete ({len(feedback)} chars)")
     
     return {
         **state,
@@ -261,11 +260,10 @@ async def judge_node(state: GraphState) -> GraphState:
     generator_output = state.get("generator_output", "")
     critic_feedback = state.get("critic_feedback", "")
     
-    # Use real Judge agent with LLM
     judge = JudgeAgent()
     result = await judge.judge(query, generator_output, critic_feedback)
     
-    record_llm_call("judge", success=True)
+    logger.info(f"Judge: Verdict={result.get('verdict')}, Confidence={result.get('confidence')}")
     
     return {
         **state,
