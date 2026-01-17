@@ -25,7 +25,7 @@ API_GATEWAY_URL = os.getenv("API_GATEWAY_URL", "http://localhost:8080")
 ORCHESTRATOR_URL = os.getenv("ORCHESTRATOR_URL", "http://localhost:8000")
 
 # Test user credentials (will be created if not exists)
-TEST_USER_EMAIL = "stress_test@kea.local"
+TEST_USER_EMAIL = "stress_test@example.com"
 TEST_USER_PASSWORD = "stress_test_password_123"
 TEST_USER_NAME = "Stress Test User"
 
