@@ -8,10 +8,15 @@ from __future__ import annotations
 
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from shared.logging import get_logger
+
+
+# Orchestrator URL for API calls
+ORCHESTRATOR_URL = "http://localhost:8000"
 
 
 logger = get_logger(__name__)
@@ -59,37 +64,82 @@ class ToolCallResponse(BaseModel):
 
 @router.get("/servers")
 async def list_servers():
-    """List all MCP servers and their status."""
-    # Placeholder: Query orchestrator for server status
-    return {
-        "servers": [
-            {"name": "scraper_server", "status": "configured", "tools_count": 2},
-            {"name": "python_server", "status": "configured", "tools_count": 3},
-            {"name": "search_server", "status": "configured", "tools_count": 2},
-            {"name": "vision_server", "status": "configured", "tools_count": 2},
-            {"name": "analysis_server", "status": "configured", "tools_count": 2},
-        ]
-    }
+    """List all MCP servers and their status from Orchestrator."""
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            # Get health to check MCP server count
+            response = await client.get(f"{ORCHESTRATOR_URL}/health")
+            
+            if response.status_code != 200:
+                raise Exception(f"Orchestrator returned {response.status_code}")
+            
+            health_data = response.json()
+            mcp_count = health_data.get("mcp_servers", 0)
+            
+            # Get tools to build server list
+            tools_response = await client.get(f"{ORCHESTRATOR_URL}/tools")
+            tools_data = tools_response.json()
+            
+            # Group tools by inferred server name
+            servers = {}
+            for tool in tools_data.get("tools", []):
+                name = tool.get("name", "unknown")
+                # Infer server from tool name (e.g., "web_search" -> "search_server")
+                if "_" in name:
+                    server_name = name.split("_")[0] + "_server"
+                else:
+                    server_name = name + "_server"
+                
+                if server_name not in servers:
+                    servers[server_name] = {"name": server_name, "status": "active", "tools_count": 0}
+                servers[server_name]["tools_count"] += 1
+            
+            return {
+                "servers": list(servers.values()),
+                "total": len(servers),
+                "orchestrator_status": "healthy",
+            }
+            
+    except Exception as e:
+        logger.warning(f"Could not reach orchestrator: {e}")
+        return {
+            "servers": [],
+            "error": f"Orchestrator unavailable: {str(e)}",
+            "orchestrator_status": "unhealthy",
+        }
 
 
 @router.get("/tools")
 async def list_tools():
-    """List all available tools from all servers."""
-    return {
-        "tools": [
-            {"name": "fetch_url", "server": "scraper_server", "description": "Fetch URL via HTTP"},
-            {"name": "browser_scrape", "server": "scraper_server", "description": "Scrape with headless browser"},
-            {"name": "execute_code", "server": "python_server", "description": "Execute Python code"},
-            {"name": "dataframe_ops", "server": "python_server", "description": "Pandas operations"},
-            {"name": "sql_query", "server": "python_server", "description": "DuckDB SQL queries"},
-            {"name": "web_search", "server": "search_server", "description": "Web search"},
-            {"name": "news_search", "server": "search_server", "description": "News search"},
-            {"name": "screenshot_extract", "server": "vision_server", "description": "Extract from images"},
-            {"name": "chart_reader", "server": "vision_server", "description": "Read charts"},
-            {"name": "meta_analysis", "server": "analysis_server", "description": "Cross-source analysis"},
-            {"name": "trend_detection", "server": "analysis_server", "description": "Trend analysis"},
-        ]
-    }
+    """List all available tools from Orchestrator."""
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.get(f"{ORCHESTRATOR_URL}/tools")
+            
+            if response.status_code != 200:
+                raise Exception(f"Orchestrator returned {response.status_code}")
+            
+            data = response.json()
+            tools = data.get("tools", [])
+            
+            return {
+                "tools": [
+                    {
+                        "name": t.get("name"),
+                        "description": t.get("description", ""),
+                        "server": t.get("server", "unknown"),
+                    }
+                    for t in tools
+                ],
+                "total": len(tools),
+            }
+            
+    except Exception as e:
+        logger.warning(f"Could not reach orchestrator: {e}")
+        return {
+            "tools": [],
+            "error": f"Orchestrator unavailable: {str(e)}",
+        }
 
 
 @router.get("/tools/{tool_name}")

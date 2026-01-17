@@ -2,6 +2,7 @@
 Stress Test Fixtures.
 
 Pytest fixtures and configuration for stress testing Kea.
+Includes API client with authentication support.
 """
 
 import pytest
@@ -10,8 +11,23 @@ import logging
 import os
 import sys
 
+import httpx
+
 from tests.stress.metrics import MetricsCollector
 from tests.stress.queries import QUERIES, get_query
+
+
+# =============================================================================
+# API Configuration
+# =============================================================================
+
+API_GATEWAY_URL = os.getenv("API_GATEWAY_URL", "http://localhost:8080")
+ORCHESTRATOR_URL = os.getenv("ORCHESTRATOR_URL", "http://localhost:8000")
+
+# Test user credentials (will be created if not exists)
+TEST_USER_EMAIL = "stress_test@example.com"
+TEST_USER_PASSWORD = "stress_test_password_123"
+TEST_USER_NAME = "Stress Test User"
 
 
 # =============================================================================
@@ -66,6 +82,153 @@ def pytest_addoption(parser):
 
 
 # =============================================================================
+# API Authentication Fixtures
+# =============================================================================
+
+class AuthenticatedAPIClient:
+    """
+    HTTP client with automatic authentication.
+    
+    Handles JWT token management for stress test API calls.
+    """
+    
+    def __init__(self, base_url: str = API_GATEWAY_URL):
+        self.base_url = base_url
+        self.access_token: str | None = None
+        self.refresh_token: str | None = None
+        self.user_id: str | None = None
+        self._client: httpx.AsyncClient | None = None
+    
+    async def __aenter__(self):
+        """Async context manager entry."""
+        await self.initialize()
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit."""
+        await self.close()
+    
+    async def initialize(self):
+        """Initialize HTTP client and authenticate."""
+        self._client = httpx.AsyncClient(timeout=300.0)
+        await self._authenticate()
+    
+    async def close(self):
+        """Close HTTP client."""
+        if self._client:
+            await self._client.aclose()
+            self._client = None
+    
+    async def _authenticate(self):
+        """
+        Authenticate with test user credentials.
+        
+        Attempts login first; if user doesn't exist, registers.
+        """
+        # Try login first
+        try:
+            response = await self._client.post(
+                f"{self.base_url}/api/v1/auth/login",
+                json={
+                    "email": TEST_USER_EMAIL,
+                    "password": TEST_USER_PASSWORD,
+                },
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                self.access_token = data["access_token"]
+                self.refresh_token = data["refresh_token"]
+                self.user_id = data["user"]["user_id"]
+                return
+        except Exception:
+            pass
+        
+        # If login fails, register new user
+        response = await self._client.post(
+            f"{self.base_url}/api/v1/auth/register",
+            json={
+                "email": TEST_USER_EMAIL,
+                "name": TEST_USER_NAME,
+                "password": TEST_USER_PASSWORD,
+            },
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            self.access_token = data["access_token"]
+            self.refresh_token = data["refresh_token"]
+            self.user_id = data["user"]["user_id"]
+        else:
+            raise Exception(f"Failed to authenticate: {response.text}")
+    
+    @property
+    def headers(self) -> dict:
+        """Get headers with authorization."""
+        headers = {"Content-Type": "application/json"}
+        if self.access_token:
+            headers["Authorization"] = f"Bearer {self.access_token}"
+        return headers
+    
+    async def get(self, path: str, **kwargs) -> httpx.Response:
+        """Make authenticated GET request."""
+        return await self._client.get(
+            f"{self.base_url}{path}",
+            headers=self.headers,
+            **kwargs,
+        )
+    
+    async def post(self, path: str, **kwargs) -> httpx.Response:
+        """Make authenticated POST request."""
+        return await self._client.post(
+            f"{self.base_url}{path}",
+            headers=self.headers,
+            **kwargs,
+        )
+    
+    async def delete(self, path: str, **kwargs) -> httpx.Response:
+        """Make authenticated DELETE request."""
+        return await self._client.delete(
+            f"{self.base_url}{path}",
+            headers=self.headers,
+            **kwargs,
+        )
+    
+    async def stream(self, method: str, path: str, **kwargs):
+        """Make streaming request."""
+        return self._client.stream(
+            method,
+            f"{self.base_url}{path}",
+            headers=self.headers,
+            **kwargs,
+        )
+
+
+@pytest.fixture(scope="session")
+async def api_client():
+    """
+    Session-scoped authenticated API client.
+    
+    Automatically registers/logs in test user.
+    """
+    client = AuthenticatedAPIClient()
+    await client.initialize()
+    yield client
+    await client.close()
+
+
+@pytest.fixture
+async def fresh_api_client():
+    """
+    Function-scoped authenticated API client.
+    
+    Creates fresh client for each test.
+    """
+    async with AuthenticatedAPIClient() as client:
+        yield client
+
+
+# =============================================================================
 # Session-scoped Fixtures
 # =============================================================================
 
@@ -101,20 +264,32 @@ def llm_provider():
     return OpenRouterProvider(api_key=api_key)
 
 
-@pytest.fixture(scope="session")
-async def research_pipeline(hardware_profile):
-    """
-    Initialize research pipeline for stress tests.
-    
-    May fail on constrained hardware.
-    """
+# =============================================================================
+# Service Check Fixtures
+# =============================================================================
+
+async def check_service(url: str) -> bool:
+    """Check if a service is available."""
     try:
-        from services.orchestrator.core.pipeline import get_research_pipeline
-        pipeline = get_research_pipeline()
-        await pipeline.initialize()
-        yield pipeline
-    except Exception as e:
-        pytest.skip(f"Pipeline not available: {e}")
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get(f"{url}/health")
+            return resp.status_code == 200
+    except Exception:
+        return False
+
+
+@pytest.fixture(scope="session")
+async def services_available():
+    """Check that all required services are running."""
+    api_ok = await check_service(API_GATEWAY_URL)
+    orch_ok = await check_service(ORCHESTRATOR_URL)
+    
+    if not api_ok:
+        pytest.skip(f"API Gateway not running at {API_GATEWAY_URL}")
+    if not orch_ok:
+        pytest.skip(f"Orchestrator not running at {ORCHESTRATOR_URL}")
+    
+    return {"api_gateway": api_ok, "orchestrator": orch_ok}
 
 
 # =============================================================================
