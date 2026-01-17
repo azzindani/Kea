@@ -148,64 +148,88 @@ async def planner_node(state: GraphState) -> GraphState:
 
 
 async def researcher_node(state: GraphState) -> GraphState:
-    """Execute research using MCP tools."""
+    """Execute research using direct tool calls (bypassing MCP server layer)."""
     iteration = state.get("iteration", 1)
     
     logger.info("\n" + "="*70)
-    logger.info(f"📍 STEP 3: RESEARCHER NODE (Iteration {iteration}) - MCP Tool Calls")
+    logger.info(f"📍 STEP 3: RESEARCHER NODE (Iteration {iteration}) - Web Search")
     logger.info("="*70)
     
     sub_queries = state.get("sub_queries", [])
+    query = state.get("query", "")
     facts = state.get("facts", [])
     sources = state.get("sources", [])
     
+    # If no sub_queries, use the main query
+    if not sub_queries:
+        sub_queries = [query]
+    
     logger.info(f"Sub-queries to research: {len(sub_queries)}")
     
-    # Import MCP client for tool calls
+    # Import the tool directly (bypasses MCP server layer)
     try:
-        from services.orchestrator.mcp.client import MCPOrchestrator
-        
-        orchestrator = MCPOrchestrator()
+        from mcp_servers.search_server.tools.web_search import web_search_tool
         
         # Execute search for each sub-query
-        for i, sub_query in enumerate(sub_queries[:3], 1):
-            logger.info(f"\n🔍 Tool Call {i}: web_search")
+        for i, sub_query in enumerate(sub_queries[:5], 1):  # Up to 5 searches
+            logger.info(f"\n🔍 Tool Call {i}: web_search (DIRECT)")
             logger.info(f"   Query: {sub_query[:80]}...")
             
             try:
-                result = await orchestrator.call_tool(
-                    "web_search",
-                    {"query": sub_query, "max_results": 5}
-                )
+                result = await web_search_tool({
+                    "query": sub_query, 
+                    "max_results": 5
+                })
                 
                 # Parse search results into facts
                 if result and hasattr(result, "content"):
                     for content in result.content:
                         if hasattr(content, "text"):
-                            fact = {
-                                "text": content.text[:500],
-                                "query": sub_query,
-                                "source": "web_search",
-                            }
-                            facts.append(fact)
-                            logger.info(f"   ✅ Fact extracted: {fact['text'][:80]}...")
+                            # Check if it's an error
+                            if result.isError:
+                                logger.info(f"   ⚠️ Search returned error: {content.text[:100]}")
+                            else:
+                                fact = {
+                                    "text": content.text[:1000],
+                                    "query": sub_query,
+                                    "source": "web_search",
+                                }
+                                facts.append(fact)
+                                logger.info(f"   ✅ Search results extracted ({len(content.text)} chars)")
+                                logger.info(f"   Preview: {content.text[:200]}...")
+                                
+                                # Extract sources from results
+                                if "http" in content.text:
+                                    # Simple URL extraction
+                                    import re
+                                    urls = re.findall(r'\((https?://[^\)]+)\)', content.text)
+                                    for url in urls[:3]:
+                                        sources.append({"url": url, "title": sub_query})
                 else:
-                    logger.info(f"   ⚠️ No content returned from tool")
+                    logger.info(f"   ⚠️ No content returned from search")
                             
             except Exception as e:
                 logger.info(f"   ❌ Tool error: {e}")
                 logger.warning(f"Research tool error: {e}")
                 
-    except Exception as e:
-        logger.info(f"❌ MCP Orchestrator error: {e}")
-        logger.error(f"MCP Orchestrator error: {e}")
-        # Fallback: generate placeholder facts
+    except ImportError as e:
+        logger.error(f"Could not import web_search_tool: {e}")
+        # Fallback: use LLM knowledge only
         facts.append({
-            "text": f"Research in progress for: {sub_queries[0] if sub_queries else 'query'}",
+            "text": f"Research context for: {query}. Using LLM knowledge as external search unavailable.",
+            "query": query,
+            "source": "llm_fallback",
+        })
+    except Exception as e:
+        logger.info(f"❌ Search error: {e}")
+        logger.error(f"Research error: {e}")
+        facts.append({
+            "text": f"Research in progress for: {sub_queries[0] if sub_queries else query}",
             "source": "fallback",
         })
     
     logger.info(f"\n✅ Total Facts Collected: {len(facts)}")
+    logger.info(f"✅ Total Sources Found: {len(sources)}")
     logger.info("="*70 + "\n")
     
     return {
