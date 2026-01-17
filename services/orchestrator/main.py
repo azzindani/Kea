@@ -17,7 +17,7 @@ from services.orchestrator.core.graph import compile_research_graph, GraphState
 from services.orchestrator.mcp.client import get_mcp_orchestrator
 from shared.config import get_settings
 from shared.logging import get_logger
-from shared.middleware import RequestLoggingMiddleware
+from shared.logging.middleware import RequestLoggingMiddleware
 from shared.schemas import ResearchStatus
 
 logger = get_logger(__name__)
