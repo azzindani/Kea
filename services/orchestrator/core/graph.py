@@ -173,6 +173,9 @@ async def researcher_node(state: GraphState) -> GraphState:
     sources = state.get("sources", [])
     tool_invocations = state.get("tool_invocations", [])
     
+    # URL pool - collect URLs from search results for crawlers to use
+    url_pool = state.get("url_pool", [])
+    
     # If no execution plan, fall back to sub-queries with web_search
     if not micro_tasks:
         logger.info("No execution plan, falling back to sub-query based web search")
@@ -284,11 +287,20 @@ async def researcher_node(state: GraphState) -> GraphState:
                 # Allow LLM to specify depth - no hard limit
                 return {
                     "start_url": original_inputs["start_url"],
-                    "max_depth": original_inputs.get("max_depth", 5),  # Default 5, can go higher
-                    "max_pages": original_inputs.get("max_pages", 100),  # 100 pages per crawl
+                    "max_depth": original_inputs.get("max_depth", 5),
+                    "max_pages": original_inputs.get("max_pages", 100),
                     "same_domain": original_inputs.get("same_domain", True),
                 }
-            return None  # Need URL
+            # Try to use URL from pool (collected from earlier search results)
+            if url_pool:
+                crawl_url = url_pool.pop(0)  # Take first URL from pool
+                logger.info(f"   📋 Using URL from pool: {crawl_url[:50]}...")
+                return {
+                    "start_url": crawl_url,
+                    "max_depth": 3,
+                    "max_pages": 50,
+                }
+            return None  # No URL available, use fallback
         
         if tool_name in ["sitemap_parser", "link_extractor"]:
             if "url" in original_inputs:
@@ -426,12 +438,37 @@ async def researcher_node(state: GraphState) -> GraphState:
                         success = True  # Mark as successful when we got valid content
                         logger.info(f"   ✅ Result extracted ({len(content.text)} chars)")
                         
-                        # Extract URLs as sources
-                        if "http" in content.text:
-                            import re
-                            urls = re.findall(r'\((https?://[^\)]+)\)', content.text)
-                            for url in urls[:3]:
-                                sources.append({"url": url, "title": description[:100], "tool": used_tool})
+                        # Extract URLs using multiple patterns
+                        import re
+                        text = content.text
+                        
+                        # Pattern 1: URLs in parentheses (markdown links)
+                        urls_paren = re.findall(r'\((https?://[^\)\s]+)\)', text)
+                        
+                        # Pattern 2: URLs in brackets [url]
+                        urls_bracket = re.findall(r'\[(https?://[^\]\s]+)\]', text)
+                        
+                        # Pattern 3: Standalone URLs
+                        urls_standalone = re.findall(r'(?<![(\[])(https?://[^\s\)\]<>"]+)', text)
+                        
+                        # Combine all URLs, remove duplicates
+                        all_urls = list(set(urls_paren + urls_bracket + urls_standalone))
+                        
+                        for url in all_urls[:10]:  # Keep up to 10 URLs per result
+                            # Clean URL
+                            url = url.rstrip('.,;:')
+                            if len(url) > 20:  # Skip very short/broken URLs
+                                sources.append({
+                                    "url": url, 
+                                    "title": description[:80], 
+                                    "tool": used_tool,
+                                    "task_id": task_id,
+                                })
+                                # Add to URL pool for other tasks
+                                url_pool.append(url)
+                        
+                        if all_urls:
+                            logger.info(f"   🔗 URLs extracted: {len(all_urls)}")
         
         # Record tool invocation with proper success tracking
         tool_invocations.append({
@@ -460,6 +497,7 @@ async def researcher_node(state: GraphState) -> GraphState:
         "facts": facts,
         "sources": sources,
         "tool_invocations": tool_invocations,
+        "url_pool": url_pool,  # Persist URLs for recursive crawling
     }
 
 
