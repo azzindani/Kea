@@ -17,37 +17,37 @@ Kea adopts the **Model Context Protocol (MCP)** as its universal tool calling in
 
 ```mermaid
 graph TD
-    Orchestrator[Orchestrator - MCP Client]
-    Router[MCP Router - Parallel Dispatcher]
+    Orchestrator["Orchestrator - MCP Client<br/>(services/orchestrator/mcp/client.py)"]
+    Router["MCP Router - Parallel Dispatcher<br/>(services/orchestrator/mcp/parallel_executor.py)"]
     
     Orchestrator --> Router
     
     subgraph Core[Core Servers]
-        S1[scraper_server]
-        S2[search_server]
-        S3[python_server]
-        S4[vision_server]
+        S1["scraper_server<br/>(mcp_servers/scraper_server)"]
+        S2["search_server<br/>(mcp_servers/search_server)"]
+        S3["python_server<br/>(mcp_servers/python_server)"]
+        S4["vision_server<br/>(mcp_servers/vision_server)"]
     end
     
     subgraph Data[Data and Analytics]
-        D1[data_sources_server]
-        D2[analytics_server]
-        D3[ml_server]
-        D4[visualization_server]
+        D1["data_sources_server<br/>(mcp_servers/data_sources_server)"]
+        D2["analytics_server<br/>(mcp_servers/analytics_server)"]
+        D3["ml_server<br/>(mcp_servers/ml_server)"]
+        D4["visualization_server<br/>(mcp_servers/visualization_server)"]
     end
     
     subgraph Domain[Domain-Specific]
-        X1[academic_server]
-        X2[regulatory_server]
-        X3[document_server]
-        X4[qualitative_server]
+        X1["academic_server<br/>(mcp_servers/academic_server)"]
+        X2["regulatory_server<br/>(mcp_servers/regulatory_server)"]
+        X3["document_server<br/>(mcp_servers/document_server)"]
+        X4["qualitative_server<br/>(mcp_servers/qualitative_server)"]
     end
     
     subgraph Utility[Utility Servers]
-        U1[crawler_server]
-        U2[browser_agent_server]
-        U3[security_server]
-        U4[tool_discovery_server]
+        U1["crawler_server<br/>(mcp_servers/crawler_server)"]
+        U2["browser_agent_server<br/>(mcp_servers/browser_agent_server)"]
+        U3["security_server<br/>(mcp_servers/security_server)"]
+        U4["tool_discovery_server<br/>(mcp_servers/tool_discovery_server)"]
     end
     
     Router --> Core
@@ -421,31 +421,31 @@ The system follows a **Hub-and-Spoke Microservices Pattern**. The central Orches
 
 ```mermaid
 graph TD
-    User[User / API] --> Gateway[API Gateway]
-    Gateway --> Router{Intention Router}
+    User[User / API] --> Gateway["API Gateway<br/>(services/api_gateway/main.py)"]
+    Gateway --> Router{"Intention Router<br/>(services/orchestrator/core/router.py)"}
     
-    Router -->|Simple| FastRAG[Fast RAG Memory]
+    Router -->|Simple| FastRAG["Fast RAG Memory<br/>(services/rag_service)"]
     Router -->|Methodology| Provenance[Provenance Graph]
-    Router -->|Recalculate| ShadowLab[Shadow Lab]
-    Router -->|Deep Research| Orchestrator[Main Orchestrator]
+    Router -->|Recalculate| ShadowLab["Shadow Lab<br/>(workers/shadow_lab_worker.py)"]
+    Router -->|Deep Research| Orchestrator["Main Orchestrator<br/>(services/orchestrator/core/pipeline.py)"]
     
     subgraph CognitiveCore[The Cognitive Core]
-        Orchestrator --> Planner[Planner and Decomposer]
-        Planner --> Keeper[The Keeper]
-        Keeper --> Divergence[Divergence Engine]
-        Divergence --> Synthesizer[Report Synthesizer]
+        Orchestrator --> Planner["Planner and Decomposer<br/>(services/orchestrator/nodes/planner.py)"]
+        Planner --> Keeper["The Keeper<br/>(services/orchestrator/nodes/keeper.py)"]
+        Keeper --> Divergence["Divergence Engine<br/>(services/orchestrator/nodes/divergence.py)"]
+        Divergence --> Synthesizer["Report Synthesizer<br/>(services/orchestrator/nodes/synthesizer.py)"]
     end
     
     subgraph Tools[Tool Microservices]
-        Scraper[Robotic Scraper]
-        Analyst[Python Analyst]
+        Scraper["Robotic Scraper<br/>(mcp_servers/scraper_server)"]
+        Analyst["Python Analyst<br/>(mcp_servers/python_server)"]
         Meta[Meta-Analysis]
     end
     
     subgraph MemoryVault[Triple-Vault Memory]
-        Atomic[Atomic Facts DB]
+        Atomic["Atomic Facts DB<br/>(services/rag_service/core/vector_store.py)"]
         Episodic[Episodic Logs]
-        Artifacts[Parquet Store]
+        Artifacts["Parquet Store<br/>(services/rag_service/core/artifact_store.py)"]
     end
     
     Orchestrator <--> Scraper
@@ -546,10 +546,10 @@ graph TD
 
 ```mermaid
 sequenceDiagram
-    participant Scraper as Robotic Scraper
+    participant Scraper as Robotic Scraper<br/>(mcp_servers/scraper_server)
     participant Quarantine as Quarantine Zone
-    participant Keeper as The Keeper
-    participant Brain as Orchestrator
+    participant Keeper as The Keeper<br/>(services/orchestrator/nodes/keeper.py)
+    participant Brain as Orchestrator<br/>(services/orchestrator/core/graph.py)
 
     Scraper->>Quarantine: Ingest Raw Text (Chunked)
     loop Every Chunk
@@ -569,16 +569,16 @@ sequenceDiagram
 ```mermaid
 graph LR
     Hypothesis(Expected: Revenue UP) --Collision--> Reality(Observed: Revenue DOWN)
-    Reality --> Trigger{Divergence Type?}
+    Reality --> Trigger{"Divergence Type?<br/>(services/orchestrator/nodes/divergence.py)"}
     
-    Trigger --"Numbers Wrong?"--> AgentA[Data Scientist: Normalize Units]
-    Trigger --"Missing Factor?"--> AgentB[News Scout: Find Disruptions]
-    Trigger --"Bias?"--> AgentC[Judge: Check Source Credibility]
+    Trigger --"Numbers Wrong?"--> AgentA["Data Scientist: Normalize Units<br/>(services/orchestrator/agents/generator.py)"]
+    Trigger --"Missing Factor?"--> AgentB["News Scout: Find Disruptions<br/>(services/orchestrator/agents/generator.py)"]
+    Trigger --"Bias?"--> AgentC["Judge: Check Source Credibility<br/>(services/orchestrator/agents/judge.py)"]
     
     AgentA --> Synthesis
     AgentB --> Synthesis
     AgentC --> Synthesis
-    Synthesis --> FinalReport[Explained Contradiction]
+    Synthesis --> FinalReport["Explained Contradiction<br/>(services/orchestrator/nodes/synthesizer.py)"]
 ```
 
 ---
@@ -614,10 +614,10 @@ To optimize for **cost** and **accuracy**, Kea uses a hierarchical model strateg
 
 ```mermaid
 sequenceDiagram
-    participant Planner as 📝 Planner
-    participant Architect as 🏗️ Architect (Small LLM)
+    participant Planner as 📝 Planner<br/>(services/orchestrator/nodes/planner.py)
+    participant Architect as 🏗️ Architect (Small LLM)<br/>(services/orchestrator/core/prompt_factory.py)
     participant Worker as 👷 Worker (Large LLM)
-    participant Tool as 🛠️ Python Tool
+    participant Tool as 🛠️ Python Tool<br/>(mcp_servers/python_server)
 
     Planner->>Architect: Send Task Context
     Note over Architect: Generates strict <br/>System Prompt
@@ -646,16 +646,16 @@ graph TD
     classDef role fill:#fff,stroke:#333,stroke-width:2px;
     classDef decision fill:#0984e3,stroke:#fff,stroke-width:2px,color:#fff;
 
-    Start((Start)) --> Generator["🤠 Generator (Gather Data)"]:::role
+    Start((Start)) --> Generator["🤠 Generator (Gather Data)<br/>(services/orchestrator/agents/generator.py)"]:::role
     Generator --> Output["Draft Report"]
-    Output --> Critic["🧐 Critic (Audit & Attack)"]:::role
+    Output --> Critic["🧐 Critic (Audit & Attack)<br/>(services/orchestrator/agents/critic.py)"]:::role
     
     Critic --> Review{Pass Audit?}:::decision
     
     Review --"No (Flaws Found)"--> Feedback["📝 Correction Instructions"]
     Feedback --> Generator
     
-    Review --"Yes (Verified)"--> Judge["⚖️ Judge (Final Polish)"]:::role
+    Review --"Yes (Verified)"--> Judge["⚖️ Judge (Final Polish)<br/>(services/orchestrator/agents/judge.py)"]:::role
     Judge --> Final((Final Output))
 ```
 
@@ -689,21 +689,21 @@ graph TD
 
     %% --- 1. OBSERVE (The Senses) ---
     subgraph Phase1 ["Phase 1: OBSERVE (Execution)"]
-        Planner("📝 Current Plan"):::act --> Trigger("🚀 Trigger Agents"):::act
-        Trigger --> Scraper("🕷️ Robotic Scraper"):::observe
+        Planner("📝 Current Plan<br/>(services/orchestrator/nodes/planner.py)"):::act --> Trigger("🚀 Trigger Agents"):::act
+        Trigger --> Scraper("🕷️ Robotic Scraper<br/>(mcp_servers/scraper_server)"):::observe
         Scraper --> RawData["📄 Raw Ingested Data"]:::observe
     end
 
     %% --- 2. ORIENT (The Context) ---
     subgraph Phase2 ["Phase 2: ORIENT (Context Check)"]
-        RawData --> Keeper{"🛡️ The Keeper"}:::orient
+        RawData --> Keeper{"🛡️ The Keeper<br/>(services/orchestrator/nodes/keeper.py)"}:::orient
         Keeper --"Drift Detected<br/>(Irrelevant)"--> Incinerator("🔥 Prune Branch"):::fail
         Keeper --"Context Valid"--> ContextData["✅ Contextualized Facts"]:::orient
     end
 
     %% --- 3. DECIDE (The Hypothesis) ---
     subgraph Phase3 ["Phase 3: DECIDE (Divergence Check)"]
-        ContextData --> Divergence{"✨ Divergence Engine"}:::decide
+        ContextData --> Divergence{"✨ Divergence Engine<br/>(services/orchestrator/nodes/divergence.py)"}:::decide
         Divergence --"Hypothesis Confirmed"--> Success["🏁 Validated Fact"]:::decide
         Divergence --"Hypothesis FAILED"--> Collision("💥 Collision Detected"):::decide
     end
@@ -715,15 +715,14 @@ graph TD
         Abductive --"Missing Factor?"--> NewFactor["➕ Add Variable: Weather/Strike"]:::act
         Abductive --"Bad Data?"--> NewSource["🔄 Switch Source: Gov vs News"]:::act
         
-        NewFactor --> RePlan("🔄 Reformulate Plan"):::act
+        NewFactor --> RePlan("🔄 Reformulate Plan<br/>(services/orchestrator/nodes/planner.py)"):::act
         NewSource --> RePlan
     end
 
     %% --- THE LOOP ---
     RePlan -.->|Recursive Loop| Planner
-    Success --> Synthesizer("✍️ Final Synthesis")
-
-```
+    Success --> Synthesizer("✍️ Final Synthesis<br/>(services/orchestrator/nodes/synthesizer.py)")
+`````
 ---
 
 ### 4.4. Conversational Memory (`conversation.py`)
@@ -789,10 +788,10 @@ graph LR
     classDef db fill:#6c5ce7,stroke:#fff,stroke-width:2px,color:#fff;
 
     %% --- INGESTION ---
-    RawDoc["📄 Raw Document<br/>(PDF / HTML)"]:::raw --> Atomizer["⚛️ The Atomizer Agent<br/>(LLM Extractor)"]:::process
+    RawDoc["📄 Raw Document<br/>(PDF / HTML)"]:::raw --> Atomizer["⚛️ The Atomizer Agent<br/>(services/rag_service/core/vector_store.py)"]:::process
 
     %% --- THE SCHEMA TRANSFORMATION ---
-    Atomizer --> FactJSON["🧩 Atomic Fact (JSON)"]:::schema
+    Atomizer --> FactJSON["🧩 Atomic Fact (JSON)<br/>(shared/schemas.py)"]:::schema
     
     subgraph SchemaDetail ["The Schema Structure"]
         FactJSON --"Entity: Adaro"--> F1["Entity"]
