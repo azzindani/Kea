@@ -12,9 +12,25 @@ This enables true autonomous data processing - Kea decides what code to write.
 from __future__ import annotations
 
 import os
+import re
+import unicodedata
 from shared.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+def sanitize_for_code(text: str) -> str:
+    """
+    Sanitize text for embedding in Python code.
+    Removes non-ASCII characters that cause SyntaxError.
+    """
+    # Normalize Unicode (convert special chars to ASCII equivalents)
+    text = unicodedata.normalize('NFKD', text)
+    # Remove non-ASCII characters
+    text = text.encode('ascii', 'ignore').decode('ascii')
+    # Clean up multiple spaces
+    text = re.sub(r'\s+', ' ', text)
+    return text.strip()
 
 
 # Code generation prompt - instructs LLM to write executable Python
@@ -121,18 +137,20 @@ def generate_fallback_code(task_description: str, facts: list[dict] | None = Non
     
     NOTE: pd, np, duckdb are pre-loaded in sandbox - NO imports needed.
     """
-    desc_lower = task_description.lower()
+    # Sanitize description to remove Unicode chars that break Python
+    desc = sanitize_for_code(task_description)
+    desc_lower = desc.lower()
     
-    # Extract any data from facts if available
+    # Extract any data from facts if available (sanitized)
     data_str = ""
     if facts:
         for fact in facts[:3]:
-            text = fact.get("text", "")
+            text = sanitize_for_code(fact.get("text", ""))
             if "company" in text.lower() or "ticker" in text.lower():
                 data_str += f"# Data from research:\n# {text[:200]}\n"
     
     if any(kw in desc_lower for kw in ["filter", "market cap", "select", "candidates"]):
-        code = f'''{data_str}# {task_description[:80]}
+        code = f'''{data_str}# {desc[:80]}
 # Using collected research data
 data = {{
     'company': ['ASII', 'BBCA', 'TLKM', 'UNVR', 'BMRI'],
@@ -147,7 +165,7 @@ print(result.to_markdown())
 '''
         
     elif any(kw in desc_lower for kw in ["dupont", "roe", "margin", "turnover"]):
-        code = f'''{data_str}# {task_description[:80]}
+        code = f'''{data_str}# {desc[:80]}
 data = {{
     'company': ['ASII', 'BBCA', 'TLKM'],
     'net_income': [35, 45, 28],
@@ -165,7 +183,7 @@ print(df.to_markdown())
 '''
         
     elif any(kw in desc_lower for kw in ["growth", "revenue", "calculate"]):
-        code = f'''{data_str}# {task_description[:80]}
+        code = f'''{data_str}# {desc[:80]}
 data = {{
     'company': ['ASII', 'BBCA', 'TLKM'],
     'revenue_2023': [280, 95, 150],
@@ -177,7 +195,7 @@ print("Revenue Growth Analysis:")
 print(df.to_markdown())
 '''
     else:
-        code = f'''{data_str}# {task_description[:80]}
+        code = f'''{data_str}# {desc[:80]}
 data = {{
     'metric': ['Analysis 1', 'Analysis 2', 'Analysis 3'],
     'status': ['Completed', 'In Progress', 'Pending']
