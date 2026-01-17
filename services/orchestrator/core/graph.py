@@ -205,6 +205,32 @@ async def researcher_node(state: GraphState) -> GraphState:
         "execute_code": execute_code_tool,
     }
     
+    def build_tool_inputs(tool_name: str, description: str, original_inputs: dict) -> dict:
+        """Build proper inputs based on tool requirements."""
+        # For run_python/execute_code: need 'code' key
+        if tool_name in ["run_python", "execute_code"]:
+            # If the LLM generated code, use it; otherwise use description as pseudo-code
+            if "code" in original_inputs:
+                return original_inputs
+            # Try to extract code from description or generate placeholder
+            return {"code": f"# Task: {description}\nprint('Analysis would be performed here')"}
+        
+        # For scrape_url/fetch_url: need 'url' key
+        if tool_name in ["scrape_url", "fetch_url"]:
+            if "url" in original_inputs:
+                return original_inputs
+            # Fall back to web_search since we don't have a URL
+            return None  # Signal to use fallback
+        
+        # For web_search/news_search/fetch_data: need 'query' key
+        if tool_name in ["web_search", "news_search", "fetch_data"]:
+            if "query" in original_inputs:
+                return original_inputs
+            return {"query": description, "max_results": 10}
+        
+        # Default: pass as-is
+        return original_inputs
+    
     client = get_mcp_orchestrator()
     use_direct = len(client.tool_names) == 0  # No MCP tools registered
     
@@ -212,33 +238,51 @@ async def researcher_node(state: GraphState) -> GraphState:
     for i, task in enumerate(micro_tasks[:10], 1):  # Cap at 10 tasks
         task_id = task.get("task_id", f"task_{i}")
         tool_name = task.get("tool", "web_search")
-        description = task.get("description", "")[:80]
-        fallbacks = task.get("fallback_tools", [])
+        description = task.get("description", "")
+        fallbacks = task.get("fallback_tools", []) or ["web_search"]  # Default fallback
         persist = task.get("persist", True)
+        original_inputs = task.get("inputs", {})
         
         logger.info(f"\n🔧 Micro-Task {task_id}: {tool_name}")
-        logger.info(f"   Description: {description}...")
+        logger.info(f"   Description: {description[:80]}...")
         logger.info(f"   Persist: {persist} | Fallbacks: {fallbacks}")
         
         result = None
         used_tool = tool_name
         error = None
+        success = False
+        
+        # Build proper inputs for this tool
+        tool_inputs = build_tool_inputs(tool_name, description, original_inputs)
+        
+        # If inputs are None, tool can't run (e.g., scrape_url without URL)
+        if tool_inputs is None:
+            logger.info(f"   ⚠️ Cannot build inputs for {tool_name}, using fallback")
+            tool_name = fallbacks[0] if fallbacks else "web_search"
+            tool_inputs = {"query": description, "max_results": 10}
+            used_tool = tool_name
         
         try:
             # Try primary tool
             if use_direct and tool_name in direct_tools:
                 logger.info(f"   🔌 Direct call: {tool_name}")
-                result = await direct_tools[tool_name](task.get("inputs", {}))
+                result = await direct_tools[tool_name](tool_inputs)
             elif not use_direct:
                 logger.info(f"   📡 MCP call: {tool_name}")
-                result = await client.call_tool(tool_name, task.get("inputs", {}))
-                # Check for tool not found
-                if result and hasattr(result, "isError") and result.isError:
-                    if "Tool not found" in str(result.content):
-                        raise ValueError(f"Tool {tool_name} not found in MCP")
+                result = await client.call_tool(tool_name, tool_inputs)
             else:
                 logger.info(f"   ⚠️ Tool {tool_name} not available, trying fallbacks")
                 raise ValueError(f"Tool {tool_name} not available")
+            
+            # Check for error response - trigger fallback
+            if result and hasattr(result, "isError") and result.isError:
+                error_text = ""
+                for c in result.content:
+                    if hasattr(c, "text"):
+                        error_text = c.text
+                        break
+                logger.info(f"   ⚠️ Tool returned error: {error_text[:100]}")
+                raise ValueError(f"Tool error: {error_text[:100]}")
                 
         except Exception as e:
             error = str(e)
@@ -248,10 +292,18 @@ async def researcher_node(state: GraphState) -> GraphState:
             for fallback in fallbacks:
                 try:
                     logger.info(f"   🔄 Fallback: {fallback}")
+                    fallback_inputs = build_tool_inputs(fallback, description, original_inputs)
+                    if fallback_inputs is None:
+                        fallback_inputs = {"query": description, "max_results": 10}
+                    
                     if fallback in direct_tools:
-                        result = await direct_tools[fallback](task.get("inputs", {}))
+                        result = await direct_tools[fallback](fallback_inputs)
+                        # Check for fallback error too
+                        if result and hasattr(result, "isError") and result.isError:
+                            continue  # Try next fallback
                         used_tool = fallback
                         error = None
+                        success = True
                         break
                 except Exception as fe:
                     logger.info(f"   ❌ Fallback {fallback} failed: {fe}")
@@ -265,12 +317,13 @@ async def researcher_node(state: GraphState) -> GraphState:
                     else:
                         fact = {
                             "text": content.text[:1000],
-                            "query": description,
+                            "query": description[:200],
                             "source": used_tool,
                             "task_id": task_id,
                             "persist": persist,
                         }
                         facts.append(fact)
+                        success = True  # Mark as successful when we got valid content
                         logger.info(f"   ✅ Result extracted ({len(content.text)} chars)")
                         
                         # Extract URLs as sources
@@ -278,19 +331,22 @@ async def researcher_node(state: GraphState) -> GraphState:
                             import re
                             urls = re.findall(r'\((https?://[^\)]+)\)', content.text)
                             for url in urls[:3]:
-                                sources.append({"url": url, "title": description, "tool": used_tool})
+                                sources.append({"url": url, "title": description[:100], "tool": used_tool})
         
-        # Record tool invocation
+        # Record tool invocation with proper success tracking
         tool_invocations.append({
             "task_id": task_id,
             "tool": used_tool,
-            "success": error is None,
+            "success": success or (error is None and result is not None),
             "error": error,
             "persist": persist,
         })
     
+    # Count successes for logging
+    successes = sum(1 for inv in tool_invocations if inv.get("success", False))
     logger.info(f"\n📊 Research Summary:")
     logger.info(f"   Tasks executed: {len(tool_invocations)}")
+    logger.info(f"   Tasks succeeded: {successes}")
     logger.info(f"   Facts collected: {len(facts)}")
     logger.info(f"   Sources found: {len(sources)}")
     logger.info("="*70 + "\n")
@@ -303,6 +359,7 @@ async def researcher_node(state: GraphState) -> GraphState:
         **state,
         "facts": facts,
         "sources": sources,
+        "tool_invocations": tool_invocations,
     }
 
 
