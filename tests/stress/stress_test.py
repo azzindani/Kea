@@ -127,8 +127,8 @@ class StressTestRunner:
         # Initialize research pipeline
         try:
             from services.orchestrator.core.pipeline import get_research_pipeline
-            self.pipeline = get_research_pipeline()
-            await self.pipeline.initialize()
+            # get_research_pipeline is async and returns initialized pipeline
+            self.pipeline = await get_research_pipeline()
             logger.info("Research Pipeline: Initialized")
         except Exception as e:
             logger.warning(f"Failed to initialize full pipeline: {e}")
