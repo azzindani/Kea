@@ -46,12 +46,8 @@ class TestMCPTools:
         data = response.json()
         assert "tools" in data
         
-        # Skip if orchestrator not running or no MCP servers configured
-        if "error" in data:
-            pytest.skip(f"Orchestrator unavailable: {data['error']}")
-        
-        if len(data["tools"]) == 0:
-            pytest.skip("No tools registered (orchestrator may not have MCP servers running)")
+        # Should always have tools (built-in fallback)
+        assert len(data["tools"]) > 0, "Expected at least some tools (built-in fallback should work)"
     
     @pytest.mark.integration
     @pytest.mark.asyncio

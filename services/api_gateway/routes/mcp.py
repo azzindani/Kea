@@ -112,6 +112,19 @@ async def list_servers():
 @router.get("/tools")
 async def list_tools():
     """List all available tools from Orchestrator."""
+    # Built-in core tools (direct calls, always available)
+    builtin_tools = [
+        {"name": "web_search", "description": "Search the web using DuckDuckGo", "server": "search_server"},
+        {"name": "news_search", "description": "Search news articles", "server": "search_server"},
+        {"name": "fetch_url", "description": "Fetch content from a URL", "server": "scraper_server"},
+        {"name": "scrape_url", "description": "Scrape webpage with browser", "server": "scraper_server"},
+        {"name": "fetch_data", "description": "Fetch data from APIs", "server": "data_server"},
+        {"name": "execute_code", "description": "Execute Python code", "server": "python_server"},
+        {"name": "run_python", "description": "Run Python code in sandbox", "server": "python_server"},
+        {"name": "sql_query", "description": "Execute SQL queries", "server": "python_server"},
+        {"name": "web_crawler", "description": "Crawl websites", "server": "scraper_server"},
+    ]
+    
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             response = await client.get(f"{ORCHESTRATOR_URL}/tools")
@@ -120,25 +133,45 @@ async def list_tools():
                 raise Exception(f"Orchestrator returned {response.status_code}")
             
             data = response.json()
-            tools = data.get("tools", [])
+            mcp_tools = data.get("tools", [])
             
-            return {
-                "tools": [
-                    {
-                        "name": t.get("name"),
-                        "description": t.get("description", ""),
-                        "server": t.get("server", "unknown"),
-                    }
-                    for t in tools
-                ],
-                "total": len(tools),
-            }
+            # If orchestrator has tools, use those + merge with builtin
+            if mcp_tools:
+                # Create set of MCP tool names
+                mcp_names = {t.get("name") for t in mcp_tools}
+                
+                # Add builtins that aren't in MCP
+                all_tools = list(mcp_tools)
+                for bt in builtin_tools:
+                    if bt["name"] not in mcp_names:
+                        all_tools.append(bt)
+                
+                return {
+                    "tools": [
+                        {
+                            "name": t.get("name"),
+                            "description": t.get("description", ""),
+                            "server": t.get("server", "unknown"),
+                        }
+                        for t in all_tools
+                    ],
+                    "total": len(all_tools),
+                }
+            else:
+                # Return builtin tools as fallback
+                return {
+                    "tools": builtin_tools,
+                    "total": len(builtin_tools),
+                    "note": "Showing built-in direct tools (MCP servers not running)",
+                }
             
     except Exception as e:
         logger.warning(f"Could not reach orchestrator: {e}")
+        # Return builtin tools even when orchestrator is offline
         return {
-            "tools": [],
-            "error": f"Orchestrator unavailable: {str(e)}",
+            "tools": builtin_tools,
+            "total": len(builtin_tools),
+            "note": "Showing built-in direct tools (orchestrator offline)",
         }
 
 

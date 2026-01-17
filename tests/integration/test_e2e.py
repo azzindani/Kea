@@ -57,17 +57,13 @@ class TestCompleteResearchE2E:
             assert response.status_code == 200
             data = response.json()
             
-            # If orchestrator is not running, tools will be empty
-            if "error" in data:
-                pytest.skip(f"Orchestrator unavailable: {data['error']}")
-            
-            if len(data.get("tools", [])) == 0:
-                pytest.skip("No tools registered (orchestrator may not be running)")
+            # Should always have tools (built-in fallback)
+            assert len(data.get("tools", [])) > 0, "Expected at least some tools"
             
             tool_names = [t["name"] for t in data["tools"]]
             
-            # Check for at least one tool
-            assert len(tool_names) > 0, "No tools found"
+            # Check for core tools
+            assert "web_search" in tool_names, "Missing core tool: web_search"
     
     @pytest.mark.integration
     @pytest.mark.asyncio

@@ -41,14 +41,8 @@ class TestAPIGateway:
         data = response.json()
         assert "tools" in data
         
-        # If orchestrator not running, skip rather than fail
-        if "error" in data:
-            pytest.skip(f"Orchestrator unavailable: {data['error']}")
-        
-        if len(data.get("tools", [])) == 0:
-            pytest.skip("No tools registered (orchestrator may not be running)")
-        
-        assert len(data["tools"]) > 0
+        # Should always have tools (built-in fallback)
+        assert len(data["tools"]) > 0, "Expected at least some tools (built-in fallback should work)"
     
     @pytest.mark.integration
     @pytest.mark.asyncio
