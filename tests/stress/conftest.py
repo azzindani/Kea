@@ -1,15 +1,68 @@
 """
 Stress Test Fixtures.
 
-Pytest fixtures for stress testing Kea.
+Pytest fixtures and configuration for stress testing Kea.
 """
 
 import pytest
 import asyncio
+import logging
 import os
+import sys
 
 from tests.stress.metrics import MetricsCollector
 from tests.stress.queries import QUERIES, get_query
+
+
+# =============================================================================
+# Pytest Plugin: Configuration
+# =============================================================================
+
+def pytest_configure(config):
+    """Configure pytest for stress tests."""
+    # Setup Kea logging with console format for readable output
+    from shared.logging import setup_logging, LogConfig
+    from shared.logging.structured import LogLevel
+    
+    # Use console format (not JSON) for test readability
+    log_config = LogConfig(
+        level=LogLevel.DEBUG,
+        format="console",
+        service_name="stress-test",
+    )
+    setup_logging(log_config)
+    
+    # Ensure root logger is at DEBUG level
+    logging.getLogger().setLevel(logging.DEBUG)
+    
+    # Make sure stress test logger outputs everything
+    logging.getLogger("tests.stress").setLevel(logging.DEBUG)
+    
+    # Register markers
+    config.addinivalue_line("markers", "stress: Stress/load tests")
+
+
+def pytest_addoption(parser):
+    """Add custom pytest options for stress tests."""
+    try:
+        parser.addoption(
+            "--query",
+            action="store",
+            default=None,
+            help="Query ID(s) to run, comma-separated (e.g., '1' or '1,2,3')",
+        )
+    except ValueError:
+        pass
+    
+    try:
+        parser.addoption(
+            "--output-dir",
+            action="store",
+            default="tests/stress/results",
+            help="Output directory for results",
+        )
+    except ValueError:
+        pass
 
 
 # =============================================================================
@@ -84,6 +137,15 @@ def sample_query():
 def all_queries():
     """Get all stress test queries."""
     return QUERIES
+
+
+@pytest.fixture
+def query_ids(request):
+    """Get query IDs from command line."""
+    query_arg = request.config.getoption("--query", default=None)
+    if query_arg:
+        return [int(q.strip()) for q in query_arg.split(",")]
+    return [1]  # Default to query 1
 
 
 # =============================================================================

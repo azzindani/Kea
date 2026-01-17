@@ -2,11 +2,13 @@
 """
 Kea Stress Test Runner.
 
-CLI tool to run individual stress test queries at massive scale.
-
-Usage:
+Can be run directly or via pytest:
+    
+    # Via pytest (recommended)
+    python -m pytest tests/stress/stress_test.py --query=1 -v -s --log-cli-level=DEBUG
+    
+    # Direct execution
     python tests/stress/stress_test.py --query=1 -v
-    python tests/stress/stress_test.py --query=1,2,3
     python tests/stress/stress_test.py --list
 """
 
@@ -14,12 +16,16 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import gc
 import json
 import os
 import sys
 import time
 from datetime import datetime
 from pathlib import Path
+from typing import Any
+
+import pytest
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -29,7 +35,7 @@ from tests.stress.queries import QUERIES, get_query, StressQuery
 from tests.stress.metrics import MetricsCollector, QueryMetrics
 
 from shared.hardware.detector import detect_hardware, HardwareProfile
-from shared.logging import get_logger, setup_logging
+from shared.logging import get_logger
 
 
 logger = get_logger(__name__)
@@ -50,6 +56,26 @@ DEFAULT_OUTPUT_DIR = "tests/stress/results"
 
 
 # =============================================================================
+# Pytest Custom Options
+# =============================================================================
+
+def pytest_addoption(parser):
+    """Add custom pytest options for stress tests."""
+    parser.addoption(
+        "--query",
+        action="store",
+        default=None,
+        help="Query ID(s) to run, comma-separated (e.g., '1' or '1,2,3')",
+    )
+    parser.addoption(
+        "--output-dir",
+        action="store",
+        default=DEFAULT_OUTPUT_DIR,
+        help="Output directory for results",
+    )
+
+
+# =============================================================================
 # Stress Test Runner
 # =============================================================================
 
@@ -63,11 +89,9 @@ class StressTestRunner:
     def __init__(
         self,
         output_dir: str = DEFAULT_OUTPUT_DIR,
-        verbose: bool = False,
     ) -> None:
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.verbose = verbose
         
         self.metrics = MetricsCollector()
         self.hardware: HardwareProfile | None = None
@@ -164,27 +188,15 @@ class StressTestRunner:
     async def _execute_research(self, query: StressQuery) -> dict:
         """
         Execute the research query through Kea pipeline.
-        
-        This is the core execution loop that should achieve high efficiency ratio:
-        - Few LLM calls for planning and synthesis
-        - Many tool iterations for data gathering
         """
         if not self.pipeline:
             logger.warning("Pipeline not available, running simulation")
             return await self._simulate_execution(query)
         
         # Use the real pipeline
-        from services.orchestrator.core.pipeline import ResearchResult
-        
-        # Create a conversation for this query
         conversation_id = f"stress_test_{query.id}_{int(time.time())}"
         user_id = "stress_tester"
         
-        # This will internally:
-        # 1. Classify the query (1 LLM call)
-        # 2. Plan the research (1 LLM call)
-        # 3. Execute tool calls in batches (many iterations, few LLM calls)
-        # 4. Synthesize results (1-3 LLM calls)
         result = await self.pipeline.process_message(
             conversation_id=conversation_id,
             content=query.prompt,
@@ -200,12 +212,8 @@ class StressTestRunner:
     async def _simulate_execution(self, query: StressQuery) -> dict:
         """
         Simulate execution when full pipeline is not available.
-        
-        Used for testing the stress test framework itself.
         """
         from shared.llm.provider import LLMMessage, LLMConfig, LLMRole
-        
-        # Simulate the pattern: LLM plans → tools execute → LLM synthesizes
         
         # Phase 1: Planning (1 LLM call)
         logger.info("Phase 1: Planning...")
@@ -236,32 +244,30 @@ Output a JSON plan with:
             tokens_out=response.usage.completion_tokens,
         )
         
+        logger.debug(f"Planning response: {response.content[:200]}...")
+        
         # Rate limit
         await asyncio.sleep(LLM_DELAY_SECONDS)
         
-        # Phase 2: Tool Iterations (simulate based on expected)
+        # Phase 2: Tool Iterations (simulate)
         logger.info(f"Phase 2: Executing ~{query.expected_tool_iterations} tool iterations...")
         
-        # Simulate tool calls in batches
         batch_size = 100
         num_batches = query.expected_tool_iterations // batch_size
         
         for batch in range(min(num_batches, 10)):  # Cap at 10 batches for simulation
             for i in range(batch_size):
-                # Simulate tool call
                 self.metrics.record_tool_call(
                     tool_name="fetch_url" if i % 3 == 0 else "pdf_extract" if i % 3 == 1 else "vectorize",
                     duration_ms=50 + (i % 100),
                 )
             
-            # Progress update
-            if self.verbose:
-                logger.info(f"  Batch {batch + 1}/{num_batches}: {(batch + 1) * batch_size} iterations")
+            logger.debug(f"  Batch {batch + 1}/{num_batches}: {(batch + 1) * batch_size} iterations")
             
-            # Periodic checkpoint (every 1000 iterations = 1 LLM call)
+            # Periodic checkpoint
             if (batch + 1) % 10 == 0:
                 checkpoint_msg = [
-                    LLMMessage(role=LLMRole.USER, content=f"Checkpoint: {(batch + 1) * batch_size} items processed. Any issues to address?")
+                    LLMMessage(role=LLMRole.USER, content=f"Checkpoint: {(batch + 1) * batch_size} items processed.")
                 ]
                 response = await self.llm_provider.complete(checkpoint_msg, config)
                 self.metrics.record_llm_call(
@@ -270,7 +276,7 @@ Output a JSON plan with:
                 )
                 await asyncio.sleep(LLM_DELAY_SECONDS)
         
-        # Phase 3: Synthesis (1 LLM call)
+        # Phase 3: Synthesis
         logger.info("Phase 3: Synthesizing results...")
         
         synthesis_prompt = f"""Based on the research data gathered, synthesize a comprehensive answer to:
@@ -279,25 +285,20 @@ Output a JSON plan with:
 
 Provide a detailed response with key findings."""
         
-        messages = [
-            LLMMessage(role=LLMRole.USER, content=synthesis_prompt),
-        ]
+        messages = [LLMMessage(role=LLMRole.USER, content=synthesis_prompt)]
         response = await self.llm_provider.complete(messages, config)
         self.metrics.record_llm_call(
             tokens_in=response.usage.prompt_tokens,
             tokens_out=response.usage.completion_tokens,
         )
         
-        return {
-            "content": response.content,
-            "simulated": True,
-        }
+        return {"content": response.content, "simulated": True}
     
     def generate_report(self) -> dict:
         """Generate final test report."""
         summary = self.metrics.get_summary()
         
-        report = {
+        return {
             "test_run_id": f"stress_{int(time.time())}",
             "generated_at": datetime.utcnow().isoformat(),
             "hardware_profile": {
@@ -310,12 +311,79 @@ Provide a detailed response with key findings."""
             "summary": summary,
             "pass": summary.get("success_rate", 0) >= (1 - MAX_ERROR_RATE),
         }
-        
-        return report
 
 
 # =============================================================================
-# CLI
+# Pytest Test Functions
+# =============================================================================
+
+# Global runner instance (reused across tests in same session)
+_runner: StressTestRunner | None = None
+
+
+def get_runner(output_dir: str = DEFAULT_OUTPUT_DIR) -> StressTestRunner:
+    """Get or create stress test runner."""
+    global _runner
+    if _runner is None:
+        _runner = StressTestRunner(output_dir=output_dir)
+    return _runner
+
+
+@pytest.fixture(scope="session")
+def runner(request):
+    """Stress test runner fixture."""
+    output_dir = request.config.getoption("--output-dir", default=DEFAULT_OUTPUT_DIR)
+    return get_runner(output_dir)
+
+
+@pytest.fixture
+def query_ids(request):
+    """Get query IDs from command line."""
+    query_arg = request.config.getoption("--query")
+    if query_arg:
+        return [int(q.strip()) for q in query_arg.split(",")]
+    return [1]  # Default to query 1
+
+
+class TestStressQueries:
+    """Stress test class for running queries via pytest."""
+    
+    @pytest.mark.stress
+    @pytest.mark.asyncio
+    async def test_query(self, runner, query_ids):
+        """
+        Run stress test query(s).
+        
+        Usage:
+            pytest tests/stress/stress_test.py --query=1 -v -s --log-cli-level=DEBUG
+        """
+        for query_id in query_ids:
+            query = get_query(query_id)
+            if query is None:
+                pytest.fail(f"Query {query_id} not found")
+            
+            logger.info(f"Running query {query_id}: {query.name}")
+            
+            metrics = await runner.run_query(query)
+            
+            # Assertions
+            assert metrics is not None, "Metrics should be collected"
+            
+            if metrics.success:
+                # Check efficiency ratio
+                if metrics.llm_calls > 0:
+                    assert metrics.efficiency_ratio >= 1, \
+                        f"Efficiency ratio {metrics.efficiency_ratio} should be >= 1"
+                
+                logger.info(f"✅ Query {query_id} PASSED")
+                logger.info(f"   Efficiency ratio: {metrics.efficiency_ratio:.1f}x")
+            else:
+                logger.error(f"❌ Query {query_id} FAILED: {metrics.error_message}")
+                pytest.fail(f"Query {query_id} failed: {metrics.error_message}")
+
+
+# =============================================================================
+# CLI Direct Execution
 # =============================================================================
 
 def list_queries() -> None:
@@ -337,45 +405,28 @@ def list_queries() -> None:
         print()
 
 
-async def main() -> None:
-    """Main entry point."""
+async def main_cli() -> None:
+    """CLI entry point for direct execution."""
     parser = argparse.ArgumentParser(
         description="Kea Stress Test Runner",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python stress_test.py --query=1 -v      Run query 1 with verbose output
-  python stress_test.py --query=1,2,3     Run queries 1, 2, and 3
-  python stress_test.py --list            List all available queries
+  # Via pytest (recommended for logging):
+  pytest tests/stress/stress_test.py --query=1 -v -s --log-cli-level=DEBUG
+  
+  # Direct execution:
+  python stress_test.py --query=1 -v
+  python stress_test.py --list
         """,
     )
     
-    parser.add_argument(
-        "--query", "-q",
-        type=str,
-        help="Query ID(s) to run, comma-separated (e.g., '1' or '1,2,3')",
-    )
-    parser.add_argument(
-        "--list", "-l",
-        action="store_true",
-        help="List all available queries",
-    )
-    parser.add_argument(
-        "--verbose", "-v",
-        action="store_true",
-        help="Enable verbose output",
-    )
-    parser.add_argument(
-        "--output", "-o",
-        type=str,
-        default=DEFAULT_OUTPUT_DIR,
-        help=f"Output directory (default: {DEFAULT_OUTPUT_DIR})",
-    )
+    parser.add_argument("--query", "-q", type=str, help="Query ID(s), comma-separated")
+    parser.add_argument("--list", "-l", action="store_true", help="List queries")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
+    parser.add_argument("--output", "-o", type=str, default=DEFAULT_OUTPUT_DIR)
     
     args = parser.parse_args()
-    
-    # Setup logging
-    setup_logging()
     
     if args.list:
         list_queries()
@@ -383,63 +434,30 @@ Examples:
     
     if not args.query:
         parser.print_help()
-        print("\nError: --query is required. Use --list to see available queries.")
+        print("\n💡 Tip: Use pytest for better logging:")
+        print("   pytest tests/stress/stress_test.py --query=1 -v -s --log-cli-level=DEBUG")
         sys.exit(1)
     
-    # Parse query IDs
-    try:
-        query_ids = [int(q.strip()) for q in args.query.split(",")]
-    except ValueError:
-        print(f"Error: Invalid query ID format: {args.query}")
-        sys.exit(1)
+    query_ids = [int(q.strip()) for q in args.query.split(",")]
     
-    # Validate query IDs
-    for qid in query_ids:
-        if get_query(qid) is None:
-            print(f"Error: Query {qid} not found. Use --list to see available queries.")
-            sys.exit(1)
-    
-    # Run the stress test
-    runner = StressTestRunner(
-        output_dir=args.output,
-        verbose=args.verbose,
-    )
-    
-    print(f"\n{'='*60}")
-    print(f"KEA STRESS TEST")
-    print(f"{'='*60}")
-    print(f"Queries to run: {query_ids}")
-    print(f"Output directory: {args.output}")
-    print(f"{'='*60}\n")
+    runner = StressTestRunner(output_dir=args.output)
     
     for qid in query_ids:
         query = get_query(qid)
-        try:
-            metrics = await runner.run_query(query)
-            
-            if not metrics.success:
-                print(f"\n⚠️  Query {qid} FAILED: {metrics.error_message}")
-        except KeyboardInterrupt:
-            print("\n\nInterrupted by user.")
-            break
-        except Exception as e:
-            print(f"\n❌ Query {qid} ERROR: {e}")
+        if query is None:
+            print(f"Error: Query {qid} not found")
+            sys.exit(1)
+        
+        await runner.run_query(query)
     
-    # Generate final report
     report = runner.generate_report()
     report_path = Path(args.output) / "stress_test_report.json"
     with open(report_path, "w") as f:
         json.dump(report, f, indent=2)
     
-    print(f"\n{'='*60}")
-    print("STRESS TEST COMPLETE")
-    print(f"{'='*60}")
-    print(f"Report saved to: {report_path}")
-    print(f"Pass: {'✅ YES' if report['pass'] else '❌ NO'}")
-    if report["summary"]:
-        print(f"Overall efficiency ratio: {report['summary'].get('overall_efficiency_ratio', 0):.1f}x")
-    print(f"{'='*60}\n")
+    print(f"\nReport: {report_path}")
+    print(f"Pass: {'✅' if report['pass'] else '❌'}")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main_cli())
