@@ -160,24 +160,17 @@ def rag_service_url():
     return RAG_SERVICE_URL
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 async def auth_client():
     """
-    Module-scoped authenticated API client.
+    Function-scoped authenticated API client.
     
-    Provides authenticated HTTP client for API tests.
+    Creates fresh client per test to avoid event loop issues.
     """
     client = AuthenticatedClient()
     await client.initialize()
     yield client
     await client.close()
-
-
-@pytest.fixture
-async def fresh_auth_client():
-    """Function-scoped authenticated client."""
-    async with AuthenticatedClient() as client:
-        yield client
 
 
 @pytest.fixture(autouse=True)

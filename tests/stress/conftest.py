@@ -204,12 +204,12 @@ class AuthenticatedAPIClient:
         )
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 async def api_client():
     """
-    Session-scoped authenticated API client.
+    Function-scoped authenticated API client.
     
-    Automatically registers/logs in test user.
+    Creates fresh client per test to avoid event loop issues.
     """
     client = AuthenticatedAPIClient()
     await client.initialize()
