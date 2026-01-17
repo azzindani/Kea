@@ -2,6 +2,7 @@
 Integration Tests.
 
 End-to-end tests for the full research pipeline.
+Uses authenticated client for protected endpoints.
 """
 
 import pytest
@@ -21,7 +22,7 @@ class TestAPIGateway:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_health_check(self):
-        """Test API health endpoint."""
+        """Test API health endpoint (no auth needed)."""
         async with httpx.AsyncClient() as client:
             response = await client.get(f"{self.base_url}/health")
         
@@ -32,30 +33,31 @@ class TestAPIGateway:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_list_tools(self):
-        """Test listing available tools."""
+        """Test listing available tools (no auth needed)."""
         async with httpx.AsyncClient() as client:
             response = await client.get(f"{self.base_url}/api/v1/mcp/tools")
         
         assert response.status_code == 200
         data = response.json()
         assert "tools" in data
-        assert len(data["tools"]) > 0
+        
+        # Should always have tools (built-in fallback)
+        assert len(data["tools"]) > 0, "Expected at least some tools (built-in fallback should work)"
     
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_create_job(self):
-        """Test creating a research job."""
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{self.base_url}/api/v1/jobs/",
-                json={
-                    "query": "Test research query",
-                    "job_type": "deep_research",
-                    "depth": 2,
-                }
-            )
+    async def test_create_job(self, auth_client):
+        """Test creating a research job (requires auth)."""
+        response = await auth_client.post(
+            "/api/v1/jobs/",
+            json={
+                "query": "Test research query",
+                "job_type": "deep_research",
+                "depth": 2,
+            }
+        )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, f"Failed: {response.text}"
         data = response.json()
         assert "job_id" in data
         assert data["status"] in ["pending", "running"]
@@ -63,7 +65,7 @@ class TestAPIGateway:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_system_capabilities(self):
-        """Test system capabilities endpoint."""
+        """Test system capabilities endpoint (no auth needed)."""
         async with httpx.AsyncClient() as client:
             response = await client.get(f"{self.base_url}/api/v1/system/capabilities")
         
@@ -86,7 +88,7 @@ class TestRAGService:
     @pytest.mark.asyncio
     async def test_health_check(self):
         """Test RAG service health."""
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=5) as client:
             response = await client.get(f"{self.base_url}/health")
         
         assert response.status_code == 200
@@ -97,7 +99,7 @@ class TestRAGService:
     @pytest.mark.asyncio
     async def test_add_and_search_fact(self):
         """Test adding and searching for a fact."""
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30) as client:
             # Add a fact
             add_response = await client.post(
                 f"{self.base_url}/facts",
@@ -110,8 +112,7 @@ class TestRAGService:
                 }
             )
             
-            # May fail with 500 if vector store not configured (qdrant not running)
-            # or 503 if service not initialized
+            # May fail with 500 if vector store not configured
             if add_response.status_code in [500, 503]:
                 pytest.skip("RAG Service vector store not configured")
             
@@ -180,43 +181,40 @@ class TestFullPipeline:
     
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_research_flow(self):
-        """Test complete research flow."""
-        api_base = "http://localhost:8080"
+    async def test_research_flow(self, auth_client):
+        """Test complete research flow (requires auth)."""
+        # 1. Create a job
+        create_response = await auth_client.post(
+            "/api/v1/jobs/",
+            json={
+                "query": "What is Python programming?",
+                "depth": 1,
+            }
+        )
         
-        async with httpx.AsyncClient(timeout=120) as client:
-            # 1. Create a job
-            create_response = await client.post(
-                f"{api_base}/api/v1/jobs/",
-                json={
-                    "query": "What is Python programming?",
-                    "depth": 1,
-                }
-            )
+        assert create_response.status_code == 200, f"Failed: {create_response.text}"
+        job_id = create_response.json()["job_id"]
+        
+        # 2. Poll for completion (with timeout)
+        import time
+        start = time.time()
+        max_wait = 60  # 60 seconds max
+        
+        while time.time() - start < max_wait:
+            status_response = await auth_client.get(f"/api/v1/jobs/{job_id}")
+            status_data = status_response.json()
             
-            assert create_response.status_code == 200
-            job_id = create_response.json()["job_id"]
+            if status_data["status"] in ["completed", "failed"]:
+                break
             
-            # 2. Poll for completion (with timeout)
-            import time
-            start = time.time()
-            max_wait = 60  # 60 seconds max
-            
-            while time.time() - start < max_wait:
-                status_response = await client.get(f"{api_base}/api/v1/jobs/{job_id}")
-                status_data = status_response.json()
-                
-                if status_data["status"] in ["completed", "failed"]:
-                    break
-                
-                await asyncio.sleep(2)
-            
-            # 3. Get result
-            result_response = await client.get(f"{api_base}/api/v1/jobs/{job_id}/result")
-            
-            if result_response.status_code == 200:
-                result_data = result_response.json()
-                assert result_data["report"] is not None
+            await asyncio.sleep(2)
+        
+        # 3. Get result (may be 400 if not completed yet)
+        result_response = await auth_client.get(f"/api/v1/jobs/{job_id}/result")
+        
+        if result_response.status_code == 200:
+            result_data = result_response.json()
+            assert result_data["report"] is not None
 
 
 # ============================================================================

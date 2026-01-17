@@ -46,8 +46,8 @@ class TestMCPTools:
         data = response.json()
         assert "tools" in data
         
-        # Should have at least some tools registered
-        assert len(data["tools"]) > 0
+        # Should always have tools (built-in fallback)
+        assert len(data["tools"]) > 0, "Expected at least some tools (built-in fallback should work)"
     
     @pytest.mark.integration
     @pytest.mark.asyncio

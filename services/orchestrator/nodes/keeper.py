@@ -214,13 +214,25 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
     # ============================================================
     # CHECK CONTEXT DRIFT
     # ============================================================
-    if facts:
+    # Skip drift check if we have minimal facts (less than min_facts)
+    # or if this is the first iteration - give research time to gather data
+    if facts and len(facts) >= min_facts and iteration > 1:
         # Simple keyword overlap check
         query_words = set(query.lower().split())
         relevant_facts = 0
         
         for fact in facts:
-            fact_text = str(fact).lower() if isinstance(fact, dict) else fact.lower()
+            # Extract actual fact content from dict
+            if isinstance(fact, dict):
+                # Get text content from common fact fields
+                fact_parts = []
+                for key in ["entity", "value", "text", "content", "attribute"]:
+                    if key in fact and fact[key]:
+                        fact_parts.append(str(fact[key]).lower())
+                fact_text = " ".join(fact_parts)
+            else:
+                fact_text = str(fact).lower()
+            
             fact_words = set(fact_text.split())
             overlap = len(query_words & fact_words)
             if overlap > 0:
@@ -228,7 +240,7 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
         
         relevance_ratio = relevant_facts / len(facts) if facts else 0
         
-        if relevance_ratio < 0.3 and iteration > 0:
+        if relevance_ratio < 0.3:
             logger.warning(f"Keeper: Context drift detected (relevance: {relevance_ratio:.2f})")
             state["should_continue"] = False
             state["drift_detected"] = True
