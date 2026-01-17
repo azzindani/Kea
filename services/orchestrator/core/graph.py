@@ -27,7 +27,7 @@ from services.orchestrator.core.router import IntentionRouter
 
 # NEW: Context pool and code generator for dynamic data flow
 from services.orchestrator.core.context_pool import get_context_pool, reset_context_pool
-from services.orchestrator.agents.code_generator import generate_fallback_code
+from services.orchestrator.agents.code_generator import generate_fallback_code, generate_python_code
 
 
 logger = get_logger(__name__)
@@ -255,20 +255,20 @@ async def researcher_node(state: GraphState) -> GraphState:
     # Import for multi_browse
     from mcp_servers.browser_agent_server.server import BrowserAgentServer
     
-    def build_tool_inputs(tool_name: str, description: str, original_inputs: dict) -> dict:
+    def build_tool_inputs(tool_name: str, description: str, original_inputs: dict, collected_facts: list = None) -> dict:
         """Build proper inputs based on tool requirements."""
         
         # Get context pool for data chaining
         ctx = get_context_pool()
         
         # =====================================================
-        # PYTHON TOOLS - Use LLM code generator
+        # PYTHON TOOLS - Use code generator with collected facts
         # =====================================================
-        if tool_name in ["run_python", "execute_code"]:
+        if tool_name in ["run_python", "execute_code", "parse_document"]:
             if "code" in original_inputs:
                 return original_inputs
-            # Generate real code using LLM/fallback templates
-            code = generate_fallback_code(description)
+            # Generate code using facts from prior research tasks
+            code = generate_fallback_code(description, collected_facts or [])
             logger.info(f"   📝 Generated code ({len(code)} chars)")
             return {"code": code}
         
@@ -376,8 +376,8 @@ async def researcher_node(state: GraphState) -> GraphState:
         error = None
         success = False
         
-        # Build proper inputs for this tool
-        tool_inputs = build_tool_inputs(tool_name, description, original_inputs)
+        # Build proper inputs for this tool (pass collected facts for code generation)
+        tool_inputs = build_tool_inputs(tool_name, description, original_inputs, facts)
         
         # If inputs are None, tool can't run (e.g., scrape_url without URL)
         if tool_inputs is None:

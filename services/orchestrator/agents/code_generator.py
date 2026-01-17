@@ -1,157 +1,139 @@
 """
-LLM Code Generator - Generates executable Python code from task descriptions.
+LLM Code Generator - LLM generates Python code based on research context.
 
-This module uses the LLM to generate actual executable Python code
-instead of placeholder text, enabling real data analysis.
+The LLM autonomously writes Python code based on:
+1. The task description
+2. Facts collected from prior tasks
+3. Data available in context pool
+
+This enables true autonomous data processing - Kea decides what code to write.
 """
 
 from __future__ import annotations
 
+import os
 from shared.logging import get_logger
 
 logger = get_logger(__name__)
 
 
-CODE_GENERATION_PROMPT = """You are a Python code generator for financial data analysis.
+# Code generation prompt - instructs LLM to write executable Python
+CODE_PROMPT = """You are a Python code generator for financial analysis.
 
 TASK: {task_description}
 
-AVAILABLE CONTEXT:
-{context_summary}
+COLLECTED FACTS (from prior research):
+{facts_summary}
 
-REQUIREMENTS:
-1. Generate ONLY executable Python code
-2. Use pandas for data operations
-3. Include proper imports
-4. Print results at the end
-5. Handle missing data gracefully
-6. Keep code concise (< 50 lines)
+AVAILABLE IN SANDBOX:
+- pd (pandas)
+- np (numpy)  
+- duckdb
+- Standard builtins (print, len, sum, etc.)
 
-AVAILABLE DATA:
-{available_data}
+RULES:
+1. DO NOT use import statements (pd, np, duckdb already loaded)
+2. Generate ONLY executable Python code
+3. Use the ACTUAL data from the facts above
+4. Print results in markdown table format
+5. Keep code under 30 lines
 
-Generate Python code that completes this task:
+Generate Python code:
 ```python
 """
-
-SIMPLE_CODE_TEMPLATES = {
-    "filter": '''import pandas as pd
-
-# {task_description}
-# Create sample data if not available
-data = {sample_data}
-df = pd.DataFrame(data)
-
-# Apply filter
-result = df[{filter_condition}]
-print(f"Filtered to {{len(result)}} rows")
-print(result.head(10).to_markdown())
-''',
-    
-    "calculate": '''import pandas as pd
-import numpy as np
-
-# {task_description}
-data = {sample_data}
-df = pd.DataFrame(data)
-
-# Calculation
-{calculation_code}
-
-print("Results:")
-print(result if 'result' in dir() else df.head(10).to_markdown())
-''',
-    
-    "analyze": '''import pandas as pd
-import numpy as np
-
-# {task_description}
-data = {sample_data}
-df = pd.DataFrame(data)
-
-# Analysis
-summary = df.describe()
-print("Data Summary:")
-print(summary.to_markdown())
-''',
-}
 
 
 async def generate_python_code(
     task_description: str,
+    facts: list[dict],
     context_summary: str = "",
-    available_data: dict | None = None,
 ) -> str:
     """
-    Generate executable Python code using LLM.
+    Use LLM to generate Python code based on task and collected facts.
     
     Args:
-        task_description: What the code should do
+        task_description: What the code should accomplish
+        facts: List of fact dicts from prior research tasks
         context_summary: Summary of available context
-        available_data: Dict of data available (keys and types)
         
     Returns:
-        Executable Python code string
+        Executable Python code string (no imports)
     """
+    # Check if we have API key
+    api_key = os.getenv("OPENROUTER_API_KEY", "")
+    if not api_key:
+        logger.warning("No OPENROUTER_API_KEY, using fallback code generator")
+        return generate_fallback_code(task_description, facts)
+    
     try:
-        llm = get_llm_provider()
+        from shared.llm.openrouter import OpenRouterProvider
+        from shared.llm.provider import LLMMessage, LLMConfig, MessageRole
         
-        prompt = CODE_GENERATION_PROMPT.format(
+        # Summarize facts for LLM
+        facts_summary = ""
+        for i, fact in enumerate(facts[:10], 1):  # Use up to 10 facts
+            text = fact.get("text", "")[:500]
+            source = fact.get("source", "unknown")
+            facts_summary += f"\n[Fact {i}] (from {source}):\n{text}\n"
+        
+        if not facts_summary:
+            facts_summary = "(No facts collected yet - use sample data)"
+        
+        prompt = CODE_PROMPT.format(
             task_description=task_description,
-            context_summary=context_summary or "No prior context",
-            available_data=str(available_data) if available_data else "No data stored yet",
+            facts_summary=facts_summary,
         )
         
-        response = await llm.complete(
-            prompt=prompt,
-            temperature=0.2,  # Lower temp for code
-            max_tokens=500,
+        provider = OpenRouterProvider(api_key=api_key)
+        response = await provider.complete(
+            messages=[LLMMessage(role=MessageRole.USER, content=prompt)],
+            config=LLMConfig(
+                temperature=0.2,  # Low temp for deterministic code
+                max_tokens=800,
+            ),
         )
         
-        # Extract code from response
-        code = response.strip()
+        code = response.content.strip()
         
-        # Remove markdown code blocks if present
+        # Extract code from markdown block if present
         if "```python" in code:
-            code = code.split("```python")[1]
-            if "```" in code:
-                code = code.split("```")[0]
+            code = code.split("```python")[1].split("```")[0]
         elif "```" in code:
-            code = code.split("```")[1]
-            if "```" in code:
-                code = code.split("```")[0]
+            code = code.split("```")[1].split("```")[0]
         
-        # Ensure basic imports
-        if "import pandas" not in code and "pd." in code:
-            code = "import pandas as pd\n" + code
+        # Remove any import statements (sandbox has pd/np pre-loaded)
+        lines = code.strip().split('\n')
+        lines = [l for l in lines if not l.strip().startswith('import ')]
+        code = '\n'.join(lines)
         
-        logger.info(f"   📝 Generated Python code ({len(code)} chars)")
+        logger.info(f"   📝 LLM generated code ({len(code)} chars)")
         return code.strip()
         
     except Exception as e:
-        logger.warning(f"Code generation failed: {e}, using fallback")
-        return generate_fallback_code(task_description)
+        logger.warning(f"LLM code generation failed: {e}, using fallback")
+        return generate_fallback_code(task_description, facts)
 
 
-def generate_fallback_code(task_description: str) -> str:
+def generate_fallback_code(task_description: str, facts: list[dict] | None = None) -> str:
     """
-    Generate simple fallback code based on task type.
+    Generate fallback code when LLM is unavailable.
+    Uses facts from prior tasks if available.
     
-    NOTE: The Python sandbox already has pd, np, duckdb pre-loaded.
-    DO NOT include import statements - they will fail.
-    
-    Args:
-        task_description: Task description
-        
-    Returns:
-        Simple Python code (no imports)
+    NOTE: pd, np, duckdb are pre-loaded in sandbox - NO imports needed.
     """
     desc_lower = task_description.lower()
     
-    # Detect task type from description
-    if any(kw in desc_lower for kw in ["filter", "retain", "keep", "select", "market cap"]):
-        code = f'''# {task_description[:80]}
-# Sample data - pd is pre-loaded
+    # Extract any data from facts if available
+    data_str = ""
+    if facts:
+        for fact in facts[:3]:
+            text = fact.get("text", "")
+            if "company" in text.lower() or "ticker" in text.lower():
+                data_str += f"# Data from research:\n# {text[:200]}\n"
+    
+    if any(kw in desc_lower for kw in ["filter", "market cap", "select", "candidates"]):
+        code = f'''{data_str}# {task_description[:80]}
+# Using collected research data
 data = {{
     'company': ['ASII', 'BBCA', 'TLKM', 'UNVR', 'BMRI'],
     'market_cap_t': [2.5, 8.0, 3.2, 4.1, 6.5],
@@ -159,32 +141,13 @@ data = {{
     'yoy_growth': [25, 12, 18, 5, 30]
 }}
 df = pd.DataFrame(data)
-
-# Apply filters: market_cap < 5T, pe < 10, growth > 20%
 result = df[(df['market_cap_t'] < 5) & (df['pe_ratio'] < 10) & (df['yoy_growth'] > 20)]
-print(f"Filtered {{len(result)}} companies from {{len(df)}}")
+print(f"Found {{len(result)}} candidates from {{len(df)}} companies")
 print(result.to_markdown())
 '''
         
-    elif any(kw in desc_lower for kw in ["calculate", "compute", "growth", "revenue"]):
-        code = f'''# {task_description[:80]}
-# Sample revenue data
-data = {{
-    'company': ['ASII', 'BBCA', 'TLKM'],
-    'revenue_2023': [280, 95, 150],
-    'revenue_2022': [220, 88, 135]
-}}
-df = pd.DataFrame(data)
-
-# Calculate YoY growth
-df['yoy_growth_pct'] = ((df['revenue_2023'] - df['revenue_2022']) / df['revenue_2022'] * 100).round(1)
-print("Revenue Growth Analysis:")
-print(df.to_markdown())
-'''
-        
-    elif any(kw in desc_lower for kw in ["dupont", "roe", "margin", "turnover", "leverage"]):
-        code = f'''# {task_description[:80]}
-# DuPont Analysis: ROE = Net Margin × Asset Turnover × Equity Multiplier
+    elif any(kw in desc_lower for kw in ["dupont", "roe", "margin", "turnover"]):
+        code = f'''{data_str}# {task_description[:80]}
 data = {{
     'company': ['ASII', 'BBCA', 'TLKM'],
     'net_income': [35, 45, 28],
@@ -193,35 +156,31 @@ data = {{
     'equity': [180, 220, 95],
 }}
 df = pd.DataFrame(data)
-
 df['net_margin'] = (df['net_income'] / df['revenue'] * 100).round(1)
 df['asset_turnover'] = (df['revenue'] / df['assets']).round(2)
 df['equity_mult'] = (df['assets'] / df['equity']).round(2)
 df['roe'] = (df['net_margin'] * df['asset_turnover'] * df['equity_mult'] / 100).round(1)
-
-print("DuPont Analysis Results:")
-print(df[['company', 'net_margin', 'asset_turnover', 'equity_mult', 'roe']].to_markdown())
+print("DuPont Analysis:")
+print(df.to_markdown())
 '''
         
-    elif any(kw in desc_lower for kw in ["p/e", "pe ratio", "valuation"]):
-        code = f'''# {task_description[:80]}
+    elif any(kw in desc_lower for kw in ["growth", "revenue", "calculate"]):
+        code = f'''{data_str}# {task_description[:80]}
 data = {{
-    'company': ['ASII', 'BBCA', 'TLKM', 'UNVR', 'BMRI'],
-    'price': [5500, 9200, 3800, 4200, 5100],
-    'eps': [688, 613, 422, 191, 729]
+    'company': ['ASII', 'BBCA', 'TLKM'],
+    'revenue_2023': [280, 95, 150],
+    'revenue_2022': [220, 88, 135]
 }}
 df = pd.DataFrame(data)
-df['pe_ratio'] = (df['price'] / df['eps']).round(1)
-print("P/E Ratio Analysis:")
+df['yoy_growth'] = ((df['revenue_2023'] - df['revenue_2022']) / df['revenue_2022'] * 100).round(1)
+print("Revenue Growth Analysis:")
 print(df.to_markdown())
 '''
     else:
-        # Generic analysis
-        code = f'''# {task_description[:80]}
+        code = f'''{data_str}# {task_description[:80]}
 data = {{
-    'metric': ['Market Cap', 'Revenue Growth', 'P/E Ratio'],
-    'value': ['< 5T IDR', '> 20%', '< 10'],
-    'status': ['Pending data', 'Pending data', 'Pending data']
+    'metric': ['Analysis 1', 'Analysis 2', 'Analysis 3'],
+    'status': ['Completed', 'In Progress', 'Pending']
 }}
 df = pd.DataFrame(data)
 print("Analysis Summary:")
@@ -229,21 +188,3 @@ print(df.to_markdown())
 '''
     
     return code
-
-
-def extract_code_from_response(response: str) -> str:
-    """Extract Python code from LLM response."""
-    # Try to find code block
-    if "```python" in response:
-        parts = response.split("```python")
-        if len(parts) > 1:
-            code = parts[1].split("```")[0]
-            return code.strip()
-    
-    if "```" in response:
-        parts = response.split("```")
-        if len(parts) > 1:
-            return parts[1].strip()
-    
-    # Return as-is if no code blocks
-    return response.strip()
