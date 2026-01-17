@@ -310,7 +310,25 @@ class MCPOrchestrator:
         self._tool_registry.clear()
 
 
+# ============================================================================
+# Singleton Accessor
+# ============================================================================
+
+_orchestrator_instance: MCPOrchestrator | None = None
+
+
 def get_mcp_orchestrator() -> MCPOrchestrator:
-    """Factory function to get the singleton MCP orchestrator."""
-    return MCPOrchestrator.get_instance()
+    """
+    Get or create global MCP orchestrator instance.
+    
+    Returns:
+        MCPOrchestrator instance
+    """
+    global _orchestrator_instance
+    if _orchestrator_instance is None:
+        _orchestrator_instance = MCPOrchestrator()
+    return _orchestrator_instance
+
+
+
 
