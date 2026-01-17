@@ -2,6 +2,7 @@
 Stress Tests: Concurrent Requests.
 
 Load testing for API endpoints.
+Uses authenticated client for job creation.
 """
 
 import pytest
@@ -9,8 +10,7 @@ import httpx
 import asyncio
 import time
 
-
-API_URL = "http://localhost:8080"
+from tests.stress.conftest import AuthenticatedAPIClient, API_GATEWAY_URL
 
 
 class TestConcurrentRequests:
@@ -19,12 +19,12 @@ class TestConcurrentRequests:
     @pytest.mark.stress
     @pytest.mark.asyncio
     async def test_concurrent_health_checks(self):
-        """Hit health endpoint with many concurrent requests."""
+        """Hit health endpoint with many concurrent requests (no auth needed)."""
         num_requests = 50
         
         async def make_request():
             async with httpx.AsyncClient(timeout=10) as client:
-                return await client.get(f"{API_URL}/health")
+                return await client.get(f"{API_GATEWAY_URL}/health")
         
         start = time.perf_counter()
         
@@ -44,16 +44,16 @@ class TestConcurrentRequests:
     
     @pytest.mark.stress
     @pytest.mark.asyncio
-    async def test_concurrent_job_creation(self):
-        """Create multiple jobs concurrently."""
+    async def test_concurrent_job_creation(self, api_client):
+        """Create multiple jobs concurrently (requires auth)."""
         num_jobs = 10
         
         async def create_job(i):
-            async with httpx.AsyncClient(timeout=30) as client:
-                return await client.post(
-                    f"{API_URL}/api/v1/jobs/",
-                    json={"query": f"Concurrent test query {i}"}
-                )
+            # Use the authenticated client
+            return await api_client.post(
+                "/api/v1/jobs/",
+                json={"query": f"Concurrent test query {i}"}
+            )
         
         start = time.perf_counter()
         
@@ -71,7 +71,7 @@ class TestConcurrentRequests:
     @pytest.mark.stress
     @pytest.mark.asyncio
     async def test_sustained_load(self):
-        """Sustain load over time."""
+        """Sustain load over time (health checks, no auth needed)."""
         duration_seconds = 10
         requests_per_second = 5
         
@@ -80,7 +80,7 @@ class TestConcurrentRequests:
         async def make_request():
             try:
                 async with httpx.AsyncClient(timeout=10) as client:
-                    resp = await client.get(f"{API_URL}/health")
+                    resp = await client.get(f"{API_GATEWAY_URL}/health")
                     if resp.status_code == 200:
                         results["success"] += 1
                     else:

@@ -2,13 +2,11 @@
 Integration Tests: Jobs API.
 
 Tests for /api/v1/jobs/* endpoints.
+Uses authenticated client for JWT auth.
 """
 
 import pytest
-import httpx
-
-
-API_URL = "http://localhost:8080"
+import asyncio
 
 
 class TestJobsAPI:
@@ -16,19 +14,18 @@ class TestJobsAPI:
     
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_create_job(self):
+    async def test_create_job(self, auth_client):
         """Create a new research job."""
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.post(
-                f"{API_URL}/api/v1/jobs/",
-                json={
-                    "query": "Test research query",
-                    "job_type": "deep_research",
-                    "depth": 2,
-                }
-            )
+        response = await auth_client.post(
+            "/api/v1/jobs/",
+            json={
+                "query": "Test research query",
+                "job_type": "deep_research",
+                "depth": 2,
+            }
+        )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, f"Failed: {response.text}"
         data = response.json()
         assert "job_id" in data
         assert data["status"] in ["pending", "running"]
@@ -37,30 +34,29 @@ class TestJobsAPI:
     
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_list_jobs(self):
+    async def test_list_jobs(self, auth_client):
         """List all jobs."""
-        async with httpx.AsyncClient(timeout=10) as client:
-            response = await client.get(f"{API_URL}/api/v1/jobs/")
+        response = await auth_client.get("/api/v1/jobs/")
         
-        assert response.status_code == 200
+        assert response.status_code == 200, f"Failed: {response.text}"
         data = response.json()
         assert "jobs" in data
         assert isinstance(data["jobs"], list)
     
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_get_job_status(self):
+    async def test_get_job_status(self, auth_client):
         """Get job status by ID."""
-        async with httpx.AsyncClient(timeout=30) as client:
-            # Create a job first
-            create_resp = await client.post(
-                f"{API_URL}/api/v1/jobs/",
-                json={"query": "Status test query"}
-            )
-            job_id = create_resp.json()["job_id"]
-            
-            # Get status
-            response = await client.get(f"{API_URL}/api/v1/jobs/{job_id}")
+        # Create a job first
+        create_resp = await auth_client.post(
+            "/api/v1/jobs/",
+            json={"query": "Status test query"}
+        )
+        assert create_resp.status_code == 200, f"Create failed: {create_resp.text}"
+        job_id = create_resp.json()["job_id"]
+        
+        # Get status
+        response = await auth_client.get(f"/api/v1/jobs/{job_id}")
         
         assert response.status_code == 200
         data = response.json()
@@ -70,27 +66,26 @@ class TestJobsAPI:
     
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_get_job_not_found(self):
+    async def test_get_job_not_found(self, auth_client):
         """Get status for non-existent job."""
-        async with httpx.AsyncClient(timeout=10) as client:
-            response = await client.get(f"{API_URL}/api/v1/jobs/nonexistent-job-id")
+        response = await auth_client.get("/api/v1/jobs/nonexistent-job-id")
         
         assert response.status_code == 404
     
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_cancel_job(self):
+    async def test_cancel_job(self, auth_client):
         """Cancel a job (uses DELETE method)."""
-        async with httpx.AsyncClient(timeout=30) as client:
-            # Create a job first
-            create_resp = await client.post(
-                f"{API_URL}/api/v1/jobs/",
-                json={"query": "Cancel test query"}
-            )
-            job_id = create_resp.json()["job_id"]
-            
-            # Cancel it (DELETE, not POST)
-            response = await client.delete(f"{API_URL}/api/v1/jobs/{job_id}")
+        # Create a job first
+        create_resp = await auth_client.post(
+            "/api/v1/jobs/",
+            json={"query": "Cancel test query"}
+        )
+        assert create_resp.status_code == 200, f"Create failed: {create_resp.text}"
+        job_id = create_resp.json()["job_id"]
+        
+        # Cancel it
+        response = await auth_client.delete(f"/api/v1/jobs/{job_id}")
         
         assert response.status_code in [200, 400]  # 400 if already completed
 
@@ -100,37 +95,34 @@ class TestJobWorkflow:
     
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_create_and_poll(self):
+    async def test_create_and_poll(self, auth_client):
         """Create job and poll for completion."""
-        import asyncio
+        # Create job
+        create_resp = await auth_client.post(
+            "/api/v1/jobs/",
+            json={
+                "query": "Simple test query",
+                "depth": 1,
+            }
+        )
         
-        async with httpx.AsyncClient(timeout=30) as client:
-            # Create job
-            create_resp = await client.post(
-                f"{API_URL}/api/v1/jobs/",
-                json={
-                    "query": "Simple test query",
-                    "depth": 1,
-                }
-            )
+        assert create_resp.status_code == 200
+        job_id = create_resp.json()["job_id"]
+        
+        # Poll for status (with timeout)
+        max_polls = 10
+        for _ in range(max_polls):
+            status_resp = await auth_client.get(f"/api/v1/jobs/{job_id}")
+            status = status_resp.json()["status"]
             
-            assert create_resp.status_code == 200
-            job_id = create_resp.json()["job_id"]
+            if status in ["completed", "failed"]:
+                break
             
-            # Poll for status (with timeout)
-            max_polls = 10
-            for _ in range(max_polls):
-                status_resp = await client.get(f"{API_URL}/api/v1/jobs/{job_id}")
-                status = status_resp.json()["status"]
-                
-                if status in ["completed", "failed"]:
-                    break
-                
-                await asyncio.sleep(2)
-            
-            # Final status check
-            final_resp = await client.get(f"{API_URL}/api/v1/jobs/{job_id}")
-            assert final_resp.status_code == 200
+            await asyncio.sleep(2)
+        
+        # Final status check
+        final_resp = await auth_client.get(f"/api/v1/jobs/{job_id}")
+        assert final_resp.status_code == 200
 
 
 if __name__ == "__main__":
