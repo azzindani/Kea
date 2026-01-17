@@ -304,11 +304,10 @@ All core components implemented and functional:
 | **API Gateway** | ✅ | 8 route modules, JWT auth, rate limiting |
 | **Test Suite** | ✅ | Unit, integration, stress tests |
 
-### � Known Limitations
+### Known Limitations
 
-1. **Graph Nodes**: `graph.py` uses stub implementations. Real execution requires wiring to `nodes/` and `agents/` modules.
-2. **MCP Servers**: Server processes not auto-started; need explicit initialization.
-3. **Full Pipeline**: End-to-end research flow requires MCP tools + LLM to be connected in graph nodes.
+1. **Hybrid Tool Implementation**: While the architecture is MCP-first, the core research loop currently uses direct imports for critical tools (Search) for performance optimization.
+2. **Environment Specificity**: MCP Server auto-start in `main.py` assumes a standard environment; Docker setups may require adjusting `mcp_servers.yaml`.
 
 ### 🏗️ Architecture Principles
 
@@ -1442,10 +1441,14 @@ graph LR
 - Organization module, Work Units, Message Bus, Supervisor
 - Security: ResourceGuard, KillSwitch, rate limiting
 
+### ✅ Completed (v3.0)
+- Wire `graph.py` to real `nodes/` and `agents/` modules
+- Connect MCP Orchestrator to researcher node
+- Full end-to-end research pipeline
+
 ### 🚧 In Progress (v3.1)
-- [ ] Wire `graph.py` to real `nodes/` and `agents/` modules
-- [ ] Connect MCP Orchestrator to researcher node
-- [ ] Full end-to-end research pipeline
+- [ ] Refine MCP Lifecycle Management for Docker
+- [ ] Optimization of Hybrid Tool Calling
 
 ### 🔮 Future (v4.0+)
 - [ ] Multi-process agent isolation

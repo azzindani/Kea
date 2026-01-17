@@ -148,7 +148,7 @@ async def planner_node(state: GraphState) -> GraphState:
 
 
 async def researcher_node(state: GraphState) -> GraphState:
-    """Execute research using direct tool calls (bypassing MCP server layer)."""
+    """Execute research using MCP tool calls."""
     iteration = state.get("iteration", 1)
     
     logger.info("\n" + "="*70)
@@ -166,17 +166,19 @@ async def researcher_node(state: GraphState) -> GraphState:
     
     logger.info(f"Sub-queries to research: {len(sub_queries)}")
     
-    # Import the tool directly (bypasses MCP server layer)
+    # Use MCP Client
     try:
-        from mcp_servers.search_server.tools.web_search import web_search_tool
+        from services.orchestrator.mcp.client import get_mcp_orchestrator
+        client = get_mcp_orchestrator()
         
         # Execute search for each sub-query
         for i, sub_query in enumerate(sub_queries[:5], 1):  # Up to 5 searches
-            logger.info(f"\n🔍 Tool Call {i}: web_search (DIRECT)")
+            logger.info(f"\n🔍 Tool Call {i}: web_search (MCP)")
             logger.info(f"   Query: {sub_query[:80]}...")
             
             try:
-                result = await web_search_tool({
+                # Call tool via orchestrator
+                result = await client.call_tool("web_search", {
                     "query": sub_query, 
                     "max_results": 5
                 })
@@ -213,7 +215,7 @@ async def researcher_node(state: GraphState) -> GraphState:
                 logger.warning(f"Research tool error: {e}")
                 
     except ImportError as e:
-        logger.error(f"Could not import web_search_tool: {e}")
+        logger.error(f"Could not import mcp client: {e}")
         # Fallback: use LLM knowledge only
         facts.append({
             "text": f"Research context for: {query}. Using LLM knowledge as external search unavailable.",
