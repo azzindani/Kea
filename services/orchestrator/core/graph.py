@@ -60,11 +60,13 @@ class GraphState(TypedDict, total=False):
     # Planning
     sub_queries: list[str]
     hypotheses: list[str]
+    execution_plan: dict  # Execution plan from planner
     
     # Execution
     facts: list[dict]
     sources: list[dict]
     artifacts: list[str]
+    tool_invocations: list[dict]  # Record of tool calls
     
     # Consensus
     generator_output: str
@@ -117,19 +119,20 @@ async def router_node(state: GraphState) -> GraphState:
 
 
 async def planner_node(state: GraphState) -> GraphState:
-    """Decompose query into sub-queries and hypotheses using real LLM."""
+    """Decompose query into sub-queries, hypotheses, and execution plan using real LLM."""
     logger.info("\n" + "="*70)
     logger.info("📍 STEP 2: PLANNER NODE (LLM Call)")
     logger.info("="*70)
     logger.info(f"Query: {state.get('query', '')[:200]}...")
     logger.info("-"*70)
-    logger.info("Calling LLM to decompose query into sub-queries...")
+    logger.info("Calling LLM to decompose query into sub-queries and execution plan...")
     
     # Call real planner that uses OpenRouter LLM
     updated_state = await real_planner_node(dict(state))
     
     sub_queries = updated_state.get("sub_queries", [])
     hypotheses = updated_state.get("hypotheses", [])
+    execution_plan = updated_state.get("execution_plan", {})
     
     logger.info(f"\n✅ Sub-Queries Generated ({len(sub_queries)}):")
     for i, sq in enumerate(sub_queries, 1):
@@ -139,6 +142,14 @@ async def planner_node(state: GraphState) -> GraphState:
     for i, h in enumerate(hypotheses, 1):
         logger.info(f"   {i}. {h}")
     
+    # Log execution plan
+    micro_tasks = execution_plan.get("micro_tasks", [])
+    if micro_tasks:
+        logger.info(f"\n✅ Execution Plan Generated ({len(micro_tasks)} micro-tasks):")
+        for task in micro_tasks:
+            logger.info(f"   [{task.get('task_id')}] {task.get('tool')}: {task.get('description', '')[:60]}...")
+        logger.info(f"   Phases: {execution_plan.get('phases', [])}")
+    
     logger.info("="*70 + "\n")
     
     # Increment iteration
@@ -146,108 +157,133 @@ async def planner_node(state: GraphState) -> GraphState:
     
     return {**state, **updated_state}
 
-
 async def researcher_node(state: GraphState) -> GraphState:
-    """Execute research using MCP tool calls."""
+    """Execute research using execution plan with dynamic tool routing."""
     iteration = state.get("iteration", 1)
     
     logger.info("\n" + "="*70)
-    logger.info(f"📍 STEP 3: RESEARCHER NODE (Iteration {iteration}) - Web Search")
+    logger.info(f"📍 STEP 3: RESEARCHER NODE (Iteration {iteration}) - Dynamic Tool Routing")
     logger.info("="*70)
     
+    execution_plan = state.get("execution_plan", {})
+    micro_tasks = execution_plan.get("micro_tasks", [])
     sub_queries = state.get("sub_queries", [])
     query = state.get("query", "")
     facts = state.get("facts", [])
     sources = state.get("sources", [])
+    tool_invocations = state.get("tool_invocations", [])
     
-    # If no sub_queries, use the main query
-    if not sub_queries:
-        sub_queries = [query]
+    # If no execution plan, fall back to sub-queries with web_search
+    if not micro_tasks:
+        logger.info("No execution plan, falling back to sub-query based web search")
+        micro_tasks = [
+            {"task_id": f"task_{i+1}", "description": sq, "tool": "web_search", 
+             "inputs": {"query": sq}, "fallback_tools": ["news_search"], "persist": True}
+            for i, sq in enumerate(sub_queries or [query])
+        ]
     
-    logger.info(f"Sub-queries to research: {len(sub_queries)}")
+    logger.info(f"Executing {len(micro_tasks)} micro-tasks from execution plan")
     
-    # Use MCP Client with direct fallback
-    try:
-        from services.orchestrator.mcp.client import get_mcp_orchestrator
-        from mcp_servers.search_server.tools.web_search import web_search_tool
+    # Tool registry for dynamic routing
+    from services.orchestrator.mcp.client import get_mcp_orchestrator
+    from mcp_servers.search_server.tools.web_search import web_search_tool
+    
+    # Direct tool implementations (fallback when MCP not configured)
+    direct_tools = {
+        "web_search": web_search_tool,
+        "news_search": web_search_tool,  # Same tool, different intent
+        # Add more direct tool mappings as needed
+    }
+    
+    client = get_mcp_orchestrator()
+    use_direct = len(client.tool_names) == 0  # No MCP tools registered
+    
+    # Execute each micro-task
+    for i, task in enumerate(micro_tasks[:10], 1):  # Cap at 10 tasks
+        task_id = task.get("task_id", f"task_{i}")
+        tool_name = task.get("tool", "web_search")
+        description = task.get("description", "")[:80]
+        fallbacks = task.get("fallback_tools", [])
+        persist = task.get("persist", True)
         
-        client = get_mcp_orchestrator()
-        use_direct = len(client.tool_names) == 0  # No MCP tools registered
+        logger.info(f"\n🔧 Micro-Task {task_id}: {tool_name}")
+        logger.info(f"   Description: {description}...")
+        logger.info(f"   Persist: {persist} | Fallbacks: {fallbacks}")
         
-        # Execute search for each sub-query
-        for i, sub_query in enumerate(sub_queries[:5], 1):  # Up to 5 searches
-            if use_direct:
-                logger.info(f"\n🔍 Tool Call {i}: web_search (DIRECT - MCP not configured)")
+        result = None
+        used_tool = tool_name
+        error = None
+        
+        try:
+            # Try primary tool
+            if use_direct and tool_name in direct_tools:
+                logger.info(f"   🔌 Direct call: {tool_name}")
+                result = await direct_tools[tool_name](task.get("inputs", {}))
+            elif not use_direct:
+                logger.info(f"   📡 MCP call: {tool_name}")
+                result = await client.call_tool(tool_name, task.get("inputs", {}))
+                # Check for tool not found
+                if result and hasattr(result, "isError") and result.isError:
+                    if "Tool not found" in str(result.content):
+                        raise ValueError(f"Tool {tool_name} not found in MCP")
             else:
-                logger.info(f"\n🔍 Tool Call {i}: web_search (MCP)")
-            logger.info(f"   Query: {sub_query[:80]}...")
+                logger.info(f"   ⚠️ Tool {tool_name} not available, trying fallbacks")
+                raise ValueError(f"Tool {tool_name} not available")
+                
+        except Exception as e:
+            error = str(e)
+            logger.info(f"   ❌ Primary tool failed: {e}")
             
-            try:
-                # Try MCP first, fallback to direct
-                if use_direct:
-                    result = await web_search_tool({
-                        "query": sub_query, 
-                        "max_results": 5
-                    })
-                else:
-                    result = await client.call_tool("web_search", {
-                        "query": sub_query, 
-                        "max_results": 5
-                    })
-                    # Check if MCP returned "Tool not found" and fallback
-                    if result.isError and "Tool not found" in str(result.content):
-                        logger.info("   ⚠️ MCP tool not found, using direct call")
-                        result = await web_search_tool({
-                            "query": sub_query, 
-                            "max_results": 5
-                        })
-                
-                # Parse search results into facts
-                if result and hasattr(result, "content"):
-                    for content in result.content:
-                        if hasattr(content, "text"):
-                            # Check if it's an error
-                            if result.isError:
-                                logger.info(f"   ⚠️ Search returned error: {content.text[:100]}")
-                            else:
-                                fact = {
-                                    "text": content.text[:1000],
-                                    "query": sub_query,
-                                    "source": "web_search",
-                                }
-                                facts.append(fact)
-                                logger.info(f"   ✅ Search results extracted ({len(content.text)} chars)")
-                                logger.info(f"   Preview: {content.text[:200]}...")
-                                
-                                # Extract sources from results
-                                if "http" in content.text:
-                                    # Simple URL extraction
-                                    import re
-                                    urls = re.findall(r'\((https?://[^\)]+)\)', content.text)
-                                    for url in urls[:3]:
-                                        sources.append({"url": url, "title": sub_query})
-                else:
-                    logger.info(f"   ⚠️ No content returned from search")
-                            
-            except Exception as e:
-                logger.info(f"   ❌ Tool error: {e}")
-                logger.warning(f"Research tool error: {e}")
-                
-    except ImportError as e:
-        logger.error(f"Could not import mcp client: {e}")
-        # Fallback: use LLM knowledge only
-        facts.append({
-            "text": f"Research context for: {query}. Using LLM knowledge as external search unavailable.",
-            "query": query,
-            "source": "llm_fallback",
+            # Try fallbacks
+            for fallback in fallbacks:
+                try:
+                    logger.info(f"   🔄 Fallback: {fallback}")
+                    if fallback in direct_tools:
+                        result = await direct_tools[fallback](task.get("inputs", {}))
+                        used_tool = fallback
+                        error = None
+                        break
+                except Exception as fe:
+                    logger.info(f"   ❌ Fallback {fallback} failed: {fe}")
+        
+        # Process result
+        if result and hasattr(result, "content"):
+            for content in result.content:
+                if hasattr(content, "text"):
+                    if hasattr(result, "isError") and result.isError:
+                        logger.info(f"   ⚠️ Tool returned error: {content.text[:100]}")
+                    else:
+                        fact = {
+                            "text": content.text[:1000],
+                            "query": description,
+                            "source": used_tool,
+                            "task_id": task_id,
+                            "persist": persist,
+                        }
+                        facts.append(fact)
+                        logger.info(f"   ✅ Result extracted ({len(content.text)} chars)")
+                        
+                        # Extract URLs as sources
+                        if "http" in content.text:
+                            import re
+                            urls = re.findall(r'\((https?://[^\)]+)\)', content.text)
+                            for url in urls[:3]:
+                                sources.append({"url": url, "title": description, "tool": used_tool})
+        
+        # Record tool invocation
+        tool_invocations.append({
+            "task_id": task_id,
+            "tool": used_tool,
+            "success": error is None,
+            "error": error,
+            "persist": persist,
         })
-    except Exception as e:
-        logger.info(f"❌ Search error: {e}")
-        logger.error(f"Research error: {e}")
-        facts.append({
-            "text": f"Research in progress for: {sub_queries[0] if sub_queries else query}",
-            "source": "fallback",
-        })
+    
+    logger.info(f"\n📊 Research Summary:")
+    logger.info(f"   Tasks executed: {len(tool_invocations)}")
+    logger.info(f"   Facts collected: {len(facts)}")
+    logger.info(f"   Sources found: {len(sources)}")
+    logger.info("="*70 + "\n")
     
     logger.info(f"\n✅ Total Facts Collected: {len(facts)}")
     logger.info(f"✅ Total Sources Found: {len(sources)}")
