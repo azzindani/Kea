@@ -25,6 +25,10 @@ from services.orchestrator.agents.critic import CriticAgent
 from services.orchestrator.agents.judge import JudgeAgent
 from services.orchestrator.core.router import IntentionRouter
 
+# NEW: Context pool and code generator for dynamic data flow
+from services.orchestrator.core.context_pool import get_context_pool, reset_context_pool
+from services.orchestrator.agents.code_generator import generate_fallback_code
+
 
 logger = get_logger(__name__)
 
@@ -173,8 +177,9 @@ async def researcher_node(state: GraphState) -> GraphState:
     sources = state.get("sources", [])
     tool_invocations = state.get("tool_invocations", [])
     
-    # URL pool - collect URLs from search results for crawlers to use
-    url_pool = state.get("url_pool", [])
+    # Reset context pool for new research iteration
+    if iteration == 1:
+        reset_context_pool()
     
     # If no execution plan, fall back to sub-queries with web_search
     if not micro_tasks:
@@ -252,13 +257,19 @@ async def researcher_node(state: GraphState) -> GraphState:
     def build_tool_inputs(tool_name: str, description: str, original_inputs: dict) -> dict:
         """Build proper inputs based on tool requirements."""
         
+        # Get context pool for data chaining
+        ctx = get_context_pool()
+        
         # =====================================================
-        # PYTHON TOOLS
+        # PYTHON TOOLS - Use LLM code generator
         # =====================================================
         if tool_name in ["run_python", "execute_code"]:
             if "code" in original_inputs:
                 return original_inputs
-            return {"code": f"# Task: {description}\nprint('Analysis would be performed here')"}
+            # Generate real code using LLM/fallback templates
+            code = generate_fallback_code(description)
+            logger.info(f"   📝 Generated code ({len(code)} chars)")
+            return {"code": code}
         
         if tool_name in ["dataframe_ops", "analyze_data"]:
             if "operation" in original_inputs:
@@ -291,9 +302,9 @@ async def researcher_node(state: GraphState) -> GraphState:
                     "max_pages": original_inputs.get("max_pages", 100),
                     "same_domain": original_inputs.get("same_domain", True),
                 }
-            # Try to use URL from pool (collected from earlier search results)
-            if url_pool:
-                crawl_url = url_pool.pop(0)  # Take first URL from pool
+            # Try to use URL from context pool (collected from earlier search results)
+            crawl_url = ctx.get_url()
+            if crawl_url:
                 logger.info(f"   📋 Using URL from pool: {crawl_url[:50]}...")
                 return {
                     "start_url": crawl_url,
@@ -438,37 +449,18 @@ async def researcher_node(state: GraphState) -> GraphState:
                         success = True  # Mark as successful when we got valid content
                         logger.info(f"   ✅ Result extracted ({len(content.text)} chars)")
                         
-                        # Extract URLs using multiple patterns
-                        import re
-                        text = content.text
+                        # Extract URLs using context pool (centralized extraction)
+                        ctx = get_context_pool()
+                        extracted_urls = ctx.extract_urls_from_text(content.text)
                         
-                        # Pattern 1: URLs in parentheses (markdown links)
-                        urls_paren = re.findall(r'\((https?://[^\)\s]+)\)', text)
-                        
-                        # Pattern 2: URLs in brackets [url]
-                        urls_bracket = re.findall(r'\[(https?://[^\]\s]+)\]', text)
-                        
-                        # Pattern 3: Standalone URLs
-                        urls_standalone = re.findall(r'(?<![(\[])(https?://[^\s\)\]<>"]+)', text)
-                        
-                        # Combine all URLs, remove duplicates
-                        all_urls = list(set(urls_paren + urls_bracket + urls_standalone))
-                        
-                        for url in all_urls[:10]:  # Keep up to 10 URLs per result
-                            # Clean URL
-                            url = url.rstrip('.,;:')
-                            if len(url) > 20:  # Skip very short/broken URLs
-                                sources.append({
-                                    "url": url, 
-                                    "title": description[:80], 
-                                    "tool": used_tool,
-                                    "task_id": task_id,
-                                })
-                                # Add to URL pool for other tasks
-                                url_pool.append(url)
-                        
-                        if all_urls:
-                            logger.info(f"   🔗 URLs extracted: {len(all_urls)}")
+                        # Add to sources for reporting
+                        for url in extracted_urls[:10]:
+                            sources.append({
+                                "url": url, 
+                                "title": description[:80], 
+                                "tool": used_tool,
+                                "task_id": task_id,
+                            })
         
         # Record tool invocation with proper success tracking
         tool_invocations.append({
@@ -497,7 +489,6 @@ async def researcher_node(state: GraphState) -> GraphState:
         "facts": facts,
         "sources": sources,
         "tool_invocations": tool_invocations,
-        "url_pool": url_pool,  # Persist URLs for recursive crawling
     }
 
 
