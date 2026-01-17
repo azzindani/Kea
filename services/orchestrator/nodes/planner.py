@@ -45,44 +45,99 @@ class ExecutionPlan(BaseModel):
 # ============================================================================
 
 TOOL_CAPABILITIES = {
-    # Search & Research
+    # ===========================================
+    # SEARCH TOOLS
+    # ===========================================
     "web_search": {
-        "keywords": ["search", "find", "look up", "what is", "who is", "list of"],
+        "keywords": ["search", "find", "look up", "what is", "who is", "list of", "query"],
         "server": "search_server",
-        "fallbacks": ["news_search"],
+        "fallbacks": ["news_search", "human_search"],
     },
     "news_search": {
         "keywords": ["news", "recent", "latest", "announcement", "press release"],
         "server": "search_server",
         "fallbacks": ["web_search"],
     },
-    # Data Collection
-    "scrape_url": {
-        "keywords": ["scrape", "extract", "download", "annual report", "website", "page"],
-        "server": "scraper_server",
+    "human_search": {
+        "keywords": ["research", "investigate", "thorough", "comprehensive", "deep search"],
+        "server": "browser_agent_server",
         "fallbacks": ["web_search"],
     },
+    
+    # ===========================================
+    # CRAWLER TOOLS (recursive, unlimited depth)
+    # ===========================================
+    "web_crawler": {
+        "keywords": ["crawl", "explore", "recursive", "all pages", "entire site", "sitemap"],
+        "server": "crawler_server",
+        "fallbacks": ["link_extractor", "scrape_url"],
+    },
+    "sitemap_parser": {
+        "keywords": ["sitemap", "site map", "all urls", "url list"],
+        "server": "crawler_server",
+        "fallbacks": ["web_crawler"],
+    },
+    "link_extractor": {
+        "keywords": ["extract links", "get links", "find links", "outbound", "href"],
+        "server": "crawler_server",
+        "fallbacks": ["web_search"],
+    },
+    
+    # ===========================================
+    # SCRAPING TOOLS
+    # ===========================================
+    "scrape_url": {
+        "keywords": ["scrape", "extract", "download", "annual report", "website", "page", "fetch"],
+        "server": "scraper_server",
+        "fallbacks": ["web_crawler", "web_search"],
+    },
     "fetch_data": {
-        "keywords": ["data", "historical", "OHLCV", "price", "volume", "stock", "ticker"],
+        "keywords": ["data", "historical", "OHLCV", "price", "volume", "stock", "ticker", "API"],
         "server": "data_sources_server",
         "fallbacks": ["web_search"],
     },
-    # Analysis
-    "run_python": {
-        "keywords": ["calculate", "compute", "analyze", "algorithm", "filter", "ratio", "growth"],
-        "server": "python_server",
-        "fallbacks": [],
+    "multi_browse": {
+        "keywords": ["multiple sites", "parallel", "batch", "many urls", "browse all"],
+        "server": "browser_agent_server",
+        "fallbacks": ["web_crawler"],
     },
+    
+    # ===========================================
+    # DATA ANALYSIS TOOLS
+    # ===========================================
+    "run_python": {
+        "keywords": ["calculate", "compute", "analyze", "algorithm", "ratio", "growth", "formula"],
+        "server": "python_server",
+        "fallbacks": ["dataframe_ops"],
+    },
+    "dataframe_ops": {
+        "keywords": ["dataframe", "pandas", "table", "csv", "json", "filter", "aggregate", "load data"],
+        "server": "python_server",
+        "fallbacks": ["run_python"],
+    },
+    "sql_query": {
+        "keywords": ["sql", "query", "select", "from", "where", "join", "database"],
+        "server": "python_server",
+        "fallbacks": ["dataframe_ops"],
+    },
+    
+    # ===========================================
+    # SPECIALIZED TOOLS
+    # ===========================================
     "build_graph": {
         "keywords": ["graph", "relationship", "entity", "network", "connection", "ownership"],
         "server": "analytics_server",
         "fallbacks": [],
     },
-    # Document Processing
     "parse_document": {
         "keywords": ["parse", "read", "extract from", "PDF", "report", "financial statement"],
         "server": "document_server",
         "fallbacks": ["scrape_url"],
+    },
+    "source_validator": {
+        "keywords": ["validate", "credibility", "trustworthy", "verify source", "reliable"],
+        "server": "browser_agent_server",
+        "fallbacks": [],
     },
 }
 

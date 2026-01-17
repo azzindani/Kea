@@ -184,49 +184,149 @@ async def researcher_node(state: GraphState) -> GraphState:
     
     logger.info(f"Executing {len(micro_tasks)} micro-tasks from execution plan")
     
-    # Tool registry for dynamic routing
+    # Tool registry for dynamic routing - Wire ALL existing MCP tools
     from services.orchestrator.mcp.client import get_mcp_orchestrator
-    from mcp_servers.search_server.tools.web_search import web_search_tool
-    from mcp_servers.scraper_server.tools.fetch_url import fetch_url_tool
-    from mcp_servers.python_server.tools.execute_code import execute_code_tool
     
-    # Direct tool implementations (fallback when MCP not configured)
+    # Search tools
+    from mcp_servers.search_server.tools.web_search import web_search_tool
+    
+    # Scraper tools
+    from mcp_servers.scraper_server.tools.fetch_url import fetch_url_tool
+    
+    # Python execution tools
+    from mcp_servers.python_server.tools.execute_code import execute_code_tool
+    from mcp_servers.python_server.tools.dataframe_ops import dataframe_ops_tool
+    from mcp_servers.python_server.tools.sql_query import sql_query_tool
+    
+    # Crawler tools
+    from mcp_servers.crawler_server.server import web_crawler_tool, sitemap_parser_tool, link_extractor_tool
+    
+    # Browser agent tools
+    from mcp_servers.browser_agent_server.server import human_like_search_tool, source_validator_tool
+    
+    # Direct tool implementations - ALL available tools wired here
     direct_tools = {
-        # Search tools
+        # ===========================================
+        # SEARCH TOOLS (parallel capable)
+        # ===========================================
         "web_search": web_search_tool,
-        "news_search": web_search_tool,  # Same tool, different intent
-        # Scraping tools
+        "news_search": web_search_tool,
+        "human_search": human_like_search_tool,  # Human-like with delays
+        
+        # ===========================================
+        # SCRAPING TOOLS (recursive capable)
+        # ===========================================
         "scrape_url": fetch_url_tool,
         "fetch_url": fetch_url_tool,
-        # Data tools
-        "fetch_data": lambda args: web_search_tool({"query": args.get("query", ""), "max_results": 10}),  # Fallback to web search
-        # Python execution
+        "fetch_data": lambda args: web_search_tool({"query": args.get("query", ""), "max_results": 10}),
+        
+        # ===========================================
+        # CRAWLER TOOLS (depth unlimited)
+        # ===========================================
+        "web_crawler": web_crawler_tool,      # Recursive crawl - depth/pages configurable
+        "sitemap_parser": sitemap_parser_tool,  # Parse sitemap for URLs
+        "link_extractor": link_extractor_tool,  # Extract all links from page
+        
+        # ===========================================
+        # BROWSER TOOLS (parallel browse)
+        # ===========================================
+        "multi_browse": lambda args: BrowserAgentServer()._handle_multi_browse(args),  # Browse 10+ URLs parallel
+        "source_validator": source_validator_tool,  # Check credibility
+        
+        # ===========================================
+        # DATA TOOLS (DataFrame/SQL)
+        # ===========================================
+        "dataframe_ops": dataframe_ops_tool,  # Load, filter, aggregate DataFrames
+        "sql_query": sql_query_tool,          # DuckDB SQL queries
         "run_python": execute_code_tool,
         "execute_code": execute_code_tool,
+        "analyze_data": dataframe_ops_tool,   # Alias for clarity
     }
+    
+    # Import for multi_browse
+    from mcp_servers.browser_agent_server.server import BrowserAgentServer
     
     def build_tool_inputs(tool_name: str, description: str, original_inputs: dict) -> dict:
         """Build proper inputs based on tool requirements."""
-        # For run_python/execute_code: need 'code' key
+        
+        # =====================================================
+        # PYTHON TOOLS
+        # =====================================================
         if tool_name in ["run_python", "execute_code"]:
-            # If the LLM generated code, use it; otherwise use description as pseudo-code
             if "code" in original_inputs:
                 return original_inputs
-            # Try to extract code from description or generate placeholder
             return {"code": f"# Task: {description}\nprint('Analysis would be performed here')"}
         
-        # For scrape_url/fetch_url: need 'url' key
+        if tool_name in ["dataframe_ops", "analyze_data"]:
+            if "operation" in original_inputs:
+                return original_inputs
+            # Default to describe operation with web search to find data
+            return None  # Use fallback
+        
+        if tool_name == "sql_query":
+            if "query" in original_inputs:
+                return original_inputs
+            return None  # Use fallback
+        
+        # =====================================================
+        # SCRAPING TOOLS
+        # =====================================================
         if tool_name in ["scrape_url", "fetch_url"]:
             if "url" in original_inputs:
                 return original_inputs
-            # Fall back to web_search since we don't have a URL
             return None  # Signal to use fallback
         
-        # For web_search/news_search/fetch_data: need 'query' key
+        # =====================================================
+        # CRAWLER TOOLS (support unlimited depth)
+        # =====================================================
+        if tool_name == "web_crawler":
+            if "start_url" in original_inputs:
+                # Allow LLM to specify depth - no hard limit
+                return {
+                    "start_url": original_inputs["start_url"],
+                    "max_depth": original_inputs.get("max_depth", 5),  # Default 5, can go higher
+                    "max_pages": original_inputs.get("max_pages", 100),  # 100 pages per crawl
+                    "same_domain": original_inputs.get("same_domain", True),
+                }
+            return None  # Need URL
+        
+        if tool_name in ["sitemap_parser", "link_extractor"]:
+            if "url" in original_inputs:
+                return original_inputs
+            return None  # Need URL
+        
+        # =====================================================
+        # BROWSER TOOLS (parallel capable)
+        # =====================================================
+        if tool_name in ["human_search"]:
+            if "query" in original_inputs:
+                return {
+                    "query": original_inputs["query"],
+                    "max_sites": original_inputs.get("max_sites", 10),  # 10 parallel
+                }
+            return {"query": description, "max_sites": 10}
+        
+        if tool_name == "multi_browse":
+            if "urls" in original_inputs:
+                return {
+                    "urls": original_inputs["urls"],
+                    "max_concurrent": original_inputs.get("max_concurrent", 10),  # 10 parallel
+                    "extract": original_inputs.get("extract", "text"),
+                }
+            return None  # Need URLs
+        
+        if tool_name == "source_validator":
+            if "url" in original_inputs:
+                return original_inputs
+            return None
+        
+        # =====================================================
+        # SEARCH TOOLS (default)
+        # =====================================================
         if tool_name in ["web_search", "news_search", "fetch_data"]:
             if "query" in original_inputs:
                 return original_inputs
-            return {"query": description, "max_results": 10}
+            return {"query": description, "max_results": 20}  # Increased from 10
         
         # Default: pass as-is
         return original_inputs
@@ -234,8 +334,8 @@ async def researcher_node(state: GraphState) -> GraphState:
     client = get_mcp_orchestrator()
     use_direct = len(client.tool_names) == 0  # No MCP tools registered
     
-    # Execute each micro-task
-    for i, task in enumerate(micro_tasks[:10], 1):  # Cap at 10 tasks
+    # Execute each micro-task (increased limit for comprehensive research)
+    for i, task in enumerate(micro_tasks[:100], 1):  # Allow up to 100 tasks
         task_id = task.get("task_id", f"task_{i}")
         tool_name = task.get("tool", "web_search")
         description = task.get("description", "")
