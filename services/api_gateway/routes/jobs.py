@@ -111,7 +111,7 @@ class JobStore:
             """
             INSERT INTO research_jobs 
             (job_id, user_id, query, job_type, depth, max_sources, status, progress, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             """,
             job_id, user_id, query, job_type.value, depth, max_sources,
             ResearchStatus.PENDING.value, 0.0, now,
@@ -137,7 +137,7 @@ class JobStore:
         pool = await get_database_pool()
         
         row = await pool.fetchrow(
-            "SELECT * FROM research_jobs WHERE job_id = ?",
+            "SELECT * FROM research_jobs WHERE job_id = $1",
             job_id,
         )
         
@@ -153,11 +153,13 @@ class JobStore:
         
         kwargs["updated_at"] = datetime.utcnow()
         
-        # Build SET clause
+        # Build SET clause with PostgreSQL placeholders ($1, $2, etc.)
         set_parts = []
         values = []
+        param_index = 1
         for key, value in kwargs.items():
-            set_parts.append(f"{key} = ?")
+            set_parts.append(f"{key} = ${param_index}")
+            param_index += 1
             if isinstance(value, ResearchStatus):
                 value = value.value
             values.append(value)
@@ -165,7 +167,7 @@ class JobStore:
         values.append(job_id)
         
         await pool.execute(
-            f"UPDATE research_jobs SET {', '.join(set_parts)} WHERE job_id = ?",
+            f"UPDATE research_jobs SET {', '.join(set_parts)} WHERE job_id = ${param_index}",
             *values,
         )
     
@@ -184,9 +186,9 @@ class JobStore:
             rows = await pool.fetch(
                 """
                 SELECT * FROM research_jobs 
-                WHERE user_id = ? AND status = ?
+                WHERE user_id = $1 AND status = $2
                 ORDER BY created_at DESC
-                LIMIT ? OFFSET ?
+                LIMIT $3 OFFSET $4
                 """,
                 user_id, status.value, limit, offset,
             )
@@ -194,9 +196,9 @@ class JobStore:
             rows = await pool.fetch(
                 """
                 SELECT * FROM research_jobs 
-                WHERE user_id = ?
+                WHERE user_id = $1
                 ORDER BY created_at DESC
-                LIMIT ? OFFSET ?
+                LIMIT $2 OFFSET $3
                 """,
                 user_id, limit, offset,
             )
@@ -210,12 +212,12 @@ class JobStore:
         
         if status:
             result = await pool.fetchrow(
-                "SELECT COUNT(*) as cnt FROM research_jobs WHERE user_id = ? AND status = ?",
+                "SELECT COUNT(*) as cnt FROM research_jobs WHERE user_id = $1 AND status = $2",
                 user_id, status.value,
             )
         else:
             result = await pool.fetchrow(
-                "SELECT COUNT(*) as cnt FROM research_jobs WHERE user_id = ?",
+                "SELECT COUNT(*) as cnt FROM research_jobs WHERE user_id = $1",
                 user_id,
             )
         
