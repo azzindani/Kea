@@ -372,3 +372,13 @@ async def edgar_search_tool(args: dict) -> ToolResult:
 async def federal_register_tool(args: dict) -> ToolResult:
     server = RegulatoryServer()
     return await server._handle_federal_register(args)
+
+
+if __name__ == "__main__":
+    import asyncio
+    
+    async def main():
+        server = RegulatoryServer()
+        await server.run()
+        
+    asyncio.run(main())

@@ -349,3 +349,13 @@ async def xlsx_parser_tool(args: dict) -> ToolResult:
 async def html_parser_tool(args: dict) -> ToolResult:
     server = DocumentServer()
     return await server._handle_html(args)
+
+
+if __name__ == "__main__":
+    import asyncio
+    
+    async def main():
+        server = DocumentServer()
+        await server.run()
+        
+    asyncio.run(main())

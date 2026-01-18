@@ -494,3 +494,13 @@ async def content_sanitizer_tool(args: dict) -> ToolResult:
 async def code_safety_tool(args: dict) -> ToolResult:
     server = SecurityServer()
     return await server._handle_code_check(args)
+
+
+if __name__ == "__main__":
+    import asyncio
+    
+    async def main():
+        server = SecurityServer()
+        await server.run()
+        
+    asyncio.run(main())

@@ -786,3 +786,13 @@ async def evaluate_package_tool(args: dict) -> ToolResult:
 async def generate_mcp_stub_tool(args: dict) -> ToolResult:
     server = ToolDiscoveryServer()
     return await server._handle_generate_stub(args)
+
+
+if __name__ == "__main__":
+    import asyncio
+    
+    async def main():
+        server = ToolDiscoveryServer()
+        await server.run()
+        
+    asyncio.run(main())

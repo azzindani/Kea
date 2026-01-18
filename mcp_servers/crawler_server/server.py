@@ -426,3 +426,13 @@ async def sitemap_parser_tool(args: dict) -> ToolResult:
 async def link_extractor_tool(args: dict) -> ToolResult:
     server = CrawlerServer()
     return await server._handle_links(args)
+
+
+if __name__ == "__main__":
+    import asyncio
+    
+    async def main():
+        server = CrawlerServer()
+        await server.run()
+        
+    asyncio.run(main())

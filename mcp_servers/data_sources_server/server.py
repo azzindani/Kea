@@ -271,3 +271,16 @@ async def world_bank_fetch_tool(args: dict) -> ToolResult:
 async def csv_fetch_tool(args: dict) -> ToolResult:
     server = DataSourcesServer()
     return await server._handle_csv_fetch(args)
+
+
+if __name__ == "__main__":
+    import asyncio
+    
+    async def main():
+        server = DataSourcesServer()
+        await server.run()
+        
+    asyncio.run(main())
+
+
+

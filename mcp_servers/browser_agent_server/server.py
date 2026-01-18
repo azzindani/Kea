@@ -475,3 +475,13 @@ async def human_like_search_tool(args: dict) -> ToolResult:
 async def source_validator_tool(args: dict) -> ToolResult:
     server = BrowserAgentServer()
     return await server._handle_validator(args)
+
+
+if __name__ == "__main__":
+    import asyncio
+    
+    async def main():
+        server = BrowserAgentServer()
+        await server.run()
+        
+    asyncio.run(main())

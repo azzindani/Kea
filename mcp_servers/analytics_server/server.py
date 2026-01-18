@@ -496,6 +496,9 @@ async def eda_auto_tool(args: dict) -> ToolResult:
     server = AnalyticsServer()
     return await server._handle_eda_auto(args)
 
+
+
+
 async def data_cleaner_tool(args: dict) -> ToolResult:
     server = AnalyticsServer()
     return await server._handle_cleaner(args)
@@ -503,3 +506,13 @@ async def data_cleaner_tool(args: dict) -> ToolResult:
 async def correlation_matrix_tool(args: dict) -> ToolResult:
     server = AnalyticsServer()
     return await server._handle_correlation(args)
+
+
+if __name__ == "__main__":
+    import asyncio
+    
+    async def main():
+        server = AnalyticsServer()
+        await server.run()
+        
+    asyncio.run(main())

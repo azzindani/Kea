@@ -448,3 +448,23 @@ async def arxiv_search_tool(args: dict) -> ToolResult:
 async def semantic_scholar_tool(args: dict) -> ToolResult:
     server = AcademicServer()
     return await server._handle_semantic_scholar(args)
+
+
+if __name__ == "__main__":
+    import asyncio
+    
+    async def main():
+        server = AcademicServer()
+        await server.run()
+        
+    asyncio.run(main())
+
+
+if __name__ == "__main__":
+    import asyncio
+    
+    async def main():
+        server = AcademicServer()
+        await server.run()
+        
+    asyncio.run(main())

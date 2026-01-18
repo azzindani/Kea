@@ -476,3 +476,13 @@ async def clustering_tool(args: dict) -> ToolResult:
 async def anomaly_detection_tool(args: dict) -> ToolResult:
     server = MLServer()
     return await server._handle_anomaly(args)
+
+
+if __name__ == "__main__":
+    import asyncio
+    
+    async def main():
+        server = MLServer()
+        await server.run()
+        
+    asyncio.run(main())

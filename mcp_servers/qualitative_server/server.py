@@ -644,3 +644,13 @@ async def investigation_graph_tool(args: dict) -> ToolResult:
 async def triangulation_tool(args: dict) -> ToolResult:
     server = QualitativeServer()
     return await server._handle_triangulation(args)
+
+
+if __name__ == "__main__":
+    import asyncio
+    
+    async def main():
+        server = QualitativeServer()
+        await server.run()
+        
+    asyncio.run(main())

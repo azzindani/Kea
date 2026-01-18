@@ -286,3 +286,12 @@ async def plotly_chart_tool(args: dict) -> ToolResult:
 async def correlation_heatmap_tool(args: dict) -> ToolResult:
     server = VisualizationServer()
     return await server._handle_heatmap(args)
+
+if __name__ == "__main__":
+    import asyncio
+    
+    async def main():
+        server = VisualizationServer()
+        await server.run()
+        
+    asyncio.run(main())
