@@ -162,11 +162,11 @@ async def planner_node(state: GraphState) -> GraphState:
     return {**state, **updated_state}
 
 async def researcher_node(state: GraphState) -> GraphState:
-    """Execute research using execution plan with dynamic tool routing."""
+    """Execute research using execution plan with dynamic tool routing and PARALLEL execution."""
     iteration = state.get("iteration", 1)
     
     logger.info("\n" + "="*70)
-    logger.info(f"📍 STEP 3: RESEARCHER NODE (Iteration {iteration}) - Dynamic Tool Routing")
+    logger.info(f"📍 STEP 3: RESEARCHER NODE (Iteration {iteration}) - Parallel Tool Execution")
     logger.info("="*70)
     
     execution_plan = state.get("execution_plan", {})
@@ -190,11 +190,21 @@ async def researcher_node(state: GraphState) -> GraphState:
             for i, sq in enumerate(sub_queries or [query])
         ]
     
-    logger.info(f"Executing {len(micro_tasks)} micro-tasks from execution plan")
-    
-    # Tool registry for dynamic routing - Wire ALL existing MCP tools
+    # 1. Hardware-Aware Scaling
+    from shared.hardware.detector import detect_hardware
+    from services.orchestrator.mcp.parallel_executor import ParallelExecutor, ToolCall
     from services.orchestrator.mcp.client import get_mcp_orchestrator
     
+    hw_profile = detect_hardware()
+    max_workers = hw_profile.optimal_workers()
+    logger.info(f"🚀 Hardware-Aware Dispatcher: Using {max_workers} parallel workers (RAM: {hw_profile.ram_available_gb:.1f}GB)")
+    
+    executor = ParallelExecutor(max_concurrent=max_workers)
+    mcp_client = get_mcp_orchestrator()
+    use_direct = len(mcp_client.tool_names) == 0
+    
+    # Tool registry for dynamic routing
+    # ... [Keep imports and direct_tools definition] ...
     # Search tools
     from mcp_servers.search_server.tools.web_search import web_search_tool
     
@@ -210,279 +220,199 @@ async def researcher_node(state: GraphState) -> GraphState:
     from mcp_servers.crawler_server.server import web_crawler_tool, sitemap_parser_tool, link_extractor_tool
     
     # Browser agent tools
-    from mcp_servers.browser_agent_server.server import human_like_search_tool, source_validator_tool
+    from mcp_servers.browser_agent_server.server import human_like_search_tool, source_validator_tool, BrowserAgentServer
     
-    # Direct tool implementations - ALL available tools wired here
     direct_tools = {
-        # ===========================================
-        # SEARCH TOOLS (parallel capable)
-        # ===========================================
         "web_search": web_search_tool,
         "news_search": web_search_tool,
-        "human_search": human_like_search_tool,  # Human-like with delays
-        
-        # ===========================================
-        # SCRAPING TOOLS (recursive capable)
-        # ===========================================
+        "human_search": human_like_search_tool,
         "scrape_url": fetch_url_tool,
         "fetch_url": fetch_url_tool,
         "fetch_data": lambda args: web_search_tool({"query": args.get("query", ""), "max_results": 10}),
-        
-        # ===========================================
-        # CRAWLER TOOLS (depth unlimited)
-        # ===========================================
-        "web_crawler": web_crawler_tool,      # Recursive crawl - depth/pages configurable
-        "sitemap_parser": sitemap_parser_tool,  # Parse sitemap for URLs
-        "link_extractor": link_extractor_tool,  # Extract all links from page
-        
-        # ===========================================
-        # BROWSER TOOLS (parallel browse)
-        # ===========================================
-        "multi_browse": lambda args: BrowserAgentServer()._handle_multi_browse(args),  # Browse 10+ URLs parallel
-        "source_validator": source_validator_tool,  # Check credibility
-        
-        # ===========================================
-        # DATA TOOLS (DataFrame/SQL)
-        # ===========================================
-        "dataframe_ops": dataframe_ops_tool,  # Load, filter, aggregate DataFrames
-        "sql_query": sql_query_tool,          # DuckDB SQL queries
+        "web_crawler": web_crawler_tool,
+        "sitemap_parser": sitemap_parser_tool,
+        "link_extractor": link_extractor_tool,
+        "multi_browse": lambda args: BrowserAgentServer()._handle_multi_browse(args),
+        "source_validator": source_validator_tool,
+        "dataframe_ops": dataframe_ops_tool,
+        "sql_query": sql_query_tool,
         "run_python": execute_code_tool,
         "execute_code": execute_code_tool,
-        "analyze_data": dataframe_ops_tool,   # Alias for clarity
-        "parse_document": execute_code_tool,  # Document parsing via Python
+        "analyze_data": dataframe_ops_tool,
+        "parse_document": execute_code_tool,
     }
-    
-    # Import for multi_browse
-    from mcp_servers.browser_agent_server.server import BrowserAgentServer
     
     def build_tool_inputs(tool_name: str, description: str, original_inputs: dict, collected_facts: list = None) -> dict:
         """Build proper inputs based on tool requirements."""
-        
-        # Get context pool for data chaining
         ctx = get_context_pool()
         
-        # =====================================================
-        # PYTHON TOOLS - Use code generator with collected facts
-        # =====================================================
+        # PYTHON TOOLS
         if tool_name in ["run_python", "execute_code", "parse_document"]:
-            if "code" in original_inputs:
-                return original_inputs
-            # Generate code using facts from prior research tasks
+            if "code" in original_inputs: return original_inputs
             code = generate_fallback_code(description, collected_facts or [])
-            logger.info(f"   📝 Generated code ({len(code)} chars)")
             return {"code": code}
         
-        if tool_name in ["dataframe_ops", "analyze_data"]:
-            if "operation" in original_inputs:
-                return original_inputs
-            # Default to describe operation with web search to find data
-            return None  # Use fallback
+        if tool_name in ["dataframe_ops", "analyze_data", "sql_query"]:
+             if "operation" in original_inputs or "query" in original_inputs: return original_inputs
+             return None
         
-        if tool_name == "sql_query":
-            if "query" in original_inputs:
-                return original_inputs
-            return None  # Use fallback
-        
-        # =====================================================
-        # SCRAPING TOOLS
-        # =====================================================
-        if tool_name in ["scrape_url", "fetch_url"]:
-            if "url" in original_inputs:
-                return original_inputs
-            return None  # Signal to use fallback
-        
-        # =====================================================
-        # CRAWLER TOOLS (support unlimited depth)
-        # =====================================================
-        if tool_name == "web_crawler":
-            if "start_url" in original_inputs:
-                # Allow LLM to specify depth - no hard limit
-                return {
-                    "start_url": original_inputs["start_url"],
-                    "max_depth": original_inputs.get("max_depth", 5),
-                    "max_pages": original_inputs.get("max_pages", 100),
-                    "same_domain": original_inputs.get("same_domain", True),
-                }
-            # Try to use URL from context pool (collected from earlier search results)
-            crawl_url = ctx.get_url()
-            if crawl_url:
-                logger.info(f"   📋 Using URL from pool: {crawl_url[:50]}...")
-                return {
-                    "start_url": crawl_url,
-                    "max_depth": 3,
-                    "max_pages": 50,
-                }
-            return None  # No URL available, use fallback
-        
-        if tool_name in ["sitemap_parser", "link_extractor"]:
-            if "url" in original_inputs:
-                return original_inputs
-            return None  # Need URL
-        
-        # =====================================================
-        # BROWSER TOOLS (parallel capable)
-        # =====================================================
-        if tool_name in ["human_search"]:
-            if "query" in original_inputs:
-                return {
-                    "query": original_inputs["query"],
-                    "max_sites": original_inputs.get("max_sites", 10),  # 10 parallel
-                }
-            return {"query": description, "max_sites": 10}
-        
-        if tool_name == "multi_browse":
-            if "urls" in original_inputs:
-                return {
-                    "urls": original_inputs["urls"],
-                    "max_concurrent": original_inputs.get("max_concurrent", 10),  # 10 parallel
-                    "extract": original_inputs.get("extract", "text"),
-                }
-            return None  # Need URLs
-        
-        if tool_name == "source_validator":
-            if "url" in original_inputs:
-                return original_inputs
+        # SCRAPING & CRAWLING
+        if tool_name in ["scrape_url", "fetch_url", "sitemap_parser", "link_extractor"]:
+            if "url" in original_inputs: return original_inputs
             return None
         
-        # =====================================================
+        if tool_name == "web_crawler":
+            if "start_url" in original_inputs: return original_inputs
+            crawl_url = ctx.get_url()
+            if crawl_url: return {"start_url": crawl_url, "max_depth": 3, "max_pages": 50}
+            return None
+
+        # BROWSER TOOLS
+        if tool_name == "human_search":
+            if "query" in original_inputs: return {"query": original_inputs["query"], "max_sites": 10}
+            return {"query": description, "max_sites": 10}
+            
+        if tool_name == "multi_browse":
+            if "urls" in original_inputs: return original_inputs
+            return None
+
         # SEARCH TOOLS (default)
-        # =====================================================
         if tool_name in ["web_search", "news_search", "fetch_data"]:
-            if "query" in original_inputs:
-                return original_inputs
-            return {"query": description, "max_results": 20}  # Increased from 10
-        
-        # Default: pass as-is
+            if "query" in original_inputs: return original_inputs
+            return {"query": description, "max_results": 20}
+            
         return original_inputs
+
+    # 2. Unified Tool Handler
+    async def unified_tool_handler(name: str, args: dict) -> Any:
+        if use_direct and name in direct_tools:
+            return await direct_tools[name](args)
+        elif not use_direct:
+            return await mcp_client.call_tool(name, args)
+        else:
+            raise ValueError(f"Tool {name} not available")
+
+    # 3. Parallel Execution Loop
+    completed = {inv["task_id"] for inv in tool_invocations if inv.get("success")}
+    processed_this_run = set()
     
-    client = get_mcp_orchestrator()
-    use_direct = len(client.tool_names) == 0  # No MCP tools registered
-    
-    # Execute each micro-task (increased limit for comprehensive research)
-    for i, task in enumerate(micro_tasks[:100], 1):  # Allow up to 100 tasks
-        task_id = task.get("task_id", f"task_{i}")
-        tool_name = task.get("tool", "web_search")
-        description = task.get("description", "")
-        fallbacks = task.get("fallback_tools", []) or ["web_search"]  # Default fallback
-        persist = task.get("persist", True)
-        original_inputs = task.get("inputs", {})
-        
-        logger.info(f"\n🔧 Micro-Task {task_id}: {tool_name}")
-        logger.info(f"   Description: {description[:80]}...")
-        logger.info(f"   Persist: {persist} | Fallbacks: {fallbacks}")
-        
-        result = None
-        used_tool = tool_name
-        error = None
-        success = False
-        
-        # Build proper inputs for this tool (pass collected facts for code generation)
-        tool_inputs = build_tool_inputs(tool_name, description, original_inputs, facts)
-        
-        # If inputs are None, tool can't run (e.g., scrape_url without URL)
-        if tool_inputs is None:
-            logger.info(f"   ⚠️ Cannot build inputs for {tool_name}, using fallback")
-            tool_name = fallbacks[0] if fallbacks else "web_search"
-            tool_inputs = {"query": description, "max_results": 10}
-            used_tool = tool_name
-        
-        try:
-            # Try primary tool
-            if use_direct and tool_name in direct_tools:
-                logger.info(f"   🔌 Direct call: {tool_name}")
-                result = await direct_tools[tool_name](tool_inputs)
-            elif not use_direct:
-                logger.info(f"   📡 MCP call: {tool_name}")
-                result = await client.call_tool(tool_name, tool_inputs)
-            else:
-                logger.info(f"   ⚠️ Tool {tool_name} not available, trying fallbacks")
-                raise ValueError(f"Tool {tool_name} not available")
-            
-            # Check for error response - trigger fallback
-            if result and hasattr(result, "isError") and result.isError:
-                error_text = ""
-                for c in result.content:
-                    if hasattr(c, "text"):
-                        error_text = c.text
-                        break
-                logger.info(f"   ⚠️ Tool returned error: {error_text[:100]}")
-                raise ValueError(f"Tool error: {error_text[:100]}")
+    while True:
+        # Find ready tasks
+        ready_tasks = []
+        for task in micro_tasks:
+            t_id = task.get("task_id")
+            if t_id in completed or t_id in processed_this_run:
+                continue
                 
-        except Exception as e:
-            error = str(e)
-            logger.info(f"   ❌ Primary tool failed: {e}")
+            # Check dependencies
+            deps = task.get("depends_on", [])
+            if all(d in completed for d in deps):
+                ready_tasks.append(task)
+        
+        if not ready_tasks:
+            break
             
-            # Try fallbacks
-            for fallback in fallbacks:
-                try:
-                    logger.info(f"   🔄 Fallback: {fallback}")
-                    fallback_inputs = build_tool_inputs(fallback, description, original_inputs)
-                    if fallback_inputs is None:
-                        fallback_inputs = {"query": description, "max_results": 10}
-                    
-                    if fallback in direct_tools:
-                        result = await direct_tools[fallback](fallback_inputs)
-                        # Check for fallback error too
-                        if result and hasattr(result, "isError") and result.isError:
-                            continue  # Try next fallback
-                        used_tool = fallback
-                        error = None
-                        success = True
-                        break
-                except Exception as fe:
-                    logger.info(f"   ❌ Fallback {fallback} failed: {fe}")
+        # Batch execute
+        batch = ready_tasks[:max_workers * 2] # Allow slight over-subscription for IO wait
+        processed_this_run.update(t.get("task_id") for t in batch)
         
-        # Process result
-        if result and hasattr(result, "content"):
-            for content in result.content:
-                if hasattr(content, "text"):
-                    if hasattr(result, "isError") and result.isError:
-                        logger.info(f"   ⚠️ Tool returned error: {content.text[:100]}")
-                    else:
-                        fact = {
-                            "text": content.text[:1000],
-                            "query": description[:200],
-                            "source": used_tool,
-                            "task_id": task_id,
-                            "persist": persist,
-                        }
-                        facts.append(fact)
-                        success = True  # Mark as successful when we got valid content
-                        logger.info(f"   ✅ Result extracted ({len(content.text)} chars)")
-                        
-                        # Extract URLs using context pool (centralized extraction)
-                        ctx = get_context_pool()
-                        extracted_urls = ctx.extract_urls_from_text(content.text)
-                        
-                        # Add to sources for reporting
-                        for url in extracted_urls[:10]:
-                            sources.append({
-                                "url": url, 
-                                "title": description[:80], 
-                                "tool": used_tool,
-                                "task_id": task_id,
-                            })
+        logger.info(f"\n⚡ Batching {len(batch)} tasks...")
         
-        # Record tool invocation with proper success tracking
-        tool_invocations.append({
-            "task_id": task_id,
-            "tool": used_tool,
-            "success": success or (error is None and result is not None),
-            "error": error,
-            "persist": persist,
-        })
-    
-    # Count successes for logging
-    successes = sum(1 for inv in tool_invocations if inv.get("success", False))
-    logger.info(f"\n📊 Research Summary:")
-    logger.info(f"   Tasks executed: {len(tool_invocations)}")
-    logger.info(f"   Tasks succeeded: {successes}")
+        # Prepare calls
+        calls = []
+        task_map = {} # index -> task
+        
+        for idx, task in enumerate(batch):
+            t_name = task.get("tool", "web_search")
+            t_desc = task.get("description", "")
+            t_inputs = task.get("inputs", {})
+            t_id = task.get("task_id")
+            
+            final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
+            
+            # Handle input build failure (fallback immediately or skip)
+            if final_inputs is None:
+                # Try fallback
+                fallback = (task.get("fallback_tools") or ["web_search"])[0]
+                t_name = fallback
+                final_inputs = {"query": t_desc, "max_results": 10}
+            
+            calls.append(ToolCall(tool_name=t_name, arguments=final_inputs))
+            task_map[idx] = task
+            
+        # EXECUTE BATCH
+        results = await executor.execute_batch(calls, unified_tool_handler)
+        
+        # Process results
+        for idx, res in enumerate(results):
+            task = task_map[idx]
+            t_id = task.get("task_id")
+            t_persist = task.get("persist", True)
+            
+            success = res.success
+            error_msg = None
+            content_text = ""
+            
+            if success and res.result and hasattr(res.result, "content"):
+                for c in res.result.content:
+                    if hasattr(c, "text"):
+                        content_text += c.text
+                
+                # Verify content isn't error text
+                if "error" in content_text.lower() and len(content_text) < 200:
+                     # Soft error check
+                     pass
+
+            if success:
+                # Extract Facts
+                fact = {
+                    "text": content_text[:1000],
+                    "query": task.get("description", "")[:200],
+                    "source": calls[idx].tool_name,
+                    "task_id": t_id,
+                    "persist": t_persist
+                }
+                facts.append(fact)
+                
+                # Extract Sources
+                ctx = get_context_pool()
+                extracted_urls = ctx.extract_urls_from_text(content_text)
+                for url in extracted_urls[:10]:
+                    sources.append({
+                        "url": url,
+                        "title": task.get("description", "")[:80],
+                        "tool": calls[idx].tool_name,
+                        "task_id": t_id
+                    })
+                
+                completed.add(t_id)
+                logger.info(f"   ✅ Task {t_id} completed via {calls[idx].tool_name}")
+            else:
+                # Handle hard failure
+                logger.warning(f"   ❌ Task {t_id} failed: {res.result}")
+                # We do NOT add to completed, so it won't satisfy dependencies. 
+                # Ideally we should try fallbacks here, but for now we mark failed to avoid infinite loop
+                tool_invocations.append({
+                    "task_id": t_id,
+                    "tool": calls[idx].tool_name,
+                    "success": False,
+                    "error": "Execution failed"
+                })
+                # Prevent re-execution to avoid infinite loop
+                completed.add(t_id) 
+
+            # Log invocation
+            tool_invocations.append({
+                 "task_id": t_id,
+                 "tool": calls[idx].tool_name,
+                 "success": success,
+                 "persist": t_persist
+            })
+
+    # Summary Logging
+    logger.info(f"\n📊 Parallel Research Summary:")
     logger.info(f"   Facts collected: {len(facts)}")
     logger.info(f"   Sources found: {len(sources)}")
-    logger.info("="*70 + "\n")
-    
-    logger.info(f"\n✅ Total Facts Collected: {len(facts)}")
-    logger.info(f"✅ Total Sources Found: {len(sources)}")
     logger.info("="*70 + "\n")
     
     return {

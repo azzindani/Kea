@@ -525,6 +525,15 @@ graph LR
 
 ---
 
+## 🚀 4. Parallel Execution Engine (The Muscle)
+
+Kea v3.0 introduces a hardware-aware parallel dispatcher that maximizes throughput:
+- **Hardware Detection**: Automatically detects available RAM (e.g., 30GB) and CPU threads to optimize concurrency.
+- **Batch Processing**: The Planner groups independent tasks (e.g., "Scrape 500 URLs") into parallel batches.
+- **Dynamic Scaling**: Scales from single-thread debug mode to 50+ concurrent agents on high-end servers.
+
+---
+
 ## 🛠️ Technology Stack
 
 | Component | Tech | Role |
@@ -539,7 +548,7 @@ graph LR
 
 ---
 
-## 🧠 4. The Cognitive Core & Workflow Logic
+## 🧠 5. The Cognitive Core & Workflow Logic
 
 Kea differs from standard agents by implementing a **"Meta-Cognitive" Layer**. It does not simply execute a prompt; it *designs* the prompt required to execute the task, then critiques the result.
 
@@ -589,7 +598,7 @@ Auto-generates exploratory questions to deepen research (Causal Why, Counterfact
 
 ---
 
-## 💾 5. Memory & Data Structures
+## 💾 6. Memory & Data Structures
 
 To support **"Jarvis-like" Recall** and **Meta-Analysis**, Kea utilizes specific data schemas. We do not just store text; we store **Structured Artifacts**.
 
@@ -597,7 +606,7 @@ See **[services/rag_service/README.md](services/rag_service/README.md)** for sch
 
 ---
 
-## 🤖 6. The Robotic Infrastructure (The "Hands")
+## 🤖 7. The Robotic Infrastructure (The "Hands")
 
 To function as a true Deep Research Engine, Kea must navigate the modern, hostile web. It uses a **Stealth Robotic Fleet** to handle scraping, avoiding bans, and reading complex UIs.
 
@@ -618,7 +627,7 @@ To ensure long-term stability and ethical scraping, Kea implements **Domain-Leve
 
 ---
 
-## ⏳ 7. Asynchronous Task Management
+## ⏳ 8. Asynchronous Task Management
 
 Deep research takes time (minutes to hours). A standard HTTP request will timeout. Kea uses an **Event-Driven Architecture**.
 
@@ -634,7 +643,7 @@ Since the process is long, the state must be persisted. We use **LangGraph Check
 
 ---
 
-## 🚢 8. Deployment Strategy
+## 🚢 9. Deployment Strategy
 
 Kea is designed to be **Infrastructure Agnostic**. It runs on a laptop (Colab/Docker) or a cluster (Kubernetes) using the same code base, controlled by Environment Variables.
 

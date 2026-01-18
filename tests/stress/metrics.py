@@ -80,6 +80,18 @@ class QueryMetrics:
             return 0.0
         return self.cache_hits / total
     
+    @property
+    def total_tool_duration_ms(self) -> float:
+        """Total CPU time spent in tools (can exceed wall clock if parallel)."""
+        return sum(self.tool_durations_by_name.values())
+        
+    @property
+    def concurrency_factor(self) -> float:
+        """Measure of parallelism: Total Tool Time / Wall Clock Time."""
+        if self.duration_ms == 0:
+            return 0.0
+        return self.total_tool_duration_ms / self.duration_ms
+    
     # Output
     artifacts_produced: list[str] = field(default_factory=list)
     database_built: bool = False

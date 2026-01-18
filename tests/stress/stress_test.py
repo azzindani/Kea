@@ -208,6 +208,8 @@ class StressTestRunner:
             logger.info("-"*40)
             logger.info("RESULTS:")
             logger.info(f"  Duration: {metrics.duration_ms / 1000:.1f}s")
+            logger.info(f"  Total Tool Time: {metrics.total_tool_duration_ms / 1000:.1f}s")
+            logger.info(f"  Concurrency Factor: {metrics.concurrency_factor:.2f}x")
             logger.info(f"  LLM Calls: {metrics.llm_calls}")
             logger.info(f"  Tool Iterations: {metrics.tool_iterations}")
             logger.info(f"  Efficiency Ratio: {metrics.efficiency_ratio:.1f}x")
@@ -434,7 +436,7 @@ def query_ids(request):
     query_arg = request.config.getoption("--query")
     if query_arg:
         return [int(q.strip()) for q in query_arg.split(",")]
-    return [1]  # Default to query 1
+    return [1]  # Default to Query 1 (Indonesian Alpha Hunt)
 
 
 class TestStressQueries:
@@ -488,6 +490,15 @@ class TestStressQueries:
                 
                 logger.info(f"✅ Query {query_id} PASSED")
                 logger.info(f"   Efficiency ratio: {metrics.efficiency_ratio:.1f}x")
+                
+                # Verify Concurrency (Generic Check)
+                if metrics.tool_iterations > 50:
+                    logger.info(f"   Concurrency Factor: {metrics.concurrency_factor:.2f}x")
+                    
+                    if metrics.concurrency_factor > 1.2:
+                        logger.info("✅ PARALLEL EXECUTION CONFIRMED")
+                    elif metrics.duration_ms > 5000:
+                         logger.warning(f"⚠️ Low concurrency ({metrics.concurrency_factor:.2f}x). Expected parallel execution for heavy workload.")
             else:
                 logger.error(f"❌ Query {query_id} FAILED: {metrics.error_message}")
                 pytest.fail(f"Query {query_id} failed: {metrics.error_message}")
@@ -555,12 +566,10 @@ Prerequisites:
         return
     
     if not args.query:
-        parser.print_help()
-        print("\n💡 Tip: Use pytest for better logging:")
-        print("   pytest tests/stress/stress_test.py --query=1 -v -s --log-cli-level=DEBUG")
-        sys.exit(1)
-    
-    query_ids = [int(q.strip()) for q in args.query.split(",")]
+        print("Defaulting to Query 1")
+        query_ids = [1]
+    else:
+        query_ids = [int(q.strip()) for q in args.query.split(",")]
     
     runner = StressTestRunner(output_dir=args.output)
     

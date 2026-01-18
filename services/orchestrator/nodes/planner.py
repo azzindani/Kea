@@ -29,6 +29,7 @@ class MicroTask(BaseModel):
     depends_on: list[str] = Field(default_factory=list)  # task_ids this depends on
     fallback_tools: list[str] = Field(default_factory=list)  # If primary fails
     persist: bool = True  # Always persist by default (high threshold policy)
+    phase: str = "research"  # Execution phase for parallel batching
     
     
 class ExecutionPlan(BaseModel):
@@ -299,37 +300,58 @@ def generate_execution_plan(query: str, execution_steps: list[str]) -> Execution
     """
     Generate execution plan from LLM-generated steps.
     Routes each step to appropriate tools.
+    
+    PARALLEL EXECUTION STRATEGY:
+    - Tasks in the same "phase" (e.g., data_collection) have NO dependencies
+      on each other, allowing batch parallel execution.
+    - Dependencies are only created BETWEEN phases (e.g., analysis depends on
+      all data_collection tasks being complete).
     """
     import uuid
     
     micro_tasks = []
-    phases = set()
+    phase_order = ["data_collection", "extraction", "analysis", "synthesis"]
+    tasks_by_phase: dict[str, list[str]] = {p: [] for p in phase_order}
+    tasks_by_phase["research"] = []  # Fallback phase
     
-    for i, step in enumerate(execution_steps):
-        task_id = f"task_{i+1}"
+    # First pass: categorize steps by phase
+    step_phases = []
+    for step in execution_steps:
+        primary_tool, _ = route_to_tool(step)
         
-        # Route to tool
-        primary_tool, fallbacks = route_to_tool(step)
-        
-        # Determine phase based on tool
-        if primary_tool in ["web_search", "news_search", "fetch_data"]:
+        if primary_tool in ["web_search", "news_search", "fetch_data", "human_search", "web_crawler", "multi_browse"]:
             phase = "data_collection"
-        elif primary_tool in ["scrape_url", "parse_document"]:
+        elif primary_tool in ["scrape_url", "parse_document", "link_extractor", "sitemap_parser"]:
             phase = "extraction"
-        elif primary_tool in ["run_python"]:
+        elif primary_tool in ["run_python", "dataframe_ops", "sql_query"]:
             phase = "analysis"
-        elif primary_tool in ["build_graph"]:
+        elif primary_tool in ["build_graph", "source_validator"]:
             phase = "synthesis"
         else:
             phase = "research"
         
-        phases.add(phase)
+        step_phases.append(phase)
+    
+    # Second pass: create tasks with phase-based dependencies
+    for i, step in enumerate(execution_steps):
+        task_id = f"task_{i+1}"
+        phase = step_phases[i]
         
-        # Dependencies: each task depends on previous tasks in same phase
+        primary_tool, fallbacks = route_to_tool(step)
+        
+        # PARALLEL STRATEGY: Tasks in the SAME phase have NO dependencies on each other.
+        # Dependencies are only on the PREVIOUS phase being complete.
         depends_on = []
-        if i > 0:
-            # Simple dependency: each task depends on the previous
-            depends_on = [f"task_{i}"]
+        
+        # Find the previous phase that has tasks
+        current_phase_index = phase_order.index(phase) if phase in phase_order else -1
+        if current_phase_index > 0:
+            # Depend on ALL tasks from the previous phase
+            for prev_phase in phase_order[:current_phase_index]:
+                depends_on.extend(tasks_by_phase.get(prev_phase, []))
+        
+        # Track this task in its phase
+        tasks_by_phase[phase].append(task_id)
         
         micro_task = MicroTask(
             task_id=task_id,
@@ -338,7 +360,8 @@ def generate_execution_plan(query: str, execution_steps: list[str]) -> Execution
             inputs={"query": step},
             depends_on=depends_on,
             fallback_tools=fallbacks,
-            persist=True,  # Always persist (high threshold policy)
+            persist=True,
+            phase=phase,  # Add phase for debugging/logging
         )
         micro_tasks.append(micro_task)
     
@@ -346,7 +369,7 @@ def generate_execution_plan(query: str, execution_steps: list[str]) -> Execution
         plan_id=f"plan_{uuid.uuid4().hex[:8]}",
         query=query,
         micro_tasks=micro_tasks,
-        phases=sorted(phases),
+        phases=[p for p in phase_order if tasks_by_phase.get(p)],
         estimated_tools=len(micro_tasks),
     )
 
