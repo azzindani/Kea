@@ -288,8 +288,8 @@ async def researcher_node(state: GraphState) -> GraphState:
         tool_mapping = {
             "run_python": "execute_code",
             "parse_document": "execute_code",
-            "dataframe_ops": "execute_code",
-            "sql_query": "execute_code", # Fallback to python for sqlite
+            # "dataframe_ops": "dataframe_ops", # Native support
+            # "sql_query": "sql_query", # Native support
             "scrape_url": "browser_scrape",
             "fetch_page": "fetch_url"
         }
