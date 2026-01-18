@@ -24,15 +24,15 @@ mcp:
     - name: "scraper_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with playwright --with beautifulsoup4 python -m mcp_servers.scraper_server.server"
+      command: "uv run --with playwright --with beautifulsoup4 --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.scraper_server.server"
     - name: "python_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with pandas --with duckdb --with yfinance --with scikit-learn python -m mcp_servers.python_server.server"
+      command: "uv run --with pandas --with duckdb --with yfinance --with scikit-learn --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.python_server.server"
     - name: "search_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with httpx --with duckduckgo-search python -m mcp_servers.search_server.server"
+      command: "uv run --with httpx --with duckduckgo-search --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.search_server.server"
     - name: "academic_server"
       enabled: true
       transport: "stdio"
@@ -48,15 +48,15 @@ mcp:
     - name: "crawler_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with httpx --with beautifulsoup4 python -m mcp_servers.crawler_server.server"
+      command: "uv run --with httpx --with beautifulsoup4 --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.crawler_server.server"
     - name: "data_sources_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with pandas --with yfinance --with fredapi --with wbgapi python -m mcp_servers.data_sources_server.server"
+      command: "uv run --with pandas --with yfinance --with fredapi --with wbgapi --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.data_sources_server.server"
     - name: "document_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with httpx --with pymupdf --with python-docx --with pandas --with openpyxl --with beautifulsoup4 python -m mcp_servers.document_server.server"
+      command: "uv run --with httpx --with pymupdf --with python-docx --with pandas --with openpyxl --with beautifulsoup4 --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.document_server.server"
     - name: "ml_server"
       enabled: true
       transport: "stdio"
@@ -80,7 +80,7 @@ mcp:
     - name: "visualization_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with pandas --with plotly --with numpy python -m mcp_servers.visualization_server.server"
+      command: "uv run --with pandas --with plotly --with numpy --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.visualization_server.server"
     - name: "vision_server"
       enabled: true
       transport: "stdio"
