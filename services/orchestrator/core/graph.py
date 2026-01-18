@@ -270,8 +270,16 @@ async def researcher_node(state: GraphState) -> GraphState:
              return None
         
         # SCRAPING & CRAWLING
-        if tool_name in ["scrape_url", "fetch_url", "sitemap_parser", "link_extractor"]:
+        if tool_name in ["scrape_url", "fetch_url", "link_extractor", "sitemap_parser"]:
             if "url" in original_inputs: return original_inputs
+            
+            # ORCHESTRATION FIX: Auto-chain URLs from context pool
+            # If no URL provided, pull one from the pool of discovered URLs
+            next_url = ctx.get_url()
+            if next_url:
+                logger.info(f"   🔗 Chained URL from pool to {tool_name}: {next_url}")
+                return {"url": next_url}
+                
             return None
         
         if tool_name == "web_crawler":
