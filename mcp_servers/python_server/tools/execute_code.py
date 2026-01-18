@@ -54,16 +54,39 @@ async def execute_code_tool(arguments: dict) -> ToolResult:
     script_path = os.path.join(temp_dir, "script.py")
     
     try:
-        # 1. Write Code
+        # 1. Write Code with Auto-Imports
         with open(script_path, "w", encoding="utf-8") as f:
+            # Auto-inject common imports to prevent NameError
+            preamble = []
+            if "pandas" in dependencies or "pd" in code:
+                preamble.append("import pandas as pd")
+            if "numpy" in dependencies or "np" in code:
+                preamble.append("import numpy as np")
+            if "yfinance" in dependencies or "yf" in code:
+                preamble.append("import yfinance as yf")
+            
+            if preamble:
+                f.write("\n".join(preamble) + "\n\n")
+            
             f.write(code)
             
         # 2. Build 'uv' command
         # uv run --with dep1 --with dep2 python script.py
         cmd = ["uv", "run"]
-        if dependencies:
-            for dep in dependencies:
-                cmd.extend(["--with", dep])
+        
+        # Ensure dependencies are unique
+        deps_set = set(dependencies)
+        
+        # Smart dependency detection
+        if "pd" in code or "pandas" in code:
+            deps_set.add("pandas")
+        if "np" in code or "numpy" in code:
+            deps_set.add("numpy")
+        if "yf" in code or "yfinance" in code:
+            deps_set.add("yfinance")
+            
+        for dep in sorted(list(deps_set)):
+             cmd.extend(["--with", dep])
         
         # Add python script target
         cmd.extend(["python", "script.py"])

@@ -100,6 +100,15 @@ async def main() -> None:
     
     setup_logging(LogConfig(level="DEBUG", format="console", service_name="scraper_server"))
     
+    # JIT Browser Installation
+    # Ensure browsers are installed since we are running in an isolated uv environment
+    import subprocess
+    logger.info("🔧 Verifying Playwright browsers (JIT)...")
+    try:
+        subprocess.run(["playwright", "install", "chromium"], check=True)
+    except Exception as e:
+        logger.warning(f"Failed to auto-install browsers: {e}")
+
     server = ScraperServer()
     logger.info(f"Starting {server.name} with {len(server.get_tools())} tools")
     

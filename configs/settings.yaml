@@ -24,23 +24,67 @@ mcp:
     - name: "scraper_server"
       enabled: true
       transport: "stdio"
-      command: "python -m mcp_servers.scraper_server.server"
+      command: "uv run --with playwright --with beautifulsoup4 python -m mcp_servers.scraper_server.server"
     - name: "python_server"
       enabled: true
       transport: "stdio"
-      command: "python -m mcp_servers.python_server.server"
+      command: "uv run --with pandas --with duckdb --with yfinance --with scikit-learn python -m mcp_servers.python_server.server"
     - name: "search_server"
       enabled: true
       transport: "stdio"
-      command: "python -m mcp_servers.search_server.server"
-    - name: "vision_server"
-      enabled: false
+      command: "uv run --with httpx --with duckduckgo-search python -m mcp_servers.search_server.server"
+    - name: "academic_server"
+      enabled: true
       transport: "stdio"
-      command: "python -m mcp_servers.vision_server.server"
-    - name: "analysis_server"
-      enabled: false
-      transport: "sse"
-      url: "http://localhost:8001/mcp"
+      command: "uv run --with httpx python -m mcp_servers.academic_server.server"
+    - name: "analytics_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with pandas --with numpy --with scipy --with scikit-learn --with ydata-profiling python -m mcp_servers.analytics_server.server"
+    - name: "browser_agent_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with httpx --with beautifulsoup4 python -m mcp_servers.browser_agent_server.server"
+    - name: "crawler_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with httpx --with beautifulsoup4 python -m mcp_servers.crawler_server.server"
+    - name: "data_sources_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with pandas --with yfinance --with fredapi --with wbgapi python -m mcp_servers.data_sources_server.server"
+    - name: "document_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with httpx --with pymupdf --with python-docx --with pandas --with openpyxl --with beautifulsoup4 python -m mcp_servers.document_server.server"
+    - name: "ml_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with pandas --with numpy --with scikit-learn --with scipy python -m mcp_servers.ml_server.server"
+    - name: "qualitative_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run python -m mcp_servers.qualitative_server.server"
+    - name: "regulatory_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with httpx python -m mcp_servers.regulatory_server.server"
+    - name: "security_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with httpx python -m mcp_servers.security_server.server"
+    - name: "tool_discovery_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with httpx python -m mcp_servers.tool_discovery_server.server"
+    - name: "visualization_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with pandas --with plotly --with numpy python -m mcp_servers.visualization_server.server"
+    - name: "vision_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with httpx python -m mcp_servers.vision_server.server"
 
 # Research Configuration
 research:

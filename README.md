@@ -278,9 +278,9 @@ All core components implemented and functional:
 | Principle | Description |
 |-----------|-------------|
 | **Systemic AI** | Self-multiplying agent swarm with dynamic system prompts |
-| **ARM Modularity** | LangGraph core + optional MCP tool extensions |
-| **JIT Dependencies** | `uv` on-demand package install |
-| **Tool Isolation** | Each MCP server runs in own process |
+| **Pure MCP** | NO direct imports. All tools communicate via JSON-RPC over Stdio |
+| **JIT Execution** | `uv run --with ...` provides ephemeral, isolated environments for each server |
+| **Zero-Setup** | Servers self-bootstrap their own dependencies on startup |
 | **Hardware Efficiency** | Runs on VPS KVM2 / Colab / Kaggle |
 | **Conversational** | Follow-up, not restart—detect intent |
 | **Smart Context** | Inject relevant facts + pointers |
@@ -632,19 +632,19 @@ See **[services/rag_service/README.md](services/rag_service/README.md)** for sch
 
 ---
 
-## ⚡ 7. The JIT Execution Engine (The Sandbox)
+## ⚡ 7. The JIT Execution Engine (Verified)
 
-Kea allows for **unsafe code execution** by wrapping it in a secure, ephemeral environment managed by `uv`. This enables the system to "invent" its own tools by writing Python scripts and dependencies on the fly.
+Kea uses **uv** (a fast Python package manager) to create isolated, ephemeral environments for each tool execution. This allows the system to "invent" its own tools by writing Python scripts and dependencies on the fly.
 
-### 7.1. Just-In-Time (JIT) dependency Management
-Unlike standard Docker containers with fixed libraries, Kea uses `uv` to dynamically fetch dependencies at runtime without pollution.
+### 7.1. Zero-Dependency Configuration
+Unlike standard monolithic endpoints, Kea's MCP servers are configured in `settings.yaml` to pull their own dependencies at runtime:
 
-*   **Logic:**
-    1.  **Orchestrator** generates a script requiring `yfinance`, `pandas`, `sklearn`.
-    2.  **Mcp Server** receives request: `execute_code(code=..., deps=["yfinance", "pandas"])`.
-    3.  **Isolation:** Server creates a temporary directory ` /tmp/sandbox_{uuid} `.
-    4.  **Execution:** Invokes `uv run --with yfinance --with pandas python script.py`.
-    5.  **Cleanup:** Directory is wiped after execution.
+```yaml
+# Configuration Example
+command: "uv run --with pandas --with scikit-learn python -m mcp_servers.ml_server.server"
+```
+ 
+ ### 7.2. Execution Flow
 
 ```mermaid
 sequenceDiagram
@@ -773,7 +773,12 @@ Please see **[services/api_gateway/README.md](services/api_gateway/README.md)** 
 - **Pure MCP Refactoring**: Removed all direct tool imports; 100% dynamic routing via JSON-RPC.
 - **JIT Execution**: Implemented `uv` integration for on-demand dependency installation.
 
-### 🚧 In Progress (v3.2)
+### ✅ Completed (v3.2)
+- **JIT Audit & Hardening**: Audited all 16 servers for dependency correctness.
+- **Robust Configuration**: `settings.yaml` now defines isolated `uv run` environments for every server.
+- **Self-Healing**: Automated browser installation and dependency injection.
+
+### 🚧 In Progress (v3.3)
 - [ ] Refine MCP Lifecycle Management for Docker
 
 
