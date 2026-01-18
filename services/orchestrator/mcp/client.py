@@ -176,6 +176,14 @@ class MCPOrchestrator:
                 logger.error(f"❌ Failed to start/connect {name}: {e}")
                 import traceback
                 traceback.print_exc()
+
+        # Update Registry
+        try:
+            from services.orchestrator.core.tool_registry import get_tool_registry
+            registry = get_tool_registry()
+            await registry.sync_tools(self.tools)
+        except Exception as e:
+            logger.error(f"Failed to sync tool registry: {e}")
     
     async def discover_tools(self) -> list[Tool]:
         """Discover tools from all connected servers."""
