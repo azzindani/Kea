@@ -227,20 +227,13 @@ async def researcher_node(state: GraphState) -> GraphState:
             code = generate_fallback_code(description, collected_facts or [])
             return {"code": code}
         
-        if tool_name in ["sql_query"]:
-             # If input is just a description, we need to generate SQL
-             if "query" in original_inputs and not "SELECT" in original_inputs["query"].upper():
-                  # This is likely a natural language description, not SQL
-                  # Fallback to python generation which can handle SQL logic or return code
-                  code = generate_fallback_code(description, collected_facts or [])
-                  return {"query": code}  # The tool expects 'query' but we might need to be smarter
+        if tool_name in ["sql_query", "dataframe_ops", "analyze_data"]:
+             # TRANSFORM: Smart Logic -> Python Code
+             if "code" in original_inputs: return original_inputs
              
-             if "operation" in original_inputs or "query" in original_inputs: return original_inputs
-             return None
-        
-        if tool_name in ["dataframe_ops", "analyze_data"]:
-             if "operation" in original_inputs or "query" in original_inputs: return original_inputs
-             return None
+             # If we have unstructured query, generate code
+             code = generate_fallback_code(description, collected_facts or [])
+             return {"code": code}
         
         # SCRAPING & CRAWLING
         if tool_name in ["scrape_url", "fetch_url", "link_extractor", "sitemap_parser"]:
@@ -288,8 +281,8 @@ async def researcher_node(state: GraphState) -> GraphState:
         tool_mapping = {
             "run_python": "execute_code",
             "parse_document": "execute_code",
-            # "dataframe_ops": "dataframe_ops", # Native support
-            # "sql_query": "sql_query", # Native support
+            "dataframe_ops": "execute_code", # Map to code execution
+            "sql_query": "execute_code",     # Map to code execution
             "scrape_url": "browser_scrape",
             "fetch_page": "fetch_url"
         }
@@ -302,7 +295,7 @@ async def researcher_node(state: GraphState) -> GraphState:
                 args["code"] = args.pop("script")
             elif "query" in args and name == "sql_query":
                 # Synthesize SQL runner
-                args["code"] = f"import sqlite3\nconn = sqlite3.connect('kea.db')\nprint(pd.read_sql('{args['query']}', conn))"
+                args["code"] = f"import sqlite3\nimport pandas as pd\nconn = sqlite3.connect('kea.db')\nprint(pd.read_sql('{args['query']}', conn))"
         
         # Default to MCP Pure Routing
         try:
