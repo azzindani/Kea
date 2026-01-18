@@ -98,8 +98,8 @@ class MCPClient:
         
         # Wait for response with timeout
         try:
-            # Increase timeout to 120s for JIT installations
-            return await asyncio.wait_for(future, timeout=120.0)
+            # Increase timeout to 300s for JIT installations
+            return await asyncio.wait_for(future, timeout=300.0)
         except asyncio.TimeoutError:
             self._pending.pop(request_id, None)
             raise TimeoutError(f"Request timed out: {method}")
