@@ -65,25 +65,50 @@ graph TD
 │   (MCP Client)  │                    │   (Tool Host)   │
 └─────────────────┘                    └─────────────────┘
         │                                      │
-        │  1. initialize                       │
-        │  ─────────────────────────────────→  │
-        │                                      │
-        │  2. tools/list (discover)            │
-        │  ─────────────────────────────────→  │
-        │  ←─────────────────────────────────  │
-        │     [{name, description, schema}]    │
-        │                                      │
-        │  3. tools/call (parallel batch)      │
-        │  ─────────────────────────────────→  │
-        │  ─────────────────────────────────→  │ (concurrent)
-        │  ─────────────────────────────────→  │
-        │                                      │
-        │  4. results (streamed/batched)       │
-        │  ←─────────────────────────────────  │
-        │  ←─────────────────────────────────  │
-        │  ←─────────────────────────────────  │
-        │                                      │
+...
 ```
+
+## 🚀 Running the Services (Verified Config)
+
+To run the system with the new split-port architecture (to avoid conflicts):
+
+### 1. Start the Orchestrator (The Brain)
+Runs on port **8002** to host the LangGraph logic and manage MCP subprocesses.
+```bash
+# Windows (PowerShell)
+$env:API_PORT=8002; python -m services.orchestrator.main
+
+# Linux/Mac
+API_PORT=8002 python -m services.orchestrator.main
+```
+
+### 2. Start the API Gateway (The Door)
+Runs on port **8080** and connects to the Orchestrator.
+```bash
+# Windows (PowerShell)
+$env:API_PORT=8080; $env:ORCHESTRATOR_URL="http://localhost:8002"; python -m services.api_gateway.main
+
+# Linux/Mac
+API_PORT=8080 ORCHESTRATOR_URL="http://localhost:8002" python -m services.api_gateway.main
+```
+
+### 3. Run Stress Tests
+Verify the full pipeline.
+```bash
+# Windows (PowerShell)
+$env:ORCHESTRATOR_URL="http://localhost:8002"; $env:API_GATEWAY_URL="http://localhost:8080"; python tests/stress/stress_test.py --query=1
+
+# Linux/Mac
+ORCHESTRATOR_URL="http://localhost:8002" API_GATEWAY_URL="http://localhost:8080" python tests/stress/stress_test.py --query=1
+```
+
+### Key TCP Ports
+| Service | Port | Description |
+|:--------|:-----|:------------|
+| **Orchestrator** | `8002` | Reasoning Engine + MCP Host |
+| **API Gateway** | `8080` | External API & Auth |
+| **Python MCP** | `Stdio` | Subprocess (No Port) |
+
 
 ### Key MCP Benefits for Kea
 
@@ -245,8 +270,8 @@ All core components implemented and functional:
 
 ### Known Limitations
 
-1. **Hybrid Tool Implementation**: While the architecture is MCP-first, the core research loop currently uses direct imports for critical tools (Search) for performance optimization.
-2. **Environment Specificity**: MCP Server auto-start in `main.py` assumes a standard environment; Docker setups may require adjusting `mcp_servers.yaml`.
+1.  **Environment Specificity**: MCP Server auto-start in `main.py` assumes a standard environment; Docker setups may require adjusting `mcp_servers.yaml`.
+2.  **Latency**: Pure MCP architecture introduces slight IPC overhead compared to direct function calls.
 
 ### 🏗️ Architecture Principles
 
@@ -367,35 +392,36 @@ The system follows a **Hub-and-Spoke Microservices Pattern**. The central Orches
 
 ```mermaid
 graph TD
-    User[User / API] --> Gateway["API Gateway<br/>(services/api_gateway)"]
-    Gateway --> Router{"Intention Router<br/>(services/orchestrator)"}
+    User[User / API] -->|HTTP| Gateway["API Gateway<br/>(Port 8080)"]
+    Gateway -->|HTTP/REST| Router{"Intention Router<br/>(Port 8002)"}
     
-    Router -->|Simple| FastRAG["Fast RAG Memory<br/>(services/rag_service)"]
-    Router -->|Methodology| Provenance[Provenance Graph]
-    Router -->|Recalculate| ShadowLab["Shadow Lab"]
-    Router -->|Deep Research| Orchestrator["Main Orchestrator<br/>(services/orchestrator)"]
-    
-    subgraph CognitiveCore[The Cognitive Core]
-        Orchestrator --> Planner["Planner and Decomposer"]
-        Planner --> Keeper["The Keeper"]
+    subgraph "Orchestrator Service (Port 8002)"
+        Router -->|Simple| FastRAG["Fast RAG Memory"]
+        Router -->|Methodology| Provenance[Provenance Graph]
+        Router -->|Deep Research| Orchestrator["Main Orchestrator"]
+        
+        Orchestrator --> Planner["Planner"]
+        Planner --> Keeper["Keeper"]
         Keeper --> Divergence["Divergence Engine"]
-        Divergence --> Synthesizer["Report Synthesizer"]
+        Divergence --> Synthesizer["Synthesizer"]
     end
     
-    subgraph Tools[Tool Microservices]
-        Scraper["Robotic Scraper<br/>(mcp_servers/scraper_server)"]
-        Analyst["Python Analyst<br/>(mcp_servers/python_server)"]
-        Meta[Meta-Analysis]
+    subgraph "MCP Tool Layer (Subprocesses)"
+        Scraper["Scraper Server<br/>(Stdio)"]
+        Analyst["Python Server<br/>(Stdio)"]
+        Search["Search Server<br/>(Stdio)"]
     end
     
     subgraph MemoryVault[Triple-Vault Memory]
-        Atomic["Atomic Facts DB<br/>(services/rag_service)"]
-        Episodic[Episodic Logs]
+        Atomic["Atomic Facts DB"]
+        Episodic["Episodic Logs"]
         Artifacts["Parquet Store"]
     end
     
-    Orchestrator <--> Scraper
-    Orchestrator <--> Analyst
+    Orchestrator ==JSON-RPC==> Scraper
+    Orchestrator ==JSON-RPC==> Analyst
+    Orchestrator ==JSON-RPC==> Search
+    
     Divergence <--> Atomic
     Scraper --> Artifacts
     Analyst --> Artifacts
@@ -740,14 +766,16 @@ Please see **[services/api_gateway/README.md](services/api_gateway/README.md)** 
 - Organization module, Work Units, Message Bus, Supervisor
 - Security: ResourceGuard, KillSwitch, rate limiting
 
-### ✅ Completed (v3.0)
+### ✅ Completed (v3.1)
 - Wire `graph.py` to real `nodes/` and `agents/` modules
 - Connect MCP Orchestrator to researcher node
 - Full end-to-end research pipeline
+- **Pure MCP Refactoring**: Removed all direct tool imports; 100% dynamic routing via JSON-RPC.
+- **JIT Execution**: Implemented `uv` integration for on-demand dependency installation.
 
-### 🚧 In Progress (v3.1)
+### 🚧 In Progress (v3.2)
 - [ ] Refine MCP Lifecycle Management for Docker
-- [ ] Optimization of Hybrid Tool Calling
+
 
 ### 🔮 Future (v4.0+)
 - [ ] Multi-process agent isolation

@@ -32,7 +32,8 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 # Orchestrator URL for API calls
-ORCHESTRATOR_URL = "http://localhost:8000"
+import os
+ORCHESTRATOR_URL = os.getenv("ORCHESTRATOR_URL", "http://localhost:8000")
 
 
 # ============================================================================
@@ -237,11 +238,11 @@ class JobStore:
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
             "error": row["error"],
-            "report": row.get("report"),
-            "confidence": row.get("confidence", 0.0),
-            "facts_count": row.get("facts_count", 0),
-            "sources_count": row.get("sources_count", 0),
-            "artifact_ids": row.get("artifact_ids", "").split(",") if row.get("artifact_ids") else [],
+            "report": row["report"],
+            "confidence": row["confidence"] if row["confidence"] is not None else 0.0,
+            "facts_count": row["facts_count"] if row["facts_count"] is not None else 0,
+            "sources_count": row["sources_count"] if row["sources_count"] is not None else 0,
+            "artifact_ids": row["artifact_ids"].split(",") if row["artifact_ids"] else [],
         }
 
 

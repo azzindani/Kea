@@ -323,6 +323,12 @@ async def stream_research(query: str, depth: int = 2, max_sources: int = 10):
 # Main
 # ============================================================================
 
+# Force Proactor loop for Windows subprocess support
+import sys
+import asyncio
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
 def main():
     """Run the orchestrator service."""
     import uvicorn
@@ -333,7 +339,8 @@ def main():
         "services.orchestrator.main:app",
         host=settings.api_host,
         port=settings.api_port,
-        reload=settings.is_development,
+        reload=False, 
+        loop="asyncio",
     )
 
 
