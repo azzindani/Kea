@@ -122,3 +122,64 @@ To run the Orchestrator service in isolation (for development):
 # Start the service
 python -m services.orchestrator.main
 ```
+
+---
+
+## 🔮 Future Enterprise Integration Architecture
+The following diagram illustrates how the currently dormant "Enterprise" modules (`compliance.py`, `audit_trail.py` etc.) will be wired into the existing `graph.py` execution loop without rewriting the core.
+
+```mermaid
+graph TD
+    %% -- Core Pipeline --
+    User((User)) -->|Query| API[API Gateway]
+    API -->|Start Job| Graph[Graph State Machine]
+    
+    %% -- Planning --
+    Graph -->|Route| Planner[Planner Node]
+    Planner -->|Decompose| Spawner{Agent Spawner}
+    
+    %% -- Fractal Expansion (agent_spawner.py) --
+    subgraph Fractal Swarm
+        Spawner -->|Spawn| Agent1[Research Agent 1]
+        Spawner -->|Spawn| Agent2[Financial Agent 2]
+        Spawner -->|Spawn| Agent3[Legal Agent 3]
+    end
+    
+    %% -- Execution Logic --
+    Agent1 -->|Tool Call| Workflow{Approval Workflow}
+    
+    %% -- Gatekeepers (approval_workflow.py) --
+    subgraph Corporate Governance
+        Workflow --"High Cost / Risk"--> HITL((Human Admin))
+        HITL --"Approve"--> Compliance{Compliance Engine}
+        Workflow --"Safe"--> Compliance
+    end
+    
+    %% -- Safety (compliance.py) --
+    Compliance --"GDPR Check"--> Rule1[Data Minimization]
+    Compliance --"ISO27001"--> Rule2[Security Scan]
+    
+    %% -- Action --
+    Rule1 & Rule2 -->|Pass| MCP[MCP Tool Client]
+    
+    %% -- The Black Box (audit_trail.py) --
+    MCP -.->|Log Action| Audit[(Audit Trail DB)]
+    Graph -.->|Log State| Audit
+    Compliance -.->|Log Decision| Audit
+    
+    %% -- Styles --
+    classDef core fill:#222,stroke:#fff,stroke-width:2px;
+    classDef dormant fill:#2d1b1b,stroke:#f55,stroke-width:2px,stroke-dasharray: 5 5;
+    classDef active fill:#1b2d1b,stroke:#5f5,stroke-width:2px;
+    
+    class Graph,Planner,MCP active;
+    class Spawner,Workflow,Compliance,Audit dormant;
+```
+
+### Integration Wiring Guide
+| Active Component | Dormant Module | Integration Method |
+|:-----------------|:---------------|:-------------------|
+| `nodes/researcher.py` | `core/compliance.py` | Wrap tool calls: `compliance.check(tool, args)` |
+| `core/graph.py` | `core/audit_trail.py` | Add `@audited` decorator to node functions. |
+| `mcp/client.py` | `core/approval_workflow.py` | In `call_tool`, check `workflow.requires_approval()`. |
+| `nodes/planner.py` | `core/agent_spawner.py` | Replace loop with `spawner.spawn_swarm(plan)`. |

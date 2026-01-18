@@ -36,6 +36,46 @@ async def lifespan(app: FastAPI):
     
     logger.info("Starting Orchestrator service")
     
+    # =========================================================================
+    # Initialize Enterprise Subsystems
+    # =========================================================================
+    try:
+        from services.orchestrator.core.audit_trail import configure_audit_trail, SQLiteBackend
+        from services.orchestrator.core.compliance import get_compliance_engine
+        
+        # 1. Audit Trail (Black Box)
+        # Ensure data directory exists
+        audit_db_path = "data/audit_trail.db"
+        audit_backend = SQLiteBackend(audit_db_path)
+        configure_audit_trail(audit_backend)
+        logger.info(f"Audit Trail initialized at {audit_db_path}")
+        
+        # 2. Compliance Engine (Guardrails)
+        compliance = get_compliance_engine()
+        # (Optional) Load custom rules here if needed
+        logger.info(f"Compliance Engine initialized with {len(compliance.rules)} rule sets")
+        
+        # 3. Organization (The Corporate Structure)
+        from services.orchestrator.core.organization import get_organization, Domain
+        org = get_organization()
+        # Create default departments if empty
+        if not org.list_departments():
+            org.create_department("Research", Domain.RESEARCH)
+            org.create_department("Finance", Domain.FINANCE)
+            org.create_department("Legal", Domain.LEGAL)
+            logger.info("Organization structure initialized: Research, Finance, Legal")
+
+        # 4. Memory (The Mind)
+        from services.orchestrator.core.conversation import get_conversation_manager
+        memory = get_conversation_manager()
+        logger.info("Conversation Memory initialized")
+        
+    except Exception as e:
+        logger.error(f"Failed to initialize enterprise systems: {e}")
+        # Continue execution, these are optional for now, or raise if critical
+    
+    # =========================================================================
+    
     # Initialize MCP orchestrator
     mcp_orchestrator = get_mcp_orchestrator()
     

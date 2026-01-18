@@ -220,6 +220,33 @@ class MCPOrchestrator:
         Returns:
             ToolResult with content
         """
+        # =====================================================================
+        # Enterprise Guardrail: Compliance Check
+        # =====================================================================
+        try:
+            from services.orchestrator.core.compliance import get_compliance_engine
+            engine = get_compliance_engine()
+            
+            # Use 'context' to pass the tool details
+            report = await engine.check_operation(
+                operation="tool_exec",
+                context={"tool": tool_name, "args": arguments}
+            )
+            
+            if not report.passed:
+                logger.warning(f"🛡️ Compliance blocked {tool_name}: {report.summary}")
+                issues_text = "\n".join([f"- {i.message}" for i in report.issues])
+                return ToolResult(
+                    content=[TextContent(text=f"Compliance Blocked Action:\n{issues_text}")],
+                    isError=True
+                )
+        except ImportError:
+            pass  # Fail open if compliance module missing during dev
+        except Exception as e:
+            logger.error(f"Compliance check failed: {e}")
+            # Decide: Fail open or closed? Currently Fail Open to avoid breaking production
+        # =====================================================================
+
         server_name = self._tool_registry.get(tool_name)
         
         if not server_name:

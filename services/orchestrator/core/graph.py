@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from shared.schemas import ResearchState, ResearchStatus, QueryPath
 from shared.logging import get_logger
+from services.orchestrator.core.audit_trail import audited, AuditEventType
 
 # Import real implementations
 from services.orchestrator.nodes.planner import planner_node as real_planner_node
@@ -94,18 +95,47 @@ class GraphState(TypedDict, total=False):
 # ============================================================================
 
 async def router_node(state: GraphState) -> GraphState:
-    """Route query to appropriate execution path."""
+    """Route query to appropriate execution path with Memory & Intent."""
     query = state.get("query", "")
+    job_id = state.get("job_id", "unknown_session")
     
     logger.info("\n" + "="*70)
-    logger.info("📍 STEP 1: ROUTER NODE")
+    logger.info("📍 STEP 1: ROUTER NODE (Memory Aware)")
     logger.info("="*70)
     logger.info(f"Query: {query[:200]}...")
     
+    # =========================================================================
+    # Phase 2: Memory & Intent Integration
+    # =========================================================================
+    from services.orchestrator.core.conversation import get_conversation_manager, Intent
+    
+    mem_mgr = get_conversation_manager()
+    
+    # We use job_id as session_id for now for simplicity
+    # In a real app, session_id would be distinct from job_id
+    resp = await mem_mgr.process(session_id=job_id, message=query)
+    
+    logger.info(f"🧠 Intent Detected: {resp.intent.value.upper()}")
+    
+    context_str = ""
+    if resp.intent == Intent.FOLLOW_UP:
+        context_str = resp.context
+        logger.info(f"📚 Retrieved Context ({len(context_str)} chars)")
+        # Inject context into query for the Planner to see
+        # We append it so the Planner knows what "it" refers to
+        state["query"] = f"{query}\n\n[CONTEXT FROM MEMORY]:\n{context_str}"
+        
+    elif resp.intent == Intent.NEW_TOPIC:
+        logger.info("✨ New Topic Detected - Clearing localized context")
+        # No context injection
+        
+    # =========================================================================
+
     router = IntentionRouter()
     context = {
         "prior_research": state.get("prior_research"),
         "data_to_verify": state.get("data_to_verify"),
+        "memory_context": context_str
     }
     
     path = await router.route(query, context)
@@ -114,8 +144,6 @@ async def router_node(state: GraphState) -> GraphState:
     logger.info(f"   A = Memory Fork | B = Shadow Lab | C = Grand Synthesis | D = Deep Research")
     logger.info("="*70 + "\n")
     
-    logger.info(f"Router: Selected path {path}")
-    
     return {
         **state,
         "path": path,
@@ -123,6 +151,7 @@ async def router_node(state: GraphState) -> GraphState:
     }
 
 
+@audited(AuditEventType.QUERY_CLASSIFIED, "Planner Node decomposed query")
 async def planner_node(state: GraphState) -> GraphState:
     """Decompose query into sub-queries, hypotheses, and execution plan using real LLM."""
     logger.info("\n" + "="*70)
@@ -162,6 +191,7 @@ async def planner_node(state: GraphState) -> GraphState:
     
     return {**state, **updated_state}
 
+@audited(AuditEventType.TOOL_CALLED, "Researcher Node executed iteration")
 async def researcher_node(state: GraphState) -> GraphState:
     """Execute research using execution plan with dynamic tool routing and PARALLEL execution."""
     iteration = state.get("iteration", 1)
@@ -191,6 +221,51 @@ async def researcher_node(state: GraphState) -> GraphState:
             for i, sq in enumerate(sub_queries or [query])
         ]
     
+    # =========================================================================
+    # Phase 3: Fractal Spawning (High Complexity)
+    # =========================================================================
+    if len(micro_tasks) > 5:
+        logger.info(f"🚀 High Complexity Detected ({len(micro_tasks)} tasks) -> Spawning Fractal Swarm")
+        try:
+            from services.orchestrator.core.agent_spawner import get_spawner
+            from services.orchestrator.core.organization import get_organization, Domain
+            
+            # Simple prompt callback wrapper for spawner
+            # Ideally this uses the real LLM, but for now we pass a dummy or use existing infrastructure
+            # We will skip the complex 'plan_execution' and use 'execute_swarm' directly on our micro_tasks
+            spawner = get_spawner()
+            
+            # Convert micro_tasks to Spawner SubTasks
+            from services.orchestrator.core.agent_spawner import SubTask, SpawnPlan, TaskType, Domain
+            import uuid
+            
+            subtasks = []
+            for t in micro_tasks:
+                subtasks.append(SubTask(
+                    subtask_id=t.get("task_id"),
+                    query=t.get("description"),
+                    domain=Domain.RESEARCH, # Should infer from t['tool']
+                    task_type=TaskType.RESEARCH
+                ))
+                
+            plan = SpawnPlan(
+                task_id=state.get("job_id", "swarm"),
+                subtasks=subtasks,
+                max_parallel=len(micro_tasks) # Go wild
+            )
+            
+            # Execute Swarm
+            # Note: Spawner needs to be updated to use real tools. 
+            # For now, we unfortunately have to rely on the standard executor below 
+            # because Spawner is still running simulated results (as seen in file view).
+            # I will enable this block fully once Spawner is connected to MCP.
+            logger.warning("⚠️ Swarm capability present but waiting for Spawner->MCP wiring. Falling back to Standard Executor.")
+            
+        except ImportError:
+            pass
+            
+    # =========================================================================
+
     # 1. Hardware-Aware Scaling
     from shared.hardware.detector import detect_hardware
     from services.orchestrator.mcp.parallel_executor import ParallelExecutor, ToolCall
@@ -444,6 +519,7 @@ async def researcher_node(state: GraphState) -> GraphState:
     }
 
 
+@audited(AuditEventType.SECURITY_CHECK, "Keeper Node verified progress")
 async def keeper_node(state: GraphState) -> GraphState:
     """Check for context drift and verify progress."""
     iteration = state.get("iteration", 0)
@@ -572,6 +648,7 @@ async def judge_node(state: GraphState) -> GraphState:
     }
 
 
+@audited(AuditEventType.QUERY_COMPLETED, "Synthesizer Node generated final report")
 async def synthesizer_node(state: GraphState) -> GraphState:
     """Create final report from all inputs."""
     logger.info("\n" + "="*70)
