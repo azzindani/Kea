@@ -209,10 +209,30 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
                 max_tokens=1000,  # Increased for execution plan
             )
             
+            # Discover relevant tools
+            try:
+                from services.orchestrator.core.tool_registry import get_tool_registry
+                registry = get_tool_registry()
+                relevant_tools = await registry.search_tools(query, limit=20)
+                tools_json = [t.get("name") + ": " + t.get("description", "") for t in relevant_tools]
+                tools_context = "\n".join(tools_json)
+            except Exception:
+                tools_context = "Basic tools available."
+
             messages = [
                 LLMMessage(
                     role=LLMRole.SYSTEM,
-                    content="""You are a research planner. Decompose queries into sub-questions AND execution steps.
+                    content=f"""You are a research planner with the resourcefulness of an elite engineer (e.g., Tony Stark).
+Your mission is to decompose complex queries into actionable execution plans, finding creative ways to get data even when no direct tool exists.
+
+AVAILABLE TOOLS (Use these if relevant):
+{tools_context}
+
+CORE PHILOSOPHY: IMPROVISE AND BUILD.
+Do not be limited by "standard" procedures. If a specific dataset/tool is missing, plan to **build it yourself** using the available primitive tools (like Python code and Web Search).
+- Treat the web as a raw database to be scraped and parsed.
+- Treat Python as your universal adapter to process that raw data.
+
 
 Output format:
 SUB-QUERIES:
