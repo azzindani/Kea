@@ -40,7 +40,7 @@ mcp:
     - name: "analytics_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with pandas --with numpy --with scipy --with scikit-learn --with ydata-profiling python -m mcp_servers.analytics_server.server"
+      command: "uv run --with pandas --with numpy --with scipy --with scikit-learn --with ydata-profiling --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.analytics_server.server"
     - name: "browser_agent_server"
       enabled: true
       transport: "stdio"
@@ -60,7 +60,7 @@ mcp:
     - name: "ml_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with pandas --with numpy --with scikit-learn --with scipy python -m mcp_servers.ml_server.server"
+      command: "uv run --with pandas --with numpy --with scikit-learn --with scipy --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.ml_server.server"
     - name: "qualitative_server"
       enabled: true
       transport: "stdio"
