@@ -36,7 +36,7 @@ mcp:
     - name: "academic_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with httpx python -m mcp_servers.academic_server.server"
+      command: "uv run --with httpx --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.academic_server.server"
     - name: "analytics_server"
       enabled: true
       transport: "stdio"
@@ -44,7 +44,7 @@ mcp:
     - name: "browser_agent_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with httpx --with beautifulsoup4 python -m mcp_servers.browser_agent_server.server"
+      command: "uv run --with httpx --with beautifulsoup4 --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.browser_agent_server.server"
     - name: "crawler_server"
       enabled: true
       transport: "stdio"
@@ -64,19 +64,19 @@ mcp:
     - name: "qualitative_server"
       enabled: true
       transport: "stdio"
-      command: "uv run python -m mcp_servers.qualitative_server.server"
+      command: "uv run --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.qualitative_server.server"
     - name: "regulatory_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with httpx python -m mcp_servers.regulatory_server.server"
+      command: "uv run --with httpx --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.regulatory_server.server"
     - name: "security_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with httpx python -m mcp_servers.security_server.server"
+      command: "uv run --with httpx --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.security_server.server"
     - name: "tool_discovery_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with httpx python -m mcp_servers.tool_discovery_server.server"
+      command: "uv run --with httpx --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.tool_discovery_server.server"
     - name: "visualization_server"
       enabled: true
       transport: "stdio"
@@ -84,7 +84,7 @@ mcp:
     - name: "vision_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with httpx python -m mcp_servers.vision_server.server"
+      command: "uv run --with httpx --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.vision_server.server"
 
 # Research Configuration
 research:
