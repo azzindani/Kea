@@ -344,6 +344,7 @@ async def researcher_node(state: GraphState) -> GraphState:
             final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
             
             # Handle input build failure (fallback immediately or skip)
+            if final_inputs is None:
                 # Try fallback
                 fallback_tools = task.get("fallback_tools") or ["web_search"]
                 t_name = fallback_tools[0]
