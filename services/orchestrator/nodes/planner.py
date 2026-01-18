@@ -209,33 +209,14 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
                 max_tokens=1000,  # Increased for execution plan
             )
             
-            # Discover relevant tools
-            try:
-                from services.orchestrator.core.tool_registry import get_tool_registry
-                registry = get_tool_registry()
-                relevant_tools = await registry.search_tools(query, limit=20)
-                tools_json = [t.get("name") + ": " + t.get("description", "") for t in relevant_tools]
-                tools_context = "\n".join(tools_json)
-            except Exception:
-                tools_context = "Basic tools available."
-
             messages = [
                 LLMMessage(
                     role=LLMRole.SYSTEM,
-                    content=f"""You are a research planner with the resourcefulness of an elite engineer (e.g., Tony Stark).
-Your mission is to decompose complex queries into actionable execution plans, finding creative ways to get data even when no direct tool exists.
-
-AVAILABLE TOOLS (Use these if relevant):
-{tools_context}
-
-CORE PHILOSOPHY: IMPROVISE AND BUILD.
-Do not be limited by "standard" procedures. If a specific dataset/tool is missing, plan to **build it yourself** using the available primitive tools (like Python code and Web Search).
-- Treat the web as a raw database to be scraped and parsed.
-- Treat Python as your universal adapter to process that raw data.
+                    content="""You are a research planner. Decompose queries into sub-questions AND execution steps.
 
 Output format:
 SUB-QUERIES:
-1. [question]
+1. [question - be specific about what data/information is needed]
 2. [question]
 
 HYPOTHESES:
@@ -243,14 +224,17 @@ HYPOTHESES:
 2. [testable claim]
 
 EXECUTION-STEPS:
-1. [Action] [What] [How] - e.g., "Write a Python script to scrape X from Y..."
-2. [Action] [What] [How]
-...
+1. [action verb] [what] [where/how] - e.g. "Search for list of all IDX companies"
+2. [action verb] [what] [where/how] - e.g. "Download historical price data for each ticker"
+3. [action verb] [what] [where/how] - e.g. "Calculate revenue growth rate using financial data"
+4. [action verb] [what] [where/how] - e.g. "Scrape annual reports from company websites"
+5. [action verb] [what] [where/how] - e.g. "Build ownership graph from extracted entities"
 
 Be specific about:
 - What data to collect
-- How to get it (using improvisation if needed)
-- What calculations to perform"""
+- What calculations to perform
+- What to extract from documents
+- What relationships to map"""
                 ),
                 LLMMessage(role=LLMRole.USER, content=f"Decompose this research query:\n\n{query}")
             ]

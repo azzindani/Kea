@@ -139,20 +139,12 @@ class MCPOrchestrator:
                     pass
                 
                 # Create Transport & Client
-                print(f"DEBUG: Process started for {name}, PID: {process.pid}")
                 transport = SubprocessTransport(process)
                 client = MCPClient()
                 
                 # Connect (Initialize handshake)
                 logger.info(f"🔌 Connecting to {name} via stdio...")
-                try:
-                    await client.connect(transport)
-                    print(f"DEBUG: Client connected to {name}")
-                except Exception as conn_err:
-                     logger.error(f"❌ Connection failed for {name}: {conn_err}")
-                     import traceback
-                     traceback.print_exc()
-                     raise conn_err
+                await client.connect(transport)
                 
                 connection = MCPServerConnection(
                     name=name, 
@@ -174,16 +166,6 @@ class MCPOrchestrator:
                 
             except Exception as e:
                 logger.error(f"❌ Failed to start/connect {name}: {e}")
-                import traceback
-                traceback.print_exc()
-
-        # Update Registry
-        try:
-            from services.orchestrator.core.tool_registry import get_tool_registry
-            registry = get_tool_registry()
-            await registry.sync_tools(self.tools)
-        except Exception as e:
-            logger.error(f"Failed to sync tool registry: {e}")
     
     async def discover_tools(self) -> list[Tool]:
         """Discover tools from all connected servers."""
