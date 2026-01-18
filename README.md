@@ -12,48 +12,45 @@ Kea adopts the **Model Context Protocol (MCP)** as its universal tool calling in
 - **Standardized Communication:** JSON-RPC 2.0 over stdio/SSE provides consistent request/response patterns across all tools
 - **Dynamic Discovery:** Tools self-register their capabilities, allowing hot-swapping and runtime extension
 - **Isolated Execution:** Each MCP server runs in its own process/container, ensuring fault isolation
+- **Scalable Registry ("Jarvis"):** Semantic search (RAG) enables the Planner to utilize 1,000+ tools without context window overflow
+
+### Scalable Tool Discovery ("Jarvis" Registry)
+Kea v3.3 introduces a **Persistent Tool Registry** to handle large-scale tool ecosystems (1,000+ tools).
+- **Problem**: Injecting 1,000 JSON schemas into the System Prompt is impossible/expensive.
+- **Solution**:
+    1.  **Indexing**: On startup, Kea incrementally indexes tools into a local SQLite + Vector database (`data/kea.db`).
+    2.  **Retrieval**: The Planner uses semantic search to find the "Top-20" most relevant tools for the specific query.
+    3.  **Injection**: Only relevant schemas are injected into the context.
+    4.  **Zero-Maintenance**: The system automatically hashes and updates the registry on startup. No manual sync required.
 
 ### MCP Architecture Overview
+**"Pure MCP" & JIT Execution**:
+Kea uses a **Pure MCP** architecture. The Orchestrator has *zero* tool code dependencies.
+- **JIT (Just-In-Time)**: Tools are ephemeral. When a tool is called, Kea uses `uv` to spawn a pristine environment with exact dependencies.
+- **Registry-First**: The Orchestrator discovers tools via the `PersistentToolRegistry` (SQLite), ensuring it can handle 1,000+ tools without bloating prompt context.
 
 ```mermaid
 graph TD
-    Orchestrator["Orchestrator - MCP Client<br/>(services/orchestrator/mcp/client.py)"]
-    Router["MCP Router - Parallel Dispatcher<br/>(services/orchestrator/mcp/parallel_executor.py)"]
+    Orchestrator["Orchestrator (The Brain)<br/>(services/orchestrator)"]
+    Registry["Jarvis Tool Registry<br/>(SQLite + Vector Search)"]
+    Router["Parallel Dispatcher<br/>(services/orchestrator/mcp/parallel_executor.py)"]
     
+    Orchestrator <--> Registry
     Orchestrator --> Router
     
-    subgraph Core[Core Servers]
-        S1["scraper_server<br/>(mcp_servers/scraper_server)"]
-        S2["search_server<br/>(mcp_servers/search_server)"]
-        S3["python_server<br/>(mcp_servers/python_server)"]
-        S4["vision_server<br/>(mcp_servers/vision_server)"]
+    subgraph "Ephemeral Tool Swarm (JIT via uv)"
+        S1["scraper_server"]
+        S2["search_server"]
+        S3["python_server"]
+        S4["visualization_server"]
+        S_More["...12 others..."]
     end
     
-    subgraph Data[Data and Analytics]
-        D1["data_sources_server<br/>(mcp_servers/data_sources_server)"]
-        D2["analytics_server<br/>(mcp_servers/analytics_server)"]
-        D3["ml_server<br/>(mcp_servers/ml_server)"]
-        D4["visualization_server<br/>(mcp_servers/visualization_server)"]
-    end
-    
-    subgraph Domain[Domain-Specific]
-        X1["academic_server<br/>(mcp_servers/academic_server)"]
-        X2["regulatory_server<br/>(mcp_servers/regulatory_server)"]
-        X3["document_server<br/>(mcp_servers/document_server)"]
-        X4["qualitative_server<br/>(mcp_servers/qualitative_server)"]
-    end
-    
-    subgraph Utility[Utility Servers]
-        U1["crawler_server<br/>(mcp_servers/crawler_server)"]
-        U2["browser_agent_server<br/>(mcp_servers/browser_agent_server)"]
-        U3["security_server<br/>(mcp_servers/security_server)"]
-        U4["tool_discovery_server<br/>(mcp_servers/tool_discovery_server)"]
-    end
-    
-    Router --> Core
-    Router --> Data
-    Router --> Domain
-    Router --> Utility
+    Router --> S1
+    Router --> S2
+    Router --> S3
+    Router --> S4
+    Router --> S_More
 ```
 
 
@@ -72,34 +69,28 @@ graph TD
 
 To run the system with the new split-port architecture (to avoid conflicts):
 
-### 1. Start the Orchestrator (The Brain)
-Runs on port **8002** to host the LangGraph logic and manage MCP subprocesses.
+### 1. Run the "Multibagger Hunt" (Stress Test)
+The easiest way to see Kea in action is to run the stress test, which spins up the full architecture including the Tool Registry.
+
 ```bash
 # Windows (PowerShell)
+python tests/stress/stress_test.py --query=21 --concurrent
+
+# Linux/Mac
+python tests/stress/stress_test.py --query=21 --concurrent
+```
+
+### 2. Manual Start (Split-Port Architecture)
+If you need to run services individually:
+
+**Orchestrator (Port 8002)**
+```bash
 $env:API_PORT=8002; python -m services.orchestrator.main
-
-# Linux/Mac
-API_PORT=8002 python -m services.orchestrator.main
 ```
 
-### 2. Start the API Gateway (The Door)
-Runs on port **8080** and connects to the Orchestrator.
+**API Gateway (Port 8080)**
 ```bash
-# Windows (PowerShell)
 $env:API_PORT=8080; $env:ORCHESTRATOR_URL="http://localhost:8002"; python -m services.api_gateway.main
-
-# Linux/Mac
-API_PORT=8080 ORCHESTRATOR_URL="http://localhost:8002" python -m services.api_gateway.main
-```
-
-### 3. Run Stress Tests
-Verify the full pipeline.
-```bash
-# Windows (PowerShell)
-$env:ORCHESTRATOR_URL="http://localhost:8002"; $env:API_GATEWAY_URL="http://localhost:8080"; python tests/stress/stress_test.py --query=1
-
-# Linux/Mac
-ORCHESTRATOR_URL="http://localhost:8002" API_GATEWAY_URL="http://localhost:8080" python tests/stress/stress_test.py --query=1
 ```
 
 ### Key TCP Ports
@@ -141,6 +132,13 @@ ORCHESTRATOR_URL="http://localhost:8002" API_GATEWAY_URL="http://localhost:8080"
 | **Variables** | `kea_config`, `dare_result` | `config`, `research_result` |
 | **Modules** | `kea_utils.py` | `utils.py`, `helpers.py` |
 | **Metrics** | `kea_*`, `dare_*` | `research_*`, `tool_*` |
+
+- **Fault Tolerance**: Circuit breakers and exponential backoff handling server restarts.
+
+### "Systemic Agentic AI"
+Kea is not just a tool-caller; it is a **Resourceful Engineer**.
+- **Improvisation**: If a specific tool is missing, the Planner ("Tony Stark" mode) autonomously writes Python scripts to build the tool on the fly.
+- **Scalability**: The **Persistent Tool Registry** allows the system to index and retrieve from thousands of tools using semantic search, treating tool discovery as a RAG problem.
 
 ### Configuration Management
 
@@ -195,6 +193,8 @@ kea/
 │   │   ├── README.md                           # 📖 Deployment & Architecture Guide
 │   │   ├── main.py                             # FastAPI entrypoint
 │   │   ├── 📁 core/                            # Core Research Pipeline
+│   │   │   ├── tool_registry.py                # 🧠 [NEW] Persistent Tool DB (SQLite+Vector)
+│   │   │   └── ...
 │   │   ├── 📁 mcp/                             # MCP Client Implementation
 │   │   ├── 📁 nodes/                           # LangGraph Nodes
 │   │   └── 📁 agents/                          # Consensus Agents
@@ -401,6 +401,7 @@ graph TD
         Router -->|Deep Research| Orchestrator["Main Orchestrator"]
         
         Orchestrator --> Planner["Planner"]
+        Planner <--> Registry[("Jarvis Tool DB<br/>(SQLite/Vector)")]
         Planner --> Keeper["Keeper"]
         Keeper --> Divergence["Divergence Engine"]
         Divergence --> Synthesizer["Synthesizer"]
@@ -778,7 +779,12 @@ Please see **[services/api_gateway/README.md](services/api_gateway/README.md)** 
 - **Robust Configuration**: `settings.yaml` now defines isolated `uv run` environments for every server.
 - **Self-Healing**: Automated browser installation and dependency injection.
 
-### 🚧 In Progress (v3.3)
+### ✅ Completed (v3.3)
+- **Scalable Tool Discovery**: Implemented "Jarvis" Persistent Registry (SQLite + Qwen3-0.6B).
+- **Planner Intelligence**: Upgraded "Tony Stark" prompt for improvisation and tool building.
+- **Incremental Sync**: Registry auto-updates by hashing schemas (Zero-Maintenance).
+
+### 🚧 In Progress (v3.4)
 - [ ] Refine MCP Lifecycle Management for Docker
 
 
