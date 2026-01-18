@@ -39,59 +39,55 @@ class StdioTransport(Transport):
     Stdio transport for MCP communication.
     
     Reads from stdin, writes to stdout using newline-delimited JSON.
+    Compatible with Windows ProactorEventLoop via run_in_executor.
     """
     
     def __init__(self) -> None:
-        self._reader: asyncio.StreamReader | None = None
-        self._writer: asyncio.StreamWriter | None = None
+        self._loop = None
         self._closed = False
     
     async def start(self) -> None:
-        """Initialize stdio streams."""
-        loop = asyncio.get_event_loop()
-        self._reader = asyncio.StreamReader()
-        protocol = asyncio.StreamReaderProtocol(self._reader)
-        await loop.connect_read_pipe(lambda: protocol, sys.stdin)
+        """Initialize."""
+        self._loop = asyncio.get_event_loop()
+        # No special setup needed for executor-based reading
         
-        transport, _ = await loop.connect_write_pipe(
-            asyncio.Protocol, sys.stdout
-        )
-        self._writer = asyncio.StreamWriter(
-            transport, protocol, self._reader, loop
-        )
-    
     async def send(self, message: JSONRPCRequest | JSONRPCResponse | JSONRPCNotification) -> None:
         """Send a message to stdout."""
-        if self._writer is None:
-            raise RuntimeError("Transport not started")
-        
+        # Use sys.stdout.write directly to avoid async pipe issues on Windows
         data = message.model_dump_json() + "\n"
-        self._writer.write(data.encode())
-        await self._writer.drain()
+        sys.stdout.write(data)
+        sys.stdout.flush()
     
     async def receive(self) -> AsyncIterator[dict]:
         """Receive messages from stdin."""
-        if self._reader is None:
-            raise RuntimeError("Transport not started")
-        
+        if not self._loop:
+             self._loop = asyncio.get_event_loop()
+             
         while not self._closed:
             try:
-                line = await self._reader.readline()
+                # Run blocking readline in executor to avoid blocking the loop
+                # and to avoid Windows Proactor pipe issues
+                line = await self._loop.run_in_executor(None, sys.stdin.readline)
+                
                 if not line:
                     break
                 
-                data = json.loads(line.decode().strip())
-                yield data
-            except json.JSONDecodeError:
-                continue
+                line = line.strip()
+                if not line:
+                    continue
+                
+                try:
+                    data = json.loads(line)
+                    yield data
+                except json.JSONDecodeError:
+                    continue
+                    
             except Exception:
                 break
     
     async def close(self) -> None:
         """Close the transport."""
         self._closed = True
-        if self._writer:
-            self._writer.close()
 
 
 class SSETransport(Transport):
@@ -137,3 +133,58 @@ class SSETransport(Transport):
     async def close(self) -> None:
         """Close the transport."""
         self._closed = True
+
+
+class SubprocessTransport(Transport):
+    """
+    Transport for communicating with a local subprocess.
+    """
+    
+    def __init__(self, process: asyncio.subprocess.Process) -> None:
+        self.process = process
+        self._reader = process.stdout
+        self._writer = process.stdin
+        self._closed = False
+        
+    async def send(self, message: JSONRPCRequest | JSONRPCResponse | JSONRPCNotification) -> None:
+        """Send message to subprocess stdin."""
+        if self._closed or not self._writer:
+            raise RuntimeError("Transport is closed")
+            
+        data = message.model_dump_json() + "\n"
+        self._writer.write(data.encode())
+        await self._writer.drain()
+        
+    async def receive(self) -> AsyncIterator[dict]:
+        """Receive messages from subprocess stdout."""
+        if not self._reader:
+            raise RuntimeError("Transport not initialized")
+            
+        while not self._closed:
+            try:
+                line = await self._reader.readline()
+                if not line:
+                    break
+                    
+                line_str = line.decode().strip()
+                if not line_str:
+                    continue
+                    
+                try:
+                    data = json.loads(line_str)
+                    yield data
+                except json.JSONDecodeError:
+                    # Ignore debug output that isn't JSON
+                    pass
+            except Exception:
+                break
+                
+    async def close(self) -> None:
+        """Close the transport."""
+        self._closed = True
+        if self._writer:
+            try:
+                self._writer.close()
+                await self._writer.wait_closed()
+            except Exception:
+                pass

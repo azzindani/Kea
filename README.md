@@ -606,7 +606,44 @@ See **[services/rag_service/README.md](services/rag_service/README.md)** for sch
 
 ---
 
-## 🤖 7. The Robotic Infrastructure (The "Hands")
+## ⚡ 7. The JIT Execution Engine (The Sandbox)
+
+Kea allows for **unsafe code execution** by wrapping it in a secure, ephemeral environment managed by `uv`. This enables the system to "invent" its own tools by writing Python scripts and dependencies on the fly.
+
+### 7.1. Just-In-Time (JIT) dependency Management
+Unlike standard Docker containers with fixed libraries, Kea uses `uv` to dynamically fetch dependencies at runtime without pollution.
+
+*   **Logic:**
+    1.  **Orchestrator** generates a script requiring `yfinance`, `pandas`, `sklearn`.
+    2.  **Mcp Server** receives request: `execute_code(code=..., deps=["yfinance", "pandas"])`.
+    3.  **Isolation:** Server creates a temporary directory ` /tmp/sandbox_{uuid} `.
+    4.  **Execution:** Invokes `uv run --with yfinance --with pandas python script.py`.
+    5.  **Cleanup:** Directory is wiped after execution.
+
+```mermaid
+sequenceDiagram
+    participant Planner as Orchestrator
+    participant Server as Python MCP Server
+    participant UV as uv Package Manager
+    participant Py as Python Process
+
+    Planner->>Server: Execute Code (deps=["yfinance"])
+    Server->>UV: uv run --with yfinance python script.py
+    UV->>UV: Resolve & Cache (0.1s)
+    UV->>Py: Spawn Process (Isolated)
+    Py->>Py: Import yfinance (Success)
+    Py->>Server: Stdout / JSON
+    Server->>Planner: ToolResult
+```
+
+### 7.2. Security Boundaries
+*   **No Network Access:** (Optional) Can be flagged to run with `--offline` for pure logic.
+*   **Timeouts:** Hard kill after 30s.
+*   **Import Restrictions:** Even with JIT, specific dangerous modules (`os.system`, `subprocess`) can be regex-blocked at the source level before execution.
+
+---
+
+## 🤖 8. The Robotic Infrastructure (The "Hands")
 
 To function as a true Deep Research Engine, Kea must navigate the modern, hostile web. It uses a **Stealth Robotic Fleet** to handle scraping, avoiding bans, and reading complex UIs.
 
@@ -627,7 +664,7 @@ To ensure long-term stability and ethical scraping, Kea implements **Domain-Leve
 
 ---
 
-## ⏳ 8. Asynchronous Task Management
+## ⏳ 9. Asynchronous Task Management
 
 Deep research takes time (minutes to hours). A standard HTTP request will timeout. Kea uses an **Event-Driven Architecture**.
 
@@ -643,7 +680,7 @@ Since the process is long, the state must be persisted. We use **LangGraph Check
 
 ---
 
-## 🚢 9. Deployment Strategy
+## 🚢 10. Deployment Strategy
 
 Kea is designed to be **Infrastructure Agnostic**. It runs on a laptop (Colab/Docker) or a cluster (Kubernetes) using the same code base, controlled by Environment Variables.
 
@@ -683,7 +720,7 @@ services:
 
 ---
 
-## 🔌 9. API Interface (The User Layer)
+## 🔌 11. API Interface (The User Layer)
 
 The API follows a **Polymorphic Asynchronous Pattern**.
 
@@ -691,7 +728,7 @@ Please see **[services/api_gateway/README.md](services/api_gateway/README.md)** 
 
 ---
 
-## 🛡️ 10. Roadmap
+## 🛡️ 12. Roadmap
 
 ### ✅ Completed (v1.0 - v3.0)
 - Microservice Architecture, LangGraph cyclic state machine

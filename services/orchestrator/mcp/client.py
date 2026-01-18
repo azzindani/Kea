@@ -108,37 +108,64 @@ class MCPOrchestrator:
         Args:
             server_configs: List of {"name": str, "command": str}
         """
+        from shared.mcp.client import MCPClient
+        from shared.mcp.transport import SubprocessTransport
+        
         for config in server_configs:
             name = config["name"]
             command = config["command"]
             
-            logger.info(f"Starting MCP server: {name}")
+            logger.info(f"Starting MCP server: {name} (cmd: {command})")
             
             try:
-                connection = MCPServerConnection(name=name, command=command)
-                
-                # Start the server process
-                process = subprocess.Popen(
-                    command.split(),
-                    stdin=subprocess.PIPE,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
+                # Use asyncio.create_subprocess_shell for Async pipes
+                process = await asyncio.create_subprocess_shell(
+                    command,
+                    stdin=asyncio.subprocess.PIPE,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
                 )
-                connection.process = process
                 
-                # Create transport and client
-                # Note: In production, we'd use the process's stdin/stdout
-                # For now, we'll use a simplified approach
+                # Check for immediate failure
+                try:
+                    await asyncio.wait_for(process.wait(), timeout=0.5)
+                    if process.returncode is not None:
+                        # Capture stderr
+                        err = await process.stderr.read()
+                        logger.error(f"❌ Server {name} failed immediately (code {process.returncode}): {err.decode()}")
+                        continue
+                except asyncio.TimeoutError:
+                    # Process is running, good.
+                    pass
                 
-                # TODO: Implement proper stdio transport with subprocess
-                # For now, mark as connected and register known tools
-                connection.is_connected = True
+                # Create Transport & Client
+                transport = SubprocessTransport(process)
+                client = MCPClient()
+                
+                # Connect (Initialize handshake)
+                logger.info(f"🔌 Connecting to {name} via stdio...")
+                await client.connect(transport)
+                
+                connection = MCPServerConnection(
+                    name=name, 
+                    command=command,
+                    client=client,
+                    process=process,
+                    is_connected=True
+                )
                 self._servers[name] = connection
                 
-                logger.info(f"Started MCP server: {name}")
+                # Initial Discovery
+                tools = await client.list_tools()
+                connection.tools = tools
+                
+                for tool in tools:
+                    self._tool_registry[tool.name] = name
+                    
+                logger.info(f"✅ Connected to {name}: Discovered {len(tools)} tools")
                 
             except Exception as e:
-                logger.error(f"Failed to start {name}: {e}")
+                logger.error(f"❌ Failed to start/connect {name}: {e}")
     
     async def discover_tools(self) -> list[Tool]:
         """Discover tools from all connected servers."""
@@ -293,9 +320,9 @@ class MCPOrchestrator:
                     # Graceful terminate
                     server.process.terminate()
                     try:
-                        server.process.wait(timeout=5)
+                        await asyncio.wait_for(server.process.wait(), timeout=5)
                         logger.info(f"Gracefully stopped MCP server: {name}")
-                    except subprocess.TimeoutExpired:
+                    except asyncio.TimeoutError:
                         # Force kill
                         logger.warning(f"Force killing hung server: {name}")
                         server.process.kill()

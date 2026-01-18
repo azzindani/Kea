@@ -50,6 +50,11 @@ class PythonServer(MCPServer):
                 "timeout": {
                     "type": "integer",
                     "description": "Execution timeout in seconds (default: 30)"
+                },
+                "dependencies": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of PyPI dependencies to install (e.g. ['pandas', 'yfinance'])"
                 }
             },
             required=["code"]

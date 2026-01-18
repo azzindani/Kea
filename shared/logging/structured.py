@@ -155,7 +155,8 @@ def setup_logging(config: LogConfig | None = None) -> None:
     root_logger.handlers.clear()
     
     # Create handler
-    handler = logging.StreamHandler(sys.stdout)
+    # Create handler
+    handler = logging.StreamHandler(sys.stderr)
     
     # Set formatter based on format type
     if config.format == "json":

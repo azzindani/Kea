@@ -205,43 +205,15 @@ async def researcher_node(state: GraphState) -> GraphState:
     
     # Tool registry for dynamic routing
     # ... [Keep imports and direct_tools definition] ...
-    # Search tools
-    from mcp_servers.search_server.tools.web_search import web_search_tool
+    # Tool registry for dynamic routing
+    # NOTE: We have removed direct imports to enforce "Pure MCP" architecture.
+    # All tools are now discovered dynamically via MCPClient.
     
-    # Scraper tools
-    from mcp_servers.scraper_server.tools.fetch_url import fetch_url_tool
-    
-    # Python execution tools
-    from mcp_servers.python_server.tools.execute_code import execute_code_tool
-    from mcp_servers.python_server.tools.dataframe_ops import dataframe_ops_tool
-    from mcp_servers.python_server.tools.sql_query import sql_query_tool
-    
-    # Crawler tools
-    from mcp_servers.crawler_server.server import web_crawler_tool, sitemap_parser_tool, link_extractor_tool
-    
-    # Browser agent tools
-    from mcp_servers.browser_agent_server.server import human_like_search_tool, source_validator_tool, BrowserAgentServer
-    
-    direct_tools = {
-        "web_search": web_search_tool,
-        "news_search": web_search_tool,
-        "human_search": human_like_search_tool,
-        "scrape_url": fetch_url_tool,
-        "fetch_url": fetch_url_tool,
-        "fetch_data": lambda args: web_search_tool({"query": args.get("query", ""), "max_results": 10}),
-        "web_crawler": web_crawler_tool,
-        "sitemap_parser": sitemap_parser_tool,
-        "link_extractor": link_extractor_tool,
-        "multi_browse": lambda args: BrowserAgentServer()._handle_multi_browse(args),
-        "source_validator": source_validator_tool,
-        "dataframe_ops": dataframe_ops_tool,
-        "sql_query": sql_query_tool,
-        "run_python": execute_code_tool,
-        "execute_code": execute_code_tool,
-        "analyze_data": dataframe_ops_tool,
-        "parse_document": execute_code_tool,
-        # Map build_graph to simple python analysis if not available
-        "build_graph": lambda args: execute_code_tool({"code": f"# Building graph for: {args.get('query', '')}\nprint('Graph built successfully.')"}),
+    # Local handlers for composite functionality (Orchestrator-side logic)
+    local_handlers = {
+        "fetch_data": lambda args: smart_fetch_data(args),
+        "build_graph": lambda args: mcp_client.call_tool("execute_code", {"code": f"# Building graph for: {args.get('query', '')}\nprint('Graph built successfully.')"}),
+        "multi_browse": lambda args: mcp_client.call_tool("multi_browse", args), # Assuming this moves to an MCP server eventually
     }
     
     def build_tool_inputs(tool_name: str, description: str, original_inputs: dict, collected_facts: list = None) -> dict:
@@ -306,12 +278,18 @@ async def researcher_node(state: GraphState) -> GraphState:
 
     # 2. Unified Tool Handler
     async def unified_tool_handler(name: str, args: dict) -> Any:
-        if use_direct and name in direct_tools:
-            return await direct_tools[name](args)
-        elif not use_direct:
-            return await mcp_client.call_tool(name, args)
-        else:
-            raise ValueError(f"Tool {name} not available")
+        # Check local handlers first (Composite Tools)
+        if name in local_handlers:
+            return await local_handlers[name](args)
+            
+        # Default to MCP Pure Routing
+        # Use mcp_client to find and execute the tool on the appropriate server
+        try:
+            result = await mcp_client.call_tool(name, args)
+            return result
+        except Exception as e:
+            logger.error(f"Tool execution failed: {e}")
+            raise ValueError(f"Tool {name} failed: {e}")
 
     # 3. Parallel Execution Loop
     completed = {inv["task_id"] for inv in tool_invocations if inv.get("success")}
@@ -703,3 +681,127 @@ def compile_research_graph():
     """Compile the research graph for execution."""
     graph = build_research_graph()
     return graph.compile()
+
+
+async def smart_fetch_data(args: dict) -> Any:
+    # JIT-Enabled Data Fetcher
+    query = args.get("query", "")
+    
+    # 1. AUTONOMOUS SEARCH: Find the data source URL first
+    # We define a search query to find a list of companies
+    discovery_query = f"list of companies listed on {query} stock exchange wikipedia"
+    logger.info(f"🔍 Web Search for Data Source: '{discovery_query}'")
+    
+    wiki_url = "https://en.wikipedia.org/wiki/LQ45" # Default fallback
+    try:
+        search_args = {"query": discovery_query, "max_results": 3}
+        # Use MCP Client for search
+        mcp_client = get_mcp_orchestrator()
+        search_results = await mcp_client.call_tool("web_search", search_args)
+        
+        # Simple heuristic to find a Wikipedia URL
+        search_text = str(search_results)
+        import re
+        match = re.search(r'(https://[a-z]+\.wikipedia\.org/wiki/[^\s\)\"]+)', search_text)
+        if match:
+            wiki_url = match.group(0)
+            logger.info(f"✅ Discovered Data Source: {wiki_url}")
+        else:
+            logger.warning(f"⚠️ Could not extract Wiki URL from search. Defaulting manually to LQ45 one.")
+    except Exception as e:
+        logger.error(f"❌ Discovery Search Failed: {e}")
+
+    # 2. Dynamic Script Generation with DISCOVERED URL
+    # NOTE: We use raw imports because we are running in a JIT 'uv' environment
+    code = f"""
+import pandas as pd
+import yfinance as yf
+import requests
+
+def get_tickers():
+    source_url = "{wiki_url}"
+    print(f"🔍 Scraping tickers from discovered source: {{source_url}}")
+    tickers = []
+    
+    try:
+        # Robust Scrape
+        import html5lib 
+        tables = pd.read_html(source_url)
+        
+        # Smart Column Detection
+        for df in tables:
+            # Normalize cols
+            cols = [str(c).upper() for c in df.columns]
+            
+            target_col = None
+            for c in df.columns:
+                c_up = str(c).upper()
+                if "CODE" in c_up or "SYMBOL" in c_up or "TICKER" in c_up:
+                    target_col = c
+                    break
+            
+            if target_col:
+                # Valid table found
+                raw_tickers = df[target_col].tolist()
+                suffix = ".JK" if "Indonesia" in "{query}" or "IDX" in "{query}" or "LQ45" in source_url else ""
+                
+                tickers = [f"{{str(t).strip()}}{{suffix}}" for t in raw_tickers if isinstance(t, str)]
+                print(f"   ✅ Found {{len(tickers)}} tickers in table columns: {{df.columns.tolist()}}")
+                break
+                
+        if not tickers:
+            print("   ⚠️ No ticker column found in any table.")
+            try:
+                print("   🔄 Falling back to GitHub raw CSV...")
+                url = "https://raw.githubusercontent.com/goapi-io/idx-companies/main/companies.csv"
+                df_gh = pd.read_csv(url)
+                tickers = [f"{{t}}.JK" for t in df_gh.iloc[:, 0].tolist()[:50]]
+                print(f"   ✅ Discovered {{len(tickers)}} tickers from GitHub Fallback")
+            except:
+                pass
+            
+    except Exception as e:
+        print(f"Discovery error: {{e}}")
+        tickers = []
+        
+    return tickers
+
+# Main Execution
+try:
+    targets = get_tickers()
+    if not targets:
+        print("No tickers found from source.")
+    else:
+        print(f"📊 Fetching data for {{len(targets)}} companies...")
+        
+        results = []
+        for t in targets[:20]: 
+            try:
+                stock = yf.Ticker(t)
+                info = stock.info
+                results.append({{
+                    "Ticker": t,
+                    "Market Cap (IDR T)": round((info.get("marketCap", 0) or 0) / 1_000_000_000_000, 2),
+                    "PE Ratio": round(info.get("trailingPE", 999) or 999, 2),
+                    "Revenue Growth (%)": round((info.get("revenueGrowth", 0) or 0) * 100, 2),
+                    "Sector": info.get("sector", "Unknown"),
+                    "Price": info.get("currentPrice", 0)
+                }})
+                print(f"   ✅ Fetched {{t}}")
+            except Exception as e:
+                print(f"   ❌ Failed {{t}}: {{e}}")
+                
+        df = pd.DataFrame(results)
+        print("\\nDATA_START")
+        print(df.to_markdown(index=False))
+        print("DATA_END")
+        
+except Exception as e:
+    print(f"Script Error: {{e}}")
+"""
+    # Call execute_code_tool with JIT dependencies via MCP Client
+    mcp_client = get_mcp_orchestrator()
+    return await mcp_client.call_tool("execute_code", {
+        "code": code, 
+        "dependencies": ["yfinance", "pandas", "requests", "html5lib", "lxml", "tabulate"]
+    })
