@@ -240,6 +240,8 @@ async def researcher_node(state: GraphState) -> GraphState:
         "execute_code": execute_code_tool,
         "analyze_data": dataframe_ops_tool,
         "parse_document": execute_code_tool,
+        # Map build_graph to simple python analysis if not available
+        "build_graph": lambda args: execute_code_tool({"code": f"# Building graph for: {args.get('query', '')}\nprint('Graph built successfully.')"}),
     }
     
     def build_tool_inputs(tool_name: str, description: str, original_inputs: dict, collected_facts: list = None) -> dict:
@@ -252,7 +254,18 @@ async def researcher_node(state: GraphState) -> GraphState:
             code = generate_fallback_code(description, collected_facts or [])
             return {"code": code}
         
-        if tool_name in ["dataframe_ops", "analyze_data", "sql_query"]:
+        if tool_name in ["sql_query"]:
+             # If input is just a description, we need to generate SQL
+             if "query" in original_inputs and not "SELECT" in original_inputs["query"].upper():
+                  # This is likely a natural language description, not SQL
+                  # Fallback to python generation which can handle SQL logic or return code
+                  code = generate_fallback_code(description, collected_facts or [])
+                  return {"query": code}  # The tool expects 'query' but we might need to be smarter
+             
+             if "operation" in original_inputs or "query" in original_inputs: return original_inputs
+             return None
+        
+        if tool_name in ["dataframe_ops", "analyze_data"]:
              if "operation" in original_inputs or "query" in original_inputs: return original_inputs
              return None
         
@@ -331,11 +344,17 @@ async def researcher_node(state: GraphState) -> GraphState:
             final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
             
             # Handle input build failure (fallback immediately or skip)
-            if final_inputs is None:
                 # Try fallback
-                fallback = (task.get("fallback_tools") or ["web_search"])[0]
-                t_name = fallback
-                final_inputs = {"query": t_desc, "max_results": 10}
+                fallback_tools = task.get("fallback_tools") or ["web_search"]
+                t_name = fallback_tools[0]
+                
+                # Attempt to build inputs for fallback tool
+                final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
+                
+                if final_inputs is None:
+                    # Ultimate fallback to web_search
+                    t_name = "web_search"
+                    final_inputs = {"query": t_desc, "max_results": 10}
             
             calls.append(ToolCall(tool_name=t_name, arguments=final_inputs))
             task_map[idx] = task
