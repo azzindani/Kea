@@ -256,6 +256,8 @@ class StressTestRunner:
         start_time = time.time()
         last_status = None
         
+        print(f"Waiting for job {job_id} to complete (Timeout: {JOB_TIMEOUT}s)...")
+        
         while True:
             elapsed = time.time() - start_time
             if elapsed > JOB_TIMEOUT:
@@ -264,17 +266,20 @@ class StressTestRunner:
             response = await self.api_client.get(f"/api/v1/jobs/{job_id}")
             status_data = response.json()
             current_status = status_data["status"]
+            progress = status_data.get('progress', 0)
             
-            if current_status != last_status:
-                logger.info(f"Job status: {current_status} (progress: {status_data.get('progress', 0):.0%})")
-                last_status = current_status
+            # Print status update every poll
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            print(f"[{timestamp}] Status: {current_status.upper()} | Progress: {progress:.1%} | Elapsed: {elapsed:.1f}s")
             
             if current_status == "completed":
                 break
             elif current_status == "failed":
                 error = status_data.get("error", "Unknown error")
+                print(f"[{timestamp}] ❌ JOB FAILED: {error}")
                 raise Exception(f"Job failed: {error}")
             elif current_status == "cancelled":
+                print(f"[{timestamp}] ⚠️ JOB CANCELLED")
                 raise Exception("Job was cancelled")
             
             await asyncio.sleep(JOB_POLL_INTERVAL)
@@ -290,30 +295,30 @@ class StressTestRunner:
         # ============================================================
         # PRINT FULL RESULTS
         # ============================================================
-        logger.info("")
-        logger.info("="*70)
-        logger.info("FINAL REPORT")
-        logger.info("="*70)
+        print("")
+        print("="*70)
+        print("FINAL REPORT")
+        print("="*70)
         
         # Print the actual report content
         if result.get("report"):
             content = result["report"]
-            logger.info(f"\n{content}\n")
+            print(f"\n{content}\n")
         
         # Print confidence
         confidence = result.get("confidence", 0.0)
-        logger.info(f"CONFIDENCE: {confidence:.0%}")
+        print(f"CONFIDENCE: {confidence:.0%}")
         
         # Print sources count
         sources_count = result.get("sources_count", 0)
-        logger.info(f"SOURCES: {sources_count} total")
+        print(f"SOURCES: {sources_count} total")
         
         # Print facts count
         facts_count = result.get("facts_count", 0)
-        logger.info(f"FACTS EXTRACTED: {facts_count} total")
+        print(f"FACTS EXTRACTED: {facts_count} total")
         
-        logger.info("="*70)
-        logger.info("")
+        print("="*70)
+        print("")
         
         # Track metrics from result
         # Estimate LLM calls based on typical pipeline: router + planner + generator + critic + judge
