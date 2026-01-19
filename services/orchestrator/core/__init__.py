@@ -19,10 +19,7 @@ from services.orchestrator.core.graph import (
     GraphState,
     compile_research_graph,
 )
-from services.orchestrator.core.checkpointing import (
-    CheckpointStore,
-    get_checkpoint_store,
-)
+
 from services.orchestrator.core.degradation import (
     GracefulDegrader,
     DegradationLevel,
@@ -70,15 +67,7 @@ from services.orchestrator.core.curiosity import (
     Fact,
     get_curiosity_engine,
 )
-from services.orchestrator.core.guards import (
-    ResourceGuard,
-    RateLimiter,
-    get_resource_guard,
-)
-from services.orchestrator.core.kill_switch import (
-    KillSwitch,
-    get_kill_switch,
-)
+
 # v3.0 Enterprise Kernel
 from services.orchestrator.core.organization import (
     Organization,
@@ -97,21 +86,8 @@ from services.orchestrator.core.work_unit import (
     Priority,
     get_work_board,
 )
-from services.orchestrator.core.messaging import (
-    Message,
-    MessageBus,
-    MessageType,
-    get_message_bus,
-)
-from services.orchestrator.core.supervisor import (
-    Supervisor,
-    QualityGate,
-    ReviewResult,
-    HealthReport,
-    Escalation,
-    EscalationType,
-    get_supervisor,
-)
+
+
 # v4.0 Kernel Improvements
 from services.orchestrator.core.query_classifier import (
     QueryType,
@@ -138,7 +114,7 @@ from services.orchestrator.core.modality_security import (
     get_modality_validator,
     get_url_validator,
 )
-from services.orchestrator.core.audit_trail import (
+from services.vault.core.audit_trail import (
     AuditEventType,
     AuditEntry,
     AuditTrail,
@@ -153,15 +129,7 @@ from services.orchestrator.core.context_cache import (
     get_semantic_cache,
     configure_cache,
 )
-from services.orchestrator.core.compliance import (
-    ComplianceStandard,
-    ComplianceEngine,
-    ComplianceReport,
-    ProceduralAgent,
-    Procedure,
-    get_compliance_engine,
-    get_procedural_agent,
-)
+
 from services.orchestrator.core.approval_workflow import (
     ApprovalType,
     ApprovalStatus,
@@ -174,13 +142,7 @@ from services.orchestrator.core.approval_workflow import (
     configure_hitl,
 )
 
-__all__ = [
-    # Graph
-    "GraphState",
-    "compile_research_graph",
-    # Checkpointing
-    "CheckpointStore",
-    "get_checkpoint_store",
+
     # Degradation
     "GracefulDegrader",
     "DegradationLevel",
@@ -222,13 +184,7 @@ __all__ = [
     "QuestionType",
     "Fact",
     "get_curiosity_engine",
-    # Guards (Security)
-    "ResourceGuard",
-    "RateLimiter",
-    "get_resource_guard",
-    # Kill Switch (Emergency Controls)
-    "KillSwitch",
-    "get_kill_switch",
+
     # v3.0 Organization
     "Organization",
     "Department",
@@ -244,19 +200,9 @@ __all__ = [
     "WorkStatus",
     "Priority",
     "get_work_board",
-    # v3.0 Messaging
-    "Message",
-    "MessageBus",
-    "MessageType",
-    "get_message_bus",
+
     # v3.0 Supervisor
-    "Supervisor",
-    "QualityGate",
-    "ReviewResult",
-    "HealthReport",
-    "Escalation",
-    "EscalationType",
-    "get_supervisor",
+
     # v4.0 Query Classifier
     "QueryType",
     "QueryClassifier",
@@ -293,13 +239,7 @@ __all__ = [
     "get_semantic_cache",
     "configure_cache",
     # v4.0 Compliance
-    "ComplianceStandard",
-    "ComplianceEngine",
-    "ComplianceReport",
-    "ProceduralAgent",
-    "Procedure",
-    "get_compliance_engine",
-    "get_procedural_agent",
+
     # v4.0 Approval Workflow (HITL)
     "ApprovalType",
     "ApprovalStatus",

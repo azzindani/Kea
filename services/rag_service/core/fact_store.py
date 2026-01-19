@@ -12,7 +12,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from services.rag_service.core.vector_store import VectorStore, Document, create_vector_store
+from services.vault.core.vector_store import VectorStore, Document, create_vector_store
 from shared.schemas import AtomicFact
 from shared.logging import get_logger
 

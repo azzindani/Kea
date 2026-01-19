@@ -15,8 +15,10 @@ from pydantic import BaseModel
 from shared.logging import get_logger
 
 
+from shared.service_registry import ServiceRegistry, ServiceName
+
 # Orchestrator URL for API calls
-ORCHESTRATOR_URL = "http://localhost:8000"
+ORCHESTRATOR_URL = ServiceRegistry.get_url(ServiceName.ORCHESTRATOR)
 
 
 logger = get_logger(__name__)

@@ -11,7 +11,7 @@ import asyncio
 
 import asyncpg
 
-from services.orchestrator.core.audit_trail import AuditBackend, AuditEntry, AuditEventType
+from services.vault.core.audit_trail import AuditBackend, AuditEntry, AuditEventType
 from shared.logging import get_logger
 
 logger = get_logger(__name__)

@@ -14,7 +14,7 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field
 
 from services.orchestrator.core.graph import compile_research_graph, GraphState
-from services.orchestrator.mcp.client import get_mcp_orchestrator
+from services.mcp_host.core.tool_manager import get_mcp_orchestrator
 from shared.config import get_settings
 from shared.logging import get_logger
 from shared.logging.middleware import RequestLoggingMiddleware
@@ -40,8 +40,8 @@ async def lifespan(app: FastAPI):
     # Initialize Enterprise Subsystems
     # =========================================================================
     try:
-        from services.orchestrator.core.audit_trail import configure_audit_trail, SQLiteBackend
-        from services.orchestrator.core.compliance import get_compliance_engine
+        from services.vault.core.audit_trail import configure_audit_trail, SQLiteBackend
+        from services.swarm_manager.core.compliance import get_compliance_engine
         
         # 1. Audit Trail (Black Box)
         # Ensure data directory exists
@@ -236,6 +236,69 @@ async def call_tool(tool_name: str, arguments: dict[str, Any]):
 
 
 # ============================================================================
+# Pipeline Endpoint (Chat)
+# ============================================================================
+
+class ChatMessageRequest(BaseModel):
+    conversation_id: str
+    content: str
+    user_id: str
+    attachments: list[str] = []
+
+@app.post("/chat/message")
+async def process_chat_message(request: ChatMessageRequest):
+    """
+    Process a chat message through the research pipeline.
+    
+    This endpoint:
+    1. Classifies the query
+    2. Checks cache
+    3. Runs research graph if needed
+    4. Logs to audit trail
+    5. Returns the result (content, sources, etc.)
+    """
+    from services.orchestrator.core.pipeline import get_research_pipeline
+    
+    try:
+        pipeline = await get_research_pipeline()
+        
+        # Note: pipeline.process_message does NOT store to DB if called directly.
+        # But pipeline.process_and_store DOES.
+        # However, Gateway's conversation route typically adds the User message first,
+        # then expects the Assistant message to be generated.
+        # If we use process_message, we just get the result, and Gateway can save the Assistant message.
+        # OR we let Orchestrator save it.
+        # Let's check conversations.py again.
+        # conversations.py: adds User msg, then calls pipeline.process_message, then adds Assistant msg.
+        # So we should return the Result, and let Gateway save the Assistant msg (or Orchestrator).
+        # To keep Gateway as the "Interface Layer", it handles DB interaction for the conversation view.
+        # Orchestrator provides the "Result".
+        
+        result = await pipeline.process_message(
+            conversation_id=request.conversation_id,
+            content=request.content,
+            user_id=request.user_id,
+            attachments=request.attachments,
+        )
+        
+        return {
+            "content": result.content,
+            "confidence": result.confidence,
+            "sources": result.sources,
+            "tool_calls": result.tool_calls,
+            "facts": result.facts,
+            "duration_ms": result.duration_ms,
+            "query_type": result.query_type,
+            "was_cached": result.was_cached,
+        }
+        
+    except Exception as e:
+        logger.error(f"Pipeline processing failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+# ============================================================================
 # Streaming Endpoints (SSE)
 # ============================================================================
 
@@ -375,10 +438,12 @@ def main():
     
     settings = get_settings()
     
+    from shared.service_registry import ServiceRegistry, ServiceName
+    
     uvicorn.run(
         "services.orchestrator.main:app",
         host=settings.api_host,
-        port=settings.api_port,
+        port=ServiceRegistry.get_port(ServiceName.ORCHESTRATOR),
         reload=False, 
         loop="asyncio",
     )

@@ -77,11 +77,39 @@ class ConversationResearchPipeline:
         # Audit trail
         if is_feature_enabled("audit_trail"):
             try:
-                from services.orchestrator.core.audit_trail import get_audit_trail
-                self._audit = get_audit_trail()
-                logger.debug("Audit trail enabled")
-            except ImportError:
-                logger.warning("Audit trail not available")
+                from shared.service_registry import ServiceRegistry, ServiceName
+                vault_url = ServiceRegistry.get_url(ServiceName.VAULT)
+                
+                class AuditApiClient:
+                    def __init__(self, url):
+                        self.url = url
+                        
+                    async def log(self, event_type, action, actor="system", resource="", details=None, parent_id="", session_id=""):
+                        try:
+                            import httpx
+                            # Map event_type to string if it is an enum
+                            et = event_type.value if hasattr(event_type, 'value') else str(event_type)
+                            
+                            async with httpx.AsyncClient(timeout=2.0) as client:
+                                # Fire and forget-ish, or wait? Pipeline awaits it.
+                                await client.post(
+                                    f"{self.url}/audit/logs",
+                                    json={
+                                        "event_type": et,
+                                        "action": action,
+                                        "actor": actor,
+                                        "resource": resource,
+                                        "details": details or {},
+                                        "session_id": session_id,
+                                    }
+                                )
+                        except Exception as e:
+                            logger.warning(f"Failed to send audit log: {e}")
+                            
+                self._audit = AuditApiClient(vault_url)
+                logger.debug("Audit trail enabled (Remote Vault)")
+            except Exception as e:
+                logger.warning(f"Audit trail setup failed: {e}")
         
         # Research graph
         try:

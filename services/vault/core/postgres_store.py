@@ -15,7 +15,7 @@ from typing import Any
 import asyncpg
 from pgvector.asyncpg import register_vector
 
-from services.rag_service.core.vector_store import VectorStore, Document, SearchResult
+from services.vault.core.vector_store import VectorStore, Document, SearchResult
 from shared.logging import get_logger
 
 logger = get_logger(__name__)

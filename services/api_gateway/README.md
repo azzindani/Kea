@@ -15,22 +15,20 @@ The Gateway implements a **4-Layer Architecture** to ensure security and scalabi
 
 ```mermaid
 graph TD
-    User((User)) -->|HTTP/REST| Gateway[API Gateway]
+    User((User)) -->|HTTP/REST| Gateway[API Gateway (Port 8000)]
     
     subgraph Layers
         Gateway --> Auth[Identity & Security]
         Auth --> Router{Route Dispatcher}
         
-        Router -->|Chat| Conversations[Cognitive Pipeline]
-        Router -->|Research| Jobs[Job Orchestrator]
-        Router -->|Control| Interventions[HITL Manager]
-        Router -->|Tools| MCP[MCP Tool Proxy]
-        Router -->|Data| Graph[Knowledge Graph]
+        Router -->|/chat/message| Orch[Orchestrator<br/>(Port 8001)]
+        Router -->|/tools/call| MCP[MCP Host<br/>(Port 8002)]
+        Router -->|/audit/logs| Vault[Vault Service<br/>(Port 8004)]
+        Router -->|/jobs| Chronos[Chronos Service<br/>(Port 8006)]
     end
     
-    Conversations -->|Trigger| Planner
-    Jobs -->|Push| Redis[Redis Queue]
-    Interventions -->|Pause| StateMachine
+    Orch -->|Trigger| Planner
+    Chronos -->|Schedule| Redis[Redis Queue]
 ```
 
 ---
@@ -40,15 +38,15 @@ graph TD
 | File / Directory | Component | Description | Key Functions/Classes |
 |:-----------------|:----------|:------------|:----------------------|
 | **`main.py`** | **Entry Point** | App configuration, middleware assembly, and router verification. | `create_app()`, `mount_routes()` |
-| **`routes/`** | **Route Modules** | Domain-specific request handlers. | |
-| ├── `jobs.py` | Orchestration | Manages long-running research tasks via Redis/BackgroundTasks. | `create_job()`, `get_job_status()` |
-| ├── `conversations.py` | Cognitive Logic | **The Core Brain.** Handles chat messages, context, and triggers the Research Pipeline. | `send_message()`, `search_conversations()` |
-| ├── `interventions.py` | HITL | "Stop-and-Wait" logic for human approval of agent actions. | `respond_to_intervention()`, `list_pending()` |
-| ├── `mcp.py` | Tooling | Direct interface to the 17 MCP Servers for testing/bypassing agents. | `invoke_tool()`, `list_servers()` |
-| ├── `llm.py` | AI Proxy | Internal gateway for LLM switching, usage tracking, and cost calculation. | `generate()`, `enable_provider()` |
-| ├── `auth.py` | Identity | User registration, login, and JWT token issuance. | `login()`, `register()`, `refresh_token()` |
-| ├── `graph.py` | Memory | API for exploring the Knowledge Graph and Provenance chains. | `get_entity_provenance()`, `find_contradictions()` |
-| └── `artifacts.py` | Storage | Blob storage for large research outputs (PDFs, Parquet). | `upload_artifact()`, `download_artifact()` |
+| **`routes/`** | **Route Modules** | Delegates requests to upstream microservices. | |
+| ├── `jobs.py` | Orchestration | Proxies job triggers to **Chronos** (Port 8006). | `create_job()` → `cron.schedule()` |
+| ├── `conversations.py` | Cognitive Logic | Proxies chat to **Orchestrator** (Port 8001). | `send_message()` → `orch.process()` |
+| ├── `interventions.py` | HITL | Manages checks via **Swarm** (Port 8005). | `list_interventions()` |
+| ├── `mcp.py` | Tooling | Proxies tool calls to **MCP Host** (Port 8002). | `invoke_tool()` → `host.call_tool()` |
+| ├── `llm.py` | AI Proxy | Internal gateway for LLM switching. | `generate()` |
+| ├── `auth.py` | Identity | Handles JWT locally (Gateway is the Auth authority). | `login()`, `register()` |
+| ├── `graph.py` | Memory | Proxies graph queries to **Vault** (Port 8004). | `get_entity_provenance()` |
+| └── `artifacts.py` | Storage | Manages uploads/downloads via **Vault/S3**. | `upload_artifact()` |
 | **`middleware/`** | **Middleware** | Cross-cutting concerns. | `RateLimitMiddleware`, `AuthMiddleware` |
 
 ---

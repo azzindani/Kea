@@ -25,32 +25,37 @@ Kea v3.3 introduces a **Persistent Tool Registry** to handle large-scale tool ec
 
 ### MCP Architecture Overview
 **"Pure MCP" & JIT Execution**:
-Kea uses a **Pure MCP** architecture. The Orchestrator has *zero* tool code dependencies.
+Kea uses a **Pure MCP** architecture. The Orchestrator has *zero* tool code dependencies and delegates all execution to the **MCP Host Service**.
 - **JIT (Just-In-Time)**: Tools are ephemeral. When a tool is called, Kea uses `uv` to spawn a pristine environment with exact dependencies.
 - **Registry-First**: The Orchestrator discovers tools via the `PersistentToolRegistry` (SQLite), ensuring it can handle 1,000+ tools without bloating prompt context.
 
 ```mermaid
-graph TD
-    Orchestrator["Orchestrator (The Brain)<br/>(services/orchestrator)"]
-    Registry["Jarvis Tool Registry<br/>(SQLite + Vector Search)"]
-    Router["Parallel Dispatcher<br/>(services/orchestrator/mcp/parallel_executor.py)"]
+sequenceDiagram
+    participant Planner as Orchestrator (Brain)
+    participant Registry as Jarvis Registry (SQLite)
+    participant Host as MCP Host (Hands)
+    participant Tool as Ephemeral Tool (Process)
+
+    Note over Planner, Registry: Phase 1: Discovery
+    Planner->>Registry: Search("Analyze mining data")
+    Registry-->>Planner: Returns [Scraper, Python, Analysis] Schemas
     
-    Orchestrator <--> Registry
-    Orchestrator --> Router
+    Note over Planner, Host: Phase 2: Execution
+    Planner->>Planner: Select Tool: Scraper
+    Planner->>Host: POST /tools/call (Tool="Scraper", Args={...})
     
-    subgraph "Ephemeral Tool Swarm (JIT via uv)"
-        S1["scraper_server"]
-        S2["search_server"]
-        S3["python_server"]
-        S4["visualization_server"]
-        S_More["...12 others..."]
-    end
+    Host->>Registry: Get Config (Image, Envs, Dependencies)
+    Registry-->>Host: {cmd: "uv run...", env: {...}}
     
-    Router --> S1
-    Router --> S2
-    Router --> S3
-    Router --> S4
-    Router --> S_More
+    Note over Host, Tool: Phase 3: JIT Spawning
+    Host->>Tool: uv run --with playright python server.py
+    Tool-->>Host: JSON-RPC Ready
+    Host->>Tool: Execute(Args)
+    
+    Tool-->>Host: Stream Progress...
+    Tool-->>Host: Return Result
+    
+    Host-->>Planner: Final ToolResult
 ```
 
 
@@ -80,24 +85,43 @@ python tests/stress/stress_test.py --query=21 --concurrent
 python tests/stress/stress_test.py --query=21 --concurrent
 ```
 
-### 2. Manual Start (Split-Port Architecture)
-If you need to run services individually:
+### 2. Manual Start (Fractal Microservices)
+If you need to run services individually, use the following commands. Note that `API_PORT` is no longer used; ports are managed by `shared.service_registry`.
 
-**Orchestrator (Port 8002)**
+**API Gateway (Port 8000)**
 ```bash
-$env:API_PORT=8002; python -m services.orchestrator.main
+python -m services.api_gateway.main
 ```
 
-**API Gateway (Port 8080)**
+**Orchestrator (Port 8001)**
 ```bash
-$env:API_PORT=8080; $env:ORCHESTRATOR_URL="http://localhost:8002"; python -m services.api_gateway.main
+python -m services.orchestrator.main
+```
+
+**MCP Host (Port 8002)**
+```bash
+python -m services.mcp_host.main
+```
+
+**Vault (Port 8004)**
+```bash
+python -m services.vault.main
+```
+
+**Swarm Manager (Port 8005)**
+```bash
+python -m services.swarm_manager.main
 ```
 
 ### Key TCP Ports
 | Service | Port | Description |
 |:--------|:-----|:------------|
-| **Orchestrator** | `8002` | Reasoning Engine + MCP Host |
-| **API Gateway** | `8080` | External API & Auth |
+| **API Gateway** | `8000` | Public Entrypoint (Auth & Routing) |
+| **Orchestrator** | `8001` | Research & Reasoning Engine |
+| **MCP Host** | `8002` | Tool Execution Host |
+| **Vault** | `8004` | Audit & Memory Storage |
+| **Swarm Manager** | `8005` | Compliance & Governance |
+| **Chronos** | `8006` | Scheduling & Time |
 | **Python MCP** | `Stdio` | Subprocess (No Port) |
 
 
@@ -189,27 +213,40 @@ roles:
 kea/
 ├── 📁 services/                                # Microservices (The Core)
 │   │
-│   ├── 📁 orchestrator/                        # [BRAIN] Main Orchestrator
-│   │   ├── README.md                           # 📖 Deployment & Architecture Guide
-│   │   ├── main.py                             # FastAPI entrypoint
-│   │   ├── 📁 core/                            # Core Research Pipeline
-│   │   │   ├── tool_registry.py                # 🧠 [NEW] Persistent Tool DB (SQLite+Vector)
-│   │   │   └── ...
-│   │   ├── 📁 mcp/                             # MCP Client Implementation
-│   │   ├── 📁 nodes/                           # LangGraph Nodes
-│   │   └── 📁 agents/                          # Consensus Agents
+│   ├── 📁 orchestrator/                        # [BRAIN] Main Orchestrator (Reasoning & Planning)
+│   │   ├── README.md                           # 📖 Service Documentation
+│   │   ├── main.py                             # FastAPI entrypoint (Port 8001)
+│   │   ├── 📁 core/                            # Graph Logic & Pipeline
+│   │   └── 📁 nodes/                           # LangGraph Nodes
 │   │
-│   ├── 📁 rag_service/                         # [MEMORY] Vector & Artifact Vault
-│   │   ├── README.md                           # 📖 Schema & Retrieval Guide
-│   │   ├── main.py                             # API entrypoint
-│   │   └── 📁 core/
-│   │       ├── vector_store.py                 # Qdrant abstraction
-│   │       └── artifact_store.py               # Blob storage
+│   ├── 📁 api_gateway/                         # [DOOR] API Gateway (Routing & Auth)
+│   │   ├── README.md                           # 📖 Service Documentation
+│   │   ├── main.py                             # Entrypoint (Port 8000)
+│   │   └── 📁 routes/                          # Route definitions
 │   │
-│   └── 📁 api_gateway/                         # [DOOR] API & Async Queue
-│       ├── README.md                           # 📖 API Routes & Middleware Guide
-│       ├── main.py                             # Gateway entrypoint
-│       └── 📁 routes/                          # 8 route modules
+│   ├── 📁 mcp_host/                            # [HANDS] MCP Tool Host (Execution)
+│   │   ├── README.md                           # 📖 Service Documentation
+│   │   ├── main.py                             # Entrypoint (Port 8002)
+│   │   └── 📁 core/                            # Tool Manager & Parallel Executor
+│   │
+│   ├── 📁 vault/                               # [MEMORY] The Vault (Storage & Audit)
+│   │   ├── README.md                           # 📖 Service Documentation
+│   │   ├── main.py                             # Entrypoint (Port 8004)
+│   │   └── 📁 core/                            # Vector Store, Audit Trail, Checkpoints
+│   │
+│   ├── 📁 swarm_manager/                       # [CONSCIENCE] Governance & Oversight
+│   │   ├── README.md                           # 📖 Service Documentation
+│   │   ├── main.py                             # Entrypoint (Port 8005)
+│   │   └── 📁 core/                            # Compliance, Guards, Supervisor
+│   │
+│   ├── 📁 chronos/                             # [TIME] Chronos (Scheduling & Time)
+│   │   ├── README.md                           # 📖 Service Documentation
+│   │   ├── main.py                             # Entrypoint (Port 8006)
+│   │   └── 📁 core/                            # Job Scheduling logic
+│   │
+│   └── 📁 shared/                              # [COMMON] Shared Utilities
+│       ├── service_registry.py                 # 🕸️ Service Discovery & Ports
+│       └── ...
 │
 ├── 📁 mcp_servers/                             # [TOOLS] 17 MCP Tool Servers
 │   ├── README.md                               # 📖 Tool Catalog
@@ -386,47 +423,120 @@ It separates **Reasoning** (The Brain/LLM) from **Execution** (The Muscle/Python
 
 ---
 
-## 🗺️ 1. The General Architecture (High-Level Map)
+## 🗺️ 1. The General Architecture (Fractal Corp - 7 Services)
 
-The system follows a **Hub-and-Spoke Microservices Pattern**. The central Orchestrator manages the lifecycle of a request, delegating work to specialized, isolated services via gRPC/REST.
+The system follows a **Fractal Microservices Architecture**, dividing cognition into distinct functional areas. This "Split-Brain" design ensures separation of concerns between Reasoning, Execution, Memory, and Oversight.
 
 ```mermaid
 graph TD
-    User[User / API] -->|HTTP| Gateway["API Gateway<br/>(Port 8080)"]
-    Gateway -->|HTTP/REST| Router{"Intention Router<br/>(Port 8002)"}
+    %% -- External World --
+    User[User / Client] -->|HTTP/1.1 REST| Gateway
     
-    subgraph "Orchestrator Service (Port 8002)"
-        Router -->|Simple| FastRAG["Fast RAG Memory"]
-        Router -->|Methodology| Provenance[Provenance Graph]
-        Router -->|Deep Research| Orchestrator["Main Orchestrator"]
+    %% -- INTERFACE LAYER --
+    subgraph "API Gateway Service (Port 8000)"
+        Gateway[FastAPI App]
+        Auth[Auth Middleware]
+        Limiter[Rate Limiter]
+        Gateway --> Auth --> Limiter
+    end
+    
+    %% -- COGNITIVE LAYER (The Brain) --
+    subgraph "Orchestrator Service (Port 8001)"
+        OrchAPI[FastAPI Endpoint]
         
-        Orchestrator --> Planner["Planner"]
-        Planner <--> Registry[("Jarvis Tool DB<br/>(SQLite/Vector)")]
-        Planner --> Keeper["Keeper"]
-        Keeper --> Divergence["Divergence Engine"]
-        Divergence --> Synthesizer["Synthesizer"]
+        subgraph "LangGraph State Machine"
+            Planner[Planner Node]
+            Researcher[Researcher Node]
+            Keeper[Keeper Node]
+            Synthesizer[Synthesizer Node]
+        end
+        
+        OrchAPI --> Planner
+        Planner --> Researcher
+        Researcher --> Keeper
+        Keeper --"Refine"--> Researcher
+        Keeper --"Approved"--> Synthesizer
     end
     
-    subgraph "MCP Tool Layer (Subprocesses)"
-        Scraper["Scraper Server<br/>(Stdio)"]
-        Analyst["Python Server<br/>(Stdio)"]
-        Search["Search Server<br/>(Stdio)"]
+    %% -- EXECUTION LAYER (The Hands) --
+    subgraph "MCP Host Service (Port 8002)"
+        MCPAPI[FastAPI Endpoint]
+        ToolMgr[Tool Manager]
+        RegistryClient[Registry Client]
+        
+        subgraph "Process Isolation"
+            Scraper[Scraper Process]
+            Python[Python Sandbox]
+            Search[Search Process]
+        end
+        
+        MCPAPI --> ToolMgr
+        ToolMgr -->|Sync| RegistryClient
+        ToolMgr -->|JSON-RPC Stdio| Scraper
+        ToolMgr -->|JSON-RPC Stdio| Python
+        ToolMgr -->|JSON-RPC Stdio| Search
     end
     
-    subgraph MemoryVault[Triple-Vault Memory]
-        Atomic["Atomic Facts DB"]
-        Episodic["Episodic Logs"]
-        Artifacts["Parquet Store"]
+    %% -- MEMORY LAYER ( The Vault) --
+    subgraph "Vault Service (Port 8004)"
+        VaultAPI[FastAPI Endpoint]
+        AuditLog[Audit Logger]
+        VectorDB[(Qdrant Vector DB)]
+        SQLDB[(Postgres SQL DB)]
+        
+        VaultAPI --> AuditLog
+        VaultAPI --> VectorDB
+        VaultAPI --> SQLDB
+    end
+
+    %% -- GOVERNANCE LAYER (The Conscience) --
+    subgraph "Swarm Manager (Port 8005)"
+        SwarmAPI[FastAPI Endpoint]
+        Policy[Policy Engine]
+        Supervisor[Supervisor Agent]
+        
+        SwarmAPI --> Policy
+        Policy --> Supervisor
     end
     
-    Orchestrator ==JSON-RPC==> Scraper
-    Orchestrator ==JSON-RPC==> Analyst
-    Orchestrator ==JSON-RPC==> Search
+    %% -- TEMPORAL LAYER (Time) --
+    subgraph "Chronos Service (Port 8006)"
+        ChronosAPI[FastAPI Endpoint]
+        Scheduler[apscheduler]
+        JobQueue[Job Queue]
+        
+        ChronosAPI --> Scheduler --> JobQueue
+    end
+
+    %% -- SERVICE WIRING --
+    Limiter -->|HTTP Route| OrchAPI
+    Limiter -->|HTTP Route| MCPAPI
     
-    Divergence <--> Atomic
-    Scraper --> Artifacts
-    Analyst --> Artifacts
+    Researcher -->|HTTP POST /tools/call| MCPAPI
+    Researcher -->|HTTP POST /audit| VaultAPI
+    Planner -->|HTTP POST /audit| VaultAPI
+    
+    ToolMgr -->|HTTP POST /compliance| SwarmAPI
+    
+    JobQueue -->|HTTP POST /jobs/trigger| OrchAPI
+
+    %% -- STYLING --
+    style Gateway fill:#e1f5fe,stroke:#01579b
+    style OrchAPI fill:#f3e5f5,stroke:#4a148c
+    style MCPAPI fill:#e8f5e9,stroke:#1b5e20
+    style VaultAPI fill:#fff3e0,stroke:#e65100
+    style SwarmAPI fill:#ffebee,stroke:#b71c1c
+    style ChronosAPI fill:#fff8e1,stroke:#fbc02d
 ```
+
+### The 6 Core Services (Plus Gateway)
+
+1. **API Gateway (Port 8000)**: The single entry point. Handles Auth, Rate Limiting, and routing to internal services.
+2. **Orchestrator (Port 8001)**: The "Brain". Runs the LangGraph state machine, plans research, and synthesizes results. It contains *zero* tool code.
+3. **MCP Host (Port 8002)**: The "Hands". Manages the 17 MCP tools, handles parallel execution, and maintains the Tool Registry.
+4. **Vault (Port 8004)**: The "Memory". Centralized storage for Vector Search (Qdrant), SQL (Postgres), Audit Logs, and Graph Checkpoints.
+5. **Swarm Manager (Port 8005)**: The "Conscience". Enforces ISO/SOC2 Compliance, runs the "Kill Switch", and supervises Agent Health.
+6. **Chronos (Port 8006)**: The "Timekeeper". Manages scheduled jobs and "Time-Travel" debugging.
 
 ---
 
@@ -650,17 +760,17 @@ command: "uv run --with pandas --with scikit-learn python -m mcp_servers.ml_serv
 ```mermaid
 sequenceDiagram
     participant Planner as Orchestrator
-    participant Server as Python MCP Server
+    participant Host as MCP Host
+    participant Server as Python Tool
     participant UV as uv Package Manager
-    participant Py as Python Process
 
-    Planner->>Server: Execute Code (deps=["yfinance"])
+    Planner->>Host: Execute Tool (JSON-RPC)
+    Host->>Server: Forward Request
     Server->>UV: uv run --with yfinance python script.py
     UV->>UV: Resolve & Cache (0.1s)
-    UV->>Py: Spawn Process (Isolated)
-    Py->>Py: Import yfinance (Success)
-    Py->>Server: Stdout / JSON
-    Server->>Planner: ToolResult
+    UV->>Server: Spawn Process (Isolated)
+    Server->>Host: Return Result
+    Host->>Planner: ToolResult
 ```
 
 ### 7.2. Security Boundaries
@@ -784,7 +894,12 @@ Please see **[services/api_gateway/README.md](services/api_gateway/README.md)** 
 - **Planner Intelligence**: Upgraded "Tony Stark" prompt for improvisation and tool building.
 - **Incremental Sync**: Registry auto-updates by hashing schemas (Zero-Maintenance).
 
-### 🚧 In Progress (v3.4)
+### ✅ Completed (v3.4 - Fractal Scaffolding)
+- **Service Fission**: Split monolithic Orchestrator into 6 distinct microservices (Orchestrator, Gateway, MCP Host, Vault, Swarm, Chronos).
+- **Service Registry**: Implemented centralized port management and discovery.
+- **Network Wiring**: Replaced internal Python imports with HTTP API calls between services.
+
+### 🚧 In Progress (v4.0 - User Integration)
 - [ ] Refine MCP Lifecycle Management for Docker
 
 

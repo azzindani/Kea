@@ -416,7 +416,7 @@ class AgentSpawner:
             # For this implementation, we treat the agent as a "Smart Worker"
             # It uses the LLM to decide which tool to call from the registry
             
-            from services.orchestrator.mcp.client import get_mcp_orchestrator
+            from services.mcp_host.core.tool_manager import get_mcp_orchestrator
             mcp = get_mcp_orchestrator()
             
             # Simple heuristic: If it looks like a direct question, ask LLM. 

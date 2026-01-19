@@ -316,7 +316,7 @@ def create_vector_store(use_memory: bool = False) -> VectorStore:
     db_url = os.getenv("DATABASE_URL")
     if db_url:
         try:
-            from services.rag_service.core.postgres_store import PostgresVectorStore
+            from services.vault.core.postgres_store import PostgresVectorStore
             logger.info("Using PostgreSQL vector store (pgvector)")
             return PostgresVectorStore()
         except ImportError as e:
@@ -338,4 +338,3 @@ def create_vector_store(use_memory: bool = False) -> VectorStore:
             
     logger.info("Using in-memory vector store (Fallback)")
     return InMemoryVectorStore()
-

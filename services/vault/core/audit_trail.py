@@ -475,7 +475,7 @@ class AuditTrail:
             # 1. Try Postgres (The "God Database")
             if os.getenv("DATABASE_URL"):
                 try:
-                    from services.orchestrator.core.postgres_audit import PostgresBackend
+                    from services.vault.core.postgres_audit import PostgresBackend
                     backend = PostgresBackend()
                     logger.debug("AuditTrail using PostgresBackend")
                 except Exception as e:
@@ -715,3 +715,4 @@ def configure_audit_trail(backend: AuditBackend):
     """Configure audit trail with custom backend."""
     global _audit_trail
     _audit_trail = AuditTrail(backend=backend)
+

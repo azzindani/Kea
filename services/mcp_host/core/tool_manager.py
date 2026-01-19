@@ -166,10 +166,10 @@ class MCPOrchestrator:
                 
             except Exception as e:
                 logger.error(f"❌ Failed to start/connect {name}: {e}")
-
+                
         # Update Registry
         try:
-            from services.orchestrator.core.tool_registry import get_tool_registry
+            from services.mcp_host.core.tool_registry import get_tool_registry
             registry = get_tool_registry()
             await registry.sync_tools(self.tools)
         except Exception as e:
@@ -224,24 +224,34 @@ class MCPOrchestrator:
         # Enterprise Guardrail: Compliance Check
         # =====================================================================
         try:
-            from services.orchestrator.core.compliance import get_compliance_engine
-            engine = get_compliance_engine()
+            from shared.service_registry import ServiceRegistry, ServiceName
+            import httpx
             
-            # Use 'context' to pass the tool details
-            report = await engine.check_operation(
-                operation="tool_exec",
-                context={"tool": tool_name, "args": arguments}
-            )
+            swarm_url = ServiceRegistry.get_url(ServiceName.SWARM_MANAGER)
             
-            if not report.passed:
-                logger.warning(f"🛡️ Compliance blocked {tool_name}: {report.summary}")
-                issues_text = "\n".join([f"- {i.message}" for i in report.issues])
-                return ToolResult(
-                    content=[TextContent(text=f"Compliance Blocked Action:\n{issues_text}")],
-                    isError=True
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.post(
+                    f"{swarm_url}/compliance/check",
+                    json={
+                        "operation": "tool_exec",
+                        "context": {"tool": tool_name, "args": arguments}
+                    }
                 )
+                
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if not data.get("passed", True):
+                        logger.warning(f"🛡️ Compliance blocked {tool_name}: {data.get('summary')}")
+                        issues_text = "\n".join([f"- {i.get('message')}" for i in data.get("issues", [])])
+                        return ToolResult(
+                            content=[TextContent(text=f"Compliance Blocked Action:\n{issues_text}")],
+                            isError=True
+                        )
+                else:
+                    logger.warning(f"Compliance check returned {resp.status_code}, allowing tool call (Fail Open)")
+
         except ImportError:
-            pass  # Fail open if compliance module missing during dev
+            pass
         except Exception as e:
             logger.error(f"Compliance check failed: {e}")
             # Decide: Fail open or closed? Currently Fail Open to avoid breaking production
@@ -390,7 +400,3 @@ def get_mcp_orchestrator() -> MCPOrchestrator:
     if _orchestrator_instance is None:
         _orchestrator_instance = MCPOrchestrator()
     return _orchestrator_instance
-
-
-
-

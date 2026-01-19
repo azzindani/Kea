@@ -32,8 +32,8 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 # Orchestrator URL for API calls
-import os
-ORCHESTRATOR_URL = os.getenv("ORCHESTRATOR_URL", "http://localhost:8000")
+from shared.service_registry import ServiceRegistry, ServiceName
+ORCHESTRATOR_URL = ServiceRegistry.get_url(ServiceName.ORCHESTRATOR)
 
 
 # ============================================================================

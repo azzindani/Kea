@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 from shared.schemas import ResearchState, ResearchStatus, QueryPath
 from shared.logging import get_logger
-from services.orchestrator.core.audit_trail import audited, AuditEventType
+from services.vault.core.audit_trail import audited, AuditEventType
 
 # Import real implementations
 from services.orchestrator.nodes.planner import planner_node as real_planner_node
@@ -27,9 +27,9 @@ from services.orchestrator.agents.judge import JudgeAgent
 from services.orchestrator.core.router import IntentionRouter
 
 # NEW: Context pool and code generator for dynamic data flow
-from services.orchestrator.core.context_pool import get_context_pool, reset_context_pool
+from shared.context_pool import get_context_pool, reset_context_pool
 from services.orchestrator.agents.code_generator import generate_fallback_code, generate_python_code
-from services.orchestrator.mcp.client import get_mcp_orchestrator
+from services.mcp_host.core.tool_manager import get_mcp_orchestrator
 
 
 logger = get_logger(__name__)
@@ -270,8 +270,8 @@ async def researcher_node(state: GraphState) -> GraphState:
 
     # 1. Hardware-Aware Scaling
     from shared.hardware.detector import detect_hardware
-    from services.orchestrator.mcp.parallel_executor import ParallelExecutor, ToolCall
-    from services.orchestrator.mcp.client import get_mcp_orchestrator
+    from services.mcp_host.core.parallel_executor import ParallelExecutor, ToolCall
+    from services.mcp_host.core.tool_manager import get_mcp_orchestrator
     
     hw_profile = detect_hardware()
     max_workers = hw_profile.optimal_workers()

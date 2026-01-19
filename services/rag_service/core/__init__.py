@@ -8,7 +8,7 @@ Core components for the RAG service.
 - graph_rag: Knowledge graph for provenance
 """
 
-from services.rag_service.core.vector_store import (
+from services.vault.core.vector_store import (
     VectorStore,
     QdrantVectorStore,
     InMemoryVectorStore,

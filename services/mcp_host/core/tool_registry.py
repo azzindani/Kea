@@ -175,7 +175,7 @@ def get_tool_registry():
         # 1. Try Postgres (Unified)
         if os.getenv("DATABASE_URL"):
             try:
-                from services.orchestrator.core.postgres_registry import PostgresToolRegistry
+                from services.mcp_host.core.postgres_registry import PostgresToolRegistry
                 _registry_instance = PostgresToolRegistry()
                 logger.info("ToolRegistry using PostgresToolRegistry")
                 return _registry_instance
