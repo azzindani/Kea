@@ -35,12 +35,15 @@ class PostgresVectorStore(VectorStore):
         table_name: str = "research_facts",
         embedding_dim: int = 1024,  # Qwen3 default
         use_local_embedding: bool = False,
+        use_vl_model: bool = False,
     ) -> None:
         self.table_name = table_name
         self.embedding_dim = embedding_dim
         self.use_local_embedding = use_local_embedding
+        self.use_vl_model = use_vl_model
         self._pool: asyncpg.Pool | None = None
         self._embedding_provider = None
+        self._reranker = None
         self._db_url = os.getenv("DATABASE_URL")
         
         if not self._db_url:
@@ -87,14 +90,37 @@ class PostgresVectorStore(VectorStore):
     async def _get_embedding(self, text: str) -> list[float]:
         """Get embedding for text using Qwen3 embedding provider."""
         if self._embedding_provider is None:
-            from shared.embedding import create_embedding_provider
-            
-            self._embedding_provider = create_embedding_provider(
-                use_local=self.use_local_embedding,
-                dimension=self.embedding_dim,
-            )
+            if self.use_vl_model:
+                from shared.embedding.qwen3_vl_embedding import create_vl_embedding_provider, VLInput
+                self._embedding_provider = create_vl_embedding_provider(
+                    use_local=self.use_local_embedding,
+                )
+            else:
+                from shared.embedding import create_embedding_provider
+                self._embedding_provider = create_embedding_provider(
+                    use_local=self.use_local_embedding,
+                    dimension=self.embedding_dim,
+                )
         
+        if self.use_vl_model:
+            # Wrap text in VLInput for consistency if using VL model
+            # Note: Caller might need to update to pass VLInput for images
+            from shared.embedding.qwen3_vl_embedding import VLInput
+            embeddings = await self._embedding_provider.embed([VLInput(text=text)])
+            return embeddings[0]
+            
         return await self._embedding_provider.embed_query(text)
+
+    async def _get_reranker(self):
+        """Lazy load reranker."""
+        if self._reranker is None:
+            if self.use_vl_model:
+                from shared.embedding.qwen3_vl_reranker import create_vl_reranker_provider
+                self._reranker = create_vl_reranker_provider()
+            else:
+                from shared.embedding.qwen3_reranker import create_reranker_provider
+                self._reranker = create_reranker_provider()
+        return self._reranker
 
     async def add(self, documents: list[Document]) -> list[str]:
         """Add documents to Postgres."""
@@ -133,10 +159,16 @@ class PostgresVectorStore(VectorStore):
         query: str,
         limit: int = 10,
         filter: dict | None = None,
+        enable_reranking: bool = True,
     ) -> list[SearchResult]:
-        """Search for similar documents."""
+        """Search for similar documents with optional reranking."""
         pool = await self._get_pool()
         query_embedding = await self._get_embedding(query)
+        
+        # Double the limit if reranking to get a candidate pool
+        # Google AI Studio recommended fetching 50 for top 5, so roughly 10x
+        # We'll use 5x for now to catch enough candidates
+        candidate_limit = limit * 5 if enable_reranking else limit
         
         async with pool.acquire() as conn:
             await register_vector(conn)
@@ -153,7 +185,7 @@ class PostgresVectorStore(VectorStore):
             
             # Construct WHERE clause from filter
             where_clauses = []
-            params = [query_embedding, limit] # $1, $2
+            params = [query_embedding, candidate_limit] # $1, $2
             param_idx = 3
             
             if filter:
@@ -179,7 +211,7 @@ class PostgresVectorStore(VectorStore):
             
             rows = await conn.fetch(sql, *params)
             
-            return [
+            initial_results = [
                 SearchResult(
                     id=row['id'],
                     content=row['content'],
@@ -188,6 +220,38 @@ class PostgresVectorStore(VectorStore):
                 )
                 for row in rows
             ]
+
+            if enable_reranking and rows:
+                try:
+                    reranker = await self._get_reranker()
+                    docs = [r.content for r in initial_results]
+                    
+                    if self.use_vl_model:
+                        from shared.embedding.qwen3_vl_embedding import VLInput
+                        # Convert docs to VLInput
+                        vl_docs = [VLInput(text=d) for d in docs]
+                        reranked = await reranker.rerank(query, vl_docs, top_k=limit)
+                    else:
+                        # Rerank
+                        reranked = await reranker.rerank(query, docs, top_k=limit)
+                    
+                    # Map back to SearchResult
+                    final_results = []
+                    for res in reranked:
+                        # Find original metadata (optimization: use a dict map if N is large)
+                        original = initial_results[res.index]
+                        final_results.append(SearchResult(
+                            id=original.id,
+                            content=original.content,
+                            score=res.score, # Replace cosine score with reranker score
+                            metadata=original.metadata
+                        ))
+                    return final_results
+                except Exception as e:
+                    logger.warning(f"Reranking failed (falling back to vector score): {e}")
+                    return initial_results[:limit]
+            
+            return initial_results[:limit]
 
     async def get(self, ids: list[str]) -> list[Document]:
         """Get documents by ID."""
