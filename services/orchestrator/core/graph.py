@@ -228,7 +228,9 @@ async def researcher_node(state: GraphState) -> GraphState:
         logger.info(f"🚀 High Complexity Detected ({len(micro_tasks)} tasks) -> Spawning Fractal Swarm")
         try:
             from services.orchestrator.core.agent_spawner import get_spawner
-            from services.orchestrator.core.organization import get_organization, Domain
+            # Use strict imports to avoid shadowing
+            from services.orchestrator.core.organization import get_organization 
+            # Domain is imported from agent_spawner below (which uses prompt_factory.Domain)
             
             # Simple prompt callback wrapper for spawner
             # Ideally this uses the real LLM, but for now we pass a dummy or use existing infrastructure

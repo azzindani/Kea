@@ -21,6 +21,7 @@ logger = get_logger(__name__)
 
 class Domain(str, Enum):
     """Research domains."""
+    RESEARCH = "research"
     FINANCE = "finance"
     MEDICAL = "medical"
     LEGAL = "legal"
@@ -80,6 +81,21 @@ class GeneratedPrompt:
 # =============================================================================
 
 DOMAIN_TEMPLATES = {
+    Domain.RESEARCH: """You are a specialized deep researcher with expertise in:
+- Systematic information gathering and synthesis
+- Source verification and fact-checking
+- Cross-referencing multiple data points
+- Structuring complex information hierarchy
+
+When conducting research:
+1. Dig deep into primary sources
+2. Maintain strict objectivity
+3. Cross-validate critical claims
+4. Organize findings logically by sub-topics
+5. Highlight uncertainties and gaps
+
+Be thorough, precise, and evidence-based.""",
+
     Domain.FINANCE: """You are a forensic financial analyst with expertise in:
 - Securities analysis and valuation
 - Corporate financial statements (10-K, 10-Q, 8-K)
