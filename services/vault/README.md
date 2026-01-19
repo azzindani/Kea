@@ -73,3 +73,18 @@ Save a new state snapshot (delta).
 ### Memory RAG
 **POST** `/memory/search`
 Semantic search against the Atomic Facts database.
+
+---
+
+## 🏗️ Technical Deep Dive
+
+### 1. Immutable Audit Integrity (`core/audit_trail.py`)
+The Vault implements a "Chain of Custody" for every action:
+- **Cryptographic Checksums**: Every log entry (e.g., `TOOL_CALLED`) includes a SHA-256 hash of its contents (actor, timestamp, payload, parent_id).
+- **Audit Verification**: The system can verify the integrity of a session trace by re-computing hashes, making it suitable for SOC2/ISO compliance.
+- **Parent-Child Tracing**: Uses `parent_id` to link recursive sub-orchestrations back to the original user query.
+
+### 2. High-Fidelity Graph Checkpointing (`core/checkpointing.py`)
+Unlike standard state stores, the Vault stores the **entire LangGraph snapshot**:
+- **State Time-Travel**: Every "turn" in the research loop is saved. Chronos can pull these snapshots to "rewind" the brain to a previous state for debugging.
+- **Fact Deduplication**: Before storing a new Atomic Fact in the Vector Store, the Vault performs a semantic similarity check to prevent "Knowledge Bloat".

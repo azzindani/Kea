@@ -1,72 +1,98 @@
-# Shared Libraries ("The Foundation")
+# 📚 Shared Libraries ("The Foundation")
 
-This directory contains the **Core Infrastructure** and **Type Definitions** used by all microservices. It ensures consistency across the distributed system (e.g., that the Orchestrator speaks the same API language as the Gateway).
+The `shared/` directory is the **Standard Library** of the Kea system. It contains the core primitives, data schemas, and infrastructure abstractions that ensure consistency and interoperability across all microservices in the Fractal Corp architecture.
 
 ---
 
 ## 🏗️ Architecture Role
 
-The `shared/` library acts as the "Standard Library" of Kea.
-1.  **Configuration**: Centralized `.env` loading via Pydantic Settings.
-2.  **Schemas**: The canonical source of truth for all API contracts.
-3.  **Observability**: Unified JSON logging and Tracing.
-4.  **Hardware**: Abstractions for interacting with LLM providers.
+The Shared Library acts as the "Glue" and "Substrate" for the distributed system. By centralizing core logic, it prevents drift between services and enables a unified development experience.
+
+```mermaid
+graph TD
+    subgraph Services [Fractal Corp Microservices]
+        Gateway[API Gateway]
+        Orch[Orchestrator]
+        Host[MCP Host]
+        Vault[Vault]
+        Swarm[Swarm Manager]
+        Chronos[Chronos]
+    end
+
+    subgraph Shared [shared/ Library]
+        Schemas[schemas.py<br/>Contracts]
+        Context[context_pool.py<br/>Research Flow]
+        Hardware[hardware/<br/>Auto-scaling]
+        LLM[llm/<br/>Provider Abstraction]
+        MCP[mcp/<br/>Protocol SDK]
+        Logging[logging/<br/>Observability]
+    end
+
+    Gateway -.-> Shared
+    Orch -.-> Shared
+    Host -.-> Shared
+    Vault -.-> Shared
+    Swarm -.-> Shared
+    Chronos -.-> Shared
+```
+
+1.  **Contract Management**: Canonical Pydantic schemas for inter-service communication.
+2.  **Cognitive State Flow**: Shared memory primitives (`TaskContextPool`) for parallel research.
+3.  **Cross-Platform Adaptation**: Hardware-aware execution strategies.
+4.  **Observer Integrity**: Unified tracing and structured logging.
 
 ---
 
 ## 📁 Codebase Structure & Reference
 
-| File / Directory | Component | Description | Key Classes/Functions |
-|:-----------------|:----------|:------------|:----------------------|
-| **`schemas.py`** | **Contracts** | **Critical**. Defines the Pydantic models exchanged between services. | `AtomicFact`, `ResearchState`, `JobRequest` |
-| **`config.py`** | **Settings** | Strongly-typed configuration manager. Reads env vars. | `Settings`, `get_settings()` |
-| **`logging/`** | **Observability**| JSON-structured logger with request ID propagation. | `get_logger()`, `RequestLoggingMiddleware` |
-| **`mcp/`** | **Protocol** | The JSON-RPC 2.0 client implementation. | `MCPOrchestrator`, `ToolRegistry` |
-| **`llm/`** | **AI** | Provider abstractions (OpenAI, Anthropic). | `ChatModel`, `get_provider()` |
-| **`users/`** | **Auth** | User and Tenant management logic. | `UserManager`, `ApiKeyManager` |
+| Module / File | Component | Description | Key Classes/Functions |
+|:--------------|:----------|:------------|:----------------------|
+| **`schemas.py`** | **Contracts** | **Critical**. Truth for all API and Graph contracts. | `ResearchState`, `AtomicFact`, `JobRequest` |
+| **`context_pool.py`** | **Memory** | Shared clipboard for parallel agent workers. | `TaskContextPool`, `ExtractionStrategy` |
+| **`hardware/`** | **Infrastructure**| Hardware detection and resource monitoring. | `detect_hardware()`, `HardwareProfile` |
+| **`llm/`** | **Intelligence** | Unified interface for 20+ LLM providers. | `LLMProvider`, `OpenRouter`, `LLMConfig` |
+| **`mcp/`** | **Protocol** | Model Context Protocol SDK implementation. | `MCPClient`, `ToolRouter`, `ToolIndex` |
+| **`logging/`** | **Observability**| Tracing, business metrics, and structured logs. | `get_logger()`, `trace_function`, `record_tool_call` |
+| **`database/`** | **Persistence** | Database connection pooling and health checks. | `DatabasePool`, `DatabaseConfig` |
+| **`tools/`** | **Execution** | JIT tool loading and process isolation. | `JITToolLoader`, `ToolIsolator` |
+| **`tenants/`** | **Security** | Multi-tenancy and data isolation logic. | `TenantContext`, `ResourcePrefix` |
+| **`messaging.py`** | **Event Bus** | Inter-service message passing (Sync/Async). | `Message`, `MessageBus` |
+| **`config.py`** | **Environment** | Strongly-typed configuration management. | `Settings`, `get_settings()` |
 
 ---
 
-## 🔬 Deep Dive: The Lingua Franca
+## 🔬 Deep Dive: Core Mechanics
 
-### 1. Research State (`schemas.ResearchState`)
-This is the object passed around the Orchestrator's graph.
-*   **Attributes**: `query`, `facts` (List), `hypotheses` (List), `report` (Markdown).
-*   **Usage**: It allows the Planner to write a plan that the Researcher can read, and the Researcher to write facts that the Generator can read.
+### 1. Research State Flow (`TaskContextPool`)
+Used by the `Researcher` node to manage data flow between 50+ parallel scrapers.
+- **URL Pooling**: Deduplicates and prioritizes URLs discovered during crawling.
+- **Fact Accumulation**: Thread-safe harvesting of atomic data points before final synthesis.
+- **Data Chaining**: Automatically passes context from an "Overview" tool to a "Deep Dive" tool.
 
-### 2. Atomic Fact (`schemas.AtomicFact`)
-The unit of knowledge in Kea.
-```python
-class AtomicFact(BaseModel):
-    fact_id: str
-    entity: str        # "Nvidia"
-    attribute: str     # "Revenue 2024"
-    value: str         # "$60 Billion"
-    confidence: float  # 0.95
-```
+### 2. Hardware-Aware Dispatching (`hardware/`)
+Ensures Kea runs efficiently on everything from a Raspberry Pi to a H100 GPU cluster.
+- **Profile Detection**: Probes CPU cores, RAM bandwidth, and GPU VRAM.
+- **Optimal Scaling**: Provides the `optimal_workers()` formula used by the Orchestrator to decide how many agents to spawn without crashing the host.
 
-### 3. Job Polymorphism (`schemas.JobType`)
-Defines the valid modes of operation:
-*   `DEEP_RESEARCH`: Standard crawl.
-*   `SHADOW_LAB`: Recalculation (Sandbox).
-*   `GRAND_SYNTHESIS`: Meta-study.
+### 3. JIT Tool Evolution (`tools/jit_loader.py`)
+Enables "Self-Healing" tool execution.
+- **Dependency Sandboxing**: Uses `uv` to dynamically install exact package versions (e.g., `playwright`, `scikit-learn`) for ephemeral tool processes.
+- **Security Whitelisting**: Intercepts `pip/uv` calls to prevent execution of malicious code.
 
 ---
 
 ## 🔌 Core Type Reference
 
-These are the primary data structures developer interact with.
-
-### Research Primitives
+### Research State primitives
 | Class | Description | Fields |
 |:------|:------------|:-------|
-| `ResearchStatus` | Enum for job lifecycle. | `PENDING`, `RUNNING`, `COMPLETED` |
-| `Source` | Provenance metadata. | `url`, `reliability_score`, `accessed_at` |
-| `ToolInvocation` | Audit log for agent actions. | `tool_name`, `arguments`, `result` |
+| `ResearchState` | The LangGraph state object. | `job_id`, `facts`, `hypotheses`, `report`, `path` |
+| `AtomicFact` | Verification unit. | `entity`, `attribute`, `value`, `confidence_score` |
+| `QueryPath` | Enum for routing. | `A (Memory)`, `B (Lab)`, `C (Synthesis)`, `D (Deep)` |
 
-### API Contracts
+### Transport & API
 | Class | Description | Fields |
 |:------|:------------|:-------|
-| `JobRequest` | Input for `POST /jobs`. | `query`, `depth`, `max_sources` |
-| `JobResponse` | Output for `GET /jobs/{id}`. | `job_id`, `progress`, `report` |
-| `FactResponse` | Output for `GET /facts`. | `entity`, `attribute`, `value`, `source_url` |
+| `JobRequest` | Input for `/jobs`. | `query`, `job_type`, `depth`, `domain_hints` |
+| `NodeOutput` | Standardized log entry. | `trace_id`, `source_node`, `content`, `timestamp` |
+| `ToolInvocation` | Execution audit log. | `tool_name`, `arguments`, `result`, `is_error` |

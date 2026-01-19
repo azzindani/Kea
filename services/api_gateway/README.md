@@ -47,7 +47,29 @@ graph TD
 | ├── `auth.py` | Identity | Handles JWT locally (Gateway is the Auth authority). | `login()`, `register()` |
 | ├── `graph.py` | Memory | Proxies graph queries to **Vault** (Port 8004). | `get_entity_provenance()` |
 | └── `artifacts.py` | Storage | Manages uploads/downloads via **Vault/S3**. | `upload_artifact()` |
-| **`middleware/`** | **Middleware** | Cross-cutting concerns. | `RateLimitMiddleware`, `AuthMiddleware` |
+| **`middleware/`** | **Middleware** | Cross-cutting concerns. | `RateLimitMiddleware` | Uses a **Sliding Window Algorithm** (Redis ZSet) to manage quotas. |
+| `AuthMiddleware` | Decodes JWTs and injects `request.state.user` for downstream routing. |
+
+---
+
+## 🏗️ Deep Dive: Production Hardening
+
+### 1. Hybrid Rate Limiting (`middleware/rate_limit.py`)
+To prevent "DDoS by Agent" (infinite loops), the Gateway implements a tiered limiting strategy:
+- **Algorithm**: Sliding Window (ZSET-based).
+- **Backend**: Redis in production for global state; In-Memory fallback for development.
+- **Fail-Open Logic**: If Redis becomes unavailable, the Gateway defaults to allowing requests (Fail-Open) to prioritize availability over strict quota enforcement.
+- **Key Hierarchy**: Limits are applied to `user_id` if authenticated, falling back to IP address for anonymous traffic.
+
+### 2. Service-to-Service Security
+All internal routing is managed via the **Service Registry**.
+- **Env Overrides**: Service URLs can be dynamically changed via `SERVICE_URL_ORCHESTRATOR` env vars.
+- **Circuit Breakers**: While primarily in the Orchestrator, the Gateway handles `503 Service Unavailable` responses from upstream services with standard error payloads.
+
+### 3. Identity Awareness
+The Gateway is the **Source of Truth for Identity**.
+- It handles `Token` generation and verification.
+- Upstream internal services (Orchestrator, Vault) receive a validated `user_id` header, removing the need for them to implement Auth logic locally.
 
 ---
 

@@ -11,7 +11,7 @@ It is responsible for breaking down user queries, coordinating MCP tools, and sy
 The Orchestrator operates as a **Cyclic State Machine**, allowing it to "Think Fast" (Router) and "Think Slow" (Deep Research Loop). It delegates execution logic to specialized microservices.
 
 1.  **Planning Layer**: Decomposes complex queries into atomic micro-tasks.
-2.  **Delegation Layer** (NEW): Dispatches tool execution to **MCP Host** (Port 8002).
+2.  **Delegation Layer** (NEW): Dispatches tool execution to **MCP Host** (Port 8003).
 3.  **Auditing Layer** (NEW): Asynchronously logs all state changes to **Vault** (Port 8004).
 4.  **Consensus Layer**: Adversarial Agents (Generator vs Critic) verify the final output.
 
@@ -84,9 +84,29 @@ The Keeper is the "Traffic Cop" of the brain. It prevents the infinite loop prob
 
 ### 3. Adversarial Collaboration (`agents/`)
 To maximize accuracy, we use a multi-persona boardroom simulation:
-*   **Generator**: "I have found these facts, here is the conclusion."
-*   **Critic**: "You missed the date on the second fact. Source B is unreliable."
 *   **Judge**: "Objection sustained. Generator, re-write section 2."
+
+---
+
+## 🏗️ Technical Deep Dive: Orchestration Logic
+
+### 1. Autonomic Memory Interceptor (`core/interceptor.py`)
+The Orchestrator doesn't just "gather" facts; it actively builds a knowledge base.
+- **Shadow Logging**: Every tool result returned from the **MCP Host** is intercepted before it reaches the graph node.
+- **Vault Mirroring**: Data is sent to **Vault** (Port 8004) where it is split into "Atomic Facts" and stored in Postgres.
+- **Persistence**: This ensures that even if the Orchestrator crashes, the research gathered so far is permanently searchable.
+
+### 2. JIT Tool Invention (The Code Generator)
+When the **Planner** schedules a task like "Perform a regression analysis on these 5 URLs," and no static tool exists:
+- **Fallback Agent**: The `agents/code_generator.py` is invoked.
+- **Script Generation**: It writes a precision Python script using `pandas` and `scikit-learn` based on the facts collected so far.
+- **Dynamic Execution**: This script is sent as a `code` argument to the **MCP Host**.
+
+### 3. Intent-Aware Routing (`core/router.py`)
+The Orchestrator maintains state across messages by analyzing **Intent**:
+- **FOLLOW_UP**: Injects facts from the **Vault** into the current context (Memory Augmentation).
+- **REVISE**: Instructs the Planner to modify a specific branch of the previously executed Graph.
+- **DEEPER**: Triggers a higher `max_depth` for the next state machine iteration.
 
 ---
 
@@ -137,7 +157,30 @@ The Orchestrator relies on the following internal microservices (wired via `shar
 
 | Dependency | Purpose | Integration Point |
 |:-----------|:--------|:------------------|
-| **MCP Host** (Port 8002) | **Tool Execution**. The Orchestrator plans tasks, but sends JSON-RPC payloads to MCP Host for actual execution. | `nodes.researcher.call_tool` |
+| **MCP Host** (Port 8003) | **Tool Execution**. The Orchestrator plans tasks, but sends JSON-RPC payloads to MCP Host for actual execution. | `nodes.researcher.call_tool` |
 | **Vault** (Port 8004) | **Memory & Audit**. Logs every state transition and tool result for compliance and long-term recall. | `core.pipeline.process_message` |
 | **Swarm Manager** (Port 8005) | **Compliance**. While MCP Host performs the check, the Orchestrator adheres to policies set by Swarm. | Implicit via MCP Host |
 | **Chronos** (Port 8006) | **Scheduling**. Triggers orchestrated jobs based on time events. | `main.trigger_job` |
+## ⛓️ Lifecycle of a Research Job
+
+The Orchestrator manages the job lifecycle through 4 distinct "Cognitive Phases":
+
+### Phase 1: Ambition Analysis (The Router)
+- **Input**: Raw user string (e.g., "Find the latest nickel prices in Indonesia").
+- **Action**: Detects if this is a **CASUAL** hello or a **DEEP** research query.
+- **Output**: Routing decision.
+
+### Phase 2: Strategic Decomposition (The Planner)
+- **Input**: The research goal.
+- **Action**: Breaks the goal into **Micro-Tasks** (e.g., "1. Scrape ESDM site", "2. Search for news on Nickel export bans").
+- **Audit**: Logs the initial plan to **Vault**.
+
+### Phase 3: Recursive Extraction (The Researcher & Keeper)
+- **Input**: The Micro-Tasks.
+- **Action**: Calls **MCP Host** (Port 8003) for tools.
+- **Loop**: The **Keeper** evaluates the results. If facts are contradictory or insufficient, it sends the Researcher back with a narrowed query.
+
+### Phase 4: Adversarial Synthesis (Consensus Engine)
+- **Input**: The collected raw facts.
+- **Action**: Generator drafts the report. Critic tears it down. Judge decides.
+- **Final Result**: A citation-backed Markdown report derived only from verified evidence.

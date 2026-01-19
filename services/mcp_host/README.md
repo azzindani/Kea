@@ -11,7 +11,8 @@ The MCP Host operates as a **Process Manager** and **RPC Proxy**. It implements 
 1.  **Tool Manager**: Validates tools against the **Tool Registry**.
 2.  **Process Spawner**: Uses `uv` (JIT) or Docker to launch isolated tool servers.
 3.  **RPC Bridge**: Converts HTTP `POST` requests from the Orchestrator into JSON-RPC messages over Stdio/SSE.
-4.  **Compliance Guard**: Pre-checks every tool call with **Swarm Manager**.
+4.  **Compliance Guard**: Pre-checks every tool call with **Swarm Manager** (Port 8005) before transmission.
+5.  **Stability Layer**: Implements **Circuit Breakers** and **Exponential Backoff** to prevent cascading failures from hanging tools.
 
 ```mermaid
 graph TD
@@ -80,3 +81,24 @@ List all active/available MCP servers (e.g., `scraper`, `python_sandbox`).
 
 **POST** `/servers/restart`
 Force restart a specific tool server (useful if a tool hangs).
+
+---
+
+## 🏗️ Technical Deep Dive
+
+### 1. Enterprise Guardrails (`core/tool_manager.py`)
+Before any tool is executed, the MCP Host initiates a synchronous compliance handshake:
+- **Operation**: `tool_exec`
+- **Context**: Pass-through of tool name and proposed arguments.
+- **Outcome**: If the **Swarm Manager** returns `passed: false`, the tool execution is halted, and a "Compliance Blocked" error is returned to the Orchestrator.
+
+### 2. Resilience Architecture
+The Host treats tool servers as volatile processes:
+- **Circuit Breaker**: Each server (e.g., `scraper`) has its own circuit breaker. If it fails 5 consecutive times, the breaker opens, and all future calls to that server are rejected for 60 seconds to allow the process to recover.
+- **Graceful Lifecycle**: When the system shuts down, it attempts `SIGTERM` followed by a 5-second timeout before `SIGKILL`, ensuring file handles and network sockets are closed properly.
+
+### 3. Monitoring & Metrics
+Integrated with Prometheus to track:
+- `ACTIVE_TOOLS`: Gauge of currently running tool processes.
+- `tool_duration_seconds`: Histogram of execution latency.
+- `tool_failure_total`: Counter of non-compliant or buggy tool executions.

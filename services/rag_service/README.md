@@ -1,9 +1,10 @@
-# RAG Service ("The Memory")
+# 💾 RAG Service (DEPRECATED)
 
-The **RAG Service** is the persistent memory system of Kea. It implements a "Triple Vault" architecture to store varying granularities of information:
-1.  **Atomic Facts**: Precision-recall for verification.
-2.  **Semantic Vectors**: Fuzzy search for exploration.
-3.  **Raw Artifacts**: Heavy file storage for source documents.
+> [!WARNING]
+> **This service is DEPRECATED.**
+> All intelligence and memory functions have been migrated to the **[Vault Service](../vault/README.md)** (Port 8004). This directory is maintained only for legacy reference and backward compatibility for older deployments.
+
+The **RAG Service** was the persistent memory system of Kea. It has been absorbed into the "Fractal Corp" architecture as part of the centralized storage layer.
 
 ---
 
