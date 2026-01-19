@@ -166,8 +166,23 @@ class PersistentToolRegistry:
 
 _registry_instance = None
 
-def get_tool_registry() -> PersistentToolRegistry:
+def get_tool_registry():
+    """Get singleton tool registry (Postgres -> SQLite)."""
     global _registry_instance
+    
     if not _registry_instance:
+        # 1. Try Postgres (Unified)
+        if os.getenv("DATABASE_URL"):
+            try:
+                from services.orchestrator.core.postgres_registry import PostgresToolRegistry
+                _registry_instance = PostgresToolRegistry()
+                logger.info("ToolRegistry using PostgresToolRegistry")
+                return _registry_instance
+            except Exception as e:
+                logger.warning(f"Failed to init PostgresToolRegistry: {e}")
+        
+        # 2. Fallback to SQLite
         _registry_instance = PersistentToolRegistry()
+        logger.info("ToolRegistry using PersistentToolRegistry (SQLite)")
+        
     return _registry_instance

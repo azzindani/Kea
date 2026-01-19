@@ -351,37 +351,59 @@ async def researcher_node(state: GraphState) -> GraphState:
     # 2. Unified Tool Handler
     async def unified_tool_handler(name: str, args: dict) -> Any:
         # Check local handlers first (Composite Tools)
+        result = None
         if name in local_handlers:
-            return await local_handlers[name](args)
+            result = await local_handlers[name](args)
             
-        # Virtual Tool Translation Layer for Planner compatibility
-        tool_mapping = {
-            "run_python": "execute_code",
-            "parse_document": "execute_code",
-            "dataframe_ops": "execute_code", # Map to code execution
-            "sql_query": "execute_code",     # Map to code execution
-            "scrape_url": "browser_scrape",
-            "fetch_page": "fetch_url"
-        }
-        
-        actual_tool_name = tool_mapping.get(name, name)
-        
-        # Special handling for code tools to ensure structure
-        if actual_tool_name == "execute_code" and "code" not in args:
-            if "script" in args:
-                args["code"] = args.pop("script")
-            elif "query" in args and name == "sql_query":
-                # Synthesize SQL runner
-                args["code"] = f"import sqlite3\nimport pandas as pd\nconn = sqlite3.connect('kea.db')\nprint(pd.read_sql('{args['query']}', conn))"
-        
-        # Default to MCP Pure Routing
+        else:
+            # Virtual Tool Translation Layer for Planner compatibility
+            tool_mapping = {
+                "run_python": "execute_code",
+                "parse_document": "execute_code",
+                "dataframe_ops": "execute_code", # Map to code execution
+                "sql_query": "execute_code",     # Map to code execution
+                "scrape_url": "browser_scrape",
+                "fetch_page": "fetch_url"
+            }
+            
+            actual_tool_name = tool_mapping.get(name, name)
+            
+            # Special handling for code tools to ensure structure
+            if actual_tool_name == "execute_code" and "code" not in args:
+                if "script" in args:
+                    args["code"] = args.pop("script")
+                elif "query" in args and name == "sql_query":
+                    # Synthesize SQL runner
+                    args["code"] = f"import sqlite3\nimport pandas as pd\nconn = sqlite3.connect('kea.db')\nprint(pd.read_sql('{args['query']}', conn))"
+            
+            # Default to MCP Pure Routing
+            try:
+                # Use mcp_client to find and execute the tool on the appropriate server
+                result = await mcp_client.call_tool(actual_tool_name, args)
+            except Exception as e:
+                logger.error(f"Tool execution failed: {e}")
+                # Intercept error state too? Maybe later.
+                raise ValueError(f"Tool {name} (mapped to {actual_tool_name}) failed: {e}")
+
+        # =========================================================================
+        # AUTONOMIC MEMORY INTERCEPTOR (The Wiring Fix)
+        # =========================================================================
         try:
-            # Use mcp_client to find and execute the tool on the appropriate server
-            result = await mcp_client.call_tool(actual_tool_name, args)
-            return result
+            from services.orchestrator.core.interceptor import MemoryInterceptor
+            job_id = state.get("job_id", "unknown_trace")
+            
+            # Fire-and-forget storage to Postgres
+            await MemoryInterceptor.intercept(
+                trace_id=job_id,
+                source_node=name,
+                result=result,
+                inputs=args
+            )
         except Exception as e:
-            logger.error(f"Tool execution failed: {e}")
-            raise ValueError(f"Tool {name} (mapped to {actual_tool_name}) failed: {e}")
+            logger.warning(f"Interceptor failed (non-blocking): {e}")
+        # =========================================================================
+
+        return result
 
     # 3. Parallel Execution Loop
     completed = {inv["task_id"] for inv in tool_invocations if inv.get("success")}

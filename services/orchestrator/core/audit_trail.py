@@ -469,15 +469,26 @@ class AuditTrail:
         Initialize audit trail.
         
         Args:
-            backend: Storage backend (defaults to SQLite)
+            backend: Storage backend (defaults to Postgres -> SQLite)
         """
         if backend is None:
-            # Use SQLite by default, memory for minimal environments
-            try:
-                backend = SQLiteBackend()
-            except:
-                logger.warning("SQLite unavailable, using memory backend")
-                backend = MemoryBackend()
+            # 1. Try Postgres (The "God Database")
+            if os.getenv("DATABASE_URL"):
+                try:
+                    from services.orchestrator.core.postgres_audit import PostgresBackend
+                    backend = PostgresBackend()
+                    logger.debug("AuditTrail using PostgresBackend")
+                except Exception as e:
+                    logger.warning(f"Failed to init PostgresBackend: {e}, falling back...")
+            
+            # 2. Try SQLite (Local)
+            if backend is None:
+                try:
+                    backend = SQLiteBackend()
+                    logger.debug("AuditTrail using SQLiteBackend")
+                except Exception as e:
+                    logger.warning(f"SQLite unavailable ({e}), using memory backend")
+                    backend = MemoryBackend()
         
         self.backend = backend
         self._session_id = str(uuid4())[:8]

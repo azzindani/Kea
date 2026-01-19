@@ -296,39 +296,46 @@ def create_vector_store(use_memory: bool = False) -> VectorStore:
     """
     Create vector store based on configuration.
     
+    Priority:
+    1. Memory (if requested)
+    2. Postgres (if DATABASE_URL set) -> PRIMARY
+    3. Qdrant (Legacy/Deprioritized)
+    4. Memory (Fallback)
+    
     Args:
-        use_memory: Use in-memory store instead of Qdrant
+        use_memory: Use in-memory store instead of DB
         
     Returns:
-        VectorStore instance (Qdrant if available, else InMemory)
+        VectorStore instance
     """
     if use_memory:
         logger.info("Using in-memory vector store (requested)")
         return InMemoryVectorStore()
-    
+        
+    # Check for Postgres (The New "God Database")
+    db_url = os.getenv("DATABASE_URL")
+    if db_url:
+        try:
+            from services.rag_service.core.postgres_store import PostgresVectorStore
+            logger.info("Using PostgreSQL vector store (pgvector)")
+            return PostgresVectorStore()
+        except ImportError as e:
+            logger.warning(f"Failed to import PostgresVectorStore: {e}")
+        except Exception as e:
+            logger.error(f"Failed to initialize PostgresVectorStore: {e}")
+
+    # Fallback/Legacy Qdrant Logic
     qdrant_url = os.getenv("QDRANT_URL")
-    if not qdrant_url:
-        logger.info("Using in-memory vector store (no QDRANT_URL)")
-        return InMemoryVectorStore()
-    
-    # Try to connect to Qdrant, fallback to in-memory if unavailable
-    try:
-        from qdrant_client import QdrantClient
-        
-        api_key = os.getenv("QDRANT_API_KEY")
-        client = QdrantClient(url=qdrant_url, api_key=api_key, timeout=5)
-        
-        # Test connection
-        client.get_collections()
-        
-        logger.info(f"Using Qdrant vector store at {qdrant_url}")
-        return QdrantVectorStore()
-        
-    except ImportError:
-        logger.warning("qdrant_client not installed, using in-memory vector store")
-        return InMemoryVectorStore()
-        
-    except Exception as e:
-        logger.warning(f"Qdrant unavailable ({e}), using in-memory vector store")
-        return InMemoryVectorStore()
+    if qdrant_url:
+        try:
+            from qdrant_client import QdrantClient
+            logger.info(f"Using Qdrant vector store at {qdrant_url} (Legacy)")
+            return QdrantVectorStore()
+        except ImportError:
+            pass
+        except Exception:
+            pass
+            
+    logger.info("Using in-memory vector store (Fallback)")
+    return InMemoryVectorStore()
 

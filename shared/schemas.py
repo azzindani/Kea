@@ -183,3 +183,22 @@ class SessionManifest(BaseModel):
     # Metadata
     tags: list[str] = Field(default_factory=list)
     domain: str = ""
+
+
+# ============================================================================
+# Universal Node Protocol
+# ============================================================================
+
+class NodeOutput(BaseModel):
+    """
+    Standardized output from any Node/Tool in the system.
+    Enables n8n-style communication and uniform memory storage.
+    """
+    trace_id: str = Field(description="Linking ID (Job ID or Trace ID)")
+    source_node: str = Field(description="Name of the tool/node that produced this")
+    content: dict[str, Any] = Field(description="Structured content (text, data, files)")
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        extra = "allow"

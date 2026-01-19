@@ -268,28 +268,130 @@ def llm_provider():
 # Service Check Fixtures
 # =============================================================================
 
-async def check_service(url: str) -> bool:
-    """Check if a service is available."""
-    try:
-        async with httpx.AsyncClient(timeout=5) as client:
-            resp = await client.get(f"{url}/health")
-            return resp.status_code == 200
-    except Exception:
-        return False
+import subprocess
+import time
+import signal
 
+# =============================================================================
+# Service Lifecycle Management
+# =============================================================================
+
+async def wait_for_service(url: str, name: str, timeout: int = 30) -> bool:
+    """Wait for a service to become healthy."""
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        try:
+            async with httpx.AsyncClient(timeout=1.0) as client:
+                resp = await client.get(f"{url}/health")
+                if resp.status_code == 200:
+                    logging.info(f"✅ {name} is READY at {url}")
+                    return True
+        except Exception:
+            pass
+        await asyncio.sleep(0.5)
+        
+    logging.error(f"❌ {name} failed to start at {url} within {timeout}s")
+    return False
+
+@pytest.fixture(scope="session", autouse=True)
+async def bootstrap_services():
+    """
+    Ensure all microservices are running. 
+    Auto-starts them as subprocesses if not detected.
+    """
+    # 1. Check if already running (e.g. Docker or manual)
+    api_ok = await wait_for_service(API_GATEWAY_URL, "API Gateway", timeout=1)
+    orch_ok = await wait_for_service(ORCHESTRATOR_URL, "Orchestrator", timeout=1)
+    # RAG service URL assumption (usually 8001 based on plan)
+    RAG_URL = "http://localhost:8001"
+    rag_ok = await wait_for_service(RAG_URL, "RAG Service", timeout=1)
+
+    procs = []
+
+    # 2. Start missing services
+    if not (api_ok and orch_ok and rag_ok):
+        logging.info("🚀 Bootstrapping Microservices (Subprocesses)...")
+        env = os.environ.copy()
+        
+        # Ensure Critical Env Vars
+        if not env.get("DATABASE_URL"):
+             logging.warning("⚠️ DATABASE_URL not set! Services might fail.")
+        
+        # Paths are relative to project root (cwd)
+        # We assume pytest is run from project root
+        
+        # Start RAG Service (Port 8001)
+        if not rag_ok:
+            logging.info("   Starting RAG Service...")
+            p_rag = subprocess.Popen(
+                [sys.executable, "-m", "services.rag_service.main"],
+                env=env,
+                cwd=os.getcwd()
+            )
+            procs.append(p_rag)
+        
+        # Start Orchestrator (Port 8002 / 8000?)
+        # Note: conftest says 8000, plan says 8002. Let's trust env or standard.
+        # Docker compose says 8002 internal, mapped to 8002.
+        # conftest defaults to 8000. Let's assume 8000 is strictly for orchestrator
+        # BUT wait, the code says ORCHESTRATOR_URL defaults to http://localhost:8000
+        # docker-compose maps 8002:8002.
+        # Let's try to stick to what the code expects (8000) or update expectation.
+        # Orchestrator main.py usually uses port defined in args or env.
+        if not orch_ok:
+            logging.info("   Starting Orchestrator...")
+            p_orch = subprocess.Popen(
+                [sys.executable, "-m", "services.orchestrator.main"],
+                env=env,
+                cwd=os.getcwd()
+            )
+            procs.append(p_orch)
+
+        # Start API Gateway (Port 8080)
+        if not api_ok:
+            logging.info("   Starting API Gateway...")
+            p_api = subprocess.Popen(
+                [sys.executable, "-m", "services.api_gateway.main"],
+                env=env,
+                cwd=os.getcwd()
+            )
+            procs.append(p_api)
+            
+        # 3. Wait for startup
+        logging.info("⏳ Waiting for services to come online...")
+        # Give them a moment to crash or bind
+        await asyncio.sleep(5) 
+        
+        ready = await asyncio.gather(
+            wait_for_service(RAG_URL, "RAG Service"),
+            wait_for_service(ORCHESTRATOR_URL, "Orchestrator"),
+            wait_for_service(API_GATEWAY_URL, "API Gateway")
+        )
+        
+        if not all(ready):
+            logging.error("❌ Failed to verify all services. Tearing down...")
+            for p in procs:
+                p.terminate()
+            pytest.fail("Could not bootstrap Kea microservices.")
+
+    yield {"api_gateway": True, "custom_procs": len(procs) > 0}
+
+    # 4. Teardown
+    if procs:
+        logging.info("🛑 Tearing down bootstrapped services...")
+        for p in procs:
+            if p.poll() is None:
+                p.terminate()
+                try:
+                    p.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    p.kill()
+        logging.info("✅ Services stopped.")
 
 @pytest.fixture(scope="session")
-async def services_available():
-    """Check that all required services are running."""
-    api_ok = await check_service(API_GATEWAY_URL)
-    orch_ok = await check_service(ORCHESTRATOR_URL)
-    
-    if not api_ok:
-        pytest.skip(f"API Gateway not running at {API_GATEWAY_URL}")
-    if not orch_ok:
-        pytest.skip(f"Orchestrator not running at {ORCHESTRATOR_URL}")
-    
-    return {"api_gateway": api_ok, "orchestrator": orch_ok}
+def services_available(bootstrap_services):
+    """Compatibility fixture."""
+    return bootstrap_services
 
 
 # =============================================================================
