@@ -103,6 +103,11 @@ python -m services.orchestrator.main
 python -m services.mcp_host.main
 ```
 
+**RAG Service (Port 8003)**
+```bash
+python -m services.rag_service.main
+```
+
 **Vault (Port 8004)**
 ```bash
 python -m services.vault.main
@@ -295,6 +300,7 @@ All core components implemented and functional:
 | Component | Status | Description |
 |:----------|:------:|:------------|
 | **Orchestrator** | ✅ | LangGraph state machine, research pipeline |
+| **RAG Service** | ✅ | External Knowledge Engine, Hugging Face ingestion |
 | **17 MCP Servers** | ✅ | Scraper, Python, Search, Vision, Analysis, + 12 more |
 | **LLM Integration** | ✅ | OpenRouter, query classification, agent personas |
 | **Hardware Adaptation** | ✅ | Auto-detect CPU/RAM/GPU, graceful degradation |

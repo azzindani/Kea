@@ -11,7 +11,7 @@ It is responsible for breaking down user queries, coordinating MCP tools, and sy
 The Orchestrator operates as a **Cyclic State Machine**, allowing it to "Think Fast" (Router) and "Think Slow" (Deep Research Loop). It delegates execution logic to specialized microservices.
 
 1.  **Planning Layer**: Decomposes complex queries into atomic micro-tasks.
-2.  **Delegation Layer** (NEW): Dispatches tool execution to **MCP Host** (Port 8003).
+2.  **Delegation Layer** (NEW): Dispatches tool execution to **MCP Host** (Port 8002).
 3.  **Auditing Layer** (NEW): Asynchronously logs all state changes to **Vault** (Port 8004).
 4.  **Consensus Layer**: Adversarial Agents (Generator vs Critic) verify the final output.
 
@@ -157,7 +157,7 @@ The Orchestrator relies on the following internal microservices (wired via `shar
 
 | Dependency | Purpose | Integration Point |
 |:-----------|:--------|:------------------|
-| **MCP Host** (Port 8003) | **Tool Execution**. The Orchestrator plans tasks, but sends JSON-RPC payloads to MCP Host for actual execution. | `nodes.researcher.call_tool` |
+| **MCP Host** (Port 8002) | **Tool Execution**. The Orchestrator plans tasks, but sends JSON-RPC payloads to MCP Host for actual execution. | `nodes.researcher.call_tool` |
 | **Vault** (Port 8004) | **Memory & Audit**. Logs every state transition and tool result for compliance and long-term recall. | `core.pipeline.process_message` |
 | **Swarm Manager** (Port 8005) | **Compliance**. While MCP Host performs the check, the Orchestrator adheres to policies set by Swarm. | Implicit via MCP Host |
 | **Chronos** (Port 8006) | **Scheduling**. Triggers orchestrated jobs based on time events. | `main.trigger_job` |
@@ -177,7 +177,7 @@ The Orchestrator manages the job lifecycle through 4 distinct "Cognitive Phases"
 
 ### Phase 3: Recursive Extraction (The Researcher & Keeper)
 - **Input**: The Micro-Tasks.
-- **Action**: Calls **MCP Host** (Port 8003) for tools.
+- **Action**: Calls **MCP Host** (Port 8002) for tools.
 - **Loop**: The **Keeper** evaluates the results. If facts are contradictory or insufficient, it sends the Researcher back with a narrowed query.
 
 ### Phase 4: Adversarial Synthesis (Consensus Engine)

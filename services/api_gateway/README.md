@@ -23,6 +23,7 @@ graph TD
         
         Router -->|/chat/message| Orch[Orchestrator<br/>(Port 8001)]
         Router -->|/tools/call| MCP[MCP Host<br/>(Port 8002)]
+        Router -->|/datasets| RAG[RAG Service<br/>(Port 8003)]
         Router -->|/audit/logs| Vault[Vault Service<br/>(Port 8004)]
         Router -->|/jobs| Chronos[Chronos Service<br/>(Port 8006)]
     end
