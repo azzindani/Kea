@@ -22,9 +22,9 @@ dependencies = [
     "openai>=1.10.0",  # OpenRouter compatible
     "httpx>=0.26.0",
     # Vector DB & RAG
-    "qdrant-client>=1.7.0",
     # Data Processing
     "pandas>=2.1.0",
+    "datasets>=2.16.0",
     "duckdb>=0.9.0",
     "pyarrow>=14.0.0",
     # Web Scraping

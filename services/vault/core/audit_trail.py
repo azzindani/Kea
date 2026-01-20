@@ -2,7 +2,7 @@
 Audit Trail System.
 
 Provides immutable audit logging for compliance requirements.
-Supports SQLite (local) and PostgreSQL (production).
+Supports PostgreSQL (production) and In-Memory (testing).
 """
 
 from __future__ import annotations
@@ -179,206 +179,6 @@ class AuditBackend(ABC):
         pass
 
 
-class SQLiteBackend(AuditBackend):
-    """SQLite backend for local/development use."""
-    
-    def __init__(self, db_path: str = "data/audit_trail.db"):
-        self.db_path = db_path
-        self._initialized = False
-    
-    async def _ensure_initialized(self):
-        """Ensure database is initialized."""
-        if self._initialized:
-            return
-        
-        import aiosqlite
-        import os
-        
-        os.makedirs(os.path.dirname(self.db_path) or ".", exist_ok=True)
-        
-        async with aiosqlite.connect(self.db_path) as db:
-            await db.execute("""
-                CREATE TABLE IF NOT EXISTS audit_trail (
-                    entry_id TEXT PRIMARY KEY,
-                    timestamp TEXT NOT NULL,
-                    event_type TEXT NOT NULL,
-                    actor TEXT NOT NULL,
-                    action TEXT NOT NULL,
-                    resource TEXT,
-                    details TEXT,
-                    parent_id TEXT,
-                    session_id TEXT,
-                    checksum TEXT NOT NULL,
-                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            await db.execute("""
-                CREATE INDEX IF NOT EXISTS idx_timestamp ON audit_trail(timestamp)
-            """)
-            await db.execute("""
-                CREATE INDEX IF NOT EXISTS idx_event_type ON audit_trail(event_type)
-            """)
-            await db.execute("""
-                CREATE INDEX IF NOT EXISTS idx_session ON audit_trail(session_id)
-            """)
-            await db.commit()
-        
-        self._initialized = True
-        logger.debug(f"SQLite audit backend initialized: {self.db_path}")
-    
-    async def write(self, entry: AuditEntry) -> bool:
-        """Write entry to SQLite."""
-        await self._ensure_initialized()
-        
-        try:
-            import aiosqlite
-            
-            async with aiosqlite.connect(self.db_path) as db:
-                await db.execute("""
-                    INSERT INTO audit_trail 
-                    (entry_id, timestamp, event_type, actor, action, resource, 
-                     details, parent_id, session_id, checksum)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    entry.entry_id,
-                    entry.timestamp.isoformat(),
-                    entry.event_type.value if hasattr(entry.event_type, 'value') else str(entry.event_type),
-                    entry.actor,
-                    entry.action,
-                    entry.resource,
-                    json.dumps(entry.details),
-                    entry.parent_id,
-                    entry.session_id,
-                    entry.checksum,
-                ))
-                await db.commit()
-            return True
-            
-        except Exception as e:
-            logger.error(f"Failed to write audit entry: {e}")
-            return False
-    
-    async def query(
-        self,
-        start_time: datetime = None,
-        end_time: datetime = None,
-        event_types: list[AuditEventType] = None,
-        actor: str = None,
-        session_id: str = None,
-        limit: int = 1000,
-    ) -> list[AuditEntry]:
-        """Query entries from SQLite."""
-        await self._ensure_initialized()
-        
-        try:
-            import aiosqlite
-            
-            conditions = []
-            params = []
-            
-            if start_time:
-                conditions.append("timestamp >= ?")
-                params.append(start_time.isoformat())
-            
-            if end_time:
-                conditions.append("timestamp <= ?")
-                params.append(end_time.isoformat())
-            
-            if event_types:
-                placeholders = ",".join("?" * len(event_types))
-                conditions.append(f"event_type IN ({placeholders})")
-                params.extend(e.value for e in event_types)
-            
-            if actor:
-                conditions.append("actor = ?")
-                params.append(actor)
-            
-            if session_id:
-                conditions.append("session_id = ?")
-                params.append(session_id)
-            
-            where_clause = " AND ".join(conditions) if conditions else "1=1"
-            
-            async with aiosqlite.connect(self.db_path) as db:
-                db.row_factory = aiosqlite.Row
-                async with db.execute(f"""
-                    SELECT * FROM audit_trail
-                    WHERE {where_clause}
-                    ORDER BY timestamp DESC
-                    LIMIT ?
-                """, params + [limit]) as cursor:
-                    rows = await cursor.fetchall()
-            
-            entries = []
-            for row in rows:
-                entries.append(AuditEntry(
-                    entry_id=row["entry_id"],
-                    timestamp=datetime.fromisoformat(row["timestamp"]),
-                    event_type=AuditEventType(row["event_type"]),
-                    actor=row["actor"],
-                    action=row["action"],
-                    resource=row["resource"] or "",
-                    details=json.loads(row["details"]) if row["details"] else {},
-                    parent_id=row["parent_id"] or "",
-                    session_id=row["session_id"] or "",
-                    checksum=row["checksum"],
-                ))
-            
-            return entries
-            
-        except Exception as e:
-            logger.error(f"Failed to query audit entries: {e}")
-            return []
-    
-    async def get_by_id(self, entry_id: str) -> AuditEntry | None:
-        """Get single entry by ID."""
-        await self._ensure_initialized()
-        
-        try:
-            import aiosqlite
-            
-            async with aiosqlite.connect(self.db_path) as db:
-                db.row_factory = aiosqlite.Row
-                async with db.execute(
-                    "SELECT * FROM audit_trail WHERE entry_id = ?",
-                    (entry_id,)
-                ) as cursor:
-                    row = await cursor.fetchone()
-            
-            if row:
-                return AuditEntry(
-                    entry_id=row["entry_id"],
-                    timestamp=datetime.fromisoformat(row["timestamp"]),
-                    event_type=AuditEventType(row["event_type"]),
-                    actor=row["actor"],
-                    action=row["action"],
-                    resource=row["resource"] or "",
-                    details=json.loads(row["details"]) if row["details"] else {},
-                    parent_id=row["parent_id"] or "",
-                    session_id=row["session_id"] or "",
-                    checksum=row["checksum"],
-                )
-            return None
-            
-        except Exception as e:
-            logger.error(f"Failed to get audit entry: {e}")
-            return None
-    
-    async def count(self) -> int:
-        """Get total entry count."""
-        await self._ensure_initialized()
-        
-        try:
-            import aiosqlite
-            
-            async with aiosqlite.connect(self.db_path) as db:
-                async with db.execute("SELECT COUNT(*) FROM audit_trail") as cursor:
-                    row = await cursor.fetchone()
-                    return row[0] if row else 0
-        except:
-            return 0
-
-
 class MemoryBackend(AuditBackend):
     """In-memory backend for testing and lightweight use."""
     
@@ -469,26 +269,22 @@ class AuditTrail:
         Initialize audit trail.
         
         Args:
-            backend: Storage backend (defaults to Postgres -> SQLite)
+            backend: Storage backend (defaults to Postgres -> Memory)
         """
         if backend is None:
-            # 1. Try Postgres (The "God Database")
+            # 1. Try Postgres (Primary)
             if os.getenv("DATABASE_URL"):
                 try:
                     from services.vault.core.postgres_audit import PostgresBackend
                     backend = PostgresBackend()
                     logger.debug("AuditTrail using PostgresBackend")
                 except Exception as e:
-                    logger.warning(f"Failed to init PostgresBackend: {e}, falling back...")
+                    logger.warning(f"Failed to init PostgresBackend: {e}, falling back to Memory")
             
-            # 2. Try SQLite (Local)
+            # 2. Fallback to Memory
             if backend is None:
-                try:
-                    backend = SQLiteBackend()
-                    logger.debug("AuditTrail using SQLiteBackend")
-                except Exception as e:
-                    logger.warning(f"SQLite unavailable ({e}), using memory backend")
-                    backend = MemoryBackend()
+                backend = MemoryBackend()
+                logger.info("AuditTrail using MemoryBackend (No Database Configured)")
         
         self.backend = backend
         self._session_id = str(uuid4())[:8]

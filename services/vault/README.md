@@ -8,7 +8,7 @@ The **Vault Service** is the comprehensive data layer for Kea. It centralizes al
 
 The Vault aggregates three distinct types of storage behind a single API:
 
-1.  **Vector Store (Qdrant)**: Stores "Atomic Facts" for GraphRAG and semantic search.
+1.  **Vector Store (Postgres + pgvector)**: Stores "Atomic Facts" for GraphRAG and semantic search.
 2.  **Relational DB (Postgres/SQLite)**: Stores Service State, Job History, and Checkpoints.
 3.  **Audit Trail (Immutable Log)**: Stores a sequential history of every Agent Action, Tool Call, and Compliance Decision.
 
@@ -19,14 +19,14 @@ graph TD
     subgraph "Vault Service (Port 8004)"
         API --> Router{Data Router}
         
-        Router -->|Fact| Vector[Qdrant Client]
+        Router -->|Fact| Vector[PGVector Client]
         Router -->|State| SQL[SQLAlchemy Engine]
         Router -->|Log| Audit[Audit Manager]
     end
     
     subgraph "Persistence Layer"
-        Vector --> Qdrant[(Qdrant DB)]
-        SQL --> Postgres[(Postgres DB)]
+        Vector --> Postgres[(Postgres + pgvector)]
+        SQL --> Postgres
         Audit --> Logs[(Audit File/Table)]
     end
 ```
@@ -40,7 +40,7 @@ graph TD
 | **`main.py`** | **Entry Point** | FastAPI app (Port 8004). Exposes `audit`, `memory`, `state` routes. |
 | **`core/`** | **Logic** | Data management logic. |
 | ├── `audit_trail.py` | Compliance | Writes structured logs (JSON/DB). |
-| ├── `vector_store.py` | Intelligence | Qdrant wrapper for adding/retrieving facts. |
+| ├── `vector_store.py` | Intelligence | pgvector wrapper for adding/retrieving facts. |
 | ├── `checkpointing.py`| State | LangGraph CheckpointSaver implementation for Postgres. |
 | └── `models.py` | Schema | SQLAlchemy ORM models. |
 

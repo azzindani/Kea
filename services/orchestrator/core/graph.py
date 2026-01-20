@@ -374,7 +374,7 @@ async def researcher_node(state: GraphState) -> GraphState:
                     args["code"] = args.pop("script")
                 elif "query" in args and name == "sql_query":
                     # Synthesize SQL runner
-                    args["code"] = f"import sqlite3\nimport pandas as pd\nconn = sqlite3.connect('kea.db')\nprint(pd.read_sql('{args['query']}', conn))"
+                    args["code"] = f"import os\nimport pandas as pd\nfrom sqlalchemy import create_engine\n# Requires DATABASE_URL to be set in environment\nengine = create_engine(os.getenv('DATABASE_URL'))\nprint(pd.read_sql('{args['query']}', engine))"
             
             # Default to MCP Pure Routing
             try:

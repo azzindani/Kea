@@ -2,7 +2,6 @@
 Database Connection Management.
 
 Production-ready PostgreSQL connection pool with health checks.
-Falls back to SQLite for development/testing.
 """
 
 from __future__ import annotations
@@ -23,8 +22,8 @@ logger = get_logger(__name__)
 class DatabaseConfig:
     """Database configuration."""
     url: str
-    min_connections: int = 2
-    max_connections: int = 10
+    min_connections: int = 5
+    max_connections: int = 20
     connection_timeout: float = 30.0
     idle_timeout: float = 300.0
     
@@ -33,24 +32,26 @@ class DatabaseConfig:
         """Create config from environment."""
         env_config = get_environment_config()
         
-        url = os.getenv("DATABASE_URL", "")
+        url = os.getenv("DATABASE_URL")
+        if not url:
+            # Fallback for local dev if not set, but must be Postgres
+            # raise ValueError("DATABASE_URL environment variable is required")
+            # Actually, let's allow it to be None and fail at init if strictly required, 
+            # or just default to a local postgres url if commonly used?
+            # User requirement: "exclusively use PostgreSQL". 
+            # Better to be explicit.
+             pass 
+
+        if not url:
+             logger.warning("DATABASE_URL not set. Database features will fail.")
         
-        if env_config.is_production:
-            return cls(
-                url=url,
-                min_connections=5,
-                max_connections=20,
-                connection_timeout=10.0,
-                idle_timeout=600.0,
-            )
-        else:
-            return cls(
-                url=url or "sqlite:///data/dev.db",
-                min_connections=1,
-                max_connections=5,
-                connection_timeout=30.0,
-                idle_timeout=300.0,
-            )
+        return cls(
+            url=url or "",
+            min_connections=int(os.getenv("DATABASE_MIN_CONNECTIONS", "5")),
+            max_connections=int(os.getenv("DATABASE_MAX_CONNECTIONS", "20")),
+            connection_timeout=10.0 if env_config.is_production else 30.0,
+            idle_timeout=600.0,
+        )
 
 
 class DatabasePool:
@@ -58,14 +59,12 @@ class DatabasePool:
     Async database connection pool.
     
     Supports:
-    - PostgreSQL (asyncpg)
-    - SQLite fallback (aiosqlite)
+    - PostgreSQL (asyncpg) ONLY
     """
     
     def __init__(self, config: DatabaseConfig = None):
         self.config = config or DatabaseConfig.from_environment()
         self._pool = None
-        self._is_postgres = "postgres" in self.config.url
         self._is_initialized = False
     
     async def initialize(self):
@@ -73,11 +72,10 @@ class DatabasePool:
         if self._is_initialized:
             return
         
-        if self._is_postgres:
-            await self._init_postgres()
-        else:
-            await self._init_sqlite()
-        
+        if not self.config.url:
+            raise ValueError("Cannot initialize DatabasePool: DATABASE_URL is missing")
+            
+        await self._init_postgres()
         self._is_initialized = True
     
     async def _init_postgres(self):
@@ -95,29 +93,13 @@ class DatabasePool:
             
             logger.info(f"PostgreSQL pool initialized: {self.config.min_connections}-{self.config.max_connections} connections")
             
-        except ImportError:
-            logger.warning("asyncpg not installed, falling back to SQLite")
-            self._is_postgres = False
-            await self._init_sqlite()
         except Exception as e:
-            logger.warning(f"PostgreSQL connection failed: {e}, falling back to SQLite")
-            self._is_postgres = False
-            self.config.url = "sqlite:///data/dev.db"
-            await self._init_sqlite()
-    
-    async def _init_sqlite(self):
-        """Initialize SQLite (for development)."""
-        import os
-        
-        # Extract path from URL
-        path = self.config.url.replace("sqlite:///", "")
-        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-        
-        logger.info(f"SQLite initialized: {path}")
+            logger.error(f"PostgreSQL connection failed: {e}")
+            raise
     
     async def close(self):
         """Close connection pool."""
-        if self._pool and self._is_postgres:
+        if self._pool:
             await self._pool.close()
             logger.info("Database pool closed")
         self._is_initialized = False
@@ -128,63 +110,41 @@ class DatabasePool:
         if not self._is_initialized:
             await self.initialize()
         
-        if self._is_postgres:
-            async with self._pool.acquire() as conn:
-                yield conn
-        else:
-            import aiosqlite
-            path = self.config.url.replace("sqlite:///", "")
-            async with aiosqlite.connect(path) as conn:
-                conn.row_factory = aiosqlite.Row
-                yield conn
+        async with self._pool.acquire() as conn:
+            yield conn
     
     async def execute(self, query: str, *args) -> Any:
         """Execute query."""
         async with self.acquire() as conn:
-            if self._is_postgres:
-                return await conn.execute(query, *args)
-            else:
-                await conn.execute(query, args)
-                await conn.commit()
+            return await conn.execute(query, *args)
     
     async def fetch(self, query: str, *args) -> list:
         """Fetch all rows."""
         async with self.acquire() as conn:
-            if self._is_postgres:
-                return await conn.fetch(query, *args)
-            else:
-                async with conn.execute(query, args) as cursor:
-                    return await cursor.fetchall()
+            return await conn.fetch(query, *args)
     
     async def fetchrow(self, query: str, *args) -> Any:
         """Fetch single row."""
         async with self.acquire() as conn:
-            if self._is_postgres:
-                return await conn.fetchrow(query, *args)
-            else:
-                async with conn.execute(query, args) as cursor:
-                    return await cursor.fetchone()
+            return await conn.fetchrow(query, *args)
     
     async def health_check(self) -> dict:
         """Check database health."""
         try:
             if not self._is_initialized:
+                # Don't auto-init if no URL to avoid noise
+                if not self.config.url:
+                     return {"status": "unhealthy", "error": "DATABASE_URL missing"}
                 await self.initialize()
             
             async with self.acquire() as conn:
-                if self._is_postgres:
-                    result = await conn.fetchval("SELECT 1")
-                    pool_size = self._pool.get_size()
-                    pool_free = self._pool.get_idle_size()
-                else:
-                    async with conn.execute("SELECT 1") as cursor:
-                        result = await cursor.fetchone()
-                    pool_size = 1
-                    pool_free = 1
+                result = await conn.fetchval("SELECT 1")
+                pool_size = self._pool.get_size()
+                pool_free = self._pool.get_idle_size()
             
             return {
                 "status": "healthy",
-                "type": "postgresql" if self._is_postgres else "sqlite",
+                "type": "postgresql",
                 "pool_size": pool_size,
                 "pool_free": pool_free,
             }
@@ -208,7 +168,9 @@ async def get_database_pool() -> DatabasePool:
     global _database_pool
     if _database_pool is None:
         _database_pool = DatabasePool()
-        await _database_pool.initialize()
+        # Lazy init is better, but some prefer explicit
+        if _database_pool.config.url:
+             await _database_pool.initialize()
     return _database_pool
 
 

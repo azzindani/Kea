@@ -73,163 +73,6 @@ class VectorStore(ABC):
 
 
 # ============================================================================
-# Qdrant Implementation
-# ============================================================================
-
-class QdrantVectorStore(VectorStore):
-    """
-    Qdrant vector store implementation.
-    
-    Uses Qwen3-Embedding-8B via OpenRouter for embeddings.
-    Requires QDRANT_URL and optionally QDRANT_API_KEY.
-    """
-    
-    def __init__(
-        self,
-        collection_name: str = "research_facts",
-        embedding_dim: int = 1024,  # Qwen3 default
-        use_local_embedding: bool = False,
-    ) -> None:
-        self.collection_name = collection_name
-        self.embedding_dim = embedding_dim
-        self.use_local_embedding = use_local_embedding
-        self._client = None
-        self._embedding_provider = None
-    
-    async def _get_client(self):
-        """Get or create Qdrant client."""
-        if self._client is None:
-            from qdrant_client import QdrantClient
-            from qdrant_client.http.models import Distance, VectorParams
-            
-            url = os.getenv("QDRANT_URL", "http://localhost:6333")
-            api_key = os.getenv("QDRANT_API_KEY")
-            
-            self._client = QdrantClient(url=url, api_key=api_key)
-            
-            # Ensure collection exists
-            collections = self._client.get_collections()
-            if self.collection_name not in [c.name for c in collections.collections]:
-                self._client.create_collection(
-                    collection_name=self.collection_name,
-                    vectors_config=VectorParams(
-                        size=self.embedding_dim,
-                        distance=Distance.COSINE,
-                    )
-                )
-                logger.info(f"Created Qdrant collection: {self.collection_name}")
-        
-        return self._client
-    
-    async def _get_embedding(self, text: str) -> list[float]:
-        """Get embedding for text using Qwen3 embedding provider."""
-        if self._embedding_provider is None:
-            from shared.embedding import create_embedding_provider
-            
-            self._embedding_provider = create_embedding_provider(
-                use_local=self.use_local_embedding,
-                dimension=self.embedding_dim,
-            )
-        
-        return await self._embedding_provider.embed_query(text)
-    
-    async def add(self, documents: list[Document]) -> list[str]:
-        """Add documents to Qdrant."""
-        from qdrant_client.http.models import PointStruct
-        
-        client = await self._get_client()
-        
-        points = []
-        for doc in documents:
-            # Generate embedding if not provided
-            if doc.embedding is None:
-                doc.embedding = await self._get_embedding(doc.content)
-            
-            points.append(PointStruct(
-                id=doc.id,
-                vector=doc.embedding,
-                payload={
-                    "content": doc.content,
-                    **doc.metadata,
-                }
-            ))
-        
-        client.upsert(collection_name=self.collection_name, points=points)
-        
-        logger.info(f"Added {len(documents)} documents to Qdrant")
-        return [doc.id for doc in documents]
-    
-    async def search(
-        self,
-        query: str,
-        limit: int = 10,
-        filter: dict | None = None,
-    ) -> list[SearchResult]:
-        """Search for similar documents."""
-        client = await self._get_client()
-        
-        query_embedding = await self._get_embedding(query)
-        
-        # Use query_points for newer qdrant-client versions, fallback to search
-        try:
-            # Try newer API first (qdrant-client >= 1.10)
-            from qdrant_client.http.models import QueryRequest
-            results = client.query_points(
-                collection_name=self.collection_name,
-                query=query_embedding,
-                limit=limit,
-                query_filter=filter,
-            ).points
-        except (AttributeError, ImportError):
-            # Fallback to older search API
-            results = client.search(
-                collection_name=self.collection_name,
-                query_vector=query_embedding,
-                limit=limit,
-                query_filter=filter,
-            )
-        
-        return [
-            SearchResult(
-                id=str(r.id),
-                content=r.payload.get("content", "") if r.payload else "",
-                score=r.score if hasattr(r, 'score') else 0.0,
-                metadata={k: v for k, v in (r.payload or {}).items() if k != "content"},
-            )
-            for r in results
-        ]
-    
-    async def get(self, ids: list[str]) -> list[Document]:
-        """Get documents by ID."""
-        client = await self._get_client()
-        
-        results = client.retrieve(
-            collection_name=self.collection_name,
-            ids=ids,
-        )
-        
-        return [
-            Document(
-                id=str(r.id),
-                content=r.payload.get("content", ""),
-                metadata={k: v for k, v in r.payload.items() if k != "content"},
-            )
-            for r in results
-        ]
-    
-    async def delete(self, ids: list[str]) -> None:
-        """Delete documents by ID."""
-        client = await self._get_client()
-        
-        client.delete(
-            collection_name=self.collection_name,
-            points_selector=ids,
-        )
-        
-        logger.info(f"Deleted {len(ids)} documents from Qdrant")
-
-
-# ============================================================================
 # In-Memory Implementation (for testing)
 # ============================================================================
 
@@ -298,9 +141,7 @@ def create_vector_store(use_memory: bool = False) -> VectorStore:
     
     Priority:
     1. Memory (if requested)
-    2. Postgres (if DATABASE_URL set) -> PRIMARY
-    3. Qdrant (Legacy/Deprioritized)
-    4. Memory (Fallback)
+    2. PostgreSQL (pgvector) -> ONLY supported DB
     
     Args:
         use_memory: Use in-memory store instead of DB
@@ -312,7 +153,7 @@ def create_vector_store(use_memory: bool = False) -> VectorStore:
         logger.info("Using in-memory vector store (requested)")
         return InMemoryVectorStore()
         
-    # Check for Postgres (The New "God Database")
+    # Check for Postgres (The Only Database)
     db_url = os.getenv("DATABASE_URL")
     if db_url:
         try:
@@ -320,21 +161,13 @@ def create_vector_store(use_memory: bool = False) -> VectorStore:
             logger.info("Using PostgreSQL vector store (pgvector)")
             return PostgresVectorStore()
         except ImportError as e:
-            logger.warning(f"Failed to import PostgresVectorStore: {e}")
+            logger.error(f"Failed to import postgres_store: {e}")
+            raise
         except Exception as e:
             logger.error(f"Failed to initialize PostgresVectorStore: {e}")
-
-    # Fallback/Legacy Qdrant Logic
-    qdrant_url = os.getenv("QDRANT_URL")
-    if qdrant_url:
-        try:
-            from qdrant_client import QdrantClient
-            logger.info(f"Using Qdrant vector store at {qdrant_url} (Legacy)")
-            return QdrantVectorStore()
-        except ImportError:
-            pass
-        except Exception:
-            pass
+            raise
             
-    logger.info("Using in-memory vector store (Fallback)")
+    # Default fallback if no DB configured
+    logger.warning("DATABASE_URL not set. Falling back to in-memory store (Data will be lost on restart)")
     return InMemoryVectorStore()
+

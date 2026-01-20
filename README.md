@@ -18,7 +18,7 @@ Kea adopts the **Model Context Protocol (MCP)** as its universal tool calling in
 Kea v3.3 introduces a **Persistent Tool Registry** to handle large-scale tool ecosystems (1,000+ tools).
 - **Problem**: Injecting 1,000 JSON schemas into the System Prompt is impossible/expensive.
 - **Solution**:
-    1.  **Indexing**: On startup, Kea incrementally indexes tools into a local SQLite + Vector database (`data/kea.db`).
+    1.  **Indexing**: On startup, Kea incrementally indexes tools into a local **PostgreSQL** database (via `pgvector`).
     2.  **Retrieval**: The Planner uses semantic search to find the "Top-20" most relevant tools for the specific query.
     3.  **Injection**: Only relevant schemas are injected into the context.
     4.  **Zero-Maintenance**: The system automatically hashes and updates the registry on startup. No manual sync required.
@@ -27,12 +27,12 @@ Kea v3.3 introduces a **Persistent Tool Registry** to handle large-scale tool ec
 **"Pure MCP" & JIT Execution**:
 Kea uses a **Pure MCP** architecture. The Orchestrator has *zero* tool code dependencies and delegates all execution to the **MCP Host Service**.
 - **JIT (Just-In-Time)**: Tools are ephemeral. When a tool is called, Kea uses `uv` to spawn a pristine environment with exact dependencies.
-- **Registry-First**: The Orchestrator discovers tools via the `PersistentToolRegistry` (SQLite), ensuring it can handle 1,000+ tools without bloating prompt context.
+- **Registry-First**: The Orchestrator discovers tools via the `PersistentToolRegistry` (Postgres), ensuring it can handle 1,000+ tools without bloating prompt context.
 
 ```mermaid
 sequenceDiagram
     participant Planner as Orchestrator (Brain)
-    participant Registry as Jarvis Registry (SQLite)
+    participant Registry as Jarvis Registry (Postgres)
     participant Host as MCP Host (Hands)
     participant Tool as Ephemeral Tool (Process)
 
@@ -481,7 +481,7 @@ graph TD
     subgraph "Vault Service (Port 8004)"
         VaultAPI[FastAPI Endpoint]
         AuditLog[Audit Logger]
-        VectorDB[(Qdrant Vector DB)]
+        VectorDB[(Postgres + pgvector)]
         SQLDB[(Postgres SQL DB)]
         
         VaultAPI --> AuditLog
@@ -534,9 +534,10 @@ graph TD
 1. **API Gateway (Port 8000)**: The single entry point. Handles Auth, Rate Limiting, and routing to internal services.
 2. **Orchestrator (Port 8001)**: The "Brain". Runs the LangGraph state machine, plans research, and synthesizes results. It contains *zero* tool code.
 3. **MCP Host (Port 8002)**: The "Hands". Manages the 17 MCP tools, handles parallel execution, and maintains the Tool Registry.
-4. **Vault (Port 8004)**: The "Memory". Centralized storage for Vector Search (Qdrant), SQL (Postgres), Audit Logs, and Graph Checkpoints.
-5. **Swarm Manager (Port 8005)**: The "Conscience". Enforces ISO/SOC2 Compliance, runs the "Kill Switch", and supervises Agent Health.
-6. **Chronos (Port 8006)**: The "Timekeeper". Manages scheduled jobs and "Time-Travel" debugging.
+4. **Vault (Port 8004)**: The "Memory". Centralized storage for Vector Search (pgvector), SQL (Postgres), Audit Logs, and Graph Checkpoints.
+5. **RAG Service (Port 8003)**: The "Library". External Knowledge Engine for ingesting and searching Hugging Face datasets.
+6. **Swarm Manager (Port 8005)**: The "Conscience". Enforces ISO/SOC2 Compliance, runs the "Kill Switch", and supervises Agent Health.
+7. **Chronos (Port 8006)**: The "Timekeeper". Manages scheduled jobs and "Time-Travel" debugging.
 
 ---
 
@@ -564,7 +565,7 @@ For RESEARCH queries, the **Intention Router** selects the optimal execution pat
 *   **Trigger:** User asks a question partially covered by previous research.
 *   **Logic:**
     1.  **Introspection:** The Planner decomposes the query into atomic facts ($A, B, C$).
-    2.  **Vector Lookup:** Checks `Atomic Facts DB` for $A, B, C$.
+    2.  **Vector Lookup:** Checks `Atomic Facts Table` (pgvector) for $A, B, C$.
     3.  **Gap Analysis:** The system generates a research task *only* for missing facts.
 *   **Outcome:** 50-80% reduction in API costs and latency.
 
@@ -678,7 +679,7 @@ Kea v3.0 introduces a hardware-aware parallel dispatcher that maximizes throughp
 | **Orchestrator** | **Python / LangGraph** | Cyclic state management and consensus loops. |
 | **API Interface** | **FastAPI** | Asynchronous microservice communication. |
 | **Analysis** | **Pandas / DuckDB** | In-memory SQL/Dataframe manipulation for "Shadow Lab". |
-| **Memory** | **Qdrant + GraphRAG** | Storage of atomic facts and their relationships. |
+| **Memory** | **PostgreSQL + pgvector** | Unified storage for Atomic Facts, Tool Registry, Embeddings, and Audit Logs. | |
 | **Storage** | **Parquet / S3** | Efficient storage of "Artifacts" (Raw DataFrames). |
 | **Isolation** | **Docker / E2B** | Sandboxed code execution environment. |
 | **Browser** | **Playwright** | Headless, stealthy web scraping with vision capabilities. |
@@ -826,9 +827,9 @@ We use a centralized configuration loader that detects the environment.
 
 | Feature | Local / Colab Mode | Production / VPS Mode |
 | :--- | :--- | :--- |
-| **Database** | SQLite (File) | PostgreSQL (Server) |
+| **Database** | PostgreSQL (Server) | PostgreSQL (Server) |
 | **Queue** | Python `threading` | Redis |
-| **Vector DB** | Chroma (Local File) | Qdrant / Weaviate (Server) |
+| **Vector DB** | PostgreSQL (pgvector) | PostgreSQL (pgvector) |
 | **Browser** | Local Playwright | Browserless / ScrapingBee |
 
 ### 8.2. Production Docker Compose
@@ -851,8 +852,9 @@ services:
     
   # The State
   redis: {image: "redis:alpine"}
-  db: {image: "postgres:15"}
-  qdrant: {image: "qdrant/qdrant"}
+  db: 
+    image: "pgvector/pgvector:pg16"
+    volumes: [postgres_data:/var/lib/postgresql/data]
 ```
 
 ---

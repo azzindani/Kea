@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field
 
 from services.rag_service.core import (
@@ -17,6 +17,7 @@ from services.rag_service.core import (
     create_artifact_store,
     Artifact,
 )
+from services.rag_service.core.dataset_loader import DatasetLoader
 from shared.schemas import AtomicFact
 from shared.config import get_settings
 from shared.logging import setup_logging, get_logger, LogConfig
@@ -27,13 +28,14 @@ logger = get_logger(__name__)
 
 # Global stores
 fact_store: FactStore | None = None
+dataset_loader: DatasetLoader | None = None
 artifact_store = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager."""
-    global fact_store, artifact_store
+    global fact_store, artifact_store, dataset_loader
     
     settings = get_settings()
     
@@ -48,6 +50,7 @@ async def lifespan(app: FastAPI):
     # Initialize stores
     vector_store = create_vector_store()
     fact_store = FactStore(vector_store)
+    dataset_loader = DatasetLoader()
     artifact_store = create_artifact_store()
     
     logger.info("RAG Service initialized")
@@ -59,8 +62,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Kea RAG Service",
-    description="Fact storage and semantic search service",
-    version="0.1.0",
+    description="External Knowledge Engine (Hugging Face Integration)",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
@@ -81,6 +84,7 @@ class AddFactRequest(BaseModel):
     source_url: str
     source_title: str = ""
     confidence_score: float = Field(default=0.8, ge=0.0, le=1.0)
+    dataset_id: str | None = None
 
 
 class SearchRequest(BaseModel):
@@ -88,7 +92,16 @@ class SearchRequest(BaseModel):
     query: str
     limit: int = Field(default=10, ge=1, le=100)
     entity: str | None = None
+    dataset_id: str | None = None
     min_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+
+
+class IngestRequest(BaseModel):
+    """Dataset ingestion request."""
+    dataset_name: str
+    split: str = "train"
+    max_rows: int = 1000
+    mapping: dict[str, str] | None = None
 
 
 class FactResponse(BaseModel):
@@ -130,7 +143,7 @@ async def add_fact(request: AddFactRequest):
         confidence_score=request.confidence_score,
     )
     
-    fact_id = await fact_store.add_fact(fact)
+    fact_id = await fact_store.add_fact(fact, dataset_id=request.dataset_id)
     return {"fact_id": fact_id}
 
 
@@ -144,6 +157,7 @@ async def search_facts(request: SearchRequest):
         query=request.query,
         limit=request.limit,
         entity=request.entity,
+        dataset_id=request.dataset_id,
         min_confidence=request.min_confidence,
     )
     
@@ -205,6 +219,67 @@ async def list_entities():
 
 
 # ============================================================================
+# Dataset Routes
+# ============================================================================
+
+async def _ingest_job(request: IngestRequest):
+    """Background task for ingestion."""
+    if not dataset_loader or not fact_store:
+        logger.error("Stores not initialized for background job")
+        return
+        
+    try:
+        logger.info(f"Starting ingestion: {request.dataset_name}")
+        facts_buffer = []
+        count = 0
+        
+        async for fact in dataset_loader.stream_dataset(
+            dataset_name=request.dataset_name, 
+            split=request.split,
+            max_rows=request.max_rows,
+            mapping=request.mapping
+        ):
+            facts_buffer.append(fact)
+            
+            # Batch insert every 50
+            if len(facts_buffer) >= 50:
+                await fact_store.add_facts(facts_buffer, dataset_id=request.dataset_name)
+                count += len(facts_buffer)
+                facts_buffer.clear()
+        
+        # Insert remaining
+        if facts_buffer:
+            await fact_store.add_facts(facts_buffer, dataset_id=request.dataset_name)
+            count += len(facts_buffer)
+            
+        logger.info(f"Ingestion complete: {request.dataset_name} ({count} facts)")
+        
+    except Exception as e:
+        logger.error(f"Ingestion failed for {request.dataset_name}: {e}")
+
+
+@app.post("/datasets/ingest")
+async def ingest_dataset(request: IngestRequest, background_tasks: BackgroundTasks):
+    """Trigger background ingestion of a generic HF dataset."""
+    if not dataset_loader:
+        raise HTTPException(status_code=503, detail="Dataset service not initialized")
+        
+    background_tasks.add_task(_ingest_job, request)
+    return {"message": "Ingestion started", "dataset": request.dataset_name}
+
+
+@app.delete("/datasets/{dataset_id}")
+async def delete_dataset(dataset_id: str):
+    """Unload/Delete a dataset."""
+    if not fact_store:
+        raise HTTPException(status_code=503, detail="Fact store not initialized")
+        
+    count = await fact_store.delete_by_dataset(dataset_id)
+    return {"message": "Dataset deleted", "count": count}
+
+
+
+# ============================================================================
 # Main
 # ============================================================================
 
@@ -216,7 +291,7 @@ def main():
     uvicorn.run(
         "services.rag_service.main:app",
         host="0.0.0.0",
-        port=8001,
+        port=8003,
         reload=settings.is_development,
     )
 
