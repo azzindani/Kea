@@ -170,7 +170,7 @@ class MCPOrchestrator:
         # Update Registry
         try:
             from services.mcp_host.core.tool_registry import get_tool_registry
-            registry = get_tool_registry()
+            registry = await get_tool_registry()
             await registry.sync_tools(self.tools)
         except Exception as e:
             logger.error(f"Failed to sync tool registry: {e}")
