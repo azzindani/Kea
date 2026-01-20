@@ -21,8 +21,8 @@ from tests.stress.queries import QUERIES, get_query
 # API Configuration
 # =============================================================================
 
-API_GATEWAY_URL = os.getenv("API_GATEWAY_URL", "http://localhost:8080")
-ORCHESTRATOR_URL = os.getenv("ORCHESTRATOR_URL", "http://localhost:8000")
+API_GATEWAY_URL = os.getenv("API_GATEWAY_URL", "http://localhost:8000")
+ORCHESTRATOR_URL = os.getenv("ORCHESTRATOR_URL", "http://localhost:8001")
 
 # Test user credentials (will be created if not exists)
 TEST_USER_EMAIL = "stress_test@example.com"
@@ -302,8 +302,8 @@ async def bootstrap_services():
     # 1. Check if already running (e.g. Docker or manual)
     api_ok = await wait_for_service(API_GATEWAY_URL, "API Gateway", timeout=1)
     orch_ok = await wait_for_service(ORCHESTRATOR_URL, "Orchestrator", timeout=1)
-    # RAG service URL assumption (usually 8001 based on plan)
-    RAG_URL = "http://localhost:8001"
+    # RAG service URL assumption (usually 8003 based on plan)
+    RAG_URL = "http://localhost:8003"
     rag_ok = await wait_for_service(RAG_URL, "RAG Service", timeout=1)
 
     procs = []
