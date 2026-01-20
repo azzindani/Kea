@@ -10,7 +10,7 @@ Core components for the RAG service.
 
 from services.vault.core.vector_store import (
     VectorStore,
-    QdrantVectorStore,
+    VectorStore,
     InMemoryVectorStore,
     Document,
     SearchResult,
@@ -28,7 +28,6 @@ from services.rag_service.core.graph_rag import GraphRAG
 
 __all__ = [
     "VectorStore",
-    "QdrantVectorStore",
     "InMemoryVectorStore",
     "Document",
     "SearchResult",

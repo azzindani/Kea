@@ -12,7 +12,7 @@ async def health():
 
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
-from services.vault.core.audit_trail import get_audit_trail, AuditEventType, configure_audit_trail, SQLiteBackend
+from services.vault.core.audit_trail import get_audit_trail, AuditEventType, configure_audit_trail
 
 # Initialize Audit Backend (Lazy load with Postgres priority)
 # configure_audit_trail(SQLiteBackend("data/audit_trail.db")) <- REMOVED for Postgres-only compliance

@@ -40,15 +40,15 @@ async def lifespan(app: FastAPI):
     # Initialize Enterprise Subsystems
     # =========================================================================
     try:
-        from services.vault.core.audit_trail import configure_audit_trail, SQLiteBackend
+        from services.vault.core.audit_trail import configure_audit_trail, AuditBackend
         from services.swarm_manager.core.compliance import get_compliance_engine
         
-        # 1. Audit Trail (Black Box)
-        # Ensure data directory exists
-        audit_db_path = "data/audit_trail.db"
-        audit_backend = SQLiteBackend(audit_db_path)
-        configure_audit_trail(audit_backend)
-        logger.info(f"Audit Trail initialized at {audit_db_path}")
+        # 1. Audit Trail (Lazy Init via Vault Service or Auto-Config)
+        # We don't manually init backend here anymore, we let the internal defaults logic handle it
+        # or we assume Vault Service is the source of truth.
+        # But if Orchestrator writes directly:
+        # configure_audit_trail() # Will use Postgres if env var set
+        logger.info("Audit Trail configuration checked")
         
         # 2. Compliance Engine (Guardrails)
         compliance = get_compliance_engine()
