@@ -191,3 +191,6 @@ async def close_database_pool():
             del _loop_pools[loop]
     except RuntimeError:
         pass
+
+# Compatibility Alias
+get_db_pool = get_database_pool
