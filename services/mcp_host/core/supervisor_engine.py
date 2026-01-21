@@ -34,6 +34,7 @@ class SupervisorEngine:
         self._running = False
         self._current_load = 0
         self._active_tasks: dict[str, int] = {} # task_id -> cost
+        self._hardware_paused = False # State tracker for logging
         
         from shared.dispatcher import get_dispatcher
         from services.mcp_host.core.session_registry import get_session_registry
@@ -102,15 +103,26 @@ class SupervisorEngine:
         cpu = psutil.cpu_percent(interval=None)
         ram = psutil.virtual_memory().percent
         
+        is_critical = False
+        
         if ram > MAX_RAM_PERCENT:
             logger.warning(f"⚠️ RAM Critical ({ram}% > {MAX_RAM_PERCENT}%). Pausing.")
-            return False
+            is_critical = True
             
-        if cpu > MAX_CPU_PERCENT:
-            logger.warning(f"⚠️ CPU Critical ({cpu}% > {MAX_CPU_PERCENT}%). Pausing.")
-            return False
+        elif cpu > MAX_CPU_PERCENT:
+             # Only log warning if not already paused to avoid spam
+             if not self._hardware_paused:
+                 logger.warning(f"⚠️ CPU Critical ({cpu}% > {MAX_CPU_PERCENT}%). Pausing dispatch.")
+             is_critical = True
+        
+        # State Transition Logic
+        if is_critical and not self._hardware_paused:
+            self._hardware_paused = True
+        elif not is_critical and self._hardware_paused:
+            self._hardware_paused = False
+            logger.info(f"✅ Hardware recovered (CPU: {cpu}%, RAM: {ram}%). Resuming dispatch.")
             
-        return True
+        return not is_critical
 
     async def _fetch_next_task(self, max_cost: int):
         """Get the highest priority task that fits in the budget."""
