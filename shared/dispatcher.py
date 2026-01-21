@@ -38,7 +38,7 @@ class Dispatcher:
     def __init__(self):
         self._ensured_schema = False
 
-    async def _ensure_schema(self):
+    async def ensure_schema(self):
         """Create tables if not exists."""
         if self._ensured_schema:
             return
@@ -90,7 +90,7 @@ class Dispatcher:
         Create a new batch and insert tasks.
         Returns batch_id.
         """
-        await self._ensure_schema()
+        await self.ensure_schema()
         
         from shared.database.connection import get_database_pool as get_db_pool
         pool = await get_db_pool()
@@ -167,7 +167,7 @@ class Dispatcher:
 
     async def get_batch_status(self, batch_id: str) -> BatchStatus:
         """Get batch status summary."""
-        await self._ensure_schema()
+        await self.ensure_schema()
         from shared.database.connection import get_database_pool as get_db_pool
         pool = await get_db_pool()
         

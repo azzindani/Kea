@@ -48,6 +48,13 @@ class SupervisorEngine:
             
         self._running = True
         logger.info("👮 Supervisor Engine Started to govern execution.")
+        
+        # Ensure DB schema exists before polling
+        try:
+             await self.dispatcher.ensure_schema()
+        except Exception as e:
+             logger.warning(f"Supervisor could not ensure schema (DB might be down): {e}")
+
         asyncio.create_task(self._supervisor_loop())
 
     async def _supervisor_loop(self):

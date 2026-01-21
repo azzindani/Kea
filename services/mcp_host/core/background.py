@@ -5,7 +5,7 @@ Runs tasks from the `micro_tasks` table in parallel.
 """
 import asyncio
 import json
-from services.mcp_host.core.tool_manager import get_mcp_orchestrator
+
 from shared.dispatcher import get_dispatcher
 from shared.logging import get_logger
 
@@ -19,21 +19,29 @@ async def run_swarm_batch(batch_id: str, tasks: list[dict]):
     """
     logger.info(f"🚀 Starting Swarm Batch {batch_id} ({len(tasks)} tasks)")
     
-    orchestrator = get_mcp_orchestrator()
+    from services.mcp_host.core.session_registry import get_session_registry
+    registry = get_session_registry()
     dispatcher = get_dispatcher()
     
     async def execute_single_task(task_def):
         tool_name = task_def["tool_name"]
         args = task_def["arguments"]
         
-        # Mark processing (Optional, skipping for speed/simplicity as 'pending' covers it)
-        
         try:
-            # 1. Run Tool
-            result = await orchestrator.call_tool(tool_name, args)
+            # 1. Resolve Server
+            server_name = registry.get_server_for_tool(tool_name)
+            if not server_name:
+                await registry.list_all_tools()
+                server_name = registry.get_server_for_tool(tool_name)
             
-            # 2. Extract Artifact ID if present (Standardized Output)
-            # Assuming result.content is list of objects, we grab text
+            if not server_name:
+                raise ValueError(f"Tool {tool_name} not found in Registry.")
+
+            # 2. Execute
+            session = await registry.get_session(server_name)
+            result = await session.call_tool(tool_name, args)
+            
+            # 3. Extract output
             content_str = "\n".join([c.text for c in result.content if getattr(c, 'text', None)])
             
             status = "done"
@@ -42,16 +50,14 @@ async def run_swarm_batch(batch_id: str, tasks: list[dict]):
                 status = "error"
                 error_log = content_str
             
-            # 3. Update DB
+            # 4. Update DB
             await dispatcher.update_task(
                 batch_id=batch_id,
                 tool_name=tool_name,
                 arguments=args,
                 status=status,
-                result_summary=content_str[:500], # Keep concise in DB
+                result_summary=content_str[:500],
                 error_log=error_log
-                # artifact_id? Need to parse or change tool to return it.
-                # For now, if the tool SAVES to Vault, it should return artifact_id in text.
             )
             
         except Exception as e:

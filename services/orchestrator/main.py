@@ -14,7 +14,7 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field
 
 from services.orchestrator.core.graph import compile_research_graph, GraphState
-from services.mcp_host.core.tool_manager import get_mcp_orchestrator
+from services.mcp_host.core.session_registry import get_session_registry
 from shared.config import get_settings
 from shared.logging import get_logger
 from shared.logging.middleware import RequestLoggingMiddleware
@@ -23,19 +23,23 @@ from shared.schemas import ResearchStatus
 logger = get_logger(__name__)
 
 # Global state
-mcp_orchestrator = None
+registry = None
 research_graph = None
-server_configs = []
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle manager for the FastAPI app."""
-    global mcp_orchestrator, research_graph, server_configs
+    global registry, research_graph
     
     settings = get_settings()
     
     logger.info("Starting Orchestrator service")
     
+    # Initialize Registry (Auto-Discovery)
+    registry = get_session_registry()
+    await registry.list_all_tools() # Warmup
+    logger.info(f"Registry initialized with {len(registry.tool_to_server)} tools")
+
     # =========================================================================
     # Initialize Enterprise Subsystems
     # =========================================================================
@@ -43,22 +47,13 @@ async def lifespan(app: FastAPI):
         from services.vault.core.audit_trail import configure_audit_trail, AuditBackend
         from services.swarm_manager.core.compliance import get_compliance_engine
         
-        # 1. Audit Trail (Lazy Init via Vault Service or Auto-Config)
-        # We don't manually init backend here anymore, we let the internal defaults logic handle it
-        # or we assume Vault Service is the source of truth.
-        # But if Orchestrator writes directly:
-        # configure_audit_trail() # Will use Postgres if env var set
-        logger.info("Audit Trail configuration checked")
-        
         # 2. Compliance Engine (Guardrails)
         compliance = get_compliance_engine()
-        # (Optional) Load custom rules here if needed
         logger.info(f"Compliance Engine initialized with {len(compliance.rules)} rule sets")
         
         # 3. Organization (The Corporate Structure)
         from services.orchestrator.core.organization import get_organization, Domain
         org = get_organization()
-        # Create default departments if empty
         if not org.list_departments():
             org.create_department("Research", Domain.RESEARCH)
             org.create_department("Finance", Domain.FINANCE)
@@ -72,23 +67,6 @@ async def lifespan(app: FastAPI):
         
     except Exception as e:
         logger.error(f"Failed to initialize enterprise systems: {e}")
-        # Continue execution, these are optional for now, or raise if critical
-    
-    # =========================================================================
-    
-    # Initialize MCP orchestrator
-    mcp_orchestrator = get_mcp_orchestrator()
-    
-    # Start MCP servers based on config
-    server_configs = [
-        {"name": server.name, "command": server.command}
-        for server in settings.mcp.servers
-        if server.enabled and server.command
-    ]
-    
-    if server_configs:
-        await mcp_orchestrator.start_servers(server_configs)
-        logger.info(f"Started {len(server_configs)} MCP servers")
     
     # Compile research graph
     research_graph = compile_research_graph()
@@ -97,8 +75,8 @@ async def lifespan(app: FastAPI):
     yield
     
     # Cleanup
-    if mcp_orchestrator:
-        await mcp_orchestrator.stop_servers()
+    if registry:
+        await registry.shutdown()
     
     logger.info("Orchestrator service stopped")
 
@@ -146,22 +124,18 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "orchestrator",
-        "mcp_servers": len(mcp_orchestrator._servers) if mcp_orchestrator else 0,
+        "active_sessions": len(registry.active_sessions) if registry else 0,
     }
 
 
 @app.get("/tools")
 async def list_tools():
     """List all available MCP tools."""
-    if not mcp_orchestrator:
+    if not registry:
         return {"tools": []}
     
-    return {
-        "tools": [
-            {"name": t.name, "description": t.description}
-            for t in mcp_orchestrator.tools
-        ]
-    }
+    tools = await registry.list_all_tools()
+    return {"tools": tools}
 
 
 @app.post("/research", response_model=ResearchResponse)
@@ -223,16 +197,29 @@ async def start_research(request: ResearchRequest):
 @app.post("/tools/{tool_name}")
 async def call_tool(tool_name: str, arguments: dict[str, Any]):
     """Call a specific MCP tool directly."""
-    if not mcp_orchestrator:
-        raise HTTPException(status_code=503, detail="MCP orchestrator not initialized")
+    if not registry:
+        raise HTTPException(status_code=503, detail="Registry not initialized")
     
-    result = await mcp_orchestrator.call_tool(tool_name, arguments)
-    
-    return {
-        "tool": tool_name,
-        "is_error": result.isError,
-        "content": [c.model_dump() for c in result.content],
-    }
+    server_name = registry.get_server_for_tool(tool_name)
+    if not server_name:
+        # JIT
+        await registry.list_all_tools()
+        server_name = registry.get_server_for_tool(tool_name)
+        
+    if not server_name:
+         raise HTTPException(status_code=404, detail=f"Tool {tool_name} not found")
+
+    try:
+        session = await registry.get_session(server_name)
+        result = await session.call_tool(tool_name, arguments)
+        
+        return {
+            "tool": tool_name,
+            "is_error": result.isError,
+            "content": [c.model_dump() for c in result.content],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============================================================================

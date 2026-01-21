@@ -29,7 +29,7 @@ from services.orchestrator.core.router import IntentionRouter
 # NEW: Context pool and code generator for dynamic data flow
 from shared.context_pool import get_context_pool, reset_context_pool
 from services.orchestrator.agents.code_generator import generate_fallback_code, generate_python_code
-from services.mcp_host.core.tool_manager import get_mcp_orchestrator
+
 
 
 logger = get_logger(__name__)

@@ -416,8 +416,8 @@ class AgentSpawner:
             # For this implementation, we treat the agent as a "Smart Worker"
             # It uses the LLM to decide which tool to call from the registry
             
-            from services.mcp_host.core.tool_manager import get_mcp_orchestrator
-            mcp = get_mcp_orchestrator()
+            from services.mcp_host.core.session_registry import get_session_registry
+            registry = get_session_registry()
             
             # Simple heuristic: If it looks like a direct question, ask LLM. 
             # If it looks like "Search for X", assume tool use.
@@ -436,18 +436,34 @@ class AgentSpawner:
                 # Try to map query to a tool call (Naive routing for now)
                 # In v5 this becomes a full ReAct loop
                 if "search" in subtask.query.lower() or "find" in subtask.query.lower():
-                    tool_res = await mcp.call_tool("web_search", {"query": subtask.query})
-                    if not tool_res.isError:
-                        response = f"Search Results: {str(tool_res.content)[:500]}..."
-                    else:
-                        response = f"Search Failed: {tool_res.content}"
+                    tool_name = "web_search"
+                    server_name = registry.get_server_for_tool(tool_name) or "search_server"
+                    
+                    try:
+                        session = await registry.get_session(server_name)
+                        tool_res = await session.call_tool(tool_name, {"query": subtask.query})
+                        
+                        if not tool_res.isError:
+                            response = f"Search Results: {str(tool_res.content)[:500]}..."
+                        else:
+                            response = f"Search Failed: {tool_res.content}"
+                    except Exception as e:
+                        response = f"Search failed: {e}"
+
                 else:
                     # Default: Just think about it (Simulated thought, or real if connected to Planner)
                     # Since we want "Real Pipeline", we'll attempt a generic Python solve
-                    code_res = await mcp.call_tool("execute_code", {
-                        "code": f"# Solver for: {subtask.query}\nprint('Analyzing request...')"
-                    })
-                    response = f"Execution Result: {str(code_res.content)}"
+                    tool_name = "execute_code" 
+                    server_name = registry.get_server_for_tool(tool_name) or "python_server"
+                    
+                    try:
+                        session = await registry.get_session(server_name)
+                        code_res = await session.call_tool(tool_name, {
+                            "code": f"# Solver for: {subtask.query}\nprint('Analyzing request...')\n# TODO: Implement full solver"
+                        })
+                        response = f"Execution Result: {str(code_res.content)}"
+                    except Exception as e:
+                        response = f"Exec failed: {e}"
 
             result.result = response
             result.status = AgentStatus.COMPLETED
