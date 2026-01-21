@@ -115,12 +115,19 @@ class SessionRegistry:
         config = self.server_configs[server_name]
         
         try:
-            # Use same python interpreter as current process
-            python_exe = sys.executable
+            # Detect UV
+            import shutil
+            uv_path = shutil.which("uv")
+            
+            if uv_path:
+                logger.info(f"⚡ Using UV for {server_name}")
+                cmd = [uv_path, "run", "python", str(config.script_path)]
+            else:
+                # Fallback to current interpreter
+                cmd = [sys.executable, str(config.script_path)]
             
             process = await asyncio.create_subprocess_exec(
-                python_exe,
-                str(config.script_path),
+                *cmd,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
