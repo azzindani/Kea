@@ -43,13 +43,17 @@ async def browser_scrape_tool(arguments: dict) -> ToolResult:
     
     try:
         from playwright.async_api import async_playwright
+        from fake_useragent import UserAgent
     except ImportError:
         return ToolResult(
-            content=[TextContent(text="Error: Playwright not installed. Run: playwright install")],
+            content=[TextContent(text="Error: Playwright or fake-useragent not installed. Run: pip install playwright fake-useragent")],
             isError=True
         )
     
     try:
+        ua = UserAgent()
+        user_agent = ua.random
+        
         async with async_playwright() as p:
             # Launch browser with stealth settings
             browser = await p.chromium.launch(
@@ -58,18 +62,33 @@ async def browser_scrape_tool(arguments: dict) -> ToolResult:
                     "--disable-blink-features=AutomationControlled",
                     "--disable-dev-shm-usage",
                     "--no-sandbox",
+                    "--disable-infobars",
                 ]
             )
             
             context = await browser.new_context(
                 viewport={"width": 1920, "height": 1080},
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                user_agent=user_agent,
+                locale="en-US",
+                timezone_id="Asia/Jakarta"
             )
             
             page = await context.new_page()
             
+            # Anti-detection scripts
+            await page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+            
             # Navigate to URL
-            await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            response = await page.goto(url, wait_until="domcontentloaded", timeout=45000)
+            status_code = response.status if response else 0
+            
+            if status_code in [403, 401]:
+                await browser.close()
+                logger.warning(f"⛔ Access Denied ({status_code}) for {url}")
+                return ToolResult(
+                    content=[TextContent(text=f"Error: Access Denied (HTTP {status_code}). Site blocked the scraper.")],
+                    isError=True
+                )
             
             # Wait for specific element if requested
             if wait_for:
@@ -79,15 +98,21 @@ async def browser_scrape_tool(arguments: dict) -> ToolResult:
                     logger.warning(f"Selector '{wait_for}' not found, continuing anyway")
             
             # Allow dynamic content to load
-            await asyncio.sleep(2)
+            await asyncio.sleep(3)
             
             results: list[TextContent | ImageContent] = []
             
             # Get page content
-            content = await page.content()
-            
-            # Extract text content
             text_content = await page.evaluate("() => document.body.innerText")
+            
+            if not text_content or len(text_content.strip()) < 50:
+                 # Likely a blocked page alias or captcha
+                 await browser.close()
+                 return ToolResult(
+                     content=[TextContent(text="Error: Empty content retrieved. Possible Captcha or Block.")],
+                     isError=True
+                 )
+            
             results.append(TextContent(text=f"# Page Content\n\n{text_content[:30000]}"))
             
             # Extract tables if requested

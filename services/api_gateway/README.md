@@ -29,7 +29,7 @@ graph TD
     end
     
     Orch -->|Trigger| Planner
-    Chronos -->|Schedule| Redis[Redis Queue]
+    Chronos -->|Schedule| Queue[Postgres Queue]
 ```
 
 ---
@@ -48,7 +48,7 @@ graph TD
 | ├── `auth.py` | Identity | Handles JWT locally (Gateway is the Auth authority). | `login()`, `register()` |
 | ├── `graph.py` | Memory | Proxies graph queries to **Vault** (Port 8004). | `get_entity_provenance()` |
 | └── `artifacts.py` | Storage | Manages uploads/downloads via **Vault/S3**. | `upload_artifact()` |
-| **`middleware/`** | **Middleware** | Cross-cutting concerns. | `RateLimitMiddleware` | Uses a **Sliding Window Algorithm** (Redis ZSet) to manage quotas. |
+| **`middleware/`** | **Middleware** | Cross-cutting concerns. | `RateLimitMiddleware` | Uses an **Unlogged Postgres Table** to manage quotas. |
 | `AuthMiddleware` | Decodes JWTs and injects `request.state.user` for downstream routing. |
 
 ---
@@ -58,8 +58,8 @@ graph TD
 ### 1. Hybrid Rate Limiting (`middleware/rate_limit.py`)
 To prevent "DDoS by Agent" (infinite loops), the Gateway implements a tiered limiting strategy:
 - **Algorithm**: Sliding Window (ZSET-based).
-- **Backend**: Redis in production for global state; In-Memory fallback for development.
-- **Fail-Open Logic**: If Redis becomes unavailable, the Gateway defaults to allowing requests (Fail-Open) to prioritize availability over strict quota enforcement.
+- **Backend**: Postgres Unlogged Table for global state.
+- **Fail-Open Logic**: If DB becomes unavailable, the Gateway defaults to allowing requests (Fail-Open) to prioritize availability.
 - **Key Hierarchy**: Limits are applied to `user_id` if authenticated, falling back to IP address for anonymous traffic.
 
 ### 2. Service-to-Service Security
@@ -122,7 +122,7 @@ Configuration, Capabilities, and Health.
 | Endpoint | Method | Description |
 |:---------|:-------|:------------|
 | `/api/v1/system/capabilities` | `GET` | List active Agents/Tools (e.g., Scraper, Analyst, Vision). |
-| `/api/v1/system/health` | `GET` | Check status of Microservices (Redis, DB, Scraper). |
+| `/api/v1/system/health` | `GET` | Check status of Microservices (DB, Scraper). |
 | `/api/v1/system/config` | `GET` | View global settings (Read-only). |
 | `/api/v1/system/metrics/summary` | `GET` | Get high-level system stats. |
 

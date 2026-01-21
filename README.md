@@ -189,7 +189,6 @@ OPENROUTER_MODEL=nvidia/nemotron-3-nano-30b-a3b:free
 
 # Database
 DATABASE_URL=postgresql://user:pass@localhost:5432/dare
-REDIS_URL=redis://localhost:6379
 
 # Mode
 ENVIRONMENT=development  # development | staging | production

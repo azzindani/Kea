@@ -106,59 +106,81 @@ class SlidingWindowCounter:
             del self._windows[key]
 
 
-class RedisRateLimiter:
-    """Redis-backed rate limiter for distributed deployments."""
+class PostgresRateLimiter:
+    """
+    PostgreSQL-backed rate limiter using UNLOGGED table.
     
-    def __init__(self, redis_url: str = None):
-        self._redis = None
-        self._redis_url = redis_url
+    Uses an unlogged table for high-performance counters without WAL overhead.
+    Schema:
+        CREATE UNLOGGED TABLE IF NOT EXISTS rate_limits (
+            key TEXT PRIMARY KEY,
+            window_start DOUBLE PRECISION,
+            count INTEGER,
+            expires_at DOUBLE PRECISION
+        );
+    """
     
-    async def _get_client(self):
-        """Get Redis client lazily."""
-        if self._redis is None:
-            try:
-                import redis.asyncio as redis
-                self._redis = redis.from_url(
-                    self._redis_url or "redis://localhost:6379",
-                    decode_responses=True,
-                )
-            except Exception as e:
-                logger.warning(f"Redis not available: {e}")
-                return None
-        return self._redis
-    
+    def __init__(self):
+        self._ensured_schema = False
+
+    async def _ensure_schema(self):
+        if self._ensured_schema:
+            return
+            
+        from shared.database.connection import get_db_pool
+        pool = await get_db_pool()
+        async with pool.acquire() as conn:
+            await conn.execute("""
+                CREATE UNLOGGED TABLE IF NOT EXISTS rate_limits (
+                    key TEXT PRIMARY KEY,
+                    window_start DOUBLE PRECISION,
+                    count INTEGER,
+                    expires_at DOUBLE PRECISION
+                );
+                CREATE INDEX IF NOT EXISTS idx_rate_limits_expiry ON rate_limits(expires_at);
+            """)
+        self._ensured_schema = True
+
     async def is_allowed(
         self,
         key: str,
         limit: int,
         window_seconds: int = 60,
     ) -> tuple[bool, int]:
-        """Check if request is allowed using Redis."""
-        client = await self._get_client()
-        if not client:
-            return True, limit  # Fail open if Redis unavailable
+        """Check if request is allowed using Postgres."""
+        await self._ensure_schema()
         
-        try:
-            pipe = client.pipeline()
-            now = time.time()
-            window_key = f"ratelimit:{key}"
+        from shared.database.connection import get_db_pool
+        pool = await get_db_pool()
+        
+        now = time.time()
+        window_start = now - window_seconds
+        
+        async with pool.acquire() as conn:
+            # Clean up old entries (probabilistic or on-access)
+            # Efficiently manage the counter
+            row = await conn.fetchrow("""
+                INSERT INTO rate_limits (key, window_start, count, expires_at)
+                VALUES ($1, $2, 1, $3)
+                ON CONFLICT (key) DO UPDATE
+                SET count = CASE 
+                        WHEN rate_limits.window_start < $4 THEN 1
+                        ELSE rate_limits.count + 1
+                    END,
+                    window_start = CASE
+                        WHEN rate_limits.window_start < $4 THEN $2
+                        ELSE rate_limits.window_start
+                    END,
+                    expires_at = $3
+                RETURNING count
+            """, key, now, now + window_seconds, window_start)
             
-            pipe.zremrangebyscore(window_key, 0, now - window_seconds)
-            pipe.zadd(window_key, {str(now): now})
-            pipe.zcard(window_key)
-            pipe.expire(window_key, window_seconds)
-            
-            results = await pipe.execute()
-            count = results[2]
+            count = row["count"]
             
             if count > limit:
                 return False, 0
-            
+                
             return True, limit - count
-            
-        except Exception as e:
-            logger.warning(f"Redis rate limit error: {e}")
-            return True, limit  # Fail open
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -172,11 +194,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.config = config or RateLimitConfig.from_environment()
         self._memory_limiter = SlidingWindowCounter()
-        self._redis_limiter: RedisRateLimiter | None = None
+        self._postgres_limiter: PostgresRateLimiter | None = None
         
         env_config = get_environment_config()
-        if env_config.is_production:
-            self._redis_limiter = RedisRateLimiter()
+        if env_config.is_production or True:  # Use Postgres everywhere since Redis is gone
+            self._postgres_limiter = PostgresRateLimiter()
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """Process request with rate limiting."""
@@ -189,8 +211,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         key = self._get_key(request)
         
         # Check rate limit
-        if self._redis_limiter:
-            allowed, remaining = await self._redis_limiter.is_allowed(
+        if self._postgres_limiter:
+            allowed, remaining = await self._postgres_limiter.is_allowed(
                 key,
                 self.config.requests_per_minute,
                 60,

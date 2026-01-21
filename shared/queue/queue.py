@@ -179,6 +179,8 @@ class RedisQueue(Queue):
 
 def create_queue(name: str = "research_jobs", use_memory: bool = False) -> Queue:
     """Create queue based on configuration."""
-    if use_memory or not os.getenv("REDIS_URL"):
+    if use_memory or not os.getenv("DATABASE_URL"):
         return InMemoryQueue(name)
-    return RedisQueue(name)
+    
+    from shared.queue.postgres_queue import PostgresQueue
+    return PostgresQueue(name)

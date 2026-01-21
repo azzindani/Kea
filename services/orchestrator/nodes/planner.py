@@ -102,6 +102,11 @@ TOOL_CAPABILITIES = {
         "server": "browser_agent_server",
         "fallbacks": ["web_crawler"],
     },
+    "get_idx_tickers": {
+        "keywords": ["IDX", "JKSE", "companies", "list of stocks", "ticker list", "universe"],
+        "server": "mcp_host",
+        "fallbacks": ["web_search"],
+    },
     
     # ===========================================
     # DATA ANALYSIS TOOLS
@@ -157,6 +162,22 @@ def route_to_tool(task_description: str) -> tuple[str, list[str]]:
     """
     task_lower = task_description.lower()
     
+    # 1. INTELLIGENCE: Check for direct tool reference from Registry
+    try:
+        from services.mcp_host.core.session_registry import get_session_registry
+        registry = get_session_registry()
+        # Look for exact tool names in the task description (e.g. "Use get_idx_tickers...")
+        # Sort by length descending to match longest tool name first
+        known_tools = sorted(list(registry.tool_to_server.keys()), key=len, reverse=True)
+        
+        for tool_name in known_tools:
+            if tool_name in task_lower or tool_name.replace("_", " ") in task_lower:
+                # Found exact tool match!
+                return tool_name, []
+    except Exception:
+        pass
+
+    # 2. TEXTBOOK: Fallback to keyword matching
     # Score each tool based on keyword matches
     scores = {}
     for tool, config in TOOL_CAPABILITIES.items():
@@ -209,15 +230,42 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
                 max_tokens=1000,  # Increased for execution plan
             )
             
-            # Discover relevant tools
+            # Discover relevant tools (INTELLIGENCE INJECTION)
             try:
-                from services.orchestrator.core.tool_registry import get_tool_registry
-                registry = get_tool_registry()
-                relevant_tools = await registry.search_tools(query, limit=20)
-                tools_json = [t.get("name") + ": " + t.get("description", "") for t in relevant_tools]
-                tools_context = "\n".join(tools_json)
-            except Exception:
-                tools_context = "Basic tools available."
+                from services.mcp_host.core.session_registry import get_session_registry
+                registry = get_session_registry()
+                # Get all tools (Plan: Maybe in future use vector search here?)
+                # For now, listing all is safer for "Awareness"
+                
+                # Check if registry is populated, if not, might need a moment or just rely on what's there
+                # Since Planner is usually called AFTER host start, it should be fine.
+                # If running purely standalone without host, this might be empty.
+                
+                # We can't easily wait for async list_all_tools inside this sync/async boundary without blocking
+                # But planner_node is async.
+                
+                # NOTE: listing all tools on every request might be slow if many tools.
+                # Optimization: Cache this or use search_tools if implemented in SessionRegistry
+                # SessionRegistry doesn't have search_tools yet.
+                # Let's just peer into registry.tool_to_server which is instant RAM access
+                
+                if not registry.tool_to_server:
+                     # Try to list if empty (First run)
+                     # Use quiet timeout
+                     try:
+                        await asyncio.wait_for(registry.list_all_tools(), timeout=2.0)
+                     except asyncio.TimeoutError:
+                        pass
+                
+                known_tools = list(registry.tool_to_server.keys())
+                
+                # Format for LLM
+                tools_context = f"ACTIVE SYSTEM TOOLS ({len(known_tools)} available):\n"
+                tools_context += ", ".join(known_tools)
+                
+            except Exception as e:
+                logger.warning(f"Planner tool discovery failed: {e}")
+                tools_context = "Basic tools available (Discovery Failed)."
 
             messages = [
                 LLMMessage(
@@ -233,6 +281,10 @@ Do not be limited by "standard" procedures. If a specific dataset/tool is missin
 - Treat the web as a raw database to be scraped and parsed.
 - Treat Python as your universal adapter to process that raw data.
 
+RULES FOR FINANCIAL DATA:
+1. Do NOT use `web_search` to find data tables. Use `scrape_url`, `get_idx_tickers`, or `yfinance_tool`.
+2. Turn generic requests ("All Companies") into specific list building actions using `get_idx_tickers` or comparable tools.
+3. You cannot 'Filter' data you do not have. Your first step must always be 'Acquire Dataset'.
 
 Output format:
 SUB-QUERIES:
@@ -244,7 +296,7 @@ HYPOTHESES:
 2. [testable claim]
 
 EXECUTION-STEPS:
-1. [action verb] [what] [where/how] - e.g. "Search for list of all IDX companies"
+1. [action verb] [what] [where/how] - e.g. "Use get_idx_tickers to load JKSE company list"
 2. [action verb] [what] [where/how] - e.g. "Download historical price data for each ticker"
 3. [action verb] [what] [where/how] - e.g. "Calculate revenue growth rate using financial data"
 4. [action verb] [what] [where/how] - e.g. "Scrape annual reports from company websites"

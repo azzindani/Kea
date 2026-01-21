@@ -271,28 +271,18 @@ async def researcher_node(state: GraphState) -> GraphState:
     # 1. Hardware-Aware Scaling
     from shared.hardware.detector import detect_hardware
     from services.mcp_host.core.parallel_executor import ParallelExecutor, ToolCall
-    from services.mcp_host.core.tool_manager import get_mcp_orchestrator
+    from services.mcp_host.core.session_registry import get_session_registry
     
     hw_profile = detect_hardware()
     max_workers = hw_profile.optimal_workers()
     logger.info(f"🚀 Hardware-Aware Dispatcher: Using {max_workers} parallel workers (RAM: {hw_profile.ram_available_gb:.1f}GB)")
     
     executor = ParallelExecutor(max_concurrent=max_workers)
-    mcp_client = get_mcp_orchestrator()
-    use_direct = len(mcp_client.tool_names) == 0
+    registry = get_session_registry()
     
-    # Tool registry for dynamic routing
-    # ... [Keep imports and direct_tools definition] ...
     # Tool registry for dynamic routing
     # NOTE: We have removed direct imports to enforce "Pure MCP" architecture.
-    # All tools are now discovered dynamically via MCPClient.
-    
-    # Local handlers for composite functionality (Orchestrator-side logic)
-    local_handlers = {
-        "fetch_data": lambda args: smart_fetch_data(args),
-        "build_graph": lambda args: mcp_client.call_tool("execute_code", {"code": f"# Building graph for: {args.get('query', '')}\nprint('Graph built successfully.')"}),
-        "multi_browse": lambda args: mcp_client.call_tool("multi_browse", args), # Assuming this moves to an MCP server eventually
-    }
+    # All tools are now discovered dynamically via SessionRegistry.
     
     def build_tool_inputs(tool_name: str, description: str, original_inputs: dict, collected_facts: list = None) -> dict:
         """Build proper inputs based on tool requirements."""
@@ -348,42 +338,39 @@ async def researcher_node(state: GraphState) -> GraphState:
         return original_inputs
 
 
-    # 2. Unified Tool Handler
+    # 2. Unified Tool Handler (INTELLIGENCE INJECTED)
     async def unified_tool_handler(name: str, args: dict) -> Any:
-        # Check local handlers first (Composite Tools)
-        result = None
-        if name in local_handlers:
-            result = await local_handlers[name](args)
-            
-        else:
-            # Virtual Tool Translation Layer for Planner compatibility
-            tool_mapping = {
+        # Resolve target server dynamically
+        server_name = registry.get_server_for_tool(name)
+        
+        if not server_name:
+            # Fallback Mapping (Legacy Support)
+            legacy_map = {
                 "run_python": "execute_code",
-                "parse_document": "execute_code",
-                "dataframe_ops": "execute_code", # Map to code execution
-                "sql_query": "execute_code",     # Map to code execution
-                "scrape_url": "browser_scrape",
                 "fetch_page": "fetch_url"
             }
+            mapped = legacy_map.get(name)
+            if mapped:
+                server_name = registry.get_server_for_tool(mapped)
+                if server_name:
+                    logger.info(f"🔄 Mapped {name} -> {mapped} on {server_name}")
+                    name = mapped # Switch to actual tool name
             
-            actual_tool_name = tool_mapping.get(name, name)
+        if not server_name:
+             # Try JIT Discovery
+             await registry.list_all_tools()
+             server_name = registry.get_server_for_tool(name)
+        
+        if not server_name:
+             raise ValueError(f"Tool {name} not found in SessionRegistry.")
             
-            # Special handling for code tools to ensure structure
-            if actual_tool_name == "execute_code" and "code" not in args:
-                if "script" in args:
-                    args["code"] = args.pop("script")
-                elif "query" in args and name == "sql_query":
-                    # Synthesize SQL runner
-                    args["code"] = f"import os\nimport pandas as pd\nfrom sqlalchemy import create_engine\n# Requires DATABASE_URL to be set in environment\nengine = create_engine(os.getenv('DATABASE_URL'))\nprint(pd.read_sql('{args['query']}', engine))"
-            
-            # Default to MCP Pure Routing
-            try:
-                # Use mcp_client to find and execute the tool on the appropriate server
-                result = await mcp_client.call_tool(actual_tool_name, args)
-            except Exception as e:
-                logger.error(f"Tool execution failed: {e}")
-                # Intercept error state too? Maybe later.
-                raise ValueError(f"Tool {name} (mapped to {actual_tool_name}) failed: {e}")
+        # Execute
+        try:
+            session = await registry.get_session(server_name)
+            result = await session.call_tool(name, args)
+        except Exception as e:
+            logger.error(f"Tool execution failed: {e}")
+            raise ValueError(f"Tool {name} failed: {e}")
 
         # =========================================================================
         # AUTONOMIC MEMORY INTERCEPTOR (The Wiring Fix)
