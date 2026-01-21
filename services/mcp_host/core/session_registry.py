@@ -48,7 +48,101 @@ class SessionRegistry:
         # Discovery
         self._discover_local_servers()
 
-    # ... [Keep _discover_local_servers, _register_script, get_session as is] ...
+    def _discover_local_servers(self):
+        """
+        Scans the 'mcp_servers' directory at the project root.
+        Treats every .py file (excluding __init__) as an MCP Server.
+        """
+        # Determine path relative to this file:
+        # services/mcp_host/core/session_registry.py -> ... -> Kea/mcp_servers
+        try:
+            # Go up 4 levels from core/session_registry.py to root
+            root_path = Path(__file__).resolve().parents[3]
+            base_path = root_path / "mcp_servers"
+        except IndexError:
+            # Fallback if path structure is different (e.g. tests)
+            base_path = Path("mcp_servers").resolve()
+            
+        if not base_path.exists():
+            logger.warning(f"MCP Servers directory not found at: {base_path}")
+            return
+
+        logger.info(f"🔍 Scanning for MCP servers in: {base_path}")
+        
+        # Strategy 1: Top level .py
+        for file_path in base_path.glob("*.py"):
+            if file_path.name == "__init__.py":
+                continue
+            self._register_script(file_path.stem, file_path)
+            
+        # Strategy 2: Subdirectories
+        for dir_path in base_path.iterdir():
+            if dir_path.is_dir():
+                server_script = dir_path / "server.py"
+                if server_script.exists():
+                    self._register_script(dir_path.name, server_script)
+
+    def _register_script(self, server_name: str, script_path: Path):
+        """Register a server script configuration."""
+        env = os.environ.copy()
+        env["PYTHONUNBUFFERED"] = "1"
+        env["KEA_SERVER_NAME"] = server_name
+        env["PYTHONPATH"] = str(Path(__file__).resolve().parents[3]) # Add Kea root to pythonpath
+        
+        self.server_configs[server_name] = ServerConfig(
+            name=server_name,
+            script_path=script_path,
+            env=env
+        )
+        logger.info(f"✅ Registered JIT Server Configuration: {server_name}")
+
+    async def get_session(self, server_name: str) -> MCPClient:
+        """
+        Returns an active session. 
+        If not active, spawns it Just-In-Time (JIT).
+        """
+        # A. Return existing if alive
+        if server_name in self.active_sessions:
+            client = self.active_sessions[server_name]
+            return client
+
+        # B. Check if we know how to start it
+        if server_name not in self.server_configs:
+            raise ValueError(f"Unknown MCP Server: {server_name}. Available: {list(self.server_configs.keys())}")
+
+        # C. SPAWN (JIT)
+        logger.info(f"🚀 Spawning JIT Server: {server_name}...")
+        config = self.server_configs[server_name]
+        
+        try:
+            # Use same python interpreter as current process
+            python_exe = sys.executable
+            
+            process = await asyncio.create_subprocess_exec(
+                python_exe,
+                str(config.script_path),
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=config.env
+            )
+            
+            # Create Transport
+            transport = SubprocessTransport(process)
+            client = MCPClient()
+            
+            # Connect
+            await client.connect(transport)
+            
+            self.active_sessions[server_name] = client
+            self.active_processes[server_name] = process
+            
+            logger.info(f"✅ Connected to {server_name}")
+            return client
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to spawn {server_name}: {e}")
+            raise
 
     async def list_all_tools(self) -> List[dict]:
         """
