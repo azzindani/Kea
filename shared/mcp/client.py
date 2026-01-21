@@ -34,7 +34,7 @@ class MCPClient:
         result = await client.call_tool("fetch_url", {"url": "https://example.com"})
     """
     
-    def __init__(self, timeout: float = 300.0) -> None:
+    def __init__(self, timeout: float = 60.0) -> None:
         self._transport: Transport | None = None
         self._pending: dict[str | int, asyncio.Future[JSONRPCResponse]] = {}
         self._tools: list[Tool] = []
