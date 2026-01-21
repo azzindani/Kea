@@ -7,6 +7,7 @@ Production-ready PostgreSQL connection pool with health checks.
 from __future__ import annotations
 
 import os
+import asyncio
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, AsyncIterator
