@@ -117,10 +117,17 @@ class SessionRegistry:
         try:
             # Detect UV
             import shutil
-            uv_path = shutil.which("uv")
+            uv_path = shutil.which("uv") or shutil.which("uv.exe")
             
+            # Fallback for Windows Conda environment if not found in PATH
+            if not uv_path and os.name == 'nt':
+                 potential_path = r"C:\Users\422in\miniconda3\Scripts\uv.exe"
+                 if os.path.exists(potential_path):
+                     uv_path = potential_path
+
             if uv_path:
                 logger.info(f"⚡ Using UV for {server_name}")
+                # Use --frozen to prevent updates during runtime
                 cmd = [uv_path, "run", "python", str(config.script_path)]
             else:
                 # Fallback to current interpreter
