@@ -87,21 +87,20 @@ TOOL_CAPABILITIES = {
     # ===========================================
     # SCRAPING TOOLS
     # ===========================================
-    "scrape_url": {
-        "keywords": ["scrape", "extract", "download", "annual report", "website", "page", "fetch"],
-        "server": "scraper_server",
-        "fallbacks": ["web_crawler", "web_search"],
-    },
-    "fetch_data": {
-        "keywords": ["data", "historical", "OHLCV", "price", "volume", "stock", "ticker", "API"],
-        "server": "data_sources_server",
+    "read_url_content": {
+        "keywords": ["scrape", "extract", "download", "annual report", "website", "page", "fetch", "read url"],
+        "server": "read_url_server",
         "fallbacks": ["web_search"],
     },
-    "multi_browse": {
-        "keywords": ["multiple sites", "parallel", "batch", "many urls", "browse all"],
-        "server": "browser_agent_server",
-        "fallbacks": ["web_crawler"],
+    "execute_code": {
+        "keywords": ["data", "historical", "OHLCV", "price", "volume", "stock", "ticker", "API", "python", "calculate", "dataframe"],
+        "server": "python_server",
+        "fallbacks": ["web_search"],
     },
+    
+    # ===========================================
+    # FINANCIAL TOOLS
+    # ===========================================
     "get_idx_tickers": {
         "keywords": ["IDX", "JKSE", "companies", "list of stocks", "ticker list", "universe"],
         "server": "mcp_host",
@@ -109,47 +108,8 @@ TOOL_CAPABILITIES = {
     },
     
     # ===========================================
-    # DATA ANALYSIS TOOLS
-    # ===========================================
-    "run_python": {
-        "keywords": ["calculate", "compute", "analyze", "algorithm", "ratio", "growth", "formula"],
-        "server": "python_server",
-        "fallbacks": ["dataframe_ops"],
-    },
-    "dataframe_ops": {
-        "keywords": ["dataframe", "pandas", "table", "csv", "json", "filter", "aggregate", "load data"],
-        "server": "python_server",
-        "fallbacks": ["run_python"],
-    },
-    "sql_query": {
-        "keywords": ["sql", "query", "select", "from", "where", "join", "database"],
-        "server": "python_server",
-        "fallbacks": ["dataframe_ops"],
-    },
-    "parse_document": {
-        "keywords": ["parse", "extract text", "pdf", "document", "pdfminer", "beautifulsoup"],
-        "server": "python_server",
-        "fallbacks": ["run_python", "scrape_url"],
-    },
-    
-    # ===========================================
     # SPECIALIZED TOOLS
     # ===========================================
-    "build_graph": {
-        "keywords": ["graph", "relationship", "entity", "network", "connection", "ownership"],
-        "server": "analytics_server",
-        "fallbacks": [],
-    },
-    "parse_document": {
-        "keywords": ["parse", "read", "extract from", "PDF", "report", "financial statement"],
-        "server": "document_server",
-        "fallbacks": ["scrape_url"],
-    },
-    "source_validator": {
-        "keywords": ["validate", "credibility", "trustworthy", "verify source", "reliable"],
-        "server": "browser_agent_server",
-        "fallbacks": [],
-    },
 }
 
 
@@ -282,8 +242,8 @@ Do not be limited by "standard" procedures. If a specific dataset/tool is missin
 - Treat Python as your universal adapter to process that raw data.
 
 RULES FOR FINANCIAL DATA:
-1. Do NOT use `web_search` to find data tables. Use `scrape_url`, `get_idx_tickers`, or `yfinance_tool`.
-2. Turn generic requests ("All Companies") into specific list building actions using `get_idx_tickers` or comparable tools.
+1. Do NOT use `web_search` to find data tables if better tools exist. Use `get_idx_tickers` for identifying companies.
+2. Use `execute_code` (Python) to fetch financial data (e.g. using yfinance) or to perform calculations.
 3. You cannot 'Filter' data you do not have. Your first step must always be 'Acquire Dataset'.
 
 Output format:
