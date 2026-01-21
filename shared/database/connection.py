@@ -156,27 +156,37 @@ class DatabasePool:
             }
 
 
+
 # ============================================================================
-# Singleton
+# Singleton (Per Loop)
 # ============================================================================
 
-_database_pool: DatabasePool | None = None
-
+_loop_pools: dict[asyncio.AbstractEventLoop, DatabasePool] = {}
 
 async def get_database_pool() -> DatabasePool:
-    """Get singleton database pool."""
-    global _database_pool
-    if _database_pool is None:
-        _database_pool = DatabasePool()
-        # Lazy init is better, but some prefer explicit
-        if _database_pool.config.url:
-             await _database_pool.initialize()
-    return _database_pool
+    """Get database pool for the current event loop."""
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        # Should not happen in async context
+        return None
+        
+    if loop not in _loop_pools:
+        # Create new pool for this loop
+        pool = DatabasePool()
+        if pool.config.url:
+            await pool.initialize()
+        _loop_pools[loop] = pool
+        
+    return _loop_pools[loop]
 
 
 async def close_database_pool():
-    """Close database pool."""
-    global _database_pool
-    if _database_pool:
-        await _database_pool.close()
-        _database_pool = None
+    """Close pool for current loop."""
+    try:
+        loop = asyncio.get_running_loop()
+        if loop in _loop_pools:
+            await _loop_pools[loop].close()
+            del _loop_pools[loop]
+    except RuntimeError:
+        pass
