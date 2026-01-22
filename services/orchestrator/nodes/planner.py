@@ -87,10 +87,10 @@ TOOL_CAPABILITIES = {
     # ===========================================
     # SCRAPING TOOLS
     # ===========================================
-    "read_url_content": {
+    "fetch_url": {
         "keywords": ["scrape", "extract", "download", "annual report", "website", "page", "fetch", "read url"],
-        "server": "read_url_server",
-        "fallbacks": ["web_search"],
+        "server": "scraper_server",
+        "fallbacks": ["web_search", "browser_scrape"],
     },
     "execute_code": {
         "keywords": ["data", "historical", "OHLCV", "price", "volume", "stock", "ticker", "API", "python", "calculate", "dataframe"],
@@ -105,6 +105,58 @@ TOOL_CAPABILITIES = {
         "keywords": ["IDX", "JKSE", "companies", "list of stocks", "ticker list", "universe"],
         "server": "mcp_host",
         "fallbacks": ["web_search"],
+    },
+    
+    # ===========================================
+    # QUALITATIVE TOOLS
+    # ===========================================
+    "text_coding": {
+        "keywords": ["code text", "qualitative coding", "label themes", "categorize text", "nlp coding"],
+        "server": "qualitative_server",
+        "fallbacks": ["theme_extractor", "execute_code"],
+    },
+    "entity_extractor": {
+        "keywords": ["extract entities", "find people", "identify orgs", "ner", "named entity"],
+        "server": "qualitative_server",
+        "fallbacks": ["execute_code"],
+    },
+    "investigation_graph_add": {
+        "keywords": ["add to graph", "map relationship", "build graph", "connect entity"],
+        "server": "qualitative_server",
+        "fallbacks": ["connection_mapper"],
+    },
+    "investigation_graph_query": {
+        "keywords": ["query graph", "search graph", "find path", "graph lookup"],
+        "server": "qualitative_server",
+        "fallbacks": ["text_coding"],
+    },
+
+    # ===========================================
+    # ML TOOLS
+    # ===========================================
+    "auto_ml": {
+        "keywords": ["train model", "predict", "machine learning", "classification", "regression", "ml"],
+        "server": "ml_server",
+        "fallbacks": ["execute_code"],
+    },
+    "feature_importance": {
+        "keywords": ["feature importance", "key drivers", "what matters", "variable significance"],
+        "server": "ml_server",
+        "fallbacks": ["execute_code"],
+    },
+    
+    # ===========================================
+    # BROWSER AGENT TOOLS
+    # ===========================================
+    "human_like_search": {
+        "keywords": ["human search", "browse like human", "natural search"],
+        "server": "browser_agent_server",
+        "fallbacks": ["web_search"],
+    },
+    "search_memory_add": {
+        "keywords": ["add to memory", "remember search", "cache result"],
+        "server": "browser_agent_server",
+        "fallbacks": [],
     },
     
     # ===========================================
