@@ -91,7 +91,7 @@ class FinanceServer(MCPServer):
         )
         
     async def _handle_get_idx_tickers(self, arguments: dict) -> ToolResult:
-        logger.info("Executing get_idx_tickers", extra={"args": arguments})
+        logger.info("Executing get_idx_tickers", extra={"arguments": arguments})
         return await get_idx_tickers(arguments)
 
 
