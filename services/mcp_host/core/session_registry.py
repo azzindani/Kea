@@ -125,6 +125,10 @@ class SessionRegistry:
                  if os.path.exists(potential_path):
                      uv_path = potential_path
 
+            # Check for explicit disable
+            if os.getenv("KEA_DISABLE_UV"):
+                uv_path = None
+            
             if uv_path:
                 logger.info(f"⚡ Using UV for {server_name}")
                 # Use --frozen to prevent updates during runtime
