@@ -221,7 +221,9 @@ class BrowserAgentServer(MCPServerBase):
         """Validate source credibility."""
         import httpx
         
-        url = args["url"]
+        url = args.get("url")
+        if not url:
+             return ToolResult(content=[TextContent(text="Error: 'url' argument is required")], isError=True)
         check_type = args.get("check_type", "basic")
         
         parsed = urlparse(url)
@@ -339,8 +341,11 @@ class BrowserAgentServer(MCPServerBase):
     
     async def _handle_memory_add(self, args: dict) -> ToolResult:
         """Add search result to memory."""
-        query = args["query"]
-        url = args["url"]
+        query = args.get("query")
+        url = args.get("url")
+        
+        if not query or not url:
+            return ToolResult(content=[TextContent(text="Error: 'query' and 'url' are required")], isError=True)
         title = args.get("title", "")
         summary = args.get("summary", "")
         relevance = args.get("relevance_score", 0.5)
@@ -407,7 +412,10 @@ class BrowserAgentServer(MCPServerBase):
         import httpx
         from bs4 import BeautifulSoup
         
-        urls = args["urls"][:50]  # Allow up to 50 URLs
+        urls = args.get("urls", [])
+        if not urls:
+             return ToolResult(content=[TextContent(text="Error: 'urls' argument is required")], isError=True)
+        urls = urls[:50]  # Allow up to 50 URLs
         extract = args.get("extract", "summary")
         max_concurrent = min(args.get("max_concurrent", 10), 20)  # Up to 20 parallel
         

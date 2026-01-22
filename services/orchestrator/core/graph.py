@@ -322,9 +322,15 @@ async def researcher_node(state: GraphState) -> GraphState:
             return None
 
         # BROWSER TOOLS
-        if tool_name == "human_search":
+        if tool_name in ["human_search", "human_like_search"]:
             if "query" in original_inputs: return {"query": original_inputs["query"], "max_sites": 10}
             return {"query": description, "max_sites": 10}
+            
+        if tool_name == "source_validator":
+            if "url" in original_inputs: return original_inputs
+            next_url = ctx.get_url()
+            if next_url: return {"url": next_url}
+            return None
             
         if tool_name == "multi_browse":
             if "urls" in original_inputs: return original_inputs
