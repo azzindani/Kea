@@ -585,6 +585,15 @@ Prerequisites:
     
     args = parser.parse_args()
     
+    if args.verbose:
+        os.environ["KEA_LOG_NO_TRUNCATE"] = "1"
+        # Ensure third-party noisy loggers stay quiet(er) or become verbose?
+        # User wants "naked", so let's allow DEBUG from httpx if they really want it, 
+        # but usually we just want OUR debugs. 
+        # setup_logging in stress_test.py sets them to WARNING.
+        # Let's keep them quiet unless specifically asked, as they spam byte-level info.
+        pass
+    
     if args.list:
         list_queries()
         return

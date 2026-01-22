@@ -169,33 +169,68 @@ class AuthenticatedAPIClient:
         if self.access_token:
             headers["Authorization"] = f"Bearer {self.access_token}"
         return headers
+
+    def _log_request(self, method: str, path: str, kwargs: dict):
+        """Log full request if verbose mode."""
+        if os.getenv("KEA_LOG_NO_TRUNCATE") != "1":
+            return
+            
+        print(f"\n⚡ REQUEST: {method} {path}")
+        if "json" in kwargs:
+            print(f"BODY: {kwargs['json']}")
+        elif "data" in kwargs:
+             print(f"DATA: {kwargs['data']}")
+        elif "params" in kwargs:
+             print(f"PARAMS: {kwargs['params']}")
+
+    def _log_response(self, response: httpx.Response):
+        """Log full response if verbose mode."""
+        if os.getenv("KEA_LOG_NO_TRUNCATE") != "1":
+            return
+            
+        print(f"⚡ RESPONSE: {response.status_code}")
+        try:
+            print(f"BODY: {response.json()}")
+        except:
+            print(f"BODY: {response.text}")
+        print("")
     
     async def get(self, path: str, **kwargs) -> httpx.Response:
         """Make authenticated GET request."""
-        return await self._client.get(
+        self._log_request("GET", path, kwargs)
+        response = await self._client.get(
             f"{self.base_url}{path}",
             headers=self.headers,
             **kwargs,
         )
+        self._log_response(response)
+        return response
     
     async def post(self, path: str, **kwargs) -> httpx.Response:
         """Make authenticated POST request."""
-        return await self._client.post(
+        self._log_request("POST", path, kwargs)
+        response = await self._client.post(
             f"{self.base_url}{path}",
             headers=self.headers,
             **kwargs,
         )
+        self._log_response(response)
+        return response
     
     async def delete(self, path: str, **kwargs) -> httpx.Response:
         """Make authenticated DELETE request."""
-        return await self._client.delete(
+        self._log_request("DELETE", path, kwargs)
+        response = await self._client.delete(
             f"{self.base_url}{path}",
             headers=self.headers,
             **kwargs,
         )
+        self._log_response(response)
+        return response
     
     async def stream(self, method: str, path: str, **kwargs):
         """Make streaming request."""
+        self._log_request(method, path, kwargs)
         return self._client.stream(
             method,
             f"{self.base_url}{path}",
@@ -444,7 +479,7 @@ async def cleanup_after_test():
 # =============================================================================
 
 @pytest.fixture(autouse=True)
-def setup_stress_test_environment(monkeypatch):
+def setup_stress_test_environment(monkeypatch, request):
     """
     Configure environment for stress testing.
     """
@@ -453,3 +488,8 @@ def setup_stress_test_environment(monkeypatch):
     
     # Set rate limiting
     monkeypatch.setenv("LLM_RATE_LIMIT_SECONDS", "3")
+
+    # Check for verbosity (mapped to -v flag)
+    # Note: request.config.getoption("verbose") returns int (0, 1, 2...)
+    if request.config.getoption("verbose") > 0:
+        monkeypatch.setenv("KEA_LOG_NO_TRUNCATE", "1")

@@ -12,6 +12,7 @@ from typing import Any, Callable, TypeVar, ParamSpec
 
 from shared.logging.structured import get_logger
 from shared.logging.context import get_context
+import os
 
 P = ParamSpec("P")
 T = TypeVar("T")
@@ -47,9 +48,15 @@ def log_execution(
             
             # Log start
             extra: dict[str, Any] = {"function": func_name}
+            no_truncate = os.getenv("KEA_LOG_NO_TRUNCATE", "0") == "1"
+            
             if log_args:
-                extra["func_args"] = str(args)[:200]
-                extra["func_kwargs"] = {k: str(v)[:100] for k, v in kwargs.items()}
+                if no_truncate:
+                    extra["func_args"] = str(args)
+                    extra["func_kwargs"] = {k: str(v) for k, v in kwargs.items()}
+                else:
+                    extra["func_args"] = str(args)[:200]
+                    extra["func_kwargs"] = {k: str(v)[:100] for k, v in kwargs.items()}
             
             logger.info(f"Starting {func_name}", extra=extra)
             
@@ -62,7 +69,7 @@ def log_execution(
                 if log_timing:
                     extra["duration_ms"] = round((time.perf_counter() - start_time) * 1000, 2)
                 if log_result:
-                    extra["result"] = str(result)[:200]
+                    extra["result"] = str(result) if no_truncate else str(result)[:200]
                 
                 logger.info(f"Completed {func_name}", extra=extra)
                 return result
@@ -86,9 +93,15 @@ def log_execution(
             func_name = func.__name__
             
             extra: dict[str, Any] = {"function": func_name}
+            no_truncate = os.getenv("KEA_LOG_NO_TRUNCATE", "0") == "1"
+
             if log_args:
-                extra["func_args"] = str(args)[:200]
-                extra["func_kwargs"] = {k: str(v)[:100] for k, v in kwargs.items()}
+                if no_truncate:
+                    extra["func_args"] = str(args)
+                    extra["func_kwargs"] = {k: str(v) for k, v in kwargs.items()}
+                else:
+                    extra["func_args"] = str(args)[:200]
+                    extra["func_kwargs"] = {k: str(v)[:100] for k, v in kwargs.items()}
             
             logger.info(f"Starting {func_name}", extra=extra)
             
@@ -100,7 +113,7 @@ def log_execution(
                 if log_timing:
                     extra["duration_ms"] = round((time.perf_counter() - start_time) * 1000, 2)
                 if log_result:
-                    extra["result"] = str(result)[:200]
+                    extra["result"] = str(result) if no_truncate else str(result)[:200]
                 
                 logger.info(f"Completed {func_name}", extra=extra)
                 return result

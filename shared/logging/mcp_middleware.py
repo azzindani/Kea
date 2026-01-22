@@ -13,6 +13,7 @@ from shared.mcp.protocol import JSONRPCRequest, JSONRPCResponse, ToolResult
 from shared.logging import get_logger
 from shared.logging.context import set_log_context, get_log_context
 from shared.logging.metrics import record_tool_call
+import os
 
 
 logger = get_logger(__name__)
@@ -53,6 +54,14 @@ class MCPLoggingMiddleware:
             method = request.method
             request_id = str(request.id) if request.id else "notification"
             
+            if os.getenv("KEA_LOG_NO_TRUNCATE") == "1" and request.params:
+                # Log full parameters in verbose mode
+                # Note: We duplicate params here for visibility, normally only method/id are logged
+                logger.info(
+                   f"MCP params: {method}",
+                   extra={"arguments": request.params, "mcp_request_id": request_id}
+                )
+
             logger.info(
                 f"MCP request: {method}",
                 extra={
@@ -141,6 +150,15 @@ class MCPLoggingMiddleware:
         
         if is_error and result.content:
             log_data["error_preview"] = result.content[0].text[:200]
+        
+        no_truncate = os.getenv("KEA_LOG_NO_TRUNCATE") == "1"
+        if no_truncate:
+             log_data["arguments"] = arguments
+             # Flatten content list into readable string
+             if result.content:
+                 log_data["result"] = "\n".join([c.text for c in result.content if hasattr(c, 'text')])
+             else:
+                 log_data["result"] = "Empty content"
         
         getattr(logger, log_level)(
             f"Tool call: {tool_name}",
