@@ -30,7 +30,12 @@ class PostgresBackend(AuditBackend):
     async def _get_pool(self) -> asyncpg.Pool:
         """Get or create connection pool."""
         if self._pool is None:
-            self._pool = await asyncpg.create_pool(self._db_url)
+            # Limit pool size to prevent connection exhaustion
+            self._pool = await asyncpg.create_pool(
+                self._db_url,
+                min_size=1,
+                max_size=5,  # Audit is low-frequency
+            )
             
             async with self._pool.acquire() as conn:
                 # Create table

@@ -37,7 +37,12 @@ class PostgresToolRegistry:
     async def _get_pool(self) -> asyncpg.Pool:
         """Get or create connection pool."""
         if self._pool is None:
-            self._pool = await asyncpg.create_pool(self._db_url)
+            # Create connection pool with limits to prevent exhaustion
+            self._pool = await asyncpg.create_pool(
+                self._db_url,
+                min_size=1,
+                max_size=10,  # Limit connections per component
+            )
             
             async with self._pool.acquire() as conn:
                 await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")

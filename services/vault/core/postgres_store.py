@@ -52,8 +52,13 @@ class PostgresVectorStore(VectorStore):
     async def _get_pool(self) -> asyncpg.Pool:
         """Get or create connection pool."""
         if self._pool is None:
-            # Create connection pool
-            self._pool = await asyncpg.create_pool(self._db_url)
+            # Create connection pool with limits to prevent exhaustion
+            # PostgreSQL default max_connections is 100, so we limit each component
+            self._pool = await asyncpg.create_pool(
+                self._db_url,
+                min_size=1,
+                max_size=10,  # Limit connections per component
+            )
             
             # Initialize DB schema
             async with self._pool.acquire() as conn:
