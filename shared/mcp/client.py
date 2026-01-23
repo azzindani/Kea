@@ -80,7 +80,8 @@ class MCPClient:
             
             if response.id in self._pending:
                 future = self._pending.pop(response.id)
-                future.set_result(response)
+                if not future.done():
+                    future.set_result(response)
     
     async def _send_request(self, method: str, params: dict[str, Any] | None = None) -> JSONRPCResponse:
         """Send a request and wait for response."""
