@@ -61,6 +61,8 @@ class LocalReranker(RerankerProvider):
     ) -> None:
         self.model_name = model_name
         self.device = device or ("cuda" if self._has_cuda() else "cpu")
+        if self.device == "cuda":
+            self.device = "cuda:0"
         self.max_length = max_length
         self.use_flash_attention = use_flash_attention
         self._model = None

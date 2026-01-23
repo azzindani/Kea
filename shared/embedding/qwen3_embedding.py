@@ -142,20 +142,47 @@ class LocalEmbedding(EmbeddingProvider):
         """Lazy load model."""
         if self._model is None:
             from sentence_transformers import SentenceTransformer
+            import torch
             
-            model_kwargs = {"device_map": "auto"} if self.device == "cuda" else {}
+            # Detect multi-GPU for Data Parallelism
+            self._pool = None
+            gpu_count = torch.cuda.device_count() if torch.cuda.is_available() else 0
             
-            if self.use_flash_attention:
-                model_kwargs["attn_implementation"] = "flash_attention_2"
+            # Use Data Parallelism if multiple GPUs available
+            if self.device.startswith("cuda") and gpu_count > 1:
+                # Load model on first device just for attribute access
+                self._model = SentenceTransformer(
+                    self.model_name,
+                    device="cuda:0",
+                    trust_remote_code=True,
+                )
+                
+                # Start process pool on all GPUs
+                try:
+                    self._pool = self._model.start_multi_process_pool()
+                    logger.info(f"Loaded {self.model_name} with Data Parallelism on {gpu_count} GPUs")
+                except Exception as e:
+                    logger.warning(f"Failed to start multi-process pool: {e}. Falling back to single GPU.")
+                    self._pool = None
             
-            self._model = SentenceTransformer(
-                self.model_name,
-                model_kwargs=model_kwargs,
-                tokenizer_kwargs={"padding_side": "left"},
-                trust_remote_code=True,
-            )
-            
-            logger.info(f"Loaded {self.model_name} on {self.device}")
+            else:
+                # Single GPU pinning
+                if self.device == "cuda":
+                    self.device = "cuda:0"
+                    
+                model_kwargs = {}
+                if self.use_flash_attention:
+                    model_kwargs["attn_implementation"] = "flash_attention_2"
+                
+                self._model = SentenceTransformer(
+                    self.model_name,
+                    device=self.device,
+                    model_kwargs=model_kwargs,
+                    tokenizer_kwargs={"padding_side": "left"},
+                    trust_remote_code=True,
+                )
+                
+                logger.info(f"Loaded {self.model_name} on {self.device}")
         
         return self._model
     
@@ -171,10 +198,19 @@ class LocalEmbedding(EmbeddingProvider):
         
         # Run in executor to avoid blocking
         loop = asyncio.get_event_loop()
-        embeddings = await loop.run_in_executor(
-            None,
-            lambda: model.encode(texts, normalize_embeddings=True).tolist()
-        )
+        
+        # Use Data Parallelism for large batches if pool is available
+        if self._pool is not None and len(texts) > 32:
+            embeddings = await loop.run_in_executor(
+                None,
+                lambda: model.encode_multi_process(texts, self._pool, normalize_embeddings=True).tolist()
+            )
+        else:
+            # Standard single-GPU encoding
+            embeddings = await loop.run_in_executor(
+                None,
+                lambda: model.encode(texts, normalize_embeddings=True).tolist()
+            )
         
         return embeddings
     
@@ -185,6 +221,7 @@ class LocalEmbedding(EmbeddingProvider):
         model = self._load_model()
         
         loop = asyncio.get_event_loop()
+        # Queries are usually single items, so we don't use the pool overhead
         embedding = await loop.run_in_executor(
             None,
             lambda: model.encode(
@@ -195,6 +232,14 @@ class LocalEmbedding(EmbeddingProvider):
         )
         
         return embedding
+    
+    def __del__(self):
+        """Cleanup process pool."""
+        if hasattr(self, "_model") and self._model is not None and getattr(self, "_pool", None) is not None:
+             try:
+                 self._model.stop_multi_process_pool(self._pool)
+             except Exception:
+                 pass
 
 
 # Factory function
