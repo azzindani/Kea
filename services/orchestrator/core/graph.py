@@ -246,8 +246,9 @@ async def researcher_node(state: GraphState) -> GraphState:
                 subtasks.append(SubTask(
                     subtask_id=t.get("task_id"),
                     query=t.get("description"),
-                    domain=Domain.RESEARCH, # Should infer from t['tool']
-                    task_type=TaskType.RESEARCH
+                    domain=Domain.RESEARCH, 
+                    task_type=TaskType.RESEARCH,
+                    preferred_tool=t.get("tool") # Pass context from Planner
                 ))
                 
             plan = SpawnPlan(
@@ -257,12 +258,44 @@ async def researcher_node(state: GraphState) -> GraphState:
             )
             
             # Execute Swarm
-            # Note: Spawner needs to be updated to use real tools. 
-            # For now, we unfortunately have to rely on the standard executor below 
-            # because Spawner is still running simulated results (as seen in file view).
-            # I will enable this block fully once Spawner is connected to MCP.
-            logger.warning("⚠️ Swarm capability present but waiting for Spawner->MCP wiring. Falling back to Standard Executor.")
+            logger.info(f"💥 Executing Fractal Swarm for {len(subtasks)} subtasks...")
+            swarm_result = await spawner.execute_swarm(plan)
             
+            # Convert Swarm Result to Facts
+            for res in swarm_result.agent_results:
+                if res.status == "completed":
+                    facts.append({
+                        "text": str(res.result)[:1000],
+                        "query": f"Swarm Agent {res.agent_id}: {res.prompt_used[:50]}...",
+                        "source": "fractal_swarm",
+                        "task_id": res.subtask_id,
+                        "persist": True
+                    })
+                    # Mark as completed so we skip standard execution for these
+                    pass # Logic handled by clearing micro_tasks below
+                    # Wait, 'completed' set is defined below in the standard loop.
+                    # We need to skip the standard loop entirely or mark specific tasks as done.
+                    # Since we did ALL micro_tasks in the swarm, we can just return or clear micro_tasks.
+            
+            # Log success
+            logger.info(f"✅ Swarm Complete: {swarm_result.successful} successful, {swarm_result.failed} failed")
+            
+            # If swarm succeeded significantly, we can skip standard execution
+            if swarm_result.successful > 0:
+                # Add dummy tool invocations for tracking
+                for res in swarm_result.agent_results:
+                     tool_invocations.append({
+                        "task_id": res.subtask_id,
+                        "tool": "swarm_agent",
+                        "success": res.status == "completed",
+                        "persist": True
+                     })
+                
+                logger.info("⚡ Skipping standard execution loop (Swarm handled tasks)")
+                # Clear micro_tasks to skip standard loop
+                micro_tasks = [] 
+            else:
+                 logger.warning("⚠️ Swarm failed to produce results. Falling back to Standard Executor.")            
         except ImportError:
             pass
             
