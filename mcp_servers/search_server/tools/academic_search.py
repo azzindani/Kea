@@ -25,14 +25,17 @@ async def academic_search_tool(arguments: dict) -> ToolResult:
     Args:
         arguments: Tool arguments containing:
             - query: Search query
-            - max_results: Max results (default 10)
+            - max_results: Max results (default: hardware-aware)
             - source: arxiv, semantic_scholar, or both (default: both)
     
     Returns:
         ToolResult with paper results
     """
+    from shared.hardware.detector import detect_hardware
+    
     query = arguments.get("query", "")
-    max_results = arguments.get("max_results", 10)
+    hw = detect_hardware()
+    max_results = arguments.get("max_results", hw.optimal_max_results())
     source = arguments.get("source", "both")
     
     if not query:

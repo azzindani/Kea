@@ -62,10 +62,17 @@ class ParallelExecutor:
     
     def __init__(
         self,
-        max_concurrent: int = 5,
+        max_concurrent: int | None = None,
         timeout_seconds: float = 60.0,
         rate_limit_per_second: float = 10.0,
     ) -> None:
+        # Hardware-aware auto-detection if not specified
+        if max_concurrent is None:
+            from shared.hardware.detector import detect_hardware
+            hw = detect_hardware()
+            max_concurrent = hw.optimal_workers()
+            logger.info(f"ParallelExecutor: auto-detected {max_concurrent} workers")
+        
         self.max_concurrent = max_concurrent
         self.timeout_seconds = timeout_seconds
         self.rate_limit_per_second = rate_limit_per_second

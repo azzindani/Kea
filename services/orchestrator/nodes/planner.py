@@ -232,6 +232,26 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
     
     query = state.get("query", "")
     
+    # ============================================================
+    # RELATED FACT LOOKUP (Semantic Search for Past Research)
+    # ============================================================
+    related_facts = []
+    try:
+        from services.rag_service.core.fact_store import FactStore
+        store = FactStore()
+        
+        # Search for related past research
+        related_facts = await store.search(query, limit=5)
+        
+        if related_facts:
+            logger.info(f"Planner: Found {len(related_facts)} related past facts")
+            state["related_facts"] = [
+                {"entity": f.entity, "value": f.value[:200], "source": f.source_url}
+                for f in related_facts
+            ]
+    except Exception as e:
+        logger.debug(f"Related fact lookup skipped: {e}")
+    
     # Use LLM to decompose query
     try:
         import os

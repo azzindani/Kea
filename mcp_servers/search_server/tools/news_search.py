@@ -26,14 +26,17 @@ async def news_search_tool(arguments: dict) -> ToolResult:
         arguments: Tool arguments containing:
             - query: Search query
             - days: Search within last N days (default 7)
-            - max_results: Max results (default 10)
+            - max_results: Max results (default: hardware-aware)
     
     Returns:
         ToolResult with news results
     """
+    from shared.hardware.detector import detect_hardware
+    
     query = arguments.get("query", "")
     days = arguments.get("days", 7)
-    max_results = arguments.get("max_results", 10)
+    hw = detect_hardware()
+    max_results = arguments.get("max_results", hw.optimal_max_results())
     
     if not query:
         return ToolResult(

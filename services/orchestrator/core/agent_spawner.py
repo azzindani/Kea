@@ -529,9 +529,9 @@ class AgentSpawner:
     async def _get_optimal_parallelism(self) -> int:
         """Get optimal parallelism based on resources."""
         try:
-            from shared.hardware import detect_hardware
-            profile = detect_hardware()
-            return min(self.max_parallel, profile.optimal_workers())
+            from shared.hardware.detector import detect_hardware
+            hw = detect_hardware()
+            return min(self.max_parallel, hw.optimal_workers())
         except ImportError:
             return self.max_parallel
     

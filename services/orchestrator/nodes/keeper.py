@@ -14,6 +14,92 @@ logger = get_logger(__name__)
 
 
 # ============================================================================
+# Loop Safety Controls (from centralized config)
+# ============================================================================
+
+def _get_config():
+    """Get settings from centralized config."""
+    from shared.config import get_settings
+    return get_settings()
+
+
+def get_hardware_aware_limits() -> tuple[int, int]:
+    """Get hardware-aware iteration and facts limits."""
+    config = _get_config()
+    max_iter_config = config.loop_safety.max_global_iterations
+    max_facts_config = config.loop_safety.max_facts_threshold
+    
+    try:
+        from shared.hardware.detector import detect_hardware
+        hw = detect_hardware()
+        # More RAM = can handle more iterations and facts
+        max_iter = min(max_iter_config, max(3, int(hw.ram_available_gb)))
+        max_facts = min(max_facts_config, int(hw.ram_available_gb * 100))
+        return max_iter, max_facts
+    except ImportError:
+        return max_iter_config, max_facts_config
+
+
+def get_adaptive_threshold(iteration: int) -> float:
+    """
+    Calculate adaptive confidence threshold based on iteration.
+    
+    Uses config values: initial_threshold, degradation_rate, min_threshold.
+    """
+    config = _get_config()
+    threshold = config.confidence.initial_threshold - (iteration * config.confidence.degradation_rate)
+    return max(threshold, config.confidence.min_threshold)
+
+
+async def calculate_agreement_score(facts: list[dict]) -> float:
+    """
+    Calculate agreement score from facts using embedding similarity.
+    
+    High similarity between facts = high agreement = confident answer.
+    """
+    if not facts or len(facts) < 2:
+        return 0.5  # Default for insufficient data
+    
+    try:
+        from shared.embedding.model_manager import get_embedding_provider
+        import numpy as np
+        
+        provider = get_embedding_provider()
+        
+        # Get text from facts
+        texts = [f.get("text", "")[:1000] for f in facts[:20]]  # Limit for performance
+        
+        if not any(texts):
+            return 0.5
+        
+        # Embed facts
+        embeddings = await provider.embed(texts)
+        
+        if not embeddings:
+            return 0.5
+        
+        # Calculate average pairwise cosine similarity
+        embeddings_np = np.array(embeddings)
+        norms = np.linalg.norm(embeddings_np, axis=1, keepdims=True)
+        normalized = embeddings_np / (norms + 1e-8)
+        similarity_matrix = np.dot(normalized, normalized.T)
+        
+        # Average of upper triangle (excluding diagonal)
+        n = len(embeddings)
+        if n < 2:
+            return 0.5
+        
+        upper_triangle = similarity_matrix[np.triu_indices(n, k=1)]
+        agreement_score = float(np.mean(upper_triangle))
+        
+        return agreement_score
+        
+    except Exception as e:
+        logger.warning(f"Agreement score calculation failed: {e}")
+        return 0.5
+
+
+# ============================================================================
 # Persistence Layer (Always Persist Policy)
 # ============================================================================
 
@@ -148,6 +234,7 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
     - Deciding whether to continue or stop the research loop
     - Persisting all facts and tool invocations (always-persist policy)
     - Analyzing execution plan progress
+    - Enforcing loop safety controls (hardware-aware)
     
     Args:
         state: Current graph state
@@ -163,6 +250,24 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
     facts = state.get("facts", [])
     job_id = state.get("job_id", "unknown")
     tool_invocations = state.get("tool_invocations", [])
+    
+    # ============================================================
+    # HARDWARE-AWARE SAFETY CONTROLS
+    # ============================================================
+    hw_max_iter, hw_max_facts = get_hardware_aware_limits()
+    
+    # Global safety: Never exceed hardware-aware limits
+    if iteration >= hw_max_iter:
+        logger.warning(f"⚠️ Keeper: Global max iterations ({hw_max_iter}) reached - forcing stop")
+        state["should_continue"] = False
+        state["stop_reason"] = "max_iterations_global"
+        return state
+    
+    if len(facts) >= hw_max_facts:
+        logger.info(f"✅ Keeper: Max facts threshold ({hw_max_facts}) reached - stopping")
+        state["should_continue"] = False
+        state["stop_reason"] = "max_facts_threshold"
+        return state
     
     # ============================================================
     # ALWAYS PERSIST: Facts and Tool Invocations
@@ -186,7 +291,7 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
     state["execution_progress"] = progress
     
     # ============================================================
-    # CHECK ITERATION LIMIT
+    # CHECK LOCAL ITERATION LIMIT (user-specified)
     # ============================================================
     if iteration >= max_iterations:
         logger.info(f"Keeper: Max iterations ({max_iterations}) reached")
@@ -194,22 +299,36 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
         return state
     
     # ============================================================
-    # CHECK FACT SUFFICIENCY
+    # ADAPTIVE CONFIDENCE CHECK (0.95 - 0.05 per iteration)
     # ============================================================
     min_facts = 3
     if len(facts) >= min_facts:
-        logger.info(f"Keeper: Sufficient facts gathered ({len(facts)} >= {min_facts})")
+        # Calculate adaptive threshold for this iteration
+        current_threshold = get_adaptive_threshold(iteration)
         
-        # If all tasks complete, stop
+        # Calculate agreement score from facts (using embeddings)
+        agreement_score = await calculate_agreement_score(facts)
+        
+        logger.info(f"Keeper: Agreement score {agreement_score:.3f}, threshold {current_threshold:.2f}")
+        state["agreement_score"] = agreement_score
+        state["confidence_threshold"] = current_threshold
+        
+        # If agreement exceeds threshold, we have confident answer
+        if agreement_score >= current_threshold:
+            logger.info(f"✅ Keeper: Confidence {agreement_score:.3f} >= {current_threshold:.2f} - stopping")
+            state["should_continue"] = False
+            state["stop_reason"] = "confidence_achieved"
+            return state
+        
+        # If all tasks complete, stop regardless
         if progress["completed_tasks"] >= progress["total_tasks"]:
             logger.info("Keeper: All execution plan tasks complete")
             state["should_continue"] = False
             return state
         
-        # If in later iterations, consider stopping
-        if iteration >= 2:
-            state["should_continue"] = False
-            return state
+        # Log degradation for next iteration
+        next_threshold = get_adaptive_threshold(iteration + 1)
+        logger.info(f"   📉 Threshold will degrade to {next_threshold:.2f} next iteration")
     
     # ============================================================
     # CHECK CONTEXT DRIFT

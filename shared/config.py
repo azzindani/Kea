@@ -75,6 +75,37 @@ class ResearchSettings(BaseModel):
     parallel_tools: int = 5
 
 
+class EmbeddingSettings(BaseModel):
+    """Embedding configuration."""
+    use_local: bool = True  # Use local GPU if available, else API
+    model_name: str = "Qwen/Qwen3-Embedding-0.6B"
+    api_model: str = "qwen/qwen3-embedding-8b"  # OpenRouter model
+    dimension: int = 1024
+    batch_size: int = 32
+
+
+class RerankerSettings(BaseModel):
+    """Reranker configuration."""
+    model_name: str = "Qwen/Qwen3-Reranker-0.6B"
+    per_task_top_k: int = 10  # Top-k after each tool
+    final_batch_top_k: int = 50  # Top-k before generation
+    max_length: int = 8192
+
+
+class ConfidenceSettings(BaseModel):
+    """Adaptive confidence loop configuration."""
+    initial_threshold: float = 0.95
+    degradation_rate: float = 0.05
+    min_threshold: float = 0.60
+    max_loops: int = 5
+
+
+class LoopSafetySettings(BaseModel):
+    """Loop safety controls."""
+    max_global_iterations: int = 10
+    max_facts_threshold: int = 1000
+
+
 class Settings(BaseSettings):
     """
     Main settings class.
@@ -120,6 +151,10 @@ class Settings(BaseSettings):
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
     mcp: MCPSettings = Field(default_factory=MCPSettings)
     research: ResearchSettings = Field(default_factory=ResearchSettings)
+    embedding: EmbeddingSettings = Field(default_factory=EmbeddingSettings)
+    reranker: RerankerSettings = Field(default_factory=RerankerSettings)
+    confidence: ConfidenceSettings = Field(default_factory=ConfidenceSettings)
+    loop_safety: LoopSafetySettings = Field(default_factory=LoopSafetySettings)
     
     class Config:
         env_file = ".env"

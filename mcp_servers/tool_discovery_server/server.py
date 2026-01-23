@@ -203,9 +203,12 @@ class ToolDiscoveryServer(MCPServerBase):
     async def _handle_pypi_search(self, args: dict) -> ToolResult:
         """Search PyPI for packages."""
         import httpx
+        from shared.hardware.detector import detect_hardware
         
         query = args["query"]
-        max_results = min(args.get("max_results", 10), 20)
+        hw = detect_hardware()
+        max_results = min(args.get("max_results", hw.optimal_max_results()), hw.optimal_max_results())
+
         
         result = f"# 📦 PyPI Search: {query}\n\n"
         
@@ -287,9 +290,11 @@ class ToolDiscoveryServer(MCPServerBase):
     async def _handle_npm_search(self, args: dict) -> ToolResult:
         """Search npm for packages."""
         import httpx
+        from shared.hardware.detector import detect_hardware
         
         query = args["query"]
-        max_results = min(args.get("max_results", 10), 20)
+        hw = detect_hardware()
+        max_results = min(args.get("max_results", hw.optimal_max_results()), hw.optimal_max_results())
         
         result = f"# 📦 npm Search: {query}\n\n"
         

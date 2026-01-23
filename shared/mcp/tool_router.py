@@ -112,11 +112,18 @@ class ToolIndex:
     def search(
         self,
         query: str,
-        top_k: int = 5,
+        top_k: int | None = None,
         category: ToolCategory | None = None,
         max_cost_tier: int = 2,
     ) -> list[ToolDescriptor]:
         """Search for relevant tools."""
+        from shared.hardware.detector import detect_hardware
+        
+        # Use hardware-aware default if not specified
+        if top_k is None:
+            hw = detect_hardware()
+            top_k = hw.optimal_top_k()
+        
         # Filter candidates
         if category:
             candidates = [
@@ -209,7 +216,7 @@ class ToolRouter:
     def route(
         self,
         query: str,
-        top_k: int = 3,
+        top_k: int | None = None,
         prefer_free: bool = True,
     ) -> list[ToolDescriptor]:
         """
@@ -217,14 +224,21 @@ class ToolRouter:
         
         Args:
             query: User query describing task
-            top_k: Number of tools to return
+            top_k: Number of tools to return (default: hardware-aware)
             prefer_free: Prefer free/cheap tools
             
         Returns:
             List of matching tools, ranked by relevance
         """
+        from shared.hardware.detector import detect_hardware
+        
         # Detect category
         category = self.detect_category(query)
+        
+        # Use hardware-aware default if not specified
+        if top_k is None:
+            hw = detect_hardware()
+            top_k = hw.optimal_top_k()
         
         # Set cost preference
         max_cost = 0 if prefer_free else 2

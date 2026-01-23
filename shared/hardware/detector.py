@@ -77,6 +77,22 @@ class HardwareProfile:
     def is_constrained(self) -> bool:
         """Check if running in constrained environment."""
         return self.environment in ("colab", "kaggle") or self.ram_total_gb < 8
+    
+    def optimal_max_results(self) -> int:
+        """Calculate optimal max_results based on RAM.
+        
+        Returns hardware-aware limit for search/discovery operations.
+        10K results per GB of RAM, capped at 100K.
+        """
+        return min(int(self.ram_available_gb * 10000), 100000)
+    
+    def optimal_top_k(self) -> int:
+        """Calculate optimal top_k for tool routing.
+        
+        Returns hardware-aware limit for tool discovery.
+        Based on workers * 10, minimum 20.
+        """
+        return max(20, self.optimal_workers() * 10)
 
 
 def detect_hardware() -> HardwareProfile:

@@ -25,14 +25,17 @@ async def web_search_tool(arguments: dict) -> ToolResult:
     Args:
         arguments: Tool arguments containing:
             - query: Search query
-            - max_results: Max results (default 10)
+            - max_results: Max results (default: hardware-aware)
             - search_depth: basic or advanced
     
     Returns:
         ToolResult with search results
     """
+    from shared.hardware.detector import detect_hardware
+    
     query = arguments.get("query", "")
-    max_results = arguments.get("max_results", 10)
+    hw = detect_hardware()
+    max_results = arguments.get("max_results", hw.optimal_max_results())
     search_depth = arguments.get("search_depth", "basic")
     
     if not query:

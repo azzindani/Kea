@@ -564,6 +564,42 @@ async def researcher_node(state: GraphState) -> GraphState:
     logger.info(f"\n📊 Parallel Research Summary:")
     logger.info(f"   Facts collected: {len(facts)}")
     logger.info(f"   Sources found: {len(sources)}")
+    
+    # ============================================================
+    # RERANK FACTS BY RELEVANCE (Neural Reranking)
+    # ============================================================
+    if facts and len(facts) > 1:
+        try:
+            from shared.embedding.model_manager import get_reranker_provider
+            from shared.config import get_settings
+            
+            query = state.get("query", "")
+            reranker = get_reranker_provider()
+            config = get_settings()
+            
+            # Extract text from facts for reranking
+            fact_texts = [f.get("text", "")[:2000] for f in facts]
+            
+            # Use top_k from config
+            # (Previously was hardware aware, now config driven, which can be hardware aware if we tune defaults)
+            top_k = min(len(facts), config.reranker.per_task_top_k)
+            
+            logger.info(f"   🔄 Reranking {len(facts)} facts by relevance...")
+            results = await reranker.rerank(query, fact_texts, top_k=top_k)
+            
+            # Reorder facts by reranker score
+            reranked_facts = []
+            for r in results:
+                fact = facts[r.index].copy()
+                fact["rerank_score"] = r.score
+                reranked_facts.append(fact)
+            
+            facts = reranked_facts
+            logger.info(f"   ✅ Reranked to top {len(facts)} facts")
+            
+        except Exception as e:
+            logger.warning(f"   ⚠️ Reranking failed, using original order: {e}")
+    
     logger.info("="*70 + "\n")
     
     return {

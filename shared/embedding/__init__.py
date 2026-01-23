@@ -33,6 +33,11 @@ from shared.embedding.qwen3_vl_reranker import (
     VLRerankResult,
     create_vl_reranker_provider,
 )
+from shared.embedding.model_manager import (
+    get_embedding_provider,
+    get_reranker_provider,
+    reset_providers,
+)
 
 __all__ = [
     # Text Embedding
@@ -54,4 +59,9 @@ __all__ = [
     "VLRerankerProvider",
     "VLRerankResult",
     "create_vl_reranker_provider",
+    # Model Manager (Singletons)
+    "get_embedding_provider",
+    "get_reranker_provider",
+    "reset_providers",
 ]
+

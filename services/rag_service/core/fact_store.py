@@ -45,13 +45,19 @@ class FactStore:
         self._vector_store = vector_store or create_vector_store(use_memory=use_memory)
         self._facts: dict[str, AtomicFact] = {}  # In-memory cache
     
-    async def add_fact(self, fact: AtomicFact, dataset_id: str | None = None) -> str:
+    async def add_fact(
+        self,
+        fact: AtomicFact,
+        dataset_id: str | None = None,
+        embedding: list[float] | None = None,
+    ) -> str:
         """
         Add a fact to the store.
         
         Args:
             fact: AtomicFact to store
             dataset_id: Optional ID of the dataset this fact belongs to
+            embedding: Optional pre-computed embedding vector
             
         Returns:
             Fact ID
@@ -82,7 +88,8 @@ class FactStore:
         doc = Document(
             id=fact.fact_id,
             content=content,
-            metadata=metadata
+            metadata=metadata,
+            embedding=embedding,  # Attach pre-computed embedding
         )
         
         await self._vector_store.add([doc])

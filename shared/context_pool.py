@@ -45,6 +45,9 @@ class TaskContextPool:
     fact_pool: list[dict] = field(default_factory=list)
     code_results: dict[str, Any] = field(default_factory=dict)
     
+    # File artifacts for standardized I/O
+    file_artifacts: dict[str, str] = field(default_factory=dict)  # task_id -> path
+    
     # Statistics
     urls_extracted: int = 0
     tables_extracted: int = 0
@@ -173,6 +176,19 @@ class TaskContextPool:
     def get_code_result(self, task_id: str) -> Any:
         """Get stored code execution result."""
         return self.code_results.get(task_id)
+    
+    def store_file(self, task_id: str, path: str, description: str = "") -> None:
+        """Store file artifact path for standardized I/O between tools."""
+        self.file_artifacts[task_id] = path
+        logger.info(f"   📁 File artifact stored for '{task_id}': {path}")
+    
+    def get_file(self, task_id: str) -> str | None:
+        """Get file artifact path by task_id."""
+        return self.file_artifacts.get(task_id)
+    
+    def list_files(self) -> list[str]:
+        """List all stored file artifact paths."""
+        return list(self.file_artifacts.values())
     
     def extract_urls_from_text(self, text: str) -> list[str]:
         """

@@ -85,9 +85,12 @@ class ConsensusEngine:
                 "confidence": judgment["confidence"],
             })
             
-            # Check if we can stop early
-            if judgment["verdict"] == "Accept" and judgment["confidence"] >= 0.8:
-                logger.info(f"Consensus: Accepted with high confidence in round {round_num + 1}")
+            # Adaptive threshold: degrade by 0.05 per round (0.95 → 0.90 → 0.85...)
+            adaptive_threshold = max(0.95 - (round_num * 0.05), 0.60)
+            
+            # Check if we can stop early with adaptive threshold
+            if judgment["verdict"] == "Accept" and judgment["confidence"] >= adaptive_threshold:
+                logger.info(f"Consensus: Accepted (conf {judgment['confidence']:.2f} >= threshold {adaptive_threshold:.2f}) in round {round_num + 1}")
                 break
             
             if judgment["verdict"] == "Reject" and round_num >= 1:

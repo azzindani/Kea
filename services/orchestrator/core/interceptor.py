@@ -92,27 +92,42 @@ class MemoryInterceptor:
 
     @staticmethod
     async def _store_async(output: NodeOutput):
-        """Internal storage logic."""
+        """Internal storage logic with embedding generation."""
         try:
             store = await get_fact_store()
             
-            # Convert NodeOutput to AtomicFact(s) for storage
-            # In the future, we might just store the NodeOutput blob directly if pgvector supports it nice
-            # For now, we adapt to the existing FactStore API which expects AtomicFact
+            # Get the text content to embed
+            text_content = output.content.get("text", "")[:4000]
             
-            # Heuristic: Create a "Run Log" fact
+            if not text_content:
+                logger.debug(f"No text content to store from {output.source_node}")
+                return
+            
+            # Generate embedding for semantic search
+            embedding = None
+            try:
+                from shared.embedding.model_manager import get_embedding_provider
+                provider = get_embedding_provider()
+                embeddings = await provider.embed([text_content])
+                embedding = embeddings[0] if embeddings else None
+                logger.debug(f"🧠 Generated embedding for {output.source_node} ({len(embedding)} dims)")
+            except Exception as e:
+                logger.warning(f"Embedding generation failed: {e}, storing without embedding")
+            
+            # Create AtomicFact with embedding
             fact = AtomicFact(
-                fact_id="", # Auto-generate
+                fact_id="",  # Auto-generate
                 entity=f"Tool Execution: {output.source_node}",
                 attribute="output",
-                value=output.content.get("text", "")[:4000], # Trucate for sanity if huge
+                value=text_content,
                 source_url=f"kea://trace/{output.trace_id}/{output.source_node}",
                 source_title=f"Execution of {output.source_node}",
                 confidence_score=1.0,
                 extracted_at=output.timestamp
             )
             
-            await store.add_fact(fact)
+            # Store with embedding if available
+            await store.add_fact(fact, embedding=embedding)
             
             logger.debug(f"🧠 Autonomic Memory: Stored output from {output.source_node}")
             
