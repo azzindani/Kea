@@ -295,7 +295,12 @@ async def researcher_node(state: GraphState) -> GraphState:
                 # Clear micro_tasks to skip standard loop
                 micro_tasks = [] 
             else:
-                 logger.warning("⚠️ Swarm failed to produce results. Falling back to Standard Executor.")            
+                 logger.warning(f"⚠️ Swarm failed to produce results ({swarm_result.failed} failed). Falling back to Standard Executor.")
+                 for res in swarm_result.agent_results:
+                     if res.error:
+                         logger.warning(f"   ❌ Agent {res.agent_id} error: {res.error}")
+                     elif res.result and "Exception" in str(res.result):
+                         logger.warning(f"   ❌ Agent {res.agent_id} exception: {str(res.result)[:200]}")            
         except ImportError:
             pass
             
