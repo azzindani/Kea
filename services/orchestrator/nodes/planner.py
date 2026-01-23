@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from shared.logging import get_logger
 from shared.llm import OpenRouterProvider, LLMConfig
 from shared.llm.provider import LLMMessage, LLMRole
+import asyncio
 
 logger = get_logger(__name__)
 

@@ -41,7 +41,7 @@ async def get_idx_tickers(arguments: dict) -> ToolResult:
         "MDKA.JK", "TOWR.JK", "TBIG.JK", "SCMA.JK", "MNCN.JK", "EMT.JK", "BUKA.JK", "ARTO.JK"
     ]
     
-    df = pd.DataFrame(tickers, columns=["ticker"])
+    df = pd.DataFrame(tickers, columns=["symbol"])
     
     # Save to a temporary location
     file_path = f"/tmp/{index_name}_tickers_{uuid.uuid4().hex[:8]}.csv"

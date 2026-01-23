@@ -587,6 +587,7 @@ Prerequisites:
     
     if args.verbose:
         os.environ["KEA_LOG_NO_TRUNCATE"] = "1"
+        print("⚡ VERBOSE MODE: KEA_LOG_NO_TRUNCATE=1 (Full Payloads Enabled)")
         # Ensure third-party noisy loggers stay quiet(er) or become verbose?
         # User wants "naked", so let's allow DEBUG from httpx if they really want it, 
         # but usually we just want OUR debugs. 
