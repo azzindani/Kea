@@ -533,6 +533,15 @@ class AgentSpawner:
                             
                             if not tool_res.isError:
                                 response = f"Swarm Tool Result ({tool_name}):\n {str(tool_res.content)[:1000]}"
+                                
+                                # VERBOSE GLASS BOX LOGGING (SWARM)
+                                if tool_name in ["execute_code", "run_python", "get_ticker_metrics"]:
+                                    content_text = ""
+                                    if hasattr(tool_res.content, 'text'): content_text = tool_res.content.text
+                                    elif isinstance(tool_res.content, list):
+                                        content_text = "\n".join([c.text for c in tool_res.content if hasattr(c, 'text')])
+                                    
+                                    logger.info(f"   🐍 EXECUTION OUTPUT (SWARM AGENT {agent_id}):\n{'-'*60}\n{content_text.strip()}\n{'-'*60}")
                             else:
                                 response = f"Swarm Tool Failed ({tool_name}): {tool_res.content}"
                         except Exception as e:
