@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from enum import Enum
 from typing import Any, Callable
@@ -309,12 +309,74 @@ class AgentSpawner:
             estimated_time_seconds=len(subtasks) * 5.0,  # Rough estimate
         )
     
+    def _expand_plan(self, plan: SpawnPlan) -> SpawnPlan:
+        """
+        Bucket Pattern: Expand massive tasks into parallel shards.
+        If a task asks for '10k data' or 'massive collection', spawn multiple farmers.
+        """
+        expanded_sub = []
+        expanded_prompts = []
+        
+        for i, task in enumerate(plan.subtasks):
+            query_lower = task.query.lower()
+            
+            # Heuristic for expansion
+            is_massive = any(w in query_lower for w in ["massive", "10k", "10,000", "all items", "bucket", "parallel"])
+            
+            if is_massive and task.task_type in [TaskType.EXTRACT, TaskType.RESEARCH]:
+                # Determine expansion factor
+                factor = 5  # Default shards
+                if "100k" in query_lower: factor = 20
+                elif "10k" in query_lower or "10,000" in query_lower: factor = 10
+                elif "50k" in query_lower: factor = 15
+                
+                # Cap at reasonable max parallel
+                factor = min(factor, plan.max_parallel or 10)
+                
+                logger.info(f"💥 Expanding massive task '{task.query[:30]}...' into {factor} parallel shards")
+                
+                # Create shards
+                for j in range(1, factor + 1):
+                    # Suffix query with batch info (e.g., 'Page 1', 'Batch 1')
+                    # This allows build_tool_inputs to map it to pagination args later
+                    new_query = f"{task.query} (Batch {j})"
+                    
+                    new_task = replace(
+                        task, 
+                        subtask_id=f"{task.subtask_id}_{j}", 
+                        query=new_query
+                    )
+                    expanded_sub.append(new_task)
+                    
+                    # Replicate prompt (same instructions, just different slice of data)
+                    if i < len(plan.prompts):
+                        # We don't need deep copy of prompt object, reusing is fine OR shallow copy
+                        # GeneratedPrompt is dataclass, immutable-ish
+                        expanded_prompts.append(plan.prompts[i])
+            else:
+                # Keep original
+                expanded_sub.append(task)
+                if i < len(plan.prompts):
+                    expanded_prompts.append(plan.prompts[i])
+        
+        # Update plan
+        plan.subtasks = expanded_sub
+        plan.prompts = expanded_prompts
+        # Update estimate
+        plan.estimated_time_seconds = len(expanded_sub) * 3.0 # Parallel gain
+        
+        return plan
+
     async def execute_swarm(
         self,
         plan: SpawnPlan,
         progress_callback: Callable[[int, int], None] | None = None,
     ) -> SwarmResult:
         """Execute agent swarm based on plan."""
+        
+        # 1. Expand Plan (The "Bucket Pattern")
+        plan = self._expand_plan(plan)
+        
         swarm_result = SwarmResult(
             task_id=plan.task_id,
             agent_results=[],

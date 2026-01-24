@@ -165,8 +165,29 @@ def build_tool_inputs(tool_name: str, description: str, original_inputs: dict, c
 
     # SEARCH TOOLS (default)
     if tool_name in ["web_search", "news_search", "fetch_data"]:
-        if "query" in original_inputs: return original_inputs
-        return {"query": description, "max_results": 20}
+        args = {"query": description, "max_results": 20}
+        if "query" in original_inputs: 
+            args = original_inputs.copy()
+            if "max_results" not in args: args["max_results"] = 20
+        
+        # Pagination / Batch support
+        # Detect "page X" or "batch X" or "offset X"
+        page_match = re.search(r'(?:page|batch|offset)\s+(\d+)', description.lower())
+        if page_match:
+            try:
+                page = int(page_match.group(1))
+                # Assuming 20 results per page
+                args["offset"] = (page - 1) * 20
+                args["count"] = 20 # Explicit count
+                logger.info(f"   📄 Added pagination to {tool_name}: page {page} (offset {args['offset']})")
+            except:
+                pass
+                
+        # Detect "massive" or "10k" intent -> Maximize results
+        if any(w in description.lower() for w in ["massive", "10k", "all", "comprehensive"]):
+             args["max_results"] = 50 # Increase limit per call
+             
+        return args
     
     # DATA URL TOOLS (data_profiler, data_cleaner, feature_engineer, auto_ml)
     if tool_name in ["data_profiler", "data_cleaner", "feature_engineer", "auto_ml"]:
