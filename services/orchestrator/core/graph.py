@@ -811,6 +811,46 @@ async def researcher_node(state: GraphState) -> GraphState:
             logger.info(f"   🔄 Reranking {len(facts)} facts by relevance...")
             try:
                 results = await reranker.rerank(query, fact_texts, top_k=top_k)
+            except Exception as e:
+                # OOM CHECK & RECOVERY
+                is_oom = "out of memory" in str(e).lower()
+                if is_oom:
+                     import torch
+                     import gc
+                     from shared.embedding.model_manager import switch_reranker_device
+                     
+                     logger.warning(f"⚠️ CUDA OOM detected during reranking. Initiating failover...")
+                     
+                     # Clear cache immediately
+                     gc.collect()
+                     if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                     
+                     # Determine next device
+                     new_device = "cpu"
+                     if torch.cuda.is_available() and torch.cuda.device_count() > 1:
+                         # Try next GPU
+                         current_device = getattr(reranker, "device", "cuda:0")
+                         if isinstance(current_device, str) and ":" in current_device:
+                             try:
+                                 curr_idx = int(current_device.split(":")[-1])
+                                 new_idx = (curr_idx + 1) % torch.cuda.device_count()
+                                 # Prevent cycling back to same OOM device immediately if count > 1
+                                 if new_idx != curr_idx:
+                                     new_device = f"cuda:{new_idx}"
+                             except:
+                                 pass
+                     
+                     logger.warning(f"   🔄 Switching reranker to {new_device} and retrying operation...")
+                     
+                     # Switch device
+                     switch_reranker_device(new_device)
+                     
+                     # Retry execution
+                     results = await reranker.rerank(query, fact_texts, top_k=top_k)
+                     logger.info(f"   ✅ Retry successful on {new_device}")
+                else:
+                    raise e
             finally:
                 # Cleanup after heavy operation
                 try:

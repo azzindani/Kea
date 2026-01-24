@@ -82,8 +82,19 @@ def get_reranker_provider():
     return _reranker_provider
 
 
-def reset_providers():
-    """Reset all providers (for testing)."""
-    global _embedding_provider, _reranker_provider
-    _embedding_provider = None
     _reranker_provider = None
+
+
+def switch_reranker_device(new_device: str):
+    """
+    Switch reranker to new device (e.g., 'cuda:1', 'cpu').
+    
+    Args:
+        new_device: Target device
+    """
+    global _reranker_provider
+    if _reranker_provider and hasattr(_reranker_provider, "move_to_device"):
+        _reranker_provider.move_to_device(new_device)
+        logger.info(f"Model Manager: Reranker switched to {new_device}")
+    else:
+        logger.warning("Model Manager: Cannot switch device (Provider not initialized or incapable)")

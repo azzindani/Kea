@@ -120,6 +120,18 @@ class LocalReranker(RerankerProvider):
         
         return self._model, self._tokenizer
     
+    def move_to_device(self, new_device: str):
+        """
+        Move model to new device (e.g., 'cuda:1', 'cpu').
+        
+        Args:
+            new_device: Target device string
+        """
+        if self._model:
+            self._model = self._model.to(new_device)
+        self.device = new_device
+        logger.info(f"Model moved to {new_device}")
+    
     def _format_instruction(
         self,
         query: str,
