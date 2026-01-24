@@ -549,33 +549,90 @@ class AgentSpawner:
                             except Exception as e:
                                 logger.warning(f"Failed to fetch global context: {e}")
                             
-                            # Use robust tool input builder
-                            args = build_tool_inputs(
-                                tool_name=tool_name, 
-                                description=subtask.query, 
-                                original_inputs={}, 
-                                collected_facts=collected_facts
-                            )
-                            
-                            # Handling for None return (fallback)
-                            if args is None:
-                                args = {"query": subtask.query}  # Last resort fallback
-
-                            tool_res = await session.call_tool(tool_name, args)
-                            
-                            if not tool_res.isError:
-                                response = f"Swarm Tool Result ({tool_name}):\n {str(tool_res.content)[:1000]}"
+                            # =========================================================
+                            # GLASS-BOX EXECUTION WITH SELF-CORRECTION
+                            # =========================================================
+                            if tool_name in ["execute_code", "run_python"]:
+                                from services.orchestrator.agents.code_generator import generate_python_code
+                                from services.orchestrator.core.utils import build_tool_inputs
                                 
-                                # VERBOSE GLASS BOX LOGGING (SWARM)
-                                if tool_name in ["execute_code", "run_python", "get_ticker_metrics"]:
-                                    content_text = ""
-                                    if hasattr(tool_res.content, 'text'): content_text = tool_res.content.text
-                                    elif isinstance(tool_res.content, list):
-                                        content_text = "\n".join([c.text for c in tool_res.content if hasattr(c, 'text')])
+                                attempt = 0
+                                max_attempts = 3
+                                previous_code = None
+                                previous_error = None
+                                
+                                while attempt < max_attempts:
+                                    attempt += 1
                                     
-                                    logger.info(f"   🐍 EXECUTION OUTPUT (SWARM AGENT {agent_id}):\n{'-'*60}\n{content_text.strip()}\n{'-'*60}")
+                                    # 1. GENERATE CODE (Autonomous)
+                                    logger.info(f"   🧠 Generating Python Code (Attempt {attempt})...")
+                                    # Only fetch files once to save IO
+                                    if attempt == 1:
+                                        files = []
+                                        try:
+                                            if hasattr(ctx, 'list_files'):
+                                                files = ctx.list_files()
+                                        except: pass
+                                    
+                                    code = await generate_python_code(
+                                        task_description=subtask.query,
+                                        facts=[{"text": f.get("text")} for f in collected_facts],
+                                        file_artifacts=files,
+                                        previous_code=previous_code,
+                                        previous_error=previous_error
+                                    )
+                                    
+                                    # 2. GLASS-BOX LOGGING (Show user the code)
+                                    logger.info(f"   📝 CODE TO EXECUTE:\n{'-'*40}\n{code}\n{'-'*40}")
+                                    
+                                    # 3. EXECUTE
+                                    args = {"code": code}
+                                    tool_res = await session.call_tool("execute_code", args)
+                                    
+                                    # 4. EVALUATE
+                                    if not tool_res.isError:
+                                        # Success!
+                                        response = f"Swarm Tool Result (execute_code):\n {str(tool_res.content)[:2000]}"
+                                        
+                                        # Verbose Output Log
+                                        content_text = ""
+                                        if hasattr(tool_res.content, 'text'): content_text = tool_res.content.text
+                                        elif isinstance(tool_res.content, list):
+                                            content_text = "\n".join([c.text for c in tool_res.content if hasattr(c, 'text')])
+                                            
+                                        logger.info(f"   ✅ EXECUTION SUCCESS:\n{content_text.strip()[:1000]}...")
+                                        break
+                                    else:
+                                        # Failure - Capture error for retry
+                                        error_msg = str(tool_res.content)
+                                        logger.warning(f"   ❌ Execution Failed (Attempt {attempt}): {error_msg[:200]}")
+                                        
+                                        previous_code = code
+                                        previous_error = error_msg
+                                        
+                                        if attempt == max_attempts:
+                                            response = f"Swarm Tool Failed after {max_attempts} attempts: {error_msg}"
+                                            logger.error("   🛑 Giving up on code generation.")
+                            
                             else:
-                                response = f"Swarm Tool Failed ({tool_name}): {tool_res.content}"
+                                # STANDARD TOOL EXECUTION (Non-Code)
+                                args = build_tool_inputs(
+                                    tool_name=tool_name, 
+                                    description=subtask.query, 
+                                    original_inputs={}, 
+                                    collected_facts=collected_facts
+                                )
+                                
+                                if args is None:
+                                    args = {"query": subtask.query}
+
+                                tool_res = await session.call_tool(tool_name, args)
+                                
+                                if not tool_res.isError:
+                                    response = f"Swarm Tool Result ({tool_name}):\n {str(tool_res.content)[:1000]}"
+                                else:
+                                    response = f"Swarm Tool Failed ({tool_name}): {tool_res.content}"
+                            # =========================================================
                         except Exception as e:
                             response = f"Swarm Tool Exception ({tool_name}): {e}"
                     else:

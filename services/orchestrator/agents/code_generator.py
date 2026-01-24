@@ -66,14 +66,19 @@ async def generate_python_code(
     task_description: str,
     facts: list[dict],
     file_artifacts: list[str] | None = None,
+    previous_code: str | None = None,
+    previous_error: str | None = None,
 ) -> str:
     """
     Use LLM to generate Python code based on task and collected facts.
+    Supports self-correction if previous attempt failed.
     
     Args:
         task_description: What the code should accomplish
         facts: List of fact dicts from prior research tasks
-        file_artifacts: List of available file paths (CSV, Parquet, JSON)
+        file_artifacts: List of available file paths
+        previous_code: The code that failed (for retry)
+        previous_error: The error message (for retry)
         
     Returns:
         Executable Python code string (no imports)
@@ -90,28 +95,44 @@ async def generate_python_code(
         
         # Summarize facts for LLM
         facts_summary = ""
-        for i, fact in enumerate(facts[:10], 1):  # Use up to 10 facts
+        for i, fact in enumerate(facts[:15], 1):  # Use up to 15 facts
             text = fact.get("text", "")[:500]
             source = fact.get("source", "unknown")
             facts_summary += f"\n[Fact {i}] (from {source}):\n{text}\n"
         
         if not facts_summary:
-            facts_summary = "(No facts collected yet - use sample data)"
+            facts_summary = "(No facts collected yet - if task requires data, assume it needs to be fetched)"
             
         # Summarize files
         files_str = "\n".join(f"- {f}" for f in (file_artifacts or [])) if file_artifacts else "(No files available)"
         
+        # Build prompt
         prompt = CODE_PROMPT.format(
             task_description=task_description,
             facts_summary=facts_summary,
             file_artifacts=files_str
         )
         
+        # Add Error Context (Self-Correction)
+        if previous_error:
+            prompt += f"""
+\n\n!!! PREVIOUS ATTEMPT FAILED !!!
+CODE:
+```python
+{previous_code or 'Unknown'}
+```
+
+ERROR:
+{previous_error}
+
+INSTRUCTION: Fix the code above to resolve the error. Ensure you handle the edge case described in the error.
+"""
+        
         provider = OpenRouterProvider(api_key=api_key)
         response = await provider.complete(
             messages=[LLMMessage(role=MessageRole.USER, content=prompt)],
             config=LLMConfig(
-                temperature=0.2,  # Low temp for deterministic code
+                temperature=0.1,  # Lower temp for fixes
                 max_tokens=32768,
             ),
         )
@@ -129,7 +150,7 @@ async def generate_python_code(
         lines = [l for l in lines if not l.strip().startswith('import ')]
         code = '\n'.join(lines)
         
-        logger.info(f"   📝 GENERATED PYTHON CODE:\n{'-'*60}\n{code}\n{'-'*60}")
+        logger.info(f"   📝 GENERATED PYTHON CODE (Self-Correction={bool(previous_error)}):\n{'-'*60}\n{code}\n{'-'*60}")
         return code.strip()
         
     except Exception as e:
