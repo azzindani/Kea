@@ -82,7 +82,13 @@ def get_reranker_provider():
     return _reranker_provider
 
 
+
+def reset_providers():
+    """Reset all providers (for testing)."""
+    global _embedding_provider, _reranker_provider
+    _embedding_provider = None
     _reranker_provider = None
+
 
 
 def switch_reranker_device(new_device: str):
