@@ -546,17 +546,19 @@ async def researcher_node(state: GraphState) -> GraphState:
 
                 # ARTIFACT HARVESTING (NEW): Scan for file paths
                 import re
-                # Simple regex to find filenames with specific extensions
                 file_matches = re.findall(r'[\w\-\._\/]+\.(?:csv|parquet|xlsx|json)', content_text)
                 for fpath in file_matches:
-                    # Clean path
                     fpath = fpath.strip()
-                    if len(fpath) > 4: # Min length
+                    if len(fpath) > 4: 
                          ctx.store_file(t_id, fpath)
                          logger.info(f"   📂 Harvested artifact: {fpath}")
                 
                 completed.add(t_id)
                 logger.info(f"   ✅ Task {t_id} completed via {calls[idx].tool_name}")
+                
+                # VERBOSE CODE OUTPUT
+                if calls[idx].tool_name in ["execute_code", "run_python"]:
+                     logger.info(f"   🐍 EXECUTION OUTPUT:\n{'-'*60}\n{content_text.strip()}\n{'-'*60}")
             else:
                 # Handle hard failure - extract clean error message
                 tool_name = calls[idx].tool_name

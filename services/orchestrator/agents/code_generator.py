@@ -129,7 +129,7 @@ async def generate_python_code(
         lines = [l for l in lines if not l.strip().startswith('import ')]
         code = '\n'.join(lines)
         
-        logger.info(f"   📝 LLM generated code ({len(code)} chars)")
+        logger.info(f"   📝 GENERATED PYTHON CODE:\n{'-'*60}\n{code}\n{'-'*60}")
         return code.strip()
         
     except Exception as e:
