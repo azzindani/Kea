@@ -195,31 +195,51 @@ class LocalReranker(RerankerProvider):
         
         model, _ = self._load_model()
         
-        # Format pairs
-        pairs = [self._format_instruction(query, doc, instruction) for doc in documents]
+        # Batching configuration (to prevent OOM)
+        BATCH_SIZE = 16 
         
-        # Process in executor
-        loop = asyncio.get_event_loop()
+        all_scores = []
         
-        def compute_scores():
-            inputs = self._process_inputs(pairs)
+        # Process in batches
+        for i in range(0, len(documents), BATCH_SIZE):
+            batch_docs = documents[i : i + BATCH_SIZE]
             
-            with torch.no_grad():
-                batch_scores = model(**inputs).logits[:, -1, :]
-                true_vector = batch_scores[:, self._token_true_id]
-                false_vector = batch_scores[:, self._token_false_id]
-                batch_scores = torch.stack([false_vector, true_vector], dim=1)
-                batch_scores = torch.nn.functional.log_softmax(batch_scores, dim=1)
-                scores = batch_scores[:, 1].exp().tolist()
+            # Format pairs for this batch
+            pairs = [self._format_instruction(query, doc, instruction) for doc in batch_docs]
             
-            return scores
-        
-        scores = await loop.run_in_executor(None, compute_scores)
+            # Process in executor (CPU/GPU bound)
+            loop = asyncio.get_event_loop()
+            
+            def compute_batch_scores(batch_pairs):
+                # Ensure we handle empty batch (unlikely)
+                if not batch_pairs: return []
+                
+                inputs = self._process_inputs(batch_pairs)
+                
+                with torch.no_grad():
+                    # Move inputs to device (redundant if process_inputs does it, but safe)
+                    for k, v in inputs.items():
+                        inputs[k] = v.to(model.device)
+                        
+                    batch_logits = model(**inputs).logits[:, -1, :]
+                    true_vector = batch_logits[:, self._token_true_id]
+                    false_vector = batch_logits[:, self._token_false_id]
+                    stacked_scores = torch.stack([false_vector, true_vector], dim=1)
+                    log_probs = torch.nn.functional.log_softmax(stacked_scores, dim=1)
+                    return log_probs[:, 1].exp().tolist()
+            
+            # Run batch
+            batch_scores = await loop.run_in_executor(None, compute_batch_scores, pairs)
+            all_scores.extend(batch_scores)
+            
+            # Optional: Clear cache after every few batches if very large
+            if len(documents) > 100 and i % (BATCH_SIZE * 4) == 0:
+                torch.cuda.empty_cache() if torch.cuda.is_available() else None
         
         # Build results
         results = [
             RerankResult(index=i, score=score, text=documents[i])
-            for i, score in enumerate(scores)
+            for i, score in enumerate(all_scores)
         ]
         
         # Sort by score descending

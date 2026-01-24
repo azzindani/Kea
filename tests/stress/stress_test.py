@@ -241,7 +241,7 @@ class StressTestRunner:
                 "query": query.prompt,
                 "job_type": "deep_research",
                 "depth": 2,
-                "max_sources": 10,
+                "max_sources": 500,
             },
         )
         
