@@ -47,6 +47,9 @@ async def get_idx_tickers(arguments: dict) -> ToolResult:
     
     artifact_id = f"file://{file_path}"
     
+    # Context Injection (The Handoff Fix)
+    ticker_str = ", ".join(tickers)
+    
     return ToolResult(
         content=[TextContent(text=f"""
 # IDX Ticker List Acquired
@@ -54,6 +57,7 @@ async def get_idx_tickers(arguments: dict) -> ToolResult:
 Successfully generated ticker list for {index_name}.
 Total Tickers: {len(tickers)}
 Artifact ID: {artifact_id}
+List: {ticker_str}
 
 You now have the universe of companies. 
 Use `dispatch_parallel_tasks` to process them.
@@ -98,6 +102,8 @@ async def get_ticker_metrics(arguments: dict) -> ToolResult:
             "last_updated": "Live (Yahoo Finance)"
         }
         
+        source_url = f"https://finance.yahoo.com/quote/{ticker}"
+        
         # Format as markdown table
         md = f"""
 ### Financial Metrics for {metrics['company_name']} ({ticker})
@@ -109,6 +115,7 @@ async def get_ticker_metrics(arguments: dict) -> ToolResult:
 | **P/E Ratio** | {metrics['pe_ratio']:.2f} |
 | **Rev Growth (YoY)** | {metrics['revenue_growth_yoy']:.1f}% |
 | **Data Source** | Yahoo Finance (Live) |
+| **Source URL** | {source_url} |
 
 Raw Data:
 {metrics}
