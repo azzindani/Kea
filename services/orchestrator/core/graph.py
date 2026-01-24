@@ -30,6 +30,9 @@ from services.orchestrator.core.router import IntentionRouter
 from shared.context_pool import get_context_pool, reset_context_pool
 from services.orchestrator.agents.code_generator import generate_fallback_code, generate_python_code
 
+# Data pool for bucket pattern (massive data collection)
+from shared.data_pool import get_data_pool
+
 
 
 logger = get_logger(__name__)
@@ -224,8 +227,7 @@ async def researcher_node(state: GraphState) -> GraphState:
     # =========================================================================
     # Phase 3: Fractal Spawning (High Complexity)
     # =========================================================================
-    if len(micro_tasks) > 5:
-        logger.info(f"🚀 High Complexity Detected ({len(micro_tasks)} tasks) -> Spawning Fractal Swarm")
+    if len(micro_tasks) >= 1:  # Always use swarm for any tasks\n        logger.info(f"🚀 Spawning Fractal Swarm for {len(micro_tasks)} tasks")
         try:
             from services.orchestrator.core.agent_spawner import get_spawner
             # Use strict imports to avoid shadowing
@@ -265,8 +267,8 @@ async def researcher_node(state: GraphState) -> GraphState:
             for res in swarm_result.agent_results:
                 if res.status == "completed":
                     facts.append({
-                        "text": str(res.result)[:1000],
-                        "query": f"Swarm Agent {res.agent_id}: {res.prompt_used[:50]}...",
+                        "text": str(res.result),  # No truncation
+                        "query": f"Swarm Agent {res.agent_id}: {res.prompt_used}",  # No truncation
                         "source": "fractal_swarm",
                         "task_id": res.subtask_id,
                         "persist": True
@@ -608,8 +610,8 @@ async def researcher_node(state: GraphState) -> GraphState:
             if success:
                 # Extract Facts
                 fact = {
-                    "text": content_text[:1000],
-                    "query": task.get("description", "")[:200],
+                    "text": content_text,  # No truncation - store full content
+                    "query": task.get("description", ""),  # No truncation
                     "source": calls[idx].tool_name,
                     "task_id": t_id,
                     "persist": t_persist
@@ -619,13 +621,29 @@ async def researcher_node(state: GraphState) -> GraphState:
                 # Extract Sources
                 ctx = get_context_pool()
                 extracted_urls = ctx.extract_urls_from_text(content_text)
-                for url in extracted_urls[:10]:
+                for url in extracted_urls:  # No limit - extract all URLs
                     sources.append({
                         "url": url,
-                        "title": task.get("description", "")[:80],
+                        "title": task.get("description", ""),  # No truncation
                         "tool": calls[idx].tool_name,
                         "task_id": t_id
                     })
+                
+                # Store in DataPool for bucket pattern
+                try:
+                    data_pool = get_data_pool()
+                    await data_pool.create_pool_item(
+                        pool_id=state.get("job_id", "default"),
+                        metadata={
+                            "fact_text": content_text[:5000],  # Summary for metadata
+                            "source": calls[idx].tool_name,
+                            "task_id": t_id,
+                            "query": task.get("description", ""),
+                        },
+                        status="raw"
+                    )
+                except Exception as e:
+                    logger.debug(f"DataPool storage skipped: {e}")
                 
                 completed.add(t_id)
                 logger.info(f"   ✅ Task {t_id} completed via {calls[idx].tool_name}")

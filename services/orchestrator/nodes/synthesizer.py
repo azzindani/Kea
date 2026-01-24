@@ -44,18 +44,18 @@ async def synthesizer_node(state: dict[str, Any]) -> dict[str, Any]:
             config = LLMConfig(
                 model="nvidia/nemotron-3-nano-30b-a3b:free",
                 temperature=0.5,
-                max_tokens=1000,
+                max_tokens=32768,
             )
             
             # Prepare facts summary
             facts_text = "\n".join([
                 f"- {f.get('text', str(f)) if isinstance(f, dict) else str(f)}"
-                for f in facts[:20]  # Limit to avoid token overflow
+                for f in facts  # No limit - use all facts
             ]) if facts else "No facts collected"
             
             sources_text = "\n".join([
                 f"- {s.get('url', str(s)) if isinstance(s, dict) else str(s)}"
-                for s in sources[:10]
+                for s in sources  # No limit - use all sources
             ]) if sources else "No sources"
             
             messages = [
@@ -115,13 +115,29 @@ Previous Analysis:
             
             state["report"] = response.content
             
-            # Extract confidence from report
-            if "high" in response.content.lower():
-                state["confidence"] = 0.85
-            elif "medium" in response.content.lower():
-                state["confidence"] = 0.65
-            else:
-                state["confidence"] = 0.45
+            # Calculate confidence using reranker scoring (decimal precision)
+            try:
+                from shared.embedding.model_manager import get_reranker_provider
+                if facts:
+                    reranker = get_reranker_provider()
+                    fact_texts = [f.get('text', str(f)) if isinstance(f, dict) else str(f) for f in facts[:100]]
+                    results = await reranker.rerank(query, fact_texts)
+                    if results:
+                        avg_score = sum(r.score for r in results) / len(results)
+                        state["confidence"] = round(avg_score, 4)  # Precise decimal
+                    else:
+                        state["confidence"] = 0.5
+                else:
+                    state["confidence"] = 0.0
+            except Exception as e:
+                logger.warning(f"Reranker confidence failed: {e}, falling back to text")
+                # Fallback to text parsing
+                if "high" in response.content.lower():
+                    state["confidence"] = 0.85
+                elif "medium" in response.content.lower():
+                    state["confidence"] = 0.65
+                else:
+                    state["confidence"] = 0.45
                 
             logger.info(f"Synthesizer: Report generated ({len(response.content)} chars)")
             

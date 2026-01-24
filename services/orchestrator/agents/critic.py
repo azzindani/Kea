@@ -66,7 +66,7 @@ Be constructive - don't just criticize, suggest improvements."""
             config = LLMConfig(
                 model="nvidia/nemotron-3-nano-30b-a3b:free",
                 temperature=0.4,
-                max_tokens=600,
+                max_tokens=32768,
             )
             
             messages = [

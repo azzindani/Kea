@@ -266,7 +266,7 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
             config = LLMConfig(
                 model="nvidia/nemotron-3-nano-30b-a3b:free",
                 temperature=0.3,
-                max_tokens=1000,  # Increased for execution plan
+                max_tokens=32768,  # Maximum for task generation
             )
             
             # Discover relevant tools (INTELLIGENCE INJECTION)
@@ -315,6 +315,12 @@ Your mission is to decompose complex queries into actionable execution plans, fi
 AVAILABLE TOOLS (Use these if relevant):
 {tools_context}
 
+CRITICAL: GENERATE MAXIMUM MICRO-TASKS (up to 32768 tasks).
+- Each individual data point = 1 task
+- If analyzing 800 companies, create 800 individual tasks
+- If scraping 100 pages, create 100 separate tasks
+- MORE GRANULAR is ALWAYS BETTER for parallel execution
+
 CORE PHILOSOPHY: IMPROVISE AND BUILD.
 Do not be limited by "standard" procedures. If a specific dataset/tool is missing, plan to **build it yourself** using the available primitive tools (like Python code and Web Search).
 - Treat the web as a raw database to be scraped and parsed.
@@ -325,24 +331,32 @@ RULES FOR FINANCIAL DATA:
 2. Use `execute_code` (Python) to fetch financial data (e.g. using yfinance) or to perform calculations.
 3. You cannot 'Filter' data you do not have. Your first step must always be 'Acquire Dataset'.
 
+PHASES FOR LARGE TASKS:
+1. DISCOVERY - Find all entities (companies, URLs, documents)
+2. COLLECTION - Create ONE task per entity to collect data  
+3. VALIDATION - Verify collected data
+4. ANALYSIS - Process and calculate
+5. SYNTHESIS - Combine results
+
 Output format:
 SUB-QUERIES:
 1. [question - be specific about what data/information is needed]
 2. [question]
+... (create as many as needed)
 
 HYPOTHESES:
 1. [testable claim]
 2. [testable claim]
+... (create as many as needed)
 
-EXECUTION-STEPS:
+EXECUTION-STEPS (generate hundreds or thousands for large-scale research):
 1. [action verb] [what] [where/how] - e.g. "Use get_idx_tickers to load JKSE company list"
-2. [action verb] [what] [where/how] - e.g. "Download historical price data for each ticker"
-3. [action verb] [what] [where/how] - e.g. "Calculate revenue growth rate using financial data"
-4. [action verb] [what] [where/how] - e.g. "Scrape annual reports from company websites"
-5. [action verb] [what] [where/how] - e.g. "Build ownership graph from extracted entities"
+2. [action verb] [what] [where/how] - e.g. "Download historical price data for ASII"
+3. [action verb] [what] [where/how] - e.g. "Download historical price data for BBCA"
+... (one task per entity, repeat for ALL entities)
 
 Be specific about:
-- What data to collect
+- What data to collect (create one task per item)
 - What calculations to perform
 - What to extract from documents
 - What relationships to map"""
@@ -368,14 +382,26 @@ Be specific about:
                     current_section = "hypotheses"
                 elif "EXECUTION" in line.upper():
                     current_section = "execution"
-                elif line and line[0].isdigit() and "." in line:
-                    text = line.split(".", 1)[1].strip() if "." in line else line
-                    if current_section == "sub_queries":
-                        sub_queries.append(text)
-                    elif current_section == "hypotheses":
-                        hypotheses.append(text)
-                    elif current_section == "execution":
-                        execution_steps.append(text)
+                elif line:
+                    # Extract text from various formats: numbered, bullets, dashes
+                    text = None
+                    if line[0].isdigit() and "." in line:
+                        # Numbered: "1. Task description"
+                        text = line.split(".", 1)[1].strip() if "." in line else line
+                    elif line.startswith("-") or line.startswith("*"):
+                        # Bullets: "- Task description" or "* Task description"
+                        text = line[1:].strip()
+                    elif line.startswith("•"):
+                        # Unicode bullet
+                        text = line[1:].strip()
+                    
+                    if text and current_section:
+                        if current_section == "sub_queries":
+                            sub_queries.append(text)
+                        elif current_section == "hypotheses":
+                            hypotheses.append(text)
+                        elif current_section == "execution":
+                            execution_steps.append(text)
             
             state["sub_queries"] = sub_queries or [query]
             state["hypotheses"] = hypotheses

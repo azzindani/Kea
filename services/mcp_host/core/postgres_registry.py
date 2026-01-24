@@ -111,10 +111,40 @@ class PostgresToolRegistry:
             
             texts = []
             for tool, schema, _ in updates_needed:
-                desc = f"{tool.name}: {tool.description or ''}"
+                # Build rich embedding text (up to 32768 tokens for maximum context)
+                desc = f"Tool: {tool.name}\n"
+                desc += f"Description: {tool.description or 'No description'}\n"
+                
                 if 'inputSchema' in schema:
-                    props = schema.get('inputSchema', {}).get('properties', {})
-                    desc += f" Arguments: {', '.join(props.keys())}"
+                    input_schema = schema.get('inputSchema', {})
+                    props = input_schema.get('properties', {})
+                    required = input_schema.get('required', [])
+                    
+                    desc += "Parameters:\n"
+                    for name, spec in props.items():
+                        req_flag = "[REQUIRED]" if name in required else "[optional]"
+                        param_desc = spec.get('description', 'No description')
+                        param_type = spec.get('type', 'any')
+                        param_default = spec.get('default', '')
+                        param_enum = spec.get('enum', [])
+                        
+                        desc += f"  - {name} ({param_type}) {req_flag}: {param_desc}"
+                        if param_default:
+                            desc += f" Default: {param_default}"
+                        if param_enum:
+                            desc += f" Values: {param_enum}"
+                        desc += "\n"
+                    
+                    desc += f"Required params: {required}\n"
+                
+                # Add output schema if available
+                if 'outputSchema' in schema:
+                    desc += f"Output: {json.dumps(schema.get('outputSchema', {}))}\n"
+                
+                # Add examples if available
+                if 'examples' in schema:
+                    desc += f"Examples: {json.dumps(schema.get('examples', []))}\n"
+                
                 texts.append(desc)
             
             try:

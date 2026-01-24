@@ -26,7 +26,7 @@ class ConsensusEngine:
     4. Optionally loop for refinement
     """
     
-    def __init__(self, max_rounds: int = 2):
+    def __init__(self, max_rounds: int = 32768):
         self.generator = GeneratorAgent()
         self.critic = CriticAgent()
         self.judge = JudgeAgent()

@@ -63,7 +63,7 @@ Be fair and explain your reasoning."""
             config = LLMConfig(
                 model="nvidia/nemotron-3-nano-30b-a3b:free",
                 temperature=0.3,
-                max_tokens=800,
+                max_tokens=32768,
             )
             
             messages = [

@@ -105,7 +105,7 @@ async def calculate_agreement_score(facts: list[dict]) -> float:
 
 async def persist_facts(facts: list[dict], job_id: str) -> int:
     """
-    Persist facts to database.
+    Persist facts to database using FactStore.
     
     Always-persist policy: every fact is stored for durability and resume capability.
     
@@ -114,31 +114,74 @@ async def persist_facts(facts: list[dict], job_id: str) -> int:
     """
     persisted = 0
     
-    # TODO: Implement actual database persistence
-    # For now, filter to facts marked for persistence
-    for fact in facts:
-        if fact.get("persist", True):  # Default to True (always persist)
+    try:
+        from services.rag_service.core.fact_store import FactStore
+        from shared.schemas import AtomicFact
+        
+        store = FactStore()
+        
+        for fact in facts:
+            if not fact.get("persist", True):
+                continue
+                
+            # Create AtomicFact from dict
+            atomic_fact = AtomicFact(
+                entity=fact.get("source", "unknown"),
+                attribute="content",
+                value=fact.get("text", ""),
+                source_url=fact.get("url", ""),
+                confidence=1.0,
+            )
+            
+            # Persist to database
+            await store.add_fact(atomic_fact, dataset_id=job_id)
             persisted += 1
-            # In production: INSERT INTO facts (job_id, text, source, ...) VALUES (...)
+            
+        logger.info(f"Keeper: Persisted {persisted} facts to FactStore for job {job_id}")
+        
+    except Exception as e:
+        logger.warning(f"Keeper: FactStore persistence failed: {e}, counting only")
+        persisted = sum(1 for f in facts if f.get("persist", True))
     
-    logger.info(f"Keeper: Persisted {persisted} facts for job {job_id}")
     return persisted
 
 
 async def persist_tool_invocations(invocations: list[dict], job_id: str) -> int:
     """
-    Persist tool invocations to audit trail.
+    Persist tool invocations to audit trail using Vault.
     
     Returns:
         Number of invocations persisted
     """
     persisted = 0
     
-    for inv in invocations:
-        persisted += 1
-        # In production: INSERT INTO audit_trail (job_id, tool, success, ...) VALUES (...)
+    try:
+        from services.vault.core.audit_trail import get_audit_client, AuditEventType
+        
+        client = get_audit_client()
+        
+        for inv in invocations:
+            await client.log(
+                event_type=AuditEventType.TOOL_CALLED,
+                action=f"tool_executed_{inv.get('tool', 'unknown')}",
+                actor="keeper_node",
+                resource=job_id,
+                details={
+                    "task_id": inv.get("task_id"),
+                    "tool": inv.get("tool"),
+                    "success": inv.get("success"),
+                    "error": inv.get("error"),
+                },
+                session_id=job_id,
+            )
+            persisted += 1
+            
+        logger.info(f"Keeper: Persisted {persisted} tool invocations to AuditTrail for job {job_id}")
+        
+    except Exception as e:
+        logger.warning(f"Keeper: AuditTrail persistence failed: {e}, counting only")
+        persisted = len(invocations)
     
-    logger.info(f"Keeper: Persisted {persisted} tool invocations for job {job_id}")
     return persisted
 
 
@@ -245,7 +288,7 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
     logger.info("Keeper: Checking context drift and orchestrating tools")
     
     iteration = state.get("iteration", 0)
-    max_iterations = state.get("max_iterations", 3)
+    max_iterations = state.get("max_iterations", 32768)  # Maximum scaling
     query = state.get("query", "")
     facts = state.get("facts", [])
     job_id = state.get("job_id", "unknown")

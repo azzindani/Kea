@@ -105,7 +105,7 @@ async def generate_python_code(
             messages=[LLMMessage(role=MessageRole.USER, content=prompt)],
             config=LLMConfig(
                 temperature=0.2,  # Low temp for deterministic code
-                max_tokens=800,
+                max_tokens=32768,
             ),
         )
         

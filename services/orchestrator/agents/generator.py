@@ -66,12 +66,12 @@ Always cite your sources when making claims."""
             config = LLMConfig(
                 model="nvidia/nemotron-3-nano-30b-a3b:free",
                 temperature=0.6,
-                max_tokens=800,
+                max_tokens=32768,
             )
             
             facts_text = "\n".join([
                 f"- {f.get('text', str(f)) if isinstance(f, dict) else str(f)}"
-                for f in facts[:15]
+                for f in facts  # No limit - use all facts
             ]) if facts else "No facts available"
             
             messages = [

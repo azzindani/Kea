@@ -87,9 +87,9 @@ class EmbeddingSettings(BaseModel):
 class RerankerSettings(BaseModel):
     """Reranker configuration."""
     model_name: str = "Qwen/Qwen3-Reranker-0.6B"
-    per_task_top_k: int = 10  # Top-k after each tool
-    final_batch_top_k: int = 50  # Top-k before generation
-    max_length: int = 8192
+    per_task_top_k: int = 32768  # Top-k after each tool
+    final_batch_top_k: int = 32768  # Top-k before generation
+    max_length: int = 32768
 
 
 class ConfidenceSettings(BaseModel):
@@ -97,13 +97,13 @@ class ConfidenceSettings(BaseModel):
     initial_threshold: float = 0.95
     degradation_rate: float = 0.05
     min_threshold: float = 0.60
-    max_loops: int = 5
+    max_loops: int = 32768
 
 
 class LoopSafetySettings(BaseModel):
     """Loop safety controls."""
-    max_global_iterations: int = 10
-    max_facts_threshold: int = 1000
+    max_global_iterations: int = 32768
+    max_facts_threshold: int = 32768
 
 
 class Settings(BaseSettings):
