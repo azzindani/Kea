@@ -386,13 +386,21 @@ async def researcher_node(state: GraphState) -> GraphState:
                         try:
                             from shared.context_pool import get_context_pool
                             ctx = get_context_pool()
-                            # We store the result as a "memory" or "artifact"
-                            # This ensures Phase 2 can "see" Phase 1's output
-                            ctx.store_memory(
+                            
+                            # 1. Store as structured data (for code agents)
+                            ctx.store_data(
                                 key=f"task_output_{res.subtask_id}",
-                                value=str(res.result),
-                                metadata={"task_id": res.subtask_id, "phase": i}
+                                data=str(res.result),
+                                description=f"Output from task {res.subtask_id} (Phase {i})"
                             )
+                            
+                            # 2. Store as fact (for semantic search/prompts)
+                            ctx.add_fact(
+                                text=str(res.result),
+                                source=f"task_{res.subtask_id}",
+                                task_id=res.subtask_id
+                            )
+                            
                         except Exception as e:
                             logger.warning(f"Failed to update context pool: {e}")
 
