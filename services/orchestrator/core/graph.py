@@ -326,23 +326,62 @@ async def researcher_node(state: GraphState) -> GraphState:
         """Build proper inputs based on tool requirements."""
         ctx = get_context_pool()
         
+        # Helper: Extract URLs from description
+        def extract_url_from_text(text: str) -> str | None:
+            import re
+            url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
+            match = re.search(url_pattern, text)
+            return match.group(0) if match else None
+        
+        # Helper: Extract entity names (company, person) from description
+        def extract_entity_from_desc(text: str) -> str:
+            # Remove common prefixes and extract the main subject
+            text = text.strip()
+            # Try to find quoted entities
+            import re
+            quoted = re.findall(r'"([^"]+)"|\'([^\']+)\'', text)
+            if quoted:
+                return quoted[0][0] or quoted[0][1]
+            # Otherwise use the whole description as query
+            return text[:200]
+        
         # PYTHON TOOLS
         if tool_name in ["run_python", "execute_code", "parse_document"]:
             if "code" in original_inputs: return original_inputs
             code = generate_fallback_code(description, collected_facts or [])
             return {"code": code}
         
-        if tool_name in ["sql_query", "dataframe_ops", "analyze_data"]:
+        if tool_name in ["sql_query", "analyze_data"]:
              # TRANSFORM: Smart Logic -> Python Code
              if "code" in original_inputs: return original_inputs
-             
-             # If we have unstructured query, generate code
              code = generate_fallback_code(description, collected_facts or [])
              return {"code": code}
+        
+        # DATAFRAME OPS - needs operation parameter
+        if tool_name == "dataframe_ops":
+            if "operation" in original_inputs: return original_inputs
+            # Map description to operation
+            desc_lower = description.lower()
+            if "filter" in desc_lower:
+                return {"operation": "filter", "query": description}
+            elif "sort" in desc_lower:
+                return {"operation": "sort", "column": "value", "ascending": False}
+            elif "group" in desc_lower:
+                return {"operation": "groupby", "columns": ["category"]}
+            elif "merge" in desc_lower:
+                return {"operation": "merge"}
+            else:
+                # Default to filter with description as query
+                return {"operation": "filter", "query": description}
         
         # SCRAPING & CRAWLING
         if tool_name in ["scrape_url", "fetch_url", "link_extractor", "sitemap_parser"]:
             if "url" in original_inputs: return original_inputs
+            
+            # Try to extract URL from description
+            url_from_desc = extract_url_from_text(description)
+            if url_from_desc:
+                return {"url": url_from_desc}
             
             # ORCHESTRATION FIX: Auto-chain URLs from context pool
             # If no URL provided, pull one from the pool of discovered URLs
@@ -353,8 +392,25 @@ async def researcher_node(state: GraphState) -> GraphState:
                 
             return None
         
+        # BROWSER SCRAPE - needs URL
+        if tool_name in ["browser_scrape", "safe_download", "page_screenshot"]:
+            if "url" in original_inputs: return original_inputs
+            
+            url_from_desc = extract_url_from_text(description)
+            if url_from_desc:
+                return {"url": url_from_desc}
+            
+            next_url = ctx.get_url()
+            if next_url:
+                logger.info(f"   🔗 Chained URL from pool to {tool_name}: {next_url}")
+                return {"url": next_url}
+            return None
+        
         if tool_name == "web_crawler":
             if "start_url" in original_inputs: return original_inputs
+            url_from_desc = extract_url_from_text(description)
+            if url_from_desc:
+                return {"start_url": url_from_desc, "max_depth": 3, "max_pages": 50}
             crawl_url = ctx.get_url()
             if crawl_url: return {"start_url": crawl_url, "max_depth": 3, "max_pages": 50}
             return None
@@ -373,6 +429,41 @@ async def researcher_node(state: GraphState) -> GraphState:
         if tool_name == "multi_browse":
             if "urls" in original_inputs: return original_inputs
             return None
+        
+        # EDGAR / SEC TOOLS
+        if tool_name in ["edgar_search", "sec_search"]:
+            if "company" in original_inputs: return original_inputs
+            # Extract company name from description
+            entity = extract_entity_from_desc(description)
+            return {"company": entity}
+        
+        if tool_name in ["edgar_filing_content", "sec_filing"]:
+            if "accession_number" in original_inputs: return original_inputs
+            # We need accession number from previous edgar_search results
+            # Check collected facts for accession numbers
+            if collected_facts:
+                for fact in collected_facts:
+                    text = fact.get("text", "") if isinstance(fact, dict) else str(fact)
+                    import re
+                    acc_match = re.search(r'\d{10}-\d{2}-\d{6}', text)
+                    if acc_match:
+                        return {"accession_number": acc_match.group(0)}
+            return None
+        
+        # SENTIMENT / NLP TOOLS
+        if tool_name in ["sentiment_analysis", "text_analysis", "summarize"]:
+            if "text" in original_inputs: return original_inputs
+            # Use collected facts as text source
+            if collected_facts:
+                texts = []
+                for fact in collected_facts[:5]:
+                    text = fact.get("text", "") if isinstance(fact, dict) else str(fact)
+                    texts.append(text)
+                combined = " ".join(texts)[:5000]
+                if combined.strip():
+                    return {"text": combined}
+            # Fallback to description
+            return {"text": description}
 
         # SEARCH TOOLS (default)
         if tool_name in ["web_search", "news_search", "fetch_data"]:
