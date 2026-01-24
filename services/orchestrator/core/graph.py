@@ -466,6 +466,7 @@ async def researcher_node(state: GraphState) -> GraphState:
             error_msg = None
             content_text = ""
             
+            if success and res.result and hasattr(res.result, "content"):
                 for c in res.result.content:
                     if hasattr(c, "text"):
                         content_text += c.text
