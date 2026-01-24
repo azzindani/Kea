@@ -493,6 +493,13 @@ async def researcher_node(state: GraphState) -> GraphState:
                 # Extract Sources
                 ctx = get_context_pool()
                 extracted_urls = ctx.extract_urls_from_text(content_text)
+                
+                # FALLBACK: If no URLs found in text, check input arguments!
+                if not extracted_urls and "url" in calls[idx].arguments:
+                    url_arg = calls[idx].arguments["url"]
+                    if isinstance(url_arg, str) and url_arg.startswith("http"):
+                        extracted_urls.append(url_arg)
+                        
                 for url in extracted_urls:  # No limit - extract all URLs
                     sources.append({
                         "url": url,
@@ -592,9 +599,16 @@ async def researcher_node(state: GraphState) -> GraphState:
             # (Previously was hardware aware, now config driven, which can be hardware aware if we tune defaults)
             top_k = min(len(facts), config.reranker.per_task_top_k)
             
-            logger.info(f"   🔄 Reranking {len(facts)} facts by relevance...")
+            logger.info(f"   🔄 Reranking {len(facts)} facts by relevance to query...")
+            logger.debug(f"   🔍 Reranker Query: {query[:100]}...")
+            logger.debug(f"   🔍 Reranker Sample Fact: {fact_texts[0][:100]}...")
+            
             try:
                 results = await reranker.rerank(query, fact_texts, top_k=top_k)
+                if results:
+                    logger.info(f"   ✅ Top Score: {results[0].score:.4f}, Bottom Score: {results[-1].score:.4f}")
+                else:
+                    logger.warning("   ⚠️ Reranker returned no results")
             except Exception as e:
                 # OOM CHECK & RECOVERY
                 is_oom = "out of memory" in str(e).lower()
