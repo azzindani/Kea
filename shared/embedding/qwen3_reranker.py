@@ -44,7 +44,7 @@ class LocalReranker(RerankerProvider):
     Qwen3-Reranker-0.6B local inference.
     
     Model: Qwen/Qwen3-Reranker-0.6B
-    Max Length: 8192 tokens
+    Max Length: 32768 tokens
     Requires: transformers>=4.51.0
     
     Usage:
@@ -56,7 +56,7 @@ class LocalReranker(RerankerProvider):
         self,
         model_name: str = "Qwen/Qwen3-Reranker-0.6B",
         device: str | None = None,
-        max_length: int = 8192,
+        max_length: int = 32768,
         use_flash_attention: bool = False,
     ) -> None:
         self.model_name = model_name
@@ -133,27 +133,33 @@ class LocalReranker(RerankerProvider):
         return f"<Instruct>: {instruction}\n<Query>: {query}\n<Document>: {doc}"
     
     def _process_inputs(self, pairs: list[str]):
-        """Tokenize and process inputs."""
+        """Tokenize and process inputs using fast path."""
         import torch
         
         model, tokenizer = self._load_model()
         
+        # Build complete prompts with prefix and suffix
+        full_texts = []
+        prefix = "<|im_start|>system\nJudge whether the Document meets the requirements based on the Query and the Instruct provided. Note that the answer can only be \"yes\" or \"no\".<|im_end|>\n<|im_start|>user\n"
+        suffix = "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+        
+        for pair in pairs:
+            # Truncate pair content if needed
+            max_pair_len = self.max_length - len(self._prefix_tokens) - len(self._suffix_tokens)
+            pair_tokens = tokenizer.encode(pair, add_special_tokens=False)
+            if len(pair_tokens) > max_pair_len:
+                pair_tokens = pair_tokens[:max_pair_len]
+                pair = tokenizer.decode(pair_tokens)
+            
+            full_texts.append(prefix + pair + suffix)
+        
+        # Use __call__ directly (fast path - avoids warning)
         inputs = tokenizer(
-            pairs,
-            padding=False,
-            truncation=True,
-            return_attention_mask=False,
-            max_length=self.max_length - len(self._prefix_tokens) - len(self._suffix_tokens),
-        )
-        
-        for i, ele in enumerate(inputs['input_ids']):
-            inputs['input_ids'][i] = self._prefix_tokens + ele + self._suffix_tokens
-        
-        inputs = tokenizer.pad(
-            inputs,
+            full_texts,
             padding=True,
-            return_tensors="pt",
+            truncation=True,
             max_length=self.max_length,
+            return_tensors="pt",
         )
         
         for key in inputs:

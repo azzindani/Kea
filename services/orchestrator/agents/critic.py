@@ -34,6 +34,13 @@ Your role:
 - Question source reliability
 - Suggest what's missing
 
+CRITICAL - CHECK FOR HALLUCINATION:
+1. Flag ANY claim that isn't backed by the provided facts
+2. If numbers/statistics appear without source, mark as "POTENTIALLY FABRICATED"
+3. Check if the answer contains data that wasn't in the original facts
+4. Verify that acknowledged "data gaps" match what's actually missing
+5. Be especially suspicious of precise numbers, dates, or names without citations
+
 Be constructive - don't just criticize, suggest improvements."""
     
     async def critique(self, answer: str, facts: list, sources: list) -> str:

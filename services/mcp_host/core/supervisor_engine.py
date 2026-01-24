@@ -103,24 +103,52 @@ class SupervisorEngine:
         cpu = psutil.cpu_percent(interval=None)
         ram = psutil.virtual_memory().percent
         
+        # Get hardware profile for advanced OOM checks
+        vram_percent = 0.0
+        ram_oom_risk = False
+        try:
+            from shared.hardware.detector import detect_hardware
+            hw = detect_hardware()
+            
+            # Refresh and check RAM OOM risk
+            hw.refresh_ram()
+            ram_oom_risk = hw.is_ram_oom_risk(required_gb=2.0)
+            
+            # Refresh and check VRAM
+            if hw.cuda_available:
+                hw.refresh_vram()
+                vram_percent = hw.vram_pressure() * 100
+        except Exception:
+            pass
+        
         is_critical = False
         
-        if ram > MAX_RAM_PERCENT:
-            logger.warning(f"⚠️ RAM Critical ({ram}% > {MAX_RAM_PERCENT}%). Pausing.")
+        # RAM OOM check - use the more accurate is_ram_oom_risk method
+        if ram_oom_risk or ram > MAX_RAM_PERCENT:
+            if not self._hardware_paused:
+                available_gb = getattr(hw, 'ram_available_gb', 0)
+                logger.warning(f"⚠️ RAM Critical ({ram}% used, {available_gb:.1f}GB free). Pausing.")
             is_critical = True
             
-        elif cpu > MAX_CPU_PERCENT:
-             # Only log warning if not already paused to avoid spam
+        elif cpu > MAX_CPU_PERCENT and vram_percent < 80:
+             # Only pause if BOTH CPU is high AND GPU isn't available/loaded
+             # If GPU is available and has capacity, let GPU tasks proceed
              if not self._hardware_paused:
                  logger.warning(f"⚠️ CPU Critical ({cpu}% > {MAX_CPU_PERCENT}%). Pausing dispatch.")
              is_critical = True
+        
+        # Add VRAM check for GPU OOM prevention
+        if vram_percent > 90:
+            if not self._hardware_paused:
+                logger.warning(f"⚠️ VRAM Critical ({vram_percent:.1f}% > 90%). Pausing GPU tasks.")
+            is_critical = True
         
         # State Transition Logic
         if is_critical and not self._hardware_paused:
             self._hardware_paused = True
         elif not is_critical and self._hardware_paused:
             self._hardware_paused = False
-            logger.info(f"✅ Hardware recovered (CPU: {cpu}%, RAM: {ram}%). Resuming dispatch.")
+            logger.info(f"✅ Hardware recovered (CPU: {cpu}%, RAM: {ram}%, VRAM: {vram_percent:.1f}%). Resuming dispatch.")
             
         return not is_critical
 

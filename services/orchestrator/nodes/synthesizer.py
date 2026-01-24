@@ -63,19 +63,36 @@ async def synthesizer_node(state: dict[str, Any]) -> dict[str, Any]:
                     role=LLMRole.SYSTEM,
                     content="""You are a research report synthesizer. Create concise, well-structured reports.
 
+CRITICAL RULES - NEVER VIOLATE THESE:
+1. ONLY use information explicitly provided in "Collected Facts" and "Sources"
+2. NEVER fabricate, invent, or guess any data (numbers, dates, names, statistics)
+3. If facts are incomplete or missing, explicitly state "Data not collected/available"
+4. If a task shows as "Not yet executed", say so - DO NOT make up results
+5. If numbers or statistics are not in the facts, say "Specific figures not obtained"
+6. Distinguish clearly between what WAS found vs what was PLANNED but not executed
+
 Format:
 ## Executive Summary
-[2-3 sentences]
+[2-3 sentences based ONLY on collected facts]
 
-## Key Findings
-1. [Finding with evidence]
-2. [Finding with evidence]
+## What Was Accomplished
+[List tasks that ACTUALLY completed with real data obtained]
+
+## What Is Still Pending
+[List tasks that were planned but NOT executed - do NOT fabricate results for these]
+
+## Key Findings (from actual data only)
+1. [Finding with evidence from facts]
+2. [Finding with evidence from facts]
+
+## Data Gaps
+[Explicitly list what data is missing or was not collected]
 
 ## Confidence Assessment
-[High/Medium/Low with justification]
+[High/Medium/Low with justification - Low if many data gaps]
 
 ## Sources
-[List sources used]"""
+[List only actual sources used]"""
                 ),
                 LLMMessage(
                     role=LLMRole.USER,

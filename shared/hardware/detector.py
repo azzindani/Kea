@@ -93,6 +93,62 @@ class HardwareProfile:
         Based on workers * 10, minimum 20.
         """
         return max(20, self.optimal_workers() * 10)
+    
+    def vram_pressure(self) -> float:
+        """Calculate VRAM pressure (0.0 = free, 1.0 = full).
+        
+        Returns 0.0 if no GPU available.
+        """
+        if not self.cuda_available or self.vram_total_gb == 0:
+            return 0.0
+        return 1.0 - (self.vram_available_gb / self.vram_total_gb)
+    
+    def is_gpu_oom_risk(self, required_gb: float = 1.0) -> bool:
+        """Check if GPU is at risk of OOM.
+        
+        Args:
+            required_gb: Estimated VRAM needed for upcoming operation
+            
+        Returns:
+            True if available VRAM < required_gb or VRAM pressure > 90%
+        """
+        if not self.cuda_available:
+            return True  # No GPU = always risky
+        return self.vram_available_gb < required_gb or self.vram_pressure() > 0.9
+    
+    def refresh_vram(self) -> None:
+        """Refresh VRAM stats (call before GPU operations)."""
+        if not self.cuda_available:
+            return
+        try:
+            import torch
+            torch.cuda.synchronize()
+            self.vram_available_gb = 0.0
+            for i in range(self.gpu_count):
+                free, total = torch.cuda.mem_get_info(i)
+                self.vram_available_gb += free / (1024**3)
+        except Exception:
+            pass
+    
+    def refresh_ram(self) -> None:
+        """Refresh RAM stats (call before memory-intensive operations)."""
+        try:
+            import psutil
+            mem = psutil.virtual_memory()
+            self.ram_available_gb = mem.available / (1024**3)
+        except Exception:
+            pass
+    
+    def is_ram_oom_risk(self, required_gb: float = 2.0) -> bool:
+        """Check if RAM is at risk of OOM.
+        
+        Args:
+            required_gb: Estimated RAM needed for upcoming operation
+            
+        Returns:
+            True if available RAM < required_gb or RAM pressure > 90%
+        """
+        return self.ram_available_gb < required_gb or self.memory_pressure() > 0.9
 
 
 def detect_hardware() -> HardwareProfile:

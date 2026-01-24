@@ -539,15 +539,32 @@ async def researcher_node(state: GraphState) -> GraphState:
                 completed.add(t_id)
                 logger.info(f"   ✅ Task {t_id} completed via {calls[idx].tool_name}")
             else:
-                # Handle hard failure
-                logger.warning(f"   ❌ Task {t_id} failed: {res.result}")
+                # Handle hard failure - extract clean error message
+                tool_name = calls[idx].tool_name
+                error_text = "Unknown error"
+                
+                # Extract error text from result
+                if res.result and hasattr(res.result, "content"):
+                    for c in res.result.content:
+                        if hasattr(c, "text"):
+                            error_text = c.text
+                            break
+                elif res.result:
+                    error_text = str(res.result)
+                
+                # Clean up common error patterns for readability
+                if "Tool execution error:" in error_text:
+                    error_text = error_text.replace("Tool execution error:", "Missing parameter:")
+                
+                logger.warning(f"   ❌ Task {t_id} ({tool_name}) FAILED: {error_text}")
+                
                 # We do NOT add to completed, so it won't satisfy dependencies. 
                 # Ideally we should try fallbacks here, but for now we mark failed to avoid infinite loop
                 tool_invocations.append({
                     "task_id": t_id,
-                    "tool": calls[idx].tool_name,
+                    "tool": tool_name,
                     "success": False,
-                    "error": "Execution failed"
+                    "error": error_text
                 })
                 # Prevent re-execution to avoid infinite loop
                 completed.add(t_id) 

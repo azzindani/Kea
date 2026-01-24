@@ -3,7 +3,9 @@ Qwen3 Embedding Provider.
 
 Supports:
 - OpenRouter API: qwen/qwen3-embedding-8b
-- Local: Qwen/Qwen3-Embedding-0.6B (via sentence-transformers)
+- Local: Qwen/Qwen3-Embedding-0.6B (via transformers)
+
+Uses official Qwen3 embedding pattern with last_token_pool.
 """
 
 from __future__ import annotations
@@ -54,7 +56,7 @@ class OpenRouterEmbedding(EmbeddingProvider):
     def __init__(
         self,
         api_key: str | None = None,
-        dimension: int = 1024,
+        dimension: int = 4096,
     ) -> None:
         self.api_key = api_key or os.getenv("OPENROUTER_API_KEY", "")
         self._dimension = dimension
@@ -107,11 +109,13 @@ class OpenRouterEmbedding(EmbeddingProvider):
 
 class LocalEmbedding(EmbeddingProvider):
     """
-    Qwen3-Embedding-0.6B local inference.
+    Qwen3-Embedding-0.6B local inference using official pattern.
     
     Model: Qwen/Qwen3-Embedding-0.6B
     Dimension: up to 1024
-    Requires: transformers>=4.51.0, sentence-transformers>=2.7.0
+    Requires: transformers>=4.51.0
+    
+    Uses last_token_pool pattern as per official Qwen3 documentation.
     
     Usage:
         provider = LocalEmbedding()
@@ -124,12 +128,15 @@ class LocalEmbedding(EmbeddingProvider):
         dimension: int = 1024,
         device: str | None = None,
         use_flash_attention: bool = False,
+        max_length: int = 32768,
     ) -> None:
         self.model_name = model_name
         self._dimension = dimension
         self.device = device or ("cuda" if self._has_cuda() else "cpu")
         self.use_flash_attention = use_flash_attention
+        self.max_length = max_length
         self._model = None
+        self._tokenizer = None
     
     def _has_cuda(self) -> bool:
         try:
@@ -139,107 +146,139 @@ class LocalEmbedding(EmbeddingProvider):
             return False
     
     def _load_model(self):
-        """Lazy load model."""
+        """Lazy load model and tokenizer."""
         if self._model is None:
-            from sentence_transformers import SentenceTransformer
             import torch
+            from transformers import AutoTokenizer, AutoModel
             
-            # Detect multi-GPU for Data Parallelism
-            self._pool = None
-            gpu_count = torch.cuda.device_count() if torch.cuda.is_available() else 0
+            # Pin to specific device
+            if self.device == "cuda":
+                self.device = "cuda:0"
             
-            # Use Data Parallelism if multiple GPUs available
-            if self.device.startswith("cuda") and gpu_count > 1:
-                # Load model on first device just for attribute access
-                self._model = SentenceTransformer(
-                    self.model_name,
-                    device="cuda:0",
-                    trust_remote_code=True,
-                )
-                
-                # Start process pool on all GPUs
-                try:
-                    self._pool = self._model.start_multi_process_pool()
-                    logger.info(f"Loaded {self.model_name} with Data Parallelism on {gpu_count} GPUs")
-                except Exception as e:
-                    logger.warning(f"Failed to start multi-process pool: {e}. Falling back to single GPU.")
-                    self._pool = None
+            self._tokenizer = AutoTokenizer.from_pretrained(
+                self.model_name,
+                padding_side='left',  # Required for Qwen3 embedding
+                trust_remote_code=True,
+            )
             
-            else:
-                # Single GPU pinning
-                if self.device == "cuda":
-                    self.device = "cuda:0"
-                    
-                model_kwargs = {}
-                if self.use_flash_attention:
-                    model_kwargs["attn_implementation"] = "flash_attention_2"
-                
-                self._model = SentenceTransformer(
-                    self.model_name,
-                    device=self.device,
-                    model_kwargs=model_kwargs,
-                    tokenizer_kwargs={"padding_side": "left"},
-                    trust_remote_code=True,
-                )
-                
-                logger.info(f"Loaded {self.model_name} on {self.device}")
+            model_kwargs = {}
+            if self.use_flash_attention:
+                model_kwargs["attn_implementation"] = "flash_attention_2"
+                model_kwargs["torch_dtype"] = torch.float16
+            
+            self._model = AutoModel.from_pretrained(
+                self.model_name,
+                trust_remote_code=True,
+                **model_kwargs,
+            )
+            
+            # Move to device
+            if self.device.startswith("cuda"):
+                self._model = self._model.to(self.device)
+            
+            logger.info(f"Loaded {self.model_name} on {self.device}")
         
-        return self._model
+        return self._model, self._tokenizer
+    
+    def _last_token_pool(self, last_hidden_states, attention_mask):
+        """
+        Pool the last token representation (official Qwen3 pattern).
+        
+        Handles both left-padding and right-padding cases.
+        """
+        import torch
+        
+        left_padding = (attention_mask[:, -1].sum() == attention_mask.shape[0])
+        if left_padding:
+            return last_hidden_states[:, -1]
+        else:
+            sequence_lengths = attention_mask.sum(dim=1) - 1
+            batch_size = last_hidden_states.shape[0]
+            return last_hidden_states[
+                torch.arange(batch_size, device=last_hidden_states.device),
+                sequence_lengths
+            ]
+    
+    def _get_detailed_instruct(self, task_description: str, query: str) -> str:
+        """Format query with instruction (official Qwen3 pattern)."""
+        return f'Instruct: {task_description}\nQuery:{query}'
     
     @property
     def dimension(self) -> int:
         return self._dimension
     
     async def embed(self, texts: list[str]) -> list[list[float]]:
-        """Generate embeddings for documents."""
+        """Generate embeddings for documents using official Qwen3 pattern."""
         import asyncio
+        import torch
+        import torch.nn.functional as F
         
-        model = self._load_model()
-        
-        # Run in executor to avoid blocking
+        model, tokenizer = self._load_model()
         loop = asyncio.get_event_loop()
         
-        # Use Data Parallelism for large batches if pool is available
-        if self._pool is not None and len(texts) > 32:
-            embeddings = await loop.run_in_executor(
-                None,
-                lambda: model.encode_multi_process(texts, self._pool, normalize_embeddings=True).tolist()
-            )
-        else:
-            # Standard single-GPU encoding
-            embeddings = await loop.run_in_executor(
-                None,
-                lambda: model.encode(texts, normalize_embeddings=True).tolist()
-            )
+        # Check VRAM pressure and adjust batch size
+        batch_size = 32  # Default batch size
+        try:
+            from shared.hardware.detector import detect_hardware
+            hw = detect_hardware()
+            if hw.cuda_available:
+                hw.refresh_vram()
+                if hw.vram_pressure() > 0.8:
+                    batch_size = 8
+                    logger.warning(f"VRAM pressure high ({hw.vram_pressure()*100:.1f}%), reducing batch to {batch_size}")
+                elif hw.vram_pressure() > 0.6:
+                    batch_size = 16
+        except Exception:
+            pass
         
+        def encode_batch(batch_texts: list[str]) -> list[list[float]]:
+            """Encode a batch of texts using official pattern."""
+            # Tokenize with __call__ method (fast path)
+            batch_dict = tokenizer(
+                batch_texts,
+                padding=True,
+                truncation=True,
+                max_length=self.max_length,
+                return_tensors="pt",
+            )
+            batch_dict = {k: v.to(model.device) for k, v in batch_dict.items()}
+            
+            with torch.no_grad():
+                outputs = model(**batch_dict)
+                embeddings = self._last_token_pool(
+                    outputs.last_hidden_state,
+                    batch_dict['attention_mask']
+                )
+                # Normalize embeddings
+                embeddings = F.normalize(embeddings, p=2, dim=1)
+            
+            return embeddings.cpu().tolist()
+        
+        def process_all():
+            """Process all texts in batches."""
+            all_embeddings = []
+            for i in range(0, len(texts), batch_size):
+                batch = texts[i:i + batch_size]
+                embs = encode_batch(batch)
+                all_embeddings.extend(embs)
+                # Clear cache after each batch
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            return all_embeddings
+        
+        embeddings = await loop.run_in_executor(None, process_all)
         return embeddings
     
-    async def embed_query(self, query: str) -> list[float]:
-        """Generate embedding for query with prompt."""
-        import asyncio
+    async def embed_query(self, query: str, task: str | None = None) -> list[float]:
+        """Generate embedding for query with instruction (official Qwen3 pattern)."""
+        if task is None:
+            task = "Given a web search query, retrieve relevant passages that answer the query"
         
-        model = self._load_model()
+        # Format query with instruction
+        formatted_query = self._get_detailed_instruct(task, query)
         
-        loop = asyncio.get_event_loop()
-        # Queries are usually single items, so we don't use the pool overhead
-        embedding = await loop.run_in_executor(
-            None,
-            lambda: model.encode(
-                [query],
-                prompt_name="query",
-                normalize_embeddings=True
-            ).tolist()[0]
-        )
-        
-        return embedding
-    
-    def __del__(self):
-        """Cleanup process pool."""
-        if hasattr(self, "_model") and self._model is not None and getattr(self, "_pool", None) is not None:
-             try:
-                 self._model.stop_multi_process_pool(self._pool)
-             except Exception:
-                 pass
+        embeddings = await self.embed([formatted_query])
+        return embeddings[0]
 
 
 # Factory function
