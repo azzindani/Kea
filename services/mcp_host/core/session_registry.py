@@ -94,7 +94,37 @@ class SessionRegistry:
             script_path=script_path,
             env=env
         )
+        # Static Analysis: Discover tools without spawning
+        self._scan_tools_static(server_name, script_path)
         logger.info(f"✅ Registered JIT Server Configuration: {server_name}")
+
+    def _scan_tools_static(self, server_name: str, script_path: Path):
+        """
+        Parse the server script statically to find tool definitions.
+        Looks for: self.register_tool(name="tool_name", ...)
+        """
+        import ast
+        try:
+            with open(script_path, "r", encoding="utf-8") as f:
+                tree = ast.parse(f.read())
+            
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Call):
+                    # Check for self.register_tool(...)
+                    if isinstance(node.func, ast.Attribute) and node.func.attr == "register_tool":
+                        # Extract 'name' argument
+                        tool_name = None
+                        for keyword in node.keywords:
+                            if keyword.arg == "name" and isinstance(keyword.value, ast.Constant):
+                                tool_name = keyword.value.value
+                                break
+                        
+                        if tool_name:
+                            self.tool_to_server[tool_name] = server_name
+                            logger.debug(f"   🔍 Discovered tool '{tool_name}' in {server_name}")
+                            
+        except Exception as e:
+            logger.warning(f"Static scan failed for {server_name}: {e}")
 
     async def get_session(self, server_name: str) -> MCPClient:
         """

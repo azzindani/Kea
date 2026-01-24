@@ -466,15 +466,17 @@ async def researcher_node(state: GraphState) -> GraphState:
             error_msg = None
             content_text = ""
             
-            if success and res.result and hasattr(res.result, "content"):
                 for c in res.result.content:
                     if hasattr(c, "text"):
                         content_text += c.text
                 
-                # Verify content isn't error text
-                if "error" in content_text.lower() and len(content_text) < 200:
-                     # Soft error check
-                     pass
+                # Strict Error Filtering (Prevent "Error is a Fact")
+                if "tool not found" in content_text.lower() or "error:" in content_text.lower() or "exception" in content_text.lower():
+                    success = False # Mark as failed logically even if technically successful execution
+                    error_msg = content_text
+                elif len(content_text) < 5:
+                    success = False
+                    error_msg = "Content too short"
 
             if success:
                 # Extract Facts
