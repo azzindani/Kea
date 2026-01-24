@@ -81,8 +81,8 @@ class VLRerankerProvider:
                     trust_remote_code=True,
                 ).eval()
                 
-                if self.device == "cuda":
-                    self._model = self._model.cuda()
+                if self.device.startswith("cuda"):
+                    self._model = self._model.to(self.device)
                 
                 logger.info(f"Loaded {self.model_name} on {self.device}")
                 

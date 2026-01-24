@@ -282,7 +282,7 @@ async def run_research_job(job_id: str):
     
     try:
         # Call Orchestrator's research endpoint via API
-        async with httpx.AsyncClient(timeout=300.0) as client:
+        async with httpx.AsyncClient(timeout=600.0) as client:
             response = await client.post(
                 f"{ORCHESTRATOR_URL}/research",
                 json={

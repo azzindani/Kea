@@ -101,8 +101,9 @@ class LocalReranker(RerankerProvider):
                 trust_remote_code=True,
             ).eval()
             
-            if self.device == "cuda":
-                self._model = self._model.cuda()
+            # Move to GPU if cuda device specified
+            if self.device.startswith("cuda"):
+                self._model = self._model.to(self.device)
             
             # Setup token IDs
             self._token_false_id = self._tokenizer.convert_tokens_to_ids("no")

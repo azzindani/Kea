@@ -237,11 +237,15 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
     # ============================================================
     related_facts = []
     try:
+        import asyncio
         from services.rag_service.core.fact_store import FactStore
         store = FactStore()
         
-        # Search for related past research
-        related_facts = await store.search(query, limit=5)
+        # Search for related past research with timeout to avoid blocking
+        related_facts = await asyncio.wait_for(
+            store.search(query, limit=5),
+            timeout=5.0  # 5 second timeout to avoid blocking research
+        )
         
         if related_facts:
             logger.info(f"Planner: Found {len(related_facts)} related past facts")
@@ -249,6 +253,8 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
                 {"entity": f.entity, "value": f.value[:200], "source": f.source_url}
                 for f in related_facts
             ]
+    except asyncio.TimeoutError:
+        logger.warning("Planner: Related fact lookup timed out, skipping")
     except Exception as e:
         logger.debug(f"Related fact lookup skipped: {e}")
     
