@@ -8,25 +8,45 @@ It is responsible for breaking down user queries, coordinating MCP tools, and sy
 
 ## 🏗️ Architecture Overview
 
-The Orchestrator operates as a **Cyclic State Machine**, allowing it to "Think Fast" (Router) and "Think Slow" (Deep Research Loop). It delegates execution logic to specialized microservices.
+The Orchestrator is built on a **Stateful Multi-Agent Graph (LangGraph)**. It manages the research lifecycle through a series of specialized nodes and a central `GraphState`:
 
-1.  **Planning Layer**: Decomposes complex queries into atomic micro-tasks.
-2.  **Delegation Layer** (NEW): Dispatches tool execution to **MCP Host** (Port 8002).
-3.  **Auditing Layer** (NEW): Asynchronously logs all state changes to **Vault** (Port 8004).
-4.  **Consensus Layer**: Adversarial Agents (Generator vs Critic) verify the final output.
+1.  **Topology Optimization**: The graph dynamically reconfigures its path based on the "Depth" parameter (managed by the **Chronos** coordination logic).
+2.  **State Persistence**: Every node transition is checkpointed. If a tool call fails, the graph can roll back to the last "Stable Thought" without losing the entire context.
+3.  **Adversarial Loop**: Implements the `ConsensusEngine`, which forces a debate between the **Generator**, **Critic**, and **Judge** agents to ensure factual accuracy and objective reasoning.
 
 ```mermaid
 graph TD
-    Start[Query] --> Router{Intention Router}
-    Router -->|Deep Research| Planner[Planner Node]
+    Start((Start)) --> Planner[Planner Node]
+    Planner -->|Sub-queries| Research[Research Node]
+    Research -->|Facts| Consensus{Consensus Engine}
     
-    subgraph Execution Loop
-        Planner --> Researcher[Researcher Node]
-        Researcher -->|HTTP Post| MCP[MCP Host Service]
-        MCP -->|Result| Researcher
-        Researcher --> Keeper{The Keeper}
-        Keeper --"More Data Needed"--> Researcher
+    subgraph Adversarial Debate
+        Consensus --> Gen[GeneratorAgent]
+        Gen --> Critique[CriticAgent]
+        Critique --> Judgment[JudgeAgent]
+        Judgment -->|Reject| Gen
     end
+    
+    Judgment -->|Accept| Report[Reporter Node]
+    Report --> End((End))
+```
+
+---
+
+## ✨ Features & Adversarial Logic
+
+### 🧠 The Consensus Engine (`core/consensus.py`)
+- **Generator/Critic/Judge Loop**: A 3-player game where the AI creates a draft, attempts to find its own flaws, and is arbitrated by a neutral "Judge" agent.
+- **Adaptive Thresholding**: The Judge's acceptance threshold degrades gracefully from **0.95 → 0.60** over 32,768 possible rounds (default 2 in production) to balance perfection with progress.
+
+### 🛡️ Human-in-the-Loop (HITL) Workflow
+- **Category-Based Approvals**: Supports specific approval chains for `DECISION`, `DATA_ACCESS`, `COST`, and `COMPLIANCE`.
+- **Role-Based Access (RBAC)**: Workflows can be assigned to specific roles (e.g., `compliance_officer` or `ciso`) for manual sign-off via the API Gateway.
+- **Auto-Wait**: The `wait_for_approval` logic enables the LangGraph to pause indefinitely without holding an active network thread.
+
+### 🧩 Domain-Specific Specialization
+- **Domain Registry**: Dynamically configures agent personas via `configs/prompts.yaml` (Finance, Legal, Research, etc.).
+- **Dynamic Capabilities**: Maps user keywords to the **MCP Host** registry via `tool_registry.yaml`, enabling the Planner to discover and use new servers without code changes.
     
     subgraph Audit Wire
         Researcher -.->|HTTP Post| Vault[Vault Service]
@@ -51,15 +71,17 @@ graph TD
 
 | File / Directory | Component | Description | Key Classes/Functions |
 |:-----------------|:----------|:------------|:----------------------|
-| **`main.py`** | **Entry Point** | FastAPI app (Port 8001). Exposes `/chat/message` pipeline. | `create_app()`, `process_chat_message()` |
+| **`main.py`** | **Entry Point** | FastAPI app (Port 8001). Exposes `/research` and `/chat` pipelines. | `process_chat_message()`, `start_research()` |
 | **`core/`** | **Nervous System** | Core pipeline logic and state definitions. | |
-| ├── `graph.py` | State Machine | Defines the LangGraph nodes (Planner, Researcher) and edges. | `compile_research_graph()` |
-| ├── `router.py` | Classifier | Determines if a query needs Research or simple Chat. | `IntentionRouter.route()` |
+| ├── `graph.py` | State Machine | Defines the LangGraph nodes and edges. Includes `researcher_node`. | `compile_research_graph()` |
+| ├── `router.py` | Classifier | Determines if a query needs Research or simple Chat. | `IntentionRouter` |
 | ├── `pipeline.py` | Runner | Manages execution. Calls **Vault** for Audit. | `process_message()` |
+| ├── `tool_loader.py` | Registry | **NEW**: Dynamically loads tool capabilities from YAML. | `ToolLoader` |
+| ├── `prompt_factory.py` | Templates | **NEW**: Dynamically loads personas from YAML. | `PromptFactory` |
 | **`nodes/`** | **Graph Nodes** | Deterministic steps in the state machine. | |
 | ├── `planner.py` | Strategy | Breaks query into micro-tasks (Plan JSON). | `planner_node()` |
-| ├── `researcher.py` | Muscle | Iterates plan. Calls **MCP Host** for tools. | `researcher_node()` |
-| ├── `keeper.py` | Controller | Checks sufficiency and context drift. | `keeper_node()` |
+| ├── `keeper.py` | Controller | Enforces loop safety and resource limits. | `keeper_node()` |
+| ├── `divergence.py` | Exploration | Spawns parallel research paths. | `divergence_node()` |
 | ├── `synthesizer.py`| Output | Formats final markdown report. | `synthesizer_node()` |
 | **`agents/`** | **Personas** | LLM Agents for the Consensus Engine. | |
 | ├── `generator.py` | Optimist | Drafts initial answer. | `GeneratorAgent` |
@@ -114,29 +136,18 @@ The Orchestrator maintains state across messages by analyzing **Intent**:
 
 While the Orchestrator is usually called via `main.py`, the core Logic Units (Nodes) are distinct inputs/outputs.
 
-### 1. Planning Layer
-| Node | Input | Output | Description |
-|:-----|:------|:-------|:------------|
-| `router` | `Query` (str) | `Path` (str) | Classifies intent (RESEARCH vs CHAT). |
-| `planner` | `Query` (str) | `ExecutionPlan` (JSON) | Generates step-by-step checklist. |
+### 1. Research & Chat
+| Endpoint | Method | Description |
+|:---------|:-------|:------------|
+| `/research` | `POST` | Start a synchronous research job. |
+| `/research/stream` | `GET` | Stream research progress via SSE. |
+| `/chat/message` | `POST` | Process a chat message through the research pipeline. |
 
-### 2. Execution Layer
-| Node | Input | Output | Description |
-|:-----|:------|:-------|:------------|
-| `researcher` | `Plan` | `Facts` (List[str]) | Executes tools and gathers data. |
-| `keeper` | `Facts` | `Decision` (Continue/Stop) | Validates data sufficiency. |
-
-### 3. Consensus Layer
-| Node | Input | Output | Description |
-|:-----|:------|:-------|:------------|
-| `generator` | `Facts` | `Draft` (Markdown) | Writes the first draft. |
-| `critic` | `Draft` | `Feedback` (List[str]) | Finds errors in the draft. |
-| `judge` | `Feedback` | `Verdict` (Approve/Revise) | Final decision maker. |
-
-### 4. Output Layer
-| Node | Input | Output | Description |
-|:-----|:------|:-------|:------------|
-| `synthesizer` | `Draft` | `Report` (Markdown) | Final polish and formatting. |
+### 2. Tool Integration
+| Endpoint | Method | Description |
+|:---------|:-------|:------------|
+| `/tools` | `GET` | List all available MCP tools (via Host). |
+| `/tools/{name}` | `POST` | Execute a specific tool directly. |
 
 ---
 

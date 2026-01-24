@@ -6,12 +6,21 @@ The **API Gateway** is the centralized nerve center of the Kea system. It is res
 
 ## 🏗️ Architecture Overview
 
-The Gateway implements a **4-Layer Architecture** to ensure security and scalability:
+The Gateway implements a **4-Layer Defense-in-Depth Architecture**:
 
-1.  **Security Layer**: Token Bucket Rate Limiting, CORS, and Security Headers.
-2.  **Identity Layer**: Hybrid Authentication (JWT for APIs + HttpOnly Cookies for Web).
-3.  **Application Layer**: 9 specialized route modules handling diverse domains.
-4.  **Integration Layer**: Redis Queue for background jobs and Event Bus for inter-service comms.
+1.  **Transport & Security Layer**:
+    *   **HSTS & CSP**: Rigid security headers enforced via `SecurityHeadersMiddleware`.
+    *   **Sliding Window Rate Limiting**: Managed via `RateLimitMiddleware` using a ZSET-based algorithm (100 req/min burst protect).
+    *   **CORS Management**: Dynamically resolved origins via `get_cors_origins()`.
+2.  **Identity Layer**:
+    *   **Hybrid Authentication**: Supports `JWT` for programmatic access and `HttpOnly Cookies` for browser sessions.
+    *   **Token Authority**: The Gateway acts as the central issuer; downstream services trust the injected `X-User-ID` header.
+3.  **Application Layer**:
+    *   **Route Dispatching**: 11 polymorphic route modules (Jobs, Graph, Memory, etc.) proxying to specialized upstream services.
+    *   **Polymorphic Jobs**: The `/jobs` endpoint handles Research, Synthesis, and Calculation job types.
+4.  **Persistence Layer**:
+    *   **Event Bus**: Redis-backed message distribution.
+    *   **Unlogged Postgres State**: Used for high-frequency tracking (rate limits, session metrics) without WAL overhead.
 
 ```mermaid
 graph TD
@@ -44,9 +53,12 @@ graph TD
 | ├── `conversations.py` | Cognitive Logic | Proxies chat to **Orchestrator** (Port 8001). | `send_message()` → `orch.process()` |
 | ├── `interventions.py` | HITL | Manages checks via **Swarm** (Port 8005). | `list_interventions()` |
 | ├── `mcp.py` | Tooling | Proxies tool calls to **MCP Host** (Port 8002). | `invoke_tool()` → `host.call_tool()` |
-| ├── `llm.py` | AI Proxy | Internal gateway for LLM switching. | `generate()` |
+| ├── `llm.py` | AI Proxy | Internal gateway for LLM switching. Supports **OpenRouter**. | `generate()` |
 | ├── `auth.py` | Identity | Handles JWT locally (Gateway is the Auth authority). | `login()`, `register()` |
-| ├── `graph.py` | Memory | Proxies graph queries to **Vault** (Port 8004). | `get_entity_provenance()` |
+| ├── `graph.py` | Memory Graph | Proxies graph queries to **Vault** (Port 8004). | `get_entity_provenance()` |
+| ├── `memory.py` | Facts | Semantic search against atomic facts in RAG. | `search_memory()` |
+| ├── `system.py` | Health | System capabilities and service status. | `get_health()` |
+| ├── `users.py` | Profile | User preferences and personal API keys. | `get_me()` |
 | └── `artifacts.py` | Storage | Manages uploads/downloads via **Vault/S3**. | `upload_artifact()` |
 | **`middleware/`** | **Middleware** | Cross-cutting concerns. | `RateLimitMiddleware` | Uses an **Unlogged Postgres Table** to manage quotas. |
 | `AuthMiddleware` | Decodes JWTs and injects `request.state.user` for downstream routing. |
@@ -67,10 +79,17 @@ All internal routing is managed via the **Service Registry**.
 - **Env Overrides**: Service URLs can be dynamically changed via `SERVICE_URL_ORCHESTRATOR` env vars.
 - **Circuit Breakers**: While primarily in the Orchestrator, the Gateway handles `503 Service Unavailable` responses from upstream services with standard error payloads.
 
-### 3. Identity Awareness
+### 3. Human-in-the-Loop (HITL) Interventions
+The Gateway manages the **Decision Lifecycle**:
+- **Wait States**: Jobs can enter a `PAUSED` state (managed in the Jobs route) waiting for manual decision-making.
+- **Intervention API**: Dedicated endpoints to list, retrieve context, and submit decisions to resolve blockages.
+- **Audit Compliance**: Every human decision is passed through to the **Vault** for tamper-proof logging.
+
+### 4. Identity Awareness
 The Gateway is the **Source of Truth for Identity**.
-- It handles `Token` generation and verification.
+- It handles `Token` generation and verification locally.
 - Upstream internal services (Orchestrator, Vault) receive a validated `user_id` header, removing the need for them to implement Auth logic locally.
+- Supports **Hot-Swapping LLM Providers** via the `/v1/llm` route, enabling real-time cost and provider optimization.
 
 ---
 
@@ -131,8 +150,8 @@ Managing the AI models used by the Orchestrator.
 
 | Endpoint | Method | Description |
 |:---------|:-------|:------------|
-| `/api/v1/llm/providers` | `GET` | List available providers (OpenAI, Gemini, Anthropic). |
-| `/api/v1/llm/models` | `GET` | List available models for a specific provider. |
+| `/api/v1/llm/providers` | `GET` | List available providers (e.g., OpenRouter). |
+| `/api/v1/llm/models` | `GET` | List available models (Configured default: `nemotron-3`). |
 | `/api/v1/llm/providers/{name}/enable` | `POST` | Hot-swap: Enable a specific provider. |
 | `/api/v1/llm/usage` | `GET` | Get token usage statistics and cost estimation. |
 
@@ -144,22 +163,6 @@ Multi-turn conversation management with memory.
 | `/api/v1/conversations` | `POST` | Start new conversation session. |
 | `/api/v1/conversations/{id}` | `GET` | Get conversation history and context. |
 | `/api/v1/conversations/{id}/message` | `POST` | Send message with intent detection. |
-
-### 8. MCP Tools
-Managing MCP servers and tool execution.
-
-| Endpoint | Method | Description |
-|:---------|:-------|:------------|
-| **Jobs** | `POST` | `/jobs` | Spawn async background worker. |
-| **HITL** | `POST` | `/interventions/{id}/respond` | Submit user decision to blocked agent. |
-| **Tools** | `POST` | `/mcp/invoke` | Raw tool execution (No LLM). |
-| **LLM** | `POST` | `/llm/providers/openrouter/enable`| Hot-swap LLM provider. |
-| **Graph**| `GET` | `/graph/entities/{id}/provenance`| Visualize fact derivation. |
-| **Auth** | `POST` | `/auth/login` | Returns JWT + Sets Session Cookie. |
-|:---------|:-------|:------------|
-| `/api/v1/mcp/servers` | `GET` | List active MCP servers. |
-| `/api/v1/mcp/tools` | `GET` | List all available tools across servers. |
-| `/api/v1/mcp/invoke` | `POST` | Execute a specific tool (Body: `{"tool_name": ...}`). |
 
 ### 9. Authentication & Users
 User management and authentication.

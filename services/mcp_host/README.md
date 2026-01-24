@@ -8,29 +8,14 @@ The **MCP Host Service** is the execution engine of Kea. It is responsible for m
 
 The MCP Host operates as a **Process Manager** and **RPC Proxy**. It implements the "Pure MCP" architecture where no tool logic resides in the main process.
 
-1.  **Tool Manager**: Validates tools against the **Tool Registry**.
-2.  **Process Spawner**: Uses `uv` (JIT) or Docker to launch isolated tool servers.
-3.  **RPC Bridge**: Converts HTTP `POST` requests from the Orchestrator into JSON-RPC messages over Stdio/SSE.
-4.  **Compliance Guard**: Pre-checks every tool call with **Swarm Manager** (Port 8005) before transmission.
-5.  **Resource Governor**: The **Supervisor Engine** monitors CPU/RAM and pauses dispatch if limits are exceeded.
-6.  **Stability Layer**: Implements **Circuit Breakers** and **Exponential Backoff** to prevent cascading failures from hanging tools.
+The Host operates using a **Supervisor-Worker Topology**:
+
+1.  **Supervisor Engine**: The central factory manager. It monitors system resources and dynamically scales individual MCP server instances.
+2.  **Session Registry**: Manages the lifecycle of active `MCPServerSession` objects. It handles "JIT (Just-In-Time) Spawning"—starting a server only when a tool in its domain is requested.
+3.  **Hardware-Aware Governor**: Enforces strict `max_ram_percent` and `max_cpu_percent` limits (configurable in `settings.yaml`). If limits are breached, the Governor initiates a "Graceful Degradation" protocol, prioritizing critical tools over luxury ones.
 
 ```mermaid
 graph TD
-    Orch[Orchestrator] -->|HTTP POST| API[FastAPI Endpoint]
-    
-    subgraph "MCP Host Service (Port 8002)"
-        API --> Manager{Tool Manager}
-        Manager -->|Check| Swarm[Swarm Manager<br/>(Compliance)]
-        Manager -->|Lookup| Registry[Tool Registry]
-        
-        Manager -->|Spawn| Spawner[Process Spawner]
-    end
-    
-    subgraph "Isolation Zone"
-        Spawner -->|Stdio| T1[Scraper Process]
-        Spawner -->|Stdio| T2[Python Process]
-    end
     
     T1 -.->|Stream| API
 ```
@@ -43,46 +28,40 @@ graph TD
 |:-----------------|:----------|:------------|
 | **`main.py`** | **Entry Point** | FastAPI app (Port 8002). Exposes `/tools/call`. |
 | **`core/`** | **Logic** | Core tool management. |
-| ├── `tool_manager.py` | Controller | Coordination logic. Calls Swarm, Registry, and Spawner. |
+| ├── `session_registry.py` | Controller | Manages active sessions with MCP servers. |
 | ├── `supervisor_engine.py` | **Governor** | **NEW**: Manages hardware limits (CPU/RAM) and task priority. |
-| ├── `spawner.py` | Infrastructure | Wraps `subprocess.Popen` with `uv run` commands. |
-| ├── `rpc_client.py` | Protocol | Implements MCP JSON-RPC 2.0 Client. |
-| └── `registry.py` | Discovery | Syncs with `shared.service_registry` and local DB. |
+| ├── `parallel_executor.py` | Fan-Out | Implements concurrent tool execution logic. |
+| ├── `postgres_registry.py` | Persistence | Stores server configurations and metrics in DB. |
+| └── `background.py` | Dispatcher | Handles Fire-and-Forget batch tool execution. |
 
 ---
 
 ## 🔌 API Reference
 
 ### Tool Execution
-**POST** `/tools/{tool_name}/call`
+**POST** `/tools/execute`
 
-Executes a tool. This is the primary endpoint used by the Orchestrator.
+Executes a single tool.
 
 **Request:**
 ```json
 {
+  "tool_name": "fetch_url",
   "arguments": {
-    "url": "https://example.com",
-    "depth": 2
-  },
-  "timeout": 30
+    "url": "https://example.com"
+  }
 }
 ```
 
-**Response:**
-```json
-{
-  "content": [{"type": "text", "text": "Page content..."}],
-  "isError": false
-}
-```
+### Batch Processing
+**POST** `/tools/batch`
+Executes multiple tools in parallel and waits for results.
 
-### Server Management
-**GET** `/servers`
-List all active/available MCP servers (e.g., `scraper`, `python_sandbox`).
+**POST** `/tools/dispatch`
+Fire-and-forget execution; returns a `batch_id`.
 
-**POST** `/servers/restart`
-Force restart a specific tool server (useful if a tool hangs).
+**GET** `/tools/batch/{batch_id}`
+Check status of a dispatched batch.
 
 ---
 

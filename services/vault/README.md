@@ -39,50 +39,66 @@ graph TD
 |:-----------------|:----------|:------------|
 | **`main.py`** | **Entry Point** | FastAPI app (Port 8004). Exposes `audit`, `memory`, `state` routes. |
 | **`core/`** | **Logic** | Data management logic. |
-| ├── `audit_trail.py` | Compliance | Writes structured logs (JSON/DB). |
-| ├── `vector_store.py` | Intelligence | pgvector wrapper for adding/retrieving facts. |
-| ├── `checkpointing.py`| State | LangGraph CheckpointSaver implementation for Postgres. |
-| └── `models.py` | Schema | SQLAlchemy ORM models. |
+| ├── `audit_trail.py` | Compliance | Interface for writing structured logs. |
+| ├── `postgres_audit.py`| Storage | **NEW**: Postgres-specific implementation of the audit log. |
+| ├── `postgres_store.py`| Persistence | **NEW**: Robust Postgres client for structured data. |
+| ├── `vector_store.py` | Intelligence | Interface for pgvector operations. |
+| └── `checkpointing.py`| State | LangGraph CheckpointSaver implementation logic. |
 
 ---
 
 ## 🔌 API Reference
 
 ### Audit Logging
-**POST** `/audit/logs`
-
-Used by all other services to report actions.
-
-**Request:**
-```json
-{
-  "event_type": "TOOL_EXECUTION",
-  "actor": "scraper_agent",
-  "action": "scrape_url",
-  "details": {"url": "..."}
-}
-```
-
-### Checkpointing (LangGraph)
-**GET** `/state/{thread_id}`
-Retrieve the latest state snapshot for a research conversation.
-
-**POST** `/state/{thread_id}`
-Save a new state snapshot (delta).
-
-### Memory RAG
-**POST** `/memory/search`
-Semantic search against the Atomic Facts database.
+| Endpoint | Method | Description |
+|:---------|:-------|:------------|
+| `/audit/logs` | `POST` | Record a new audit event. |
+| `/audit/logs` | `GET` | Query historical logs with filters. |
+| `/health` | `GET` | Basic service health check. |
 
 ---
 
 ## 🏗️ Technical Deep Dive
 
 ### 1. Immutable Audit Integrity (`core/audit_trail.py`)
-The Vault implements a "Chain of Custody" for every action:
-- **Cryptographic Checksums**: Every log entry (e.g., `TOOL_CALLED`) includes a SHA-256 hash of its contents (actor, timestamp, payload, parent_id).
-- **Audit Verification**: The system can verify the integrity of a session trace by re-computing hashes, making it suitable for SOC2/ISO compliance.
-- **Parent-Child Tracing**: Uses `parent_id` to link recursive sub-orchestrations back to the original user query.
+The Vault implements a **Hardened Evidence Architecture** to provide a "Memory of Record" for all autonomous actions:
+
+1.  **Immutable Audit Trail**: Based on a **WORM (Write Once, Read Many)** storage pattern. Once an event is logged, it cannot be modified or deleted by systemic agents.
+2.  **Audit Persistence Layer**: Uses a high-integrity Postgres backend with schema-level constraints to prevent record tampering.
+3.  **Encrypted Artifact Store**: Manages binary research artifacts (PDFs, Parquet files) using AES-256 encryption at rest.
+
+```mermaid
+graph TD
+    Services[All Microservices] -->|Log Event| API[Vault API]
+    API --> Trail[Impact-Aware Audit Trail]
+    API --> Store[Artifact Store]
+    
+    subgraph Evidence Storage
+        Trail --> DB[(Immutable Postgres)]
+        Store --> Enc[(Encrypted S3/Local)]
+    end
+    
+    DB -.-> Verification[Integrity Checker]
+```
+
+---
+
+## ✨ Features & Audit Integrity
+
+### 📜 The Impact-Aware Audit Trail
+Every entry in the Vault is more than just a log; it is a **Structured Evidence Bundle**:
+- **Actor/Action/Resource**: Full trace of *who* did *what* to *which* data.
+- **Session Correlation**: Every event is tied to a `session_id` or `job_id` for end-to-end timeline reconstruction.
+- **Impact Grading**: Events are tagged by severity (e.g., `DATA_ACCESS`, `SYSTEM_RECOVERY`) to facilitate high-speed compliance reporting.
+
+### 🛡️ Storage Governance
+- **Deletion Gating**: The Vault API requires a multi-signature equivalent (internal specialized keys) to perform data pruning.
+- **Heartbeat Monitoring**: Constantly verifies the connection to the storage backend to ensure zero-loss logging.
+- **Cryptographic Provenance**: Plans for blockchain-backed hashing of audit headers to ensure third-party verifiable integrity.
+
+### 🧩 Artifact Lifecycle Management
+- **Automatic Versioning**: Every artifact uploaded is versioned to prevent "State Overwrite" errors during research.
+- **Streaming Retrieval**: Efficiently handles multi-GB research datasets via direct-to-S3 signed URLs or chunked local streams.
 
 ### 2. High-Fidelity Graph Checkpointing (`core/checkpointing.py`)
 Unlike standard state stores, the Vault stores the **entire LangGraph snapshot**:

@@ -1,12 +1,45 @@
 # 🐝 Swarm Manager ("The Conscience")
 
-The **Swarm Manager** is the governance, oversight, and policy enforcement layer of the Kea system. it ensures that all autonomous actions taken by the Orchestrator and MCP Host adhere to organizational policies, safety standards, and legal compliance (ISO/SOC2/GDPR).
+The Swarm Manager serves as the Kea **Governance Engine**, ensuring every agent operation adheres to strict organizational and legal standards:
+
+1.  **Compliance Engine**: A rule-based supervisor that intercepts "Intent" payloads before they reach the execution layer.
+2.  **Standard Mapper**: Translates high-level compliance frameworks (e.g., GDPR Article 32) into concrete data-access and tool-usage rules.
+3.  **Intervention Coordinator**: Manages the "Guardian" logic, where high-risk operations are automatically blocked or routed for Human-in-the-Loop (HITL) review.
+
+```mermaid
+graph TD
+    Orch[Orchestrator] -->|Operation Intent| API[Swarm API]
+    API --> Engine{Compliance Engine}
+    Engine -->|Query| Rules[Rule Repository]
+    
+    subgraph Standard Mapping
+        Rules --> GDPR[GDPR Core]
+        Rules --> HIPAA[HIPAA Privacy]
+        Rules --> SOC2[SOC2 Controls]
+    end
+    
+    Engine -->|Allow| Exec[MCP Host]
+    Engine -->|Block| Intervention[HITL Intervention]
+```
 
 ---
 
-## 🏗️ Architecture Overview
+## ✨ Features & Governance Logic
 
-The Swarm Manager acts as a **Policy Enforcement Point (PEP)**. It doesn't execute research tasks; it audits intentions and supervises the health and ethics of the agent swarm.
+### 🛡️ Multi-Framework Compliance
+The manager natively supports and validates operations against:
+- **Privacy Standards**: `GDPR`, `CCPA` (Validation of PII removal/masking).
+- **Healthcare Standards**: `HIPAA` (Restriction on PHI disclosure).
+- **Security Standards**: `SOC2`, `ISO27001` (Mandatory audit trail and least-privilege tool usage).
+
+### 🔍 Operation Interception
+- **Semantic Guardrails**: Uses the `check_operation` method to analyze the *intent* of a tool call, not just the parameters (e.g., preventing a "social engineering" search query).
+- **Tiered Severity**: Issues are classified as `ERROR` (Blocking), `WARNING` (Logged), or `INFO` (Advisory).
+- **Detailed Compliance Reports**: Every check returns a `ComplianceReport` with check IDs and specific failure reasons for the audit trail.
+
+### 🤝 Multi-Agent Supervision
+- **Guardian Integration**: Acts as a real-time monitor for the LangGraph, capable of injecting `REJECT` verdicts into the **Orchestrator's** consensus loop if safety rules are breached.
+- **Resource Ethics**: Enforces ethical guidelines (e.g., preventing the crawler from scraping non-commercial domains if configured).
 
 ```mermaid
 graph TD
@@ -47,10 +80,11 @@ graph TD
 |:-----------------|:----------|:------------|:----------------------|
 | **`main.py`** | **Entry Point** | FastAPI app (Port 8005). Exposes compliance and status checks. | `check_compliance()`, `get_health()` |
 | **`core/`** | **Logic** | Governance and supervision modules. | |
-| ├── `compliance.py` | Engine | Core logic for matching operations against policy sets. | `PolicyEngine`, `validate_args()` |
-| ├── `supervisor.py` | Observer | LLM-based watchdog for real-time thought auditing. | `SupervisorAgent`, `audit_thought()` |
-| ├── `guards.py` | Resource | Enforces resource quotas and rate limits per agent. | `ResourceMonitor`, `check_quota()` |
-| └── `kill_switch.py`| Shield | Logic to broadcast emergency halt to the MCP Host. | `trigger_kill_switch()`, `EmergencyHalt` |
+| ├── `compliance.py` | Engine | Core logic for matching operations against policy sets. |
+| ├── `supervisor.py` | Observer | LLM-based watchdog for real-time thought auditing. |
+| ├── `guards.py` | Resource | Enforces resource quotas and rate limits per agent. |
+| ├── `resource_governor.py`| Governor | **NEW**: Adaptive hardware-aware resource allocation logic. |
+| └── `kill_switch.py`| Shield | Logic to broadcast emergency halt to the MCP Host. |
 
 ---
 
@@ -76,12 +110,4 @@ Kea supports enterprise-grade guardrails for data access:
 | Endpoint | Method | Description |
 |:---------|:-------|:------------|
 | `/compliance/check` | `POST` | Primary gate for tool calls. Returns `passed` or `failed`. |
-| `/policies/list` | `GET` | List active compliance frameworks (e.g., GDPR, SOC2). |
-| `/policies/update` | `PUT` | Hot-swap policy rules without restarting the service. |
-
-### 2. Supervision & Safety
-| Endpoint | Method | Description |
-|:---------|:-------|:------------|
-| `/supervisor/audit` | `POST` | Submit an agent's reasoning chain for auditing. |
-| `/safety/kill` | `POST` | Trigger the emergency kill switch for all active tools. |
-| `/guards/metrics` | `GET` | View resource usage and quota status per agent. |
+| `/health` | `GET` | Basic service health check. |
