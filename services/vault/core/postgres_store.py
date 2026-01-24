@@ -101,11 +101,9 @@ class PostgresVectorStore(VectorStore):
                     use_local=self.use_local_embedding,
                 )
             else:
-                from shared.embedding import create_embedding_provider
-                self._embedding_provider = create_embedding_provider(
-                    use_local=self.use_local_embedding,
-                    dimension=self.embedding_dim,
-                )
+                from shared.embedding.model_manager import get_embedding_provider
+                # Use global settings from model_manager (don't force self.use_local_embedding default)
+                self._embedding_provider = get_embedding_provider()
         
         if self.use_vl_model:
             # Wrap text in VLInput for consistency if using VL model
