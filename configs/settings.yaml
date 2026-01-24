@@ -15,8 +15,23 @@ llm:
   default_provider: "openrouter"
   default_model: "${OPENROUTER_MODEL:nvidia/nemotron-3-nano-30b-a3b:free}"
   temperature: 0.7
-  max_tokens: 4096
+  max_tokens: 16384
   enable_reasoning: true
+
+# Embedding Configuration (Priority: Local -> API Fallback)
+embedding:
+  use_local: true
+  model_name: "Qwen/Qwen3-Embedding-0.6B"
+  api_model: "qwen/qwen3-embedding-8b"
+  dimension: 1024
+  batch_size: 32
+
+# Reranker Configuration
+reranker:
+  model_name: "Qwen/Qwen3-Reranker-0.6B"
+  per_task_top_k: 32768
+  final_batch_top_k: 32768
+  max_length: 32768
 
 # MCP Servers Configuration
 mcp:
@@ -88,10 +103,10 @@ mcp:
 
 # Research Configuration
 research:
-  max_depth: 3
-  max_sources: 10
+  max_depth: 5
+  max_sources: 50
   timeout_seconds: 300
-  parallel_tools: 5
+  parallel_tools: 10
 
 # Rate Limiting
 rate_limits:
