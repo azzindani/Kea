@@ -48,6 +48,7 @@ dependencies = [
     "aiofiles>=23.2.0",
     # Data Sources
     "yfinance>=0.2.0",
+    "wrapt>=1.14.0",
     "wbgapi>=1.0.0",  # World Bank
     # Machine Learning
     "scikit-learn>=1.4.0",
