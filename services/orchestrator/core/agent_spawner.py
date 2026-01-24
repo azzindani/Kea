@@ -473,9 +473,21 @@ class AgentSpawner:
         try:
             # 1. Build Context
             context_str = ""
+            
+            # Local Swarm Context
             if context_results:
                 findings = [str(r.result) for r in context_results if r.result]
-                context_str = f"Context from previous agents:\n" + "\n".join(findings) + "\n\n"
+                context_str += f"Context from dependent tasks:\n" + "\n".join(findings) + "\n\n"
+
+            # Global Project Context (Crucial for multi-phase workflows)
+            try:
+                from shared.context_pool import get_context_pool
+                ctx = get_context_pool()
+                if ctx.fact_pool:
+                    global_findings = [f.get("text", "")[:500] for f in ctx.fact_pool[-10:]] # Last 10 facts, truncated
+                    context_str += f"Global Context (Previous Phases):\n" + "\n".join(global_findings) + "\n\n"
+            except Exception as e:
+                logger.warning(f"Failed to fetch global context for LLM: {e}")
             
             # 2. Determine Action (LLM or Direct Tool)
             # For this implementation, we treat the agent as a "Smart Worker"
@@ -512,10 +524,30 @@ class AgentSpawner:
                             
                             # Prepare facts for context-aware parameters
                             collected_facts = []
+                            
+                            # 1. Local Context (from this swarm's dependencies)
                             if context_results:
                                 for r in context_results:
                                     if r.result:
                                         collected_facts.append({"text": str(r.result)})
+                            
+                            # 2. Global Context (from previous phases)
+                            try:
+                                from shared.context_pool import get_context_pool
+                                ctx = get_context_pool()
+                                
+                                # Add facts from pool
+                                for fact in ctx.fact_pool:
+                                    collected_facts.append({"text": fact.get("text", "")})
+                                
+                                # Add specific data items if short enough
+                                for key, item in ctx.data_pool.items():
+                                    data_str = str(item.get("data", ""))
+                                    if len(data_str) < 5000: # Limit size
+                                        collected_facts.append({"text": f"Data {key}: {data_str}"})
+                                        
+                            except Exception as e:
+                                logger.warning(f"Failed to fetch global context: {e}")
                             
                             # Use robust tool input builder
                             args = build_tool_inputs(

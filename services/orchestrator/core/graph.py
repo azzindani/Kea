@@ -348,12 +348,22 @@ async def researcher_node(state: GraphState) -> GraphState:
                     ))
                 
                 # Generate prompts for this phase
+                # FETCH GLOBAL CONTEXT for Prompt Engineering
+                try:
+                    from shared.context_pool import get_context_pool
+                    ctx = get_context_pool()
+                    global_facts = [f.get("text", "") for f in ctx.fact_pool]
+                except Exception as e:
+                    logger.warning(f"Failed to fetch global context for prompts: {e}")
+                    global_facts = []
+
                 prompts = []
                 for subtask in subtasks:
                     context = PromptContext(
                         query=subtask.query,
                         domain=subtask.domain,
                         task_type=subtask.task_type,
+                        previous_findings=global_facts  # Inject global context here!
                     )
                     prompts.append(prompt_factory.generate(context))
                     
