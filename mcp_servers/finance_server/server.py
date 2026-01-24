@@ -76,36 +76,57 @@ async def get_ticker_metrics(arguments: dict) -> ToolResult:
     Returns:
         Key metrics: Market Cap, PE, Revenue Growth, etc.
     """
+    import time
     import yfinance as yf
     
     ticker = arguments.get("ticker")
     if not ticker:
         return ToolResult(isError=True, content=[TextContent(text="Ticker argument required")])
         
-    try:
-        stock = yf.Ticker(ticker)
-        info = stock.info
-        
-        # Extract key metrics with safe defaults
-        metrics = {
-            "symbol": ticker,
-            "company_name": info.get("longName", ticker),
-            "sector": info.get("sector", "Unknown"),
-            "market_cap": info.get("marketCap", 0),
-            "market_cap_idr_t": info.get("marketCap", 0) / 1_000_000_000_000, # Trillions
-            "pe_ratio": info.get("trailingPE", 0),
-            "forward_pe": info.get("forwardPE", 0),
-            "revenue_growth_yoy": info.get("revenueGrowth", 0) * 100, # Percent
-            "profit_margin": info.get("profitMargins", 0) * 100, # Percent
-            "price": info.get("currentPrice", 0),
-            "currency": info.get("currency", "IDR"),
-            "last_updated": "Live (Yahoo Finance)"
-        }
-        
-        source_url = f"https://finance.yahoo.com/quote/{ticker}"
-        
-        # Format as markdown table
-        md = f"""
+    # Enforce .JK suffix for Indonesian stocks if missing
+    # (Assuming most usage is IDX based on context)
+    if not ticker.endswith(".JK") and not "." in ticker: 
+         # heuristic: only append if no suffix exists
+         ticker += ".JK"
+         
+    # Retry Loop
+    max_retries = 3
+    last_error = None
+    
+    for attempt in range(max_retries):
+        try:
+            stock = yf.Ticker(ticker)
+            
+            # Force a simple fetch to wake it up / check validity
+            # usage of history(period="1d") is a good connectivity check
+            hist = stock.history(period="1d")
+            
+            if hist.empty:
+                # Sometimes yfinance returns empty instead of error
+                raise ValueError(f"Empty history for {ticker} - possibly invalid ticker or block")
+
+            info = stock.info
+            
+            # Extract key metrics with safe defaults
+            metrics = {
+                "symbol": ticker,
+                "company_name": info.get("longName", ticker),
+                "sector": info.get("sector", "Unknown"),
+                "market_cap": info.get("marketCap", 0),
+                "market_cap_idr_t": info.get("marketCap", 0) / 1_000_000_000_000, # Trillions
+                "pe_ratio": info.get("trailingPE", 0),
+                "forward_pe": info.get("forwardPE", 0),
+                "revenue_growth_yoy": info.get("revenueGrowth", 0) * 100, # Percent
+                "profit_margin": info.get("profitMargins", 0) * 100, # Percent
+                "price": info.get("currentPrice", 0),
+                "currency": info.get("currency", "IDR"),
+                "last_updated": "Live (Yahoo Finance)"
+            }
+            
+            source_url = f"https://finance.yahoo.com/quote/{ticker}"
+            
+            # Format as markdown table
+            md = f"""
 ### Financial Metrics for {metrics['company_name']} ({ticker})
 
 | Metric | Value |
@@ -120,11 +141,17 @@ async def get_ticker_metrics(arguments: dict) -> ToolResult:
 Raw Data:
 {metrics}
 """
-        return ToolResult(content=[TextContent(text=md)])
-        
-    except Exception as e:
-        logger.error(f"Failed to fetch yfinance data for {ticker}: {e}")
-        return ToolResult(isError=True, content=[TextContent(text=f"Failed to fetch data for {ticker}: {str(e)}")])
+            return ToolResult(content=[TextContent(text=md)])
+            
+        except Exception as e:
+            last_error = e
+            logger.warning(f"Attempt {attempt+1}/{max_retries} failed for {ticker}: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(2) # Wait before retry
+    
+    # If we get here, all retries failed
+    logger.error(f"Failed to fetch yfinance data for {ticker} after {max_retries} retries: {last_error}")
+    return ToolResult(isError=True, content=[TextContent(text=f"Failed to fetch data for {ticker} after {max_retries} attempts. Last error: {str(last_error)}")])
 
 
 

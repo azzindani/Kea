@@ -331,12 +331,16 @@ RULES FOR FINANCIAL DATA:
 2. Use `execute_code` (Python) to fetch financial data (e.g. using yfinance) or to perform calculations.
 3. You cannot 'Filter' data you do not have. Your first step must always be 'Acquire Dataset'.
 
-PHASES FOR LARGE TASKS:
+PHASES FOR LARGE TASKS (CRITICAL: PREVENT RACE CONDITIONS):
 1. DISCOVERY - Find all entities (companies, URLs, documents)
-2. COLLECTION - Create ONE task per entity to collect data  
+2. COLLECTION - Create ONE task per entity to collect data (e.g. "Download data").
 3. VALIDATION - Verify collected data
-4. ANALYSIS - Process and calculate
+4. ANALYSIS - Process and calculate (MUST depend on Collection)
 5. SYNTHESIS - Combine results
+
+IMPORTANT: Do not mix "Fetching" and "Analyzing" in the same description. Split them.
+- BAD: "Fetch data for ASII and calculate Dupont" (Atomic violation)
+- GOOD: "Task 1: Fetch data for ASII" (Collection) -> "Task 2: Calculate Dupont for ASII" (Analysis)
 
 Output format:
 SUB-QUERIES:
@@ -456,12 +460,20 @@ def generate_execution_plan(query: str, execution_steps: list[str]) -> Execution
     for step in execution_steps:
         primary_tool, _ = route_to_tool(step)
         
-        if primary_tool in ["web_search", "news_search", "fetch_data", "human_search", "web_crawler", "multi_browse"]:
+        if primary_tool in ["web_search", "news_search", "fetch_data", "human_search", "web_crawler", "multi_browse", "get_idx_tickers"]:
             phase = "data_collection"
         elif primary_tool in ["scrape_url", "parse_document", "link_extractor", "sitemap_parser"]:
             phase = "extraction"
         elif primary_tool in ["run_python", "dataframe_ops", "sql_query"]:
-            phase = "analysis"
+             phase = "analysis"
+        elif primary_tool == "execute_code":
+            # SPECIAL HANDLING: execute_code can be used for both fetching AND analysis.
+            # We must detect intent to place it in the correct phase.
+            desc_lower = step.lower()
+            if any(kw in desc_lower for kw in ["fetch", "download", "get", "retrieve", "load", "read"]):
+                phase = "data_collection"
+            else:
+                phase = "analysis"
         elif primary_tool in ["build_graph", "source_validator"]:
             phase = "synthesis"
         else:
