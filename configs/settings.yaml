@@ -117,3 +117,38 @@ rate_limits:
     "*.gov.id":
       requests_per_minute: 10
       delay_seconds: 2
+
+# ============================================================================
+# Deep Audit Configs (Added during Refactoring)
+# ============================================================================
+
+# Model Identity Configuration
+models:
+  # The default model for most tasks
+  default_model: "nvidia/nemotron-3-nano-30b-a3b:free"
+  app_name: "Kea Research Engine"
+  
+  # Specialized models (can be same as default)
+  planner_model: "nvidia/nemotron-3-nano-30b-a3b:free"
+  critic_model: "nvidia/nemotron-3-nano-30b-a3b:free"
+  generator_model: "nvidia/nemotron-3-nano-30b-a3b:free"
+
+# Governance & Safety
+governance:
+  max_concurrent_cost: 100  # "Points" for rate limiting
+  max_ram_percent: 85.0     # Pause dispatch if RAM > 85%
+  max_cpu_percent: 90.0     # Pause dispatch if CPU > 90%
+  poll_interval: 1.0        # Supervisor check interval in seconds
+
+# Standardized Timeouts
+timeouts:
+  default: 30.0
+  llm_completion: 60.0
+  llm_streaming: 120.0
+  tool_execution: 300.0
+  long: 600.0
+
+# Loop Safety Controls
+loop_safety:
+  max_global_iterations: 20
+  max_facts_threshold: 500

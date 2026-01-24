@@ -63,8 +63,9 @@ Be constructive - don't just criticize, suggest improvements."""
                 return self._fallback_critique(answer)
             
             provider = OpenRouterProvider()
+            from shared.config import get_settings
             config = LLMConfig(
-                model="nvidia/nemotron-3-nano-30b-a3b:free",
+                model=get_settings().models.critic_model,
                 temperature=0.4,
                 max_tokens=32768,
             )

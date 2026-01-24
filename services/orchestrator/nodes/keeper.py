@@ -290,8 +290,9 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
     """
     logger.info("Keeper: Checking context drift and orchestrating tools")
     
+    config = _get_config()
     iteration = state.get("iteration", 0)
-    max_iterations = state.get("max_iterations", 32768)  # Maximum scaling
+    max_iterations = state.get("max_iterations", config.loop_safety.max_global_iterations)
     query = state.get("query", "")
     facts = state.get("facts", [])
     job_id = state.get("job_id", "unknown")

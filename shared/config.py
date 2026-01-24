@@ -106,6 +106,34 @@ class LoopSafetySettings(BaseModel):
     max_facts_threshold: int = 32768
 
 
+class TimeoutSettings(BaseModel):
+    """Standardized timeouts for the entire system."""
+    default: float = 30.0
+    audit_log: float = 2.0
+    llm_completion: float = 60.0
+    llm_streaming: float = 120.0
+    tool_execution: float = 300.0
+    short: float = 5.0
+    long: float = 600.0
+
+
+class ModelDefaults(BaseModel):
+    """Centralized model defaults."""
+    default_model: str = "nvidia/nemotron-3-nano-30b-a3b:free"
+    app_name: str = "research-engine"
+    planner_model: str = "nvidia/nemotron-3-nano-30b-a3b:free"
+    critic_model: str = "nvidia/nemotron-3-nano-30b-a3b:free"
+    generator_model: str = "nvidia/nemotron-3-nano-30b-a3b:free"
+
+
+class GovernanceSettings(BaseModel):
+    """Resource governance settings."""
+    max_concurrent_cost: int = 100
+    max_ram_percent: float = 85.0
+    max_cpu_percent: float = 90.0
+    poll_interval: float = 1.0
+
+
 class Settings(BaseSettings):
     """
     Main settings class.
@@ -155,6 +183,11 @@ class Settings(BaseSettings):
     reranker: RerankerSettings = Field(default_factory=RerankerSettings)
     confidence: ConfidenceSettings = Field(default_factory=ConfidenceSettings)
     loop_safety: LoopSafetySettings = Field(default_factory=LoopSafetySettings)
+    
+    # New Configs (Deep Audit Fixes)
+    timeouts: TimeoutSettings = Field(default_factory=TimeoutSettings)
+    models: ModelDefaults = Field(default_factory=ModelDefaults)
+    governance: GovernanceSettings = Field(default_factory=GovernanceSettings)
     
     class Config:
         env_file = ".env"

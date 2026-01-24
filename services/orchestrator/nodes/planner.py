@@ -46,167 +46,14 @@ class ExecutionPlan(BaseModel):
 # Tool Routing Logic
 # ============================================================================
 
-TOOL_CAPABILITIES = {
-    # ===========================================
-    # SEARCH TOOLS
-    # ===========================================
-    "web_search": {
-        "keywords": ["search", "find", "look up", "what is", "who is", "list of", "query"],
-        "server": "search_server",
-        "fallbacks": ["news_search", "human_search"],
-    },
-    "news_search": {
-        "keywords": ["news", "recent", "latest", "announcement", "press release"],
-        "server": "search_server",
-        "fallbacks": ["web_search"],
-    },
-    "human_search": {
-        "keywords": ["research", "investigate", "thorough", "comprehensive", "deep search"],
-        "server": "browser_agent_server",
-        "fallbacks": ["web_search"],
-    },
-    
-    # ===========================================
-    # CRAWLER TOOLS (recursive, unlimited depth)
-    # ===========================================
-    "web_crawler": {
-        "keywords": ["crawl", "explore", "recursive", "all pages", "entire site", "sitemap"],
-        "server": "crawler_server",
-        "fallbacks": ["link_extractor", "scrape_url"],
-    },
-    "sitemap_parser": {
-        "keywords": ["sitemap", "site map", "all urls", "url list"],
-        "server": "crawler_server",
-        "fallbacks": ["web_crawler"],
-    },
-    "link_extractor": {
-        "keywords": ["extract links", "get links", "find links", "outbound", "href"],
-        "server": "crawler_server",
-        "fallbacks": ["web_search"],
-    },
-    
-    # ===========================================
-    # SCRAPING TOOLS
-    # ===========================================
-    "fetch_url": {
-        "keywords": ["scrape", "extract", "download", "annual report", "website", "page", "fetch", "read url"],
-        "server": "scraper_server",
-        "fallbacks": ["web_search", "browser_scrape"],
-    },
-    "execute_code": {
-        "keywords": ["data", "historical", "OHLCV", "price", "volume", "stock", "ticker", "API", "python", "calculate", "dataframe"],
-        "server": "python_server",
-        "fallbacks": ["web_search"],
-    },
-    
-    # ===========================================
-    # FINANCIAL TOOLS
-    # ===========================================
-    "get_idx_tickers": {
-        "keywords": ["IDX", "JKSE", "companies", "list of stocks", "ticker list", "universe"],
-        "server": "mcp_host",
-        "fallbacks": ["web_search"],
-    },
-    
-    # ===========================================
-    # QUALITATIVE TOOLS
-    # ===========================================
-    "text_coding": {
-        "keywords": ["code text", "qualitative coding", "label themes", "categorize text", "nlp coding"],
-        "server": "qualitative_server",
-        "fallbacks": ["theme_extractor", "execute_code"],
-    },
-    "entity_extractor": {
-        "keywords": ["extract entities", "find people", "identify orgs", "ner", "named entity"],
-        "server": "qualitative_server",
-        "fallbacks": ["execute_code"],
-    },
-    "investigation_graph_add": {
-        "keywords": ["add to graph", "map relationship", "build graph", "connect entity"],
-        "server": "qualitative_server",
-        "fallbacks": ["connection_mapper"],
-    },
-    "investigation_graph_query": {
-        "keywords": ["query graph", "search graph", "find path", "graph lookup"],
-        "server": "qualitative_server",
-        "fallbacks": ["text_coding"],
-    },
-
-    # ===========================================
-    # ML TOOLS
-    # ===========================================
-    "auto_ml": {
-        "keywords": ["train model", "predict", "machine learning", "classification", "regression", "ml"],
-        "server": "ml_server",
-        "fallbacks": ["execute_code"],
-    },
-    "feature_importance": {
-        "keywords": ["feature importance", "key drivers", "what matters", "variable significance"],
-        "server": "ml_server",
-        "fallbacks": ["execute_code"],
-    },
-    
-    # ===========================================
-    # BROWSER AGENT TOOLS
-    # ===========================================
-    "human_like_search": {
-        "keywords": ["human search", "browse like human", "natural search"],
-        "server": "browser_agent_server",
-        "fallbacks": ["web_search"],
-    },
-    "search_memory_add": {
-        "keywords": ["add to memory", "remember search", "cache result"],
-        "server": "browser_agent_server",
-        "fallbacks": [],
-    },
-    
-    # ===========================================
-    # SPECIALIZED TOOLS
-    # ===========================================
-}
-
+from services.orchestrator.core.tool_loader import route_to_tool_dynamic
 
 def route_to_tool(task_description: str) -> tuple[str, list[str]]:
     """
     Route a micro-task to the appropriate tool based on keywords.
-    
-    Returns:
-        (primary_tool, fallback_tools)
+    Delegates to dynamic loader.
     """
-    task_lower = task_description.lower()
-    
-    # 1. INTELLIGENCE: Check for direct tool reference from Registry
-    try:
-        from services.mcp_host.core.session_registry import get_session_registry
-        registry = get_session_registry()
-        # Look for exact tool names in the task description (e.g. "Use get_idx_tickers...")
-        # Sort by length descending to match longest tool name first
-        known_tools = sorted(list(registry.tool_to_server.keys()), key=len, reverse=True)
-        
-        for tool_name in known_tools:
-            if tool_name in task_lower or tool_name.replace("_", " ") in task_lower:
-                # Found exact tool match!
-                return tool_name, []
-    except Exception:
-        pass
-
-    # 2. TEXTBOOK: Fallback to keyword matching
-    # Score each tool based on keyword matches
-    scores = {}
-    for tool, config in TOOL_CAPABILITIES.items():
-        score = sum(1 for kw in config["keywords"] if kw in task_lower)
-        if score > 0:
-            scores[tool] = score
-    
-    if not scores:
-        # Default to web_search
-        return "web_search", ["news_search"]
-    
-    # Get highest scoring tool
-    best_tool = max(scores, key=scores.get)
-    fallbacks = TOOL_CAPABILITIES[best_tool]["fallbacks"]
-    
-    return best_tool, fallbacks
+    return route_to_tool_dynamic(task_description)
 
 
 # ============================================================================
@@ -263,8 +110,11 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
         import os
         if os.getenv("OPENROUTER_API_KEY"):
             provider = OpenRouterProvider()
+            from shared.config import get_settings
+            app_config = get_settings()
+            
             config = LLMConfig(
-                model="nvidia/nemotron-3-nano-30b-a3b:free",
+                model=app_config.models.planner_model,
                 temperature=0.3,
                 max_tokens=32768,  # Maximum for task generation
             )

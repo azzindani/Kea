@@ -343,8 +343,9 @@ class UtilityHandler(BaseHandler):
             import os
             if os.getenv("OPENROUTER_API_KEY"):
                 provider = OpenRouterProvider()
+                from shared.config import get_settings
                 config = LLMConfig(
-                    model="nvidia/nemotron-3-nano-30b-a3b:free",
+                    model=get_settings().models.default_model,
                     temperature=0.3,
                     max_tokens=2000,
                 )

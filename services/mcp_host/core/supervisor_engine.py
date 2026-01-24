@@ -16,12 +16,10 @@ logger = get_logger(__name__)
 # ============================================================================
 # Governance Policies (The Corporate Budget)
 # ============================================================================
-MAX_CONCURRENT_COST = 100  # Total available "points"
-MAX_RAM_PERCENT = 85.0     # Pause dispatch if RAM > 85%
-MAX_CPU_PERCENT = 90.0     # Pause dispatch if CPU > 90%
-
-# Safety Net
-MIN_POLL_INTERVAL = 1.0     # Seconds
+# ============================================================================
+# Governance Policies (Loaded from Config)
+# ============================================================================
+from shared.config import get_settings
 
 
 class SupervisorEngine:
@@ -68,13 +66,16 @@ class SupervisorEngine:
                     continue
 
                 # 2. Check Capacity
+                config = get_settings()
+                max_cost = config.governance.max_concurrent_cost
+                
                 # Recalculate load just in case
                 self._current_load = sum(self._active_tasks.values())
-                available_capacity = MAX_CONCURRENT_COST - self._current_load
+                available_capacity = max_cost - self._current_load
                 
                 if available_capacity <= 0:
                     # Factory Full
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(config.governance.poll_interval)
                     continue
 
                 # 3. Fetch Next Task (Highest Priority, Fits in Budget)
@@ -89,7 +90,7 @@ class SupervisorEngine:
                     self._active_tasks[task_id] = cost
                     asyncio.create_task(self._run_worker(task))
                     
-                    logger.info(f"🚀 Spawning {tool_name} (Cost: {cost}, Load: {self._current_load + cost}/{MAX_CONCURRENT_COST})")
+                    logger.info(f"🚀 Spawning {tool_name} (Cost: {cost}, Load: {self._current_load + cost}/{max_cost})")
                 else:
                     # No tasks fit capability or queue empty
                     await asyncio.sleep(2)
@@ -100,6 +101,7 @@ class SupervisorEngine:
 
     def _check_hardware(self) -> bool:
         """Return True if hardware is healthy enough to spawn tasks."""
+        config = get_settings()
         cpu = psutil.cpu_percent(interval=None)
         ram = psutil.virtual_memory().percent
         
@@ -124,17 +126,17 @@ class SupervisorEngine:
         is_critical = False
         
         # RAM OOM check - use the more accurate is_ram_oom_risk method
-        if ram_oom_risk or ram > MAX_RAM_PERCENT:
+        if ram_oom_risk or ram > config.governance.max_ram_percent:
             if not self._hardware_paused:
                 available_gb = getattr(hw, 'ram_available_gb', 0)
                 logger.warning(f"⚠️ RAM Critical ({ram}% used, {available_gb:.1f}GB free). Pausing.")
             is_critical = True
             
-        elif cpu > MAX_CPU_PERCENT and vram_percent < 80:
+        elif cpu > config.governance.max_cpu_percent and vram_percent < 80:
              # Only pause if BOTH CPU is high AND GPU isn't available/loaded
              # If GPU is available and has capacity, let GPU tasks proceed
              if not self._hardware_paused:
-                 logger.warning(f"⚠️ CPU Critical ({cpu}% > {MAX_CPU_PERCENT}%). Pausing dispatch.")
+                  logger.warning(f"⚠️ CPU Critical ({cpu}% > {config.governance.max_cpu_percent}%). Pausing dispatch.")
              is_critical = True
         
         # Add VRAM check for GPU OOM prevention

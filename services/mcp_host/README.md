@@ -12,7 +12,8 @@ The MCP Host operates as a **Process Manager** and **RPC Proxy**. It implements 
 2.  **Process Spawner**: Uses `uv` (JIT) or Docker to launch isolated tool servers.
 3.  **RPC Bridge**: Converts HTTP `POST` requests from the Orchestrator into JSON-RPC messages over Stdio/SSE.
 4.  **Compliance Guard**: Pre-checks every tool call with **Swarm Manager** (Port 8005) before transmission.
-5.  **Stability Layer**: Implements **Circuit Breakers** and **Exponential Backoff** to prevent cascading failures from hanging tools.
+5.  **Resource Governor**: The **Supervisor Engine** monitors CPU/RAM and pauses dispatch if limits are exceeded.
+6.  **Stability Layer**: Implements **Circuit Breakers** and **Exponential Backoff** to prevent cascading failures from hanging tools.
 
 ```mermaid
 graph TD
@@ -43,6 +44,7 @@ graph TD
 | **`main.py`** | **Entry Point** | FastAPI app (Port 8002). Exposes `/tools/call`. |
 | **`core/`** | **Logic** | Core tool management. |
 | ├── `tool_manager.py` | Controller | Coordination logic. Calls Swarm, Registry, and Spawner. |
+| ├── `supervisor_engine.py` | **Governor** | **NEW**: Manages hardware limits (CPU/RAM) and task priority. |
 | ├── `spawner.py` | Infrastructure | Wraps `subprocess.Popen` with `uv run` commands. |
 | ├── `rpc_client.py` | Protocol | Implements MCP JSON-RPC 2.0 Client. |
 | └── `registry.py` | Discovery | Syncs with `shared.service_registry` and local DB. |
@@ -98,7 +100,8 @@ The Host treats tool servers as volatile processes:
 - **Graceful Lifecycle**: When the system shuts down, it attempts `SIGTERM` followed by a 5-second timeout before `SIGKILL`, ensuring file handles and network sockets are closed properly.
 
 ### 3. Monitoring & Metrics
-Integrated with Prometheus to track:
-- `ACTIVE_TOOLS`: Gauge of currently running tool processes.
+Integrated with Prometheus:
+- `active_tools`: Gauge of currently running tool processes.
+- `governor_status`: Boolean (Paused/Running) based on hardware health.
 - `tool_duration_seconds`: Histogram of execution latency.
 - `tool_failure_total`: Counter of non-compliant or buggy tool executions.

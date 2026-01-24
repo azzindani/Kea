@@ -672,8 +672,12 @@ async def researcher_node(state: GraphState) -> GraphState:
 @audited(AuditEventType.SECURITY_CHECK, "Keeper Node verified progress")
 async def keeper_node(state: GraphState) -> GraphState:
     """Check for context drift and verify progress."""
+    from shared.config import get_settings
+    config = get_settings()
+    
     iteration = state.get("iteration", 0)
-    max_iterations = state.get("max_iterations", 3)
+    # Use config for max depth
+    max_iterations = state.get("max_iterations", config.research.max_depth)
     facts = state.get("facts", [])
     
     logger.info("\n" + "="*70)

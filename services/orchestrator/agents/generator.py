@@ -63,8 +63,9 @@ Always cite your sources when making claims."""
                 return self._fallback_generate(query, facts, sources)
             
             provider = OpenRouterProvider()
+            from shared.config import get_settings
             config = LLMConfig(
-                model="nvidia/nemotron-3-nano-30b-a3b:free",
+                model=get_settings().models.generator_model,
                 temperature=0.6,
                 max_tokens=32768,
             )

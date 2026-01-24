@@ -39,8 +39,9 @@ async def divergence_node(state: dict[str, Any]) -> dict[str, Any]:
         import os
         if os.getenv("OPENROUTER_API_KEY"):
             provider = OpenRouterProvider()
+            from shared.config import get_settings
             config = LLMConfig(
-                model="nvidia/nemotron-3-nano-30b-a3b:free",
+                model=get_settings().models.default_model,
                 temperature=0.8,  # Higher for creativity
                 max_tokens=500,
             )

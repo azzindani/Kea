@@ -21,8 +21,10 @@ from shared.llm.provider import (
 )
 
 
-# Default model: NVIDIA Nemotron 3 Nano 30B A3B (free tier)
-DEFAULT_MODEL = "nvidia/nemotron-3-nano-30b-a3b:free"
+from shared.config import get_settings
+
+# Default model fallback (if config fails, though get_settings handles defaults)
+DEFAULT_MODEL = "nvidia/nemotron-3-nano-30b-a3b:free" 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 
@@ -76,8 +78,11 @@ class OpenRouterProvider(LLMProvider):
         stream: bool = False,
     ) -> dict[str, Any]:
         """Build the request body."""
+        settings = get_settings()
+        default_model = settings.models.default_model or DEFAULT_MODEL
+        
         body: dict[str, Any] = {
-            "model": config.model or DEFAULT_MODEL,
+            "model": config.model or default_model,
             "messages": [{"role": m.role.value if hasattr(m.role, 'value') else str(m.role), "content": m.content} for m in messages],
             "temperature": config.temperature,
             "top_p": config.top_p,
@@ -109,7 +114,10 @@ class OpenRouterProvider(LLMProvider):
         
         body = self._build_request_body(messages, config, stream=False)
         
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        settings = get_settings()
+        timeout = settings.timeouts.llm_completion
+        
+        async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(
                 f"{self.base_url}/chat/completions",
                 headers=self._get_headers(),
@@ -154,7 +162,10 @@ class OpenRouterProvider(LLMProvider):
         
         body = self._build_request_body(messages, config, stream=True)
         
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        settings = get_settings()
+        timeout = settings.timeouts.llm_streaming
+        
+        async with httpx.AsyncClient(timeout=timeout) as client:
             async with client.stream(
                 "POST",
                 f"{self.base_url}/chat/completions",
