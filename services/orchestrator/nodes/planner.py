@@ -194,20 +194,20 @@ IMPORTANT: Do not mix "Fetching" and "Analyzing" in the same description. Split 
 
 Output format:
 SUB-QUERIES:
-1. [question - be specific about what data/information is needed]
-2. [question]
-... (create as many as needed)
+1. [question]
+...
 
 HYPOTHESES:
-1. [testable claim]
-2. [testable claim]
-... (create as many as needed)
+1. [claim]
+...
 
-EXECUTION-STEPS (generate hundreds or thousands for large-scale research):
-1. [action verb] [what] [where/how] - e.g. "Use get_idx_tickers to load JKSE company list"
-2. [action verb] [what] [where/how] - e.g. "Download historical price data for ASII"
-3. [action verb] [what] [where/how] - e.g. "Download historical price data for BBCA"
-... (one task per entity, repeat for ALL entities)
+PHASE: [PHASE_NAME]
+1. [action verb] [what] [where/how]
+2. ...
+
+PHASE: [NEXT_PHASE_NAME]
+1. [action that depends on previous phase]
+...
 
 Be specific about:
 - What data to collect (create one task per item)
@@ -223,152 +223,145 @@ Be specific about:
             # Parse response
             sub_queries = []
             hypotheses = []
-            execution_steps = []
+            # New structure: Ordered dictionary of phases
+            execution_phases = {}  # { "discovery": ["step 1", "step 2"], ... }
+            current_phase_name = "default"
             
             lines = response.content.split("\n")
             current_section = None
             
             for line in lines:
                 line = line.strip()
+                if not line:
+                    continue
+                    
                 if "SUB-QUERIES" in line.upper():
                     current_section = "sub_queries"
+                    continue
                 elif "HYPOTHESES" in line.upper():
                     current_section = "hypotheses"
-                elif "EXECUTION" in line.upper():
+                    continue
+                elif "PHASE:" in line.upper():
                     current_section = "execution"
-                elif line:
-                    # Extract text from various formats: numbered, bullets, dashes
-                    text = None
-                    if line[0].isdigit() and "." in line:
-                        # Numbered: "1. Task description"
-                        text = line.split(".", 1)[1].strip() if "." in line else line
-                    elif line.startswith("-") or line.startswith("*"):
-                        # Bullets: "- Task description" or "* Task description"
-                        text = line[1:].strip()
-                    elif line.startswith("•"):
-                        # Unicode bullet
-                        text = line[1:].strip()
-                    
-                    if text and current_section:
-                        if current_section == "sub_queries":
-                            sub_queries.append(text)
-                        elif current_section == "hypotheses":
-                            hypotheses.append(text)
-                        elif current_section == "execution":
-                            execution_steps.append(text)
+                    # Extract phase name: "PHASE: DISCOVERY" -> "discovery"
+                    try:
+                        current_phase_name = line.split(":", 1)[1].strip().lower()
+                    except:
+                        current_phase_name = "unknown"
+                    if current_phase_name not in execution_phases:
+                        execution_phases[current_phase_name] = []
+                    continue
+                elif "EXECUTION" in line.upper():
+                    # Fallback for old prompt style or if LLM forgets PHASE header
+                    current_section = "execution"
+                    continue
+                
+                # Extract content
+                text = None
+                if line[0].isdigit() and "." in line:
+                    text = line.split(".", 1)[1].strip()
+                elif line.startswith("-") or line.startswith("*") or line.startswith("•"):
+                    text = line[1:].strip()
+                else:
+                    # Allow non-bullet text if it looks like a task in execution section
+                    if current_section == "execution" and len(line) > 10:
+                        text = line
+                
+                if text and current_section:
+                    if current_section == "sub_queries":
+                        sub_queries.append(text)
+                    elif current_section == "hypotheses":
+                        hypotheses.append(text)
+                    elif current_section == "execution":
+                        if current_phase_name not in execution_phases:
+                            execution_phases[current_phase_name] = []
+                        execution_phases[current_phase_name].append(text)
             
             state["sub_queries"] = sub_queries or [query]
             state["hypotheses"] = hypotheses
             
-            # Generate execution plan from steps
-            execution_plan = generate_execution_plan(query, execution_steps)
+            # Generate execution plan from phases
+            execution_plan = generate_execution_plan_phased(query, execution_phases)
             state["execution_plan"] = execution_plan.model_dump()
             
             logger.info(
                 f"Planner: Generated {len(sub_queries)} sub-queries, "
                 f"{len(hypotheses)} hypotheses, "
-                f"{len(execution_plan.micro_tasks)} micro-tasks"
+                f"{len(execution_plan.micro_tasks)} micro-tasks across {len(execution_phases)} phases"
             )
             
         else:
             # Fallback without LLM
             state["sub_queries"] = [query]
             state["hypotheses"] = []
-            state["execution_plan"] = generate_execution_plan(query, [query]).model_dump()
+            state["execution_plan"] = generate_execution_plan_phased(query, {"research": [query]}).model_dump()
             logger.info("Planner: No LLM, using query as-is")
             
     except Exception as e:
         logger.error(f"Planner error: {e}")
         state["sub_queries"] = [query]
         state["hypotheses"] = []
-        state["execution_plan"] = generate_execution_plan(query, [query]).model_dump()
+        state["execution_plan"] = generate_execution_plan_phased(query, {"research": [query]}).model_dump()
     
     state["status"] = "planning_complete"
     return state
 
 
-def generate_execution_plan(query: str, execution_steps: list[str]) -> ExecutionPlan:
+def generate_execution_plan_phased(query: str, execution_phases: dict[str, list[str]]) -> ExecutionPlan:
     """
-    Generate execution plan from LLM-generated steps.
-    Routes each step to appropriate tools.
+    Generate execution plan from Phased LLM output.
     
-    PARALLEL EXECUTION STRATEGY:
-    - Tasks in the same "phase" (e.g., data_collection) have NO dependencies
-      on each other, allowing batch parallel execution.
-    - Dependencies are only created BETWEEN phases (e.g., analysis depends on
-      all data_collection tasks being complete).
+    STRICT DEPENDENCY LOGIC:
+    - All tasks in Phase N depend on ALL tasks in Phase N-1.
+    - Tasks within the same Phase are independent (Parallel).
     """
     import uuid
     
     micro_tasks = []
-    phase_order = ["data_collection", "extraction", "analysis", "synthesis"]
-    tasks_by_phase: dict[str, list[str]] = {p: [] for p in phase_order}
-    tasks_by_phase["research"] = []  # Fallback phase
+    task_id_counter = 1
     
-    # First pass: categorize steps by phase
-    step_phases = []
-    for step in execution_steps:
-        primary_tool, _ = route_to_tool(step)
-        
-        if primary_tool in ["web_search", "news_search", "fetch_data", "human_search", "web_crawler", "multi_browse", "get_idx_tickers"]:
-            phase = "data_collection"
-        elif primary_tool in ["scrape_url", "parse_document", "link_extractor", "sitemap_parser"]:
-            phase = "extraction"
-        elif primary_tool in ["run_python", "dataframe_ops", "sql_query"]:
-             phase = "analysis"
-        elif primary_tool == "execute_code":
-            # SPECIAL HANDLING: execute_code can be used for both fetching AND analysis.
-            # We must detect intent to place it in the correct phase.
-            desc_lower = step.lower()
-            if any(kw in desc_lower for kw in ["fetch", "download", "get", "retrieve", "load", "read"]):
-                phase = "data_collection"
-            else:
-                phase = "analysis"
-        elif primary_tool in ["build_graph", "source_validator"]:
-            phase = "synthesis"
-        else:
-            phase = "research"
-        
-        step_phases.append(phase)
+    # Track tasks by phase for dependency linking
+    # We maintain order of phases as they appeared in the dict (insertion order preserved in Py3.7+)
+    phase_names = list(execution_phases.keys())
+    phase_task_ids: dict[str, list[str]] = {p: [] for p in phase_names}
     
-    # Second pass: create tasks with phase-based dependencies
-    for i, step in enumerate(execution_steps):
-        task_id = f"task_{i+1}"
-        phase = step_phases[i]
+    for i, phase_name in enumerate(phase_names):
+        steps = execution_phases[phase_name]
         
-        primary_tool, fallbacks = route_to_tool(step)
-        
-        # PARALLEL STRATEGY: Tasks in the SAME phase have NO dependencies on each other.
-        # Dependencies are only on the PREVIOUS phase being complete.
+        # Determine dependencies: All tasks from previous phase
         depends_on = []
-        
-        # Find the previous phase that has tasks
-        current_phase_index = phase_order.index(phase) if phase in phase_order else -1
-        if current_phase_index > 0:
-            # Depend on ALL tasks from the previous phase
-            for prev_phase in phase_order[:current_phase_index]:
-                depends_on.extend(tasks_by_phase.get(prev_phase, []))
-        
-        # Track this task in its phase
-        tasks_by_phase[phase].append(task_id)
-        
-        micro_task = MicroTask(
-            task_id=task_id,
-            description=step,
-            tool=primary_tool,
-            inputs={"query": step},
-            depends_on=depends_on,
-            fallback_tools=fallbacks,
-            persist=True,
-            phase=phase,  # Add phase for debugging/logging
-        )
-        micro_tasks.append(micro_task)
-    
+        if i > 0:
+            previous_phase = phase_names[i-1]
+            depends_on = phase_task_ids[previous_phase]
+            
+        for step in steps:
+            task_id = f"task_{task_id_counter}"
+            task_id_counter += 1
+            
+            primary_tool, fallbacks = route_to_tool(step)
+            
+            # Handle special case: execute_code needs "python_server" usually
+            # route_to_tool logic might need checking, but usually returns 'execute_code'
+            
+            micro_task = MicroTask(
+                task_id=task_id,
+                description=step,
+                tool=primary_tool,
+                inputs={"query": step},  # Basic input, refined by researcher_node
+                depends_on=depends_on,   # STRICT DEPENDENCY
+                fallback_tools=fallbacks,
+                persist=True,
+                phase=phase_name,
+            )
+            
+            micro_tasks.append(micro_task)
+            phase_task_ids[phase_name].append(task_id)
+            
     return ExecutionPlan(
         plan_id=f"plan_{uuid.uuid4().hex[:8]}",
         query=query,
         micro_tasks=micro_tasks,
-        phases=[p for p in phase_order if tasks_by_phase.get(p)],
+        phases=phase_names,
         estimated_tools=len(micro_tasks),
     )
 

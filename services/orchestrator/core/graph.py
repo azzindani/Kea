@@ -434,7 +434,27 @@ async def researcher_node(state: GraphState) -> GraphState:
             t_inputs = task.get("inputs", {})
             t_id = task.get("task_id")
             
-            final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
+            # SMART CODE GENERATION INTERCEPTOR
+            if t_name in ["run_python", "execute_code", "parse_document"] and "code" not in t_inputs:
+                try:
+                    from services.orchestrator.agents.code_generator import generate_python_code
+                    ctx = get_context_pool()
+                    files = ctx.list_files()
+                    
+                    logger.info(f"   🤖 Generating Smart Code for '{t_desc}' (Context: {len(facts)} facts, {len(files)} files)")
+                    generated_code = await generate_python_code(t_desc, facts, file_artifacts=files)
+                    
+                    if generated_code:
+                        t_inputs["code"] = generated_code
+                        # Skip standard build_tool_inputs since we handled it
+                        final_inputs = t_inputs
+                    else:
+                        final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
+                except Exception as e:
+                    logger.warning(f"Smart Code Generation failed: {e}, falling back")
+                    final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
+            else:
+                final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
             
             # Handle input build failure (fallback immediately or skip)
             if final_inputs is None:
@@ -523,6 +543,17 @@ async def researcher_node(state: GraphState) -> GraphState:
                     )
                 except Exception as e:
                     logger.debug(f"DataPool storage skipped: {e}")
+
+                # ARTIFACT HARVESTING (NEW): Scan for file paths
+                import re
+                # Simple regex to find filenames with specific extensions
+                file_matches = re.findall(r'[\w\-\._\/]+\.(?:csv|parquet|xlsx|json)', content_text)
+                for fpath in file_matches:
+                    # Clean path
+                    fpath = fpath.strip()
+                    if len(fpath) > 4: # Min length
+                         ctx.store_file(t_id, fpath)
+                         logger.info(f"   📂 Harvested artifact: {fpath}")
                 
                 completed.add(t_id)
                 logger.info(f"   ✅ Task {t_id} completed via {calls[idx].tool_name}")

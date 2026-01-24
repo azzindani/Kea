@@ -41,6 +41,9 @@ TASK: {task_description}
 COLLECTED FACTS (from prior research):
 {facts_summary}
 
+AVAILABLE FILES (Artifacts in current path):
+{file_artifacts}
+
 AVAILABLE IN SANDBOX:
 - pd (pandas)
 - np (numpy)  
@@ -50,7 +53,7 @@ AVAILABLE IN SANDBOX:
 RULES:
 1. DO NOT use import statements (pd, np, duckdb already loaded)
 2. Generate ONLY executable Python code
-3. Use the ACTUAL data from the facts above
+3. Use the ACTUAL data from the facts above or FILES listed
 4. Print results in markdown table format
 5. Keep code under 30 lines
 
@@ -62,7 +65,7 @@ Generate Python code:
 async def generate_python_code(
     task_description: str,
     facts: list[dict],
-    context_summary: str = "",
+    file_artifacts: list[str] | None = None,
 ) -> str:
     """
     Use LLM to generate Python code based on task and collected facts.
@@ -70,7 +73,7 @@ async def generate_python_code(
     Args:
         task_description: What the code should accomplish
         facts: List of fact dicts from prior research tasks
-        context_summary: Summary of available context
+        file_artifacts: List of available file paths (CSV, Parquet, JSON)
         
     Returns:
         Executable Python code string (no imports)
@@ -94,10 +97,14 @@ async def generate_python_code(
         
         if not facts_summary:
             facts_summary = "(No facts collected yet - use sample data)"
+            
+        # Summarize files
+        files_str = "\n".join(f"- {f}" for f in (file_artifacts or [])) if file_artifacts else "(No files available)"
         
         prompt = CODE_PROMPT.format(
             task_description=task_description,
             facts_summary=facts_summary,
+            file_artifacts=files_str
         )
         
         provider = OpenRouterProvider(api_key=api_key)
