@@ -91,7 +91,7 @@ async def generate_python_code(
     
     try:
         from shared.llm.openrouter import OpenRouterProvider
-        from shared.llm.provider import LLMMessage, LLMConfig, MessageRole
+        from shared.llm.provider import LLMMessage, LLMConfig, LLMRole
         
         # Summarize facts for LLM
         facts_summary = ""
@@ -130,7 +130,7 @@ INSTRUCTION: Fix the code above to resolve the error. Ensure you handle the edge
         
         provider = OpenRouterProvider(api_key=api_key)
         response = await provider.complete(
-            messages=[LLMMessage(role=MessageRole.USER, content=prompt)],
+            messages=[LLMMessage(role=LLMRole.USER, content=prompt)],
             config=LLMConfig(
                 temperature=0.1,  # Lower temp for fixes
                 max_tokens=32768,
