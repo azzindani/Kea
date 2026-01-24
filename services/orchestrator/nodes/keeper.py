@@ -125,12 +125,15 @@ async def persist_facts(facts: list[dict], job_id: str) -> int:
                 continue
                 
             # Create AtomicFact from dict
+            # Create AtomicFact from dict
+            import uuid
             atomic_fact = AtomicFact(
+                fact_id=str(uuid.uuid4()),
                 entity=fact.get("source", "unknown"),
                 attribute="content",
                 value=fact.get("text", ""),
                 source_url=fact.get("url", ""),
-                confidence=1.0,
+                confidence_score=1.0,
             )
             
             # Persist to database
@@ -156,9 +159,9 @@ async def persist_tool_invocations(invocations: list[dict], job_id: str) -> int:
     persisted = 0
     
     try:
-        from services.vault.core.audit_trail import get_audit_client, AuditEventType
+        from services.vault.core.audit_trail import get_audit_trail, AuditEventType
         
-        client = get_audit_client()
+        client = get_audit_trail()
         
         for inv in invocations:
             await client.log(

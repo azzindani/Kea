@@ -240,7 +240,12 @@ async def researcher_node(state: GraphState) -> GraphState:
             spawner = get_spawner()
             
             # Convert micro_tasks to Spawner SubTasks
-            from services.orchestrator.core.agent_spawner import SubTask, SpawnPlan, TaskType, Domain
+            from services.orchestrator.core.agent_spawner import (
+                SubTask, SpawnPlan, TaskType, Domain
+            )
+            from services.orchestrator.core.prompt_factory import (
+                PromptFactory, PromptContext
+            )
             import uuid
             
             subtasks = []
@@ -252,10 +257,22 @@ async def researcher_node(state: GraphState) -> GraphState:
                     task_type=TaskType.RESEARCH,
                     preferred_tool=t.get("tool") # Pass context from Planner
                 ))
+            
+            # Generate prompts for each subtask (CRITICAL: without prompts, no agents run!)
+            prompt_factory = PromptFactory()
+            prompts = []
+            for subtask in subtasks:
+                context = PromptContext(
+                    query=subtask.query,
+                    domain=subtask.domain,
+                    task_type=subtask.task_type,
+                )
+                prompts.append(prompt_factory.generate(context))
                 
             plan = SpawnPlan(
                 task_id=state.get("job_id", "swarm"),
                 subtasks=subtasks,
+                prompts=prompts,  # Now agents will actually run
                 max_parallel=len(micro_tasks) # Go wild
             )
             
@@ -471,6 +488,77 @@ async def researcher_node(state: GraphState) -> GraphState:
         if tool_name in ["web_search", "news_search", "fetch_data"]:
             if "query" in original_inputs: return original_inputs
             return {"query": description, "max_results": 20}
+        
+        # DATA URL TOOLS (data_profiler, data_cleaner, feature_engineer, auto_ml)
+        if tool_name in ["data_profiler", "data_cleaner", "feature_engineer", "auto_ml"]:
+            if "data_url" in original_inputs: return original_inputs
+            
+            # Try to extract URL from description
+            url_from_desc = extract_url_from_text(description)
+            if url_from_desc:
+                return {"data_url": url_from_desc}
+            
+            # Try to get URL from context pool
+            next_url = ctx.get_url()
+            if next_url:
+                logger.info(f"   🔗 Chained data_url from pool to {tool_name}: {next_url}")
+                return {"data_url": next_url}
+            
+            # Fallback: Use description as a hint (may not work but avoids hard failure)
+            return {"data_url": f"data://{description[:100]}"}
+        
+        # TEXT CODING TOOL
+        if tool_name == "text_coding":
+            if "text" in original_inputs: return original_inputs
+            # Use collected facts as text source
+            if collected_facts:
+                texts = []
+                for fact in collected_facts[:10]:
+                    text = fact.get("text", "") if isinstance(fact, dict) else str(fact)
+                    texts.append(text)
+                combined = " ".join(texts)[:10000]
+                if combined.strip():
+                    return {"text": combined}
+            return {"text": description}
+        
+        # THEME EXTRACTOR - needs 'texts' (list)
+        if tool_name == "theme_extractor":
+            if "texts" in original_inputs: return original_inputs
+            if collected_facts:
+                texts_list = []
+                for fact in collected_facts[:20]:
+                    text = fact.get("text", "") if isinstance(fact, dict) else str(fact)
+                    if text.strip():
+                        texts_list.append(text[:2000])
+                if texts_list:
+                    return {"texts": texts_list}
+            return {"texts": [description]}
+        
+        # TRIANGULATION CHECK - needs 'claim'
+        if tool_name == "triangulation_check":
+            if "claim" in original_inputs: return original_inputs
+            # Use description as the claim to verify
+            return {"claim": description}
+        
+        # INVESTIGATION GRAPH - needs 'entity_type'
+        if tool_name == "investigation_graph_add":
+            if "entity_type" in original_inputs: return original_inputs
+            
+            # Try to detect entity type from description
+            desc_lower = description.lower()
+            entity_type = "UNKNOWN"
+            entity_name = extract_entity_from_desc(description)
+            
+            if any(word in desc_lower for word in ["company", "corp", "inc", "ltd", "business"]):
+                entity_type = "COMPANY"
+            elif any(word in desc_lower for word in ["person", "ceo", "founder", "director", "employee"]):
+                entity_type = "PERSON"
+            elif any(word in desc_lower for word in ["document", "filing", "report", "article"]):
+                entity_type = "DOCUMENT"
+            elif any(word in desc_lower for word in ["event", "meeting", "transaction", "deal"]):
+                entity_type = "EVENT"
+            
+            return {"entity_type": entity_type, "entity_name": entity_name}
             
         return original_inputs
 
@@ -703,6 +791,16 @@ async def researcher_node(state: GraphState) -> GraphState:
             reranker = get_reranker_provider()
             config = get_settings()
             
+            # GPU MEMORY SAFETY (User Request)
+            try:
+                import torch
+                import gc
+                gc.collect()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            except ImportError:
+                pass
+            
             # Extract text from facts for reranking
             fact_texts = [f.get("text", "")[:2000] for f in facts]
             
@@ -711,7 +809,18 @@ async def researcher_node(state: GraphState) -> GraphState:
             top_k = min(len(facts), config.reranker.per_task_top_k)
             
             logger.info(f"   🔄 Reranking {len(facts)} facts by relevance...")
-            results = await reranker.rerank(query, fact_texts, top_k=top_k)
+            try:
+                results = await reranker.rerank(query, fact_texts, top_k=top_k)
+            finally:
+                # Cleanup after heavy operation
+                try:
+                    import torch
+                    import gc
+                    gc.collect()
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                except: 
+                    pass
             
             # Reorder facts by reranker score
             reranked_facts = []
