@@ -286,7 +286,7 @@ async def researcher_node(state: GraphState) -> GraphState:
                     facts.append({
                         "text": str(res.result),  # No truncation
                         "query": f"Swarm Agent {res.agent_id}: {res.prompt_used}",  # No truncation
-                        "source": "fractal_swarm",
+                        "source": res.source if res.source else "fractal_swarm",
                         "task_id": res.subtask_id,
                         "persist": True
                     })

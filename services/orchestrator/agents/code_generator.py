@@ -144,65 +144,65 @@ def generate_fallback_code(task_description: str, facts: list[dict] | None = Non
     # Extract any data from facts if available (sanitized)
     data_str = ""
     if facts:
-        for fact in facts[:3]:
+        for fact in facts[:5]:
             text = sanitize_for_code(fact.get("text", ""))
-            if "company" in text.lower() or "ticker" in text.lower():
-                data_str += f"# Data from research:\n# {text[:200]}\n"
+            # Comment out facts to verify execution without relying on them blindly
+            data_str += f"# Context: {text[:200]}\n"
     
-    if any(kw in desc_lower for kw in ["filter", "market cap", "select", "candidates"]):
-        code = f'''{data_str}# {desc[:80]}
-# Using collected research data
-data = {{
-    'company': ['ASII', 'BBCA', 'TLKM', 'UNVR', 'BMRI'],
-    'market_cap_t': [2.5, 8.0, 3.2, 4.1, 6.5],
-    'pe_ratio': [8, 15, 9, 22, 7],
-    'yoy_growth': [25, 12, 18, 5, 30]
-}}
-df = pd.DataFrame(data)
-result = df[(df['market_cap_t'] < 5) & (df['pe_ratio'] < 10) & (df['yoy_growth'] > 20)]
-print(f"Found {{len(result)}} candidates from {{len(df)}} companies")
-print(result.to_markdown())
-'''
-        
-    elif any(kw in desc_lower for kw in ["dupont", "roe", "margin", "turnover"]):
-        code = f'''{data_str}# {desc[:80]}
-data = {{
-    'company': ['ASII', 'BBCA', 'TLKM'],
-    'net_income': [35, 45, 28],
-    'revenue': [280, 95, 150],
-    'assets': [350, 1200, 210],
-    'equity': [180, 220, 95],
-}}
-df = pd.DataFrame(data)
-df['net_margin'] = (df['net_income'] / df['revenue'] * 100).round(1)
-df['asset_turnover'] = (df['revenue'] / df['assets']).round(2)
-df['equity_mult'] = (df['assets'] / df['equity']).round(2)
-df['roe'] = (df['net_margin'] * df['asset_turnover'] * df['equity_mult'] / 100).round(1)
-print("DuPont Analysis:")
-print(df.to_markdown())
-'''
-        
-    elif any(kw in desc_lower for kw in ["growth", "revenue", "calculate"]):
-        code = f'''{data_str}# {desc[:80]}
-data = {{
-    'company': ['ASII', 'BBCA', 'TLKM'],
-    'revenue_2023': [280, 95, 150],
-    'revenue_2022': [220, 88, 135]
-}}
-df = pd.DataFrame(data)
-df['yoy_growth'] = ((df['revenue_2023'] - df['revenue_2022']) / df['revenue_2022'] * 100).round(1)
-print("Revenue Growth Analysis:")
-print(df.to_markdown())
-'''
+    # Generic wrapper for data processing
+    code = f'''{data_str}# Task: {desc[:80]}
+# WARNING: Live Logic Required.
+# This fallback code suggests ensuring data is available.
+
+import pandas as pd
+
+# Check if we have data inputs
+print("Analyzing request: {desc[:50]}...")
+
+try:
+    import yfinance as yf
+    print("Environment has yfinance. Attempting to fetch relevant data if needed.")
+    
+    # Simple heuristic to fetch data if tickers are mentioned in description
+    import re
+    tickers = re.findall(r'[A-Z]{{4}}(?:\.[A-Z]{{2}})?', "{desc}")
+    
+    if tickers:
+        print(f"Detected tickers: {{tickers}}")
+        data = []
+        for t in tickers:
+            try:
+                # Add exchange suffix if missing for generic context (assuming JK for Indonesian context of query)
+                if "." not in t and len(t) == 4:
+                    full_t = t + ".JK"
+                else:
+                    full_t = t
+                    
+                stock = yf.Ticker(full_t)
+                info = stock.info
+                if info and 'marketCap' in info:
+                    data.append({{
+                        "symbol": full_t,
+                        "market_cap": info.get("marketCap", 0),
+                        "pe_ratio": info.get("trailingPE", 0),
+                        "revenue": info.get("totalRevenue", 0),
+                        "name": info.get("longName", "Unknown")
+                    }})
+            except Exception:
+                pass
+                
+        if data:
+            df = pd.DataFrame(data)
+            print("Fetched Live Data:")
+            print(df.to_markdown())
+        else:
+            print("Could not fetch live data for detected tickers.")
     else:
-        code = f'''{data_str}# {desc[:80]}
-data = {{
-    'metric': ['Analysis 1', 'Analysis 2', 'Analysis 3'],
-    'status': ['Completed', 'In Progress', 'Pending']
-}}
-df = pd.DataFrame(data)
-print("Analysis Summary:")
-print(df.to_markdown())
+        print("No tickers detected in task description for auto-fetch.")
+
+except ImportError:
+    print("yfinance not available in this sandbox. Please use 'finance_server' tools to collect data first.")
+
+print("\\nNOTE: To prevent hallucinations, specific data retrieval tools should be used.")
 '''
-    
     return code

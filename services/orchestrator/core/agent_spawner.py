@@ -22,7 +22,7 @@ from services.orchestrator.core.prompt_factory import (
     Domain,
     TaskType,
 )
-from services.orchestrator.core.utils import build_tool_inputs
+from services.orchestrator.core.utils import build_tool_inputs, extract_url_from_text
 
 
 logger = get_logger(__name__)
@@ -61,6 +61,7 @@ class AgentResult:
     started_at: datetime | None = None
     completed_at: datetime | None = None
     prompt_used: str = ""
+    source: str | None = None
     
     @property
     def duration_seconds(self) -> float:
@@ -571,6 +572,10 @@ class AgentSpawner:
                         response = f"Exec failed: {e}"
 
             result.result = response
+            # Extract source metadata if available (provenance tracking)
+            if response:
+                result.source = extract_url_from_text(str(response))
+            
             result.status = AgentStatus.COMPLETED
             logger.info(f"✅ Agent {agent_id} completed.")
             

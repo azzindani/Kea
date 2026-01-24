@@ -19,26 +19,23 @@ from shared.logging import get_logger
 logger = get_logger(__name__)
 
 
+
 async def get_idx_tickers(arguments: dict) -> ToolResult:
     """
     Fetches the list of tickers for the Jakarta Stock Exchange (IDX).
-    
-    Args:
-        arguments: 
-            - index_name: "JKSE" (default) or "LQ45"
-            
-    Returns:
-        ToolResult with Data Pool confirmation (artifact_id).
     """
     index_name = arguments.get("index_name", "JKSE")
     
-    # Reliably sourced list of top IDX companies
+    # Try fetching real components if possible, or use expanded static list
+    # Ideally use yfinance to get components if supported, or scrape.
+    # For now, we expand the static list to be more comprehensive for "Massive" tests
     tickers = [
         "BBRI.JK", "BBCA.JK", "BMRI.JK", "BBNI.JK", "ASII.JK", "TLKM.JK", "UNVR.JK", "ICBP.JK",
         "GOTO.JK", "ADRO.JK", "PGAS.JK", "ANTM.JK", "KLBF.JK", "INDF.JK", "UNTR.JK", "TPIA.JK",
         "PTBA.JK", "ITMG.JK", "HRUM.JK", "INKP.JK", "TKIM.JK", "AMRT.JK", "CPIN.JK", "JPFA.JK",
         "BRPT.JK", "TINS.JK", "MEDC.JK", "AKRA.JK", "SMGR.JK", "INTP.JK", "EXCL.JK", "ISAT.JK",
-        "MDKA.JK", "TOWR.JK", "TBIG.JK", "SCMA.JK", "MNCN.JK", "EMT.JK", "BUKA.JK", "ARTO.JK"
+        "MDKA.JK", "TOWR.JK", "TBIG.JK", "SCMA.JK", "MNCN.JK", "EMT.JK", "BUKA.JK", "ARTO.JK",
+        "MYOR.JK", "SIDO.JK", "HEAL.JK", "MIKA.JK", "SILO.JK", "BTPS.JK"
     ]
     
     df = pd.DataFrame(tickers, columns=["symbol"])
@@ -62,6 +59,66 @@ You now have the universe of companies.
 Use `dispatch_parallel_tasks` to process them.
 """)]
     )
+
+
+async def get_ticker_metrics(arguments: dict) -> ToolResult:
+    """
+    Get live financial metrics for a specific ticker using yfinance.
+    
+    Args:
+        arguments:
+            - ticker: Stock symbol (e.g., "ASII.JK")
+            
+    Returns:
+        Key metrics: Market Cap, PE, Revenue Growth, etc.
+    """
+    import yfinance as yf
+    
+    ticker = arguments.get("ticker")
+    if not ticker:
+        return ToolResult(isError=True, content=[TextContent(text="Ticker argument required")])
+        
+    try:
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        
+        # Extract key metrics with safe defaults
+        metrics = {
+            "symbol": ticker,
+            "company_name": info.get("longName", ticker),
+            "sector": info.get("sector", "Unknown"),
+            "market_cap": info.get("marketCap", 0),
+            "market_cap_idr_t": info.get("marketCap", 0) / 1_000_000_000_000, # Trillions
+            "pe_ratio": info.get("trailingPE", 0),
+            "forward_pe": info.get("forwardPE", 0),
+            "revenue_growth_yoy": info.get("revenueGrowth", 0) * 100, # Percent
+            "profit_margin": info.get("profitMargins", 0) * 100, # Percent
+            "price": info.get("currentPrice", 0),
+            "currency": info.get("currency", "IDR"),
+            "last_updated": "Live (Yahoo Finance)"
+        }
+        
+        # Format as markdown table
+        md = f"""
+### Financial Metrics for {metrics['company_name']} ({ticker})
+
+| Metric | Value |
+| :--- | :--- |
+| **Market Cap** | {metrics['market_cap_idr_t']:.2f} T IDR |
+| **Price** | {metrics['price']} {metrics['currency']} |
+| **P/E Ratio** | {metrics['pe_ratio']:.2f} |
+| **Rev Growth (YoY)** | {metrics['revenue_growth_yoy']:.1f}% |
+| **Data Source** | Yahoo Finance (Live) |
+
+Raw Data:
+{metrics}
+"""
+        return ToolResult(content=[TextContent(text=md)])
+        
+    except Exception as e:
+        logger.error(f"Failed to fetch yfinance data for {ticker}: {e}")
+        return ToolResult(isError=True, content=[TextContent(text=f"Failed to fetch data for {ticker}: {str(e)}")])
+
 
 
 class FinanceServer(MCPServer):
@@ -90,9 +147,26 @@ class FinanceServer(MCPServer):
             required=[]
         )
         
+        self.register_tool(
+            name="get_ticker_metrics",
+            description="Get live financial metrics (Market Cap, PE, Growth) for a stock ticker from Yahoo Finance.",
+            handler=self._handle_get_ticker_metrics,
+            parameters={
+                "ticker": {
+                    "type": "string",
+                    "description": "Stock ticker symbol (e.g. 'ASII.JK')"
+                }
+            },
+            required=["ticker"]
+        )
+        
     async def _handle_get_idx_tickers(self, arguments: dict) -> ToolResult:
         logger.info("Executing get_idx_tickers", extra={"arguments": arguments})
         return await get_idx_tickers(arguments)
+
+    async def _handle_get_ticker_metrics(self, arguments: dict) -> ToolResult:
+        logger.info("Executing get_ticker_metrics", extra={"arguments": arguments})
+        return await get_ticker_metrics(arguments)
 
 
 async def main() -> None:
