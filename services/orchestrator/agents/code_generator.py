@@ -92,6 +92,7 @@ async def generate_python_code(
     try:
         from shared.llm.openrouter import OpenRouterProvider
         from shared.llm.provider import LLMMessage, LLMConfig, LLMRole
+        from shared.config import get_settings
         
         # Summarize facts for LLM
         facts_summary = ""
@@ -128,10 +129,12 @@ ERROR:
 INSTRUCTION: Fix the code above to resolve the error. Ensure you handle the edge case described in the error.
 """
         
+        settings = get_settings()
         provider = OpenRouterProvider(api_key=api_key)
         response = await provider.complete(
             messages=[LLMMessage(role=LLMRole.USER, content=prompt)],
             config=LLMConfig(
+                model=settings.models.generator_model,
                 temperature=0.1,  # Lower temp for fixes
                 max_tokens=32768,
             ),
