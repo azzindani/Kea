@@ -51,7 +51,7 @@ AVAILABLE IN SANDBOX:
 - Standard builtins (print, len, sum, etc.)
 
 RULES:
-1. DO NOT use import statements (pd, np, duckdb already loaded)
+1. DO NOT use import statements (pd, np, duckdb already loaded), EXCEPT `import yfinance as yf` (allowed if you need missing data).
 2. Generate ONLY executable Python code
 3. Use the ACTUAL data from the facts above or FILES listed
 4. Print results in markdown table format
