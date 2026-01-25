@@ -202,3 +202,123 @@ class NodeOutput(BaseModel):
 
     class Config:
         extra = "allow"
+
+
+# ============================================================================
+# Standard I/O for Tool Communication (n8n-style)
+# ============================================================================
+
+class FileType(str, Enum):
+    """Supported file types for tool I/O."""
+    CSV = "csv"
+    JSON = "json"
+    PARQUET = "parquet"
+    EXCEL = "xlsx"
+    PDF = "pdf"
+    IMAGE = "image"
+    TEXT = "text"
+    BINARY = "binary"
+    DATAFRAME = "dataframe"  # In-memory pandas DataFrame reference
+
+
+class FileReference(BaseModel):
+    """
+    Reference to a file that can be passed between tools.
+    Supports both local paths and in-memory data.
+    """
+    file_id: str = Field(description="Unique identifier for this file")
+    file_type: FileType = Field(description="Type of file content")
+    path: str | None = Field(default=None, description="Local file path if persisted")
+    url: str | None = Field(default=None, description="Remote URL if available")
+    content_preview: str | None = Field(default=None, description="First N chars for display")
+    size_bytes: int = Field(default=0, description="File size in bytes")
+    encoding: str = Field(default="utf-8", description="Text encoding")
+    
+    # For DataFrames - column info
+    columns: list[str] | None = Field(default=None, description="Column names for tabular data")
+    row_count: int | None = Field(default=None, description="Row count for tabular data")
+    
+    class Config:
+        extra = "allow"
+
+
+class DataPayload(BaseModel):
+    """
+    Structured data payload for tool I/O.
+    Replaces raw dict with typed structure.
+    """
+    data_type: str = Field(description="Type hint (e.g., 'list[dict]', 'dict', 'str')")
+    data: Any = Field(description="The actual data")
+    schema_hint: dict[str, Any] | None = Field(default=None, description="JSON Schema for validation")
+    
+    # Convenience fields for common types
+    is_list: bool = Field(default=False, description="True if data is a list")
+    item_count: int = Field(default=0, description="Number of items if list")
+
+
+class ToolOutput(BaseModel):
+    """
+    Comprehensive output from any MCP tool.
+    
+    Enables n8n-style data passing between tools:
+    - Text output for display
+    - Structured data for processing
+    - File references for large data
+    - Suggested next inputs for chaining
+    
+    Example:
+        # Tool A returns stock data
+        output = ToolOutput(
+            text="Found 800 tickers",
+            data=DataPayload(data_type="list[str]", data=tickers, is_list=True, item_count=800),
+            files=[FileReference(file_id="tickers.csv", file_type=FileType.CSV, path="/tmp/tickers.csv")],
+            next_input={"tool": "fetch_stock_data", "args": {"tickers": "$data"}}
+        )
+        
+        # Tool B can consume this directly
+        # The orchestrator substitutes $data with the actual data
+    """
+    # Primary text content (for LLM/display)
+    text: str | None = Field(default=None, description="Human-readable text output")
+    
+    # Structured data (for processing)
+    data: DataPayload | None = Field(default=None, description="Structured data payload")
+    
+    # File references (for large data)
+    files: list[FileReference] = Field(default_factory=list, description="File references")
+    
+    # Suggested next tool input (n8n-style chaining)
+    next_input: dict[str, Any] | None = Field(
+        default=None, 
+        description="Suggested input for next tool. Use $data, $files[0], etc. as placeholders"
+    )
+    
+    # Metadata
+    tool_name: str = Field(default="", description="Name of tool that produced this")
+    execution_time_ms: float = Field(default=0.0, description="Execution time in milliseconds")
+    success: bool = Field(default=True, description="Whether tool executed successfully")
+    error: str | None = Field(default=None, description="Error message if failed")
+    
+    def get_for_llm(self) -> str:
+        """Get text representation for LLM consumption."""
+        if self.text:
+            return self.text
+        if self.data:
+            # Summarize data
+            summary = f"Data: {self.data.data_type}"
+            if self.data.is_list:
+                summary += f" ({self.data.item_count} items)"
+            return summary
+        if self.files:
+            return f"Files: {[f.file_id for f in self.files]}"
+        return "(empty output)"
+    
+    def get_data_value(self) -> Any:
+        """Get the raw data value for tool chaining."""
+        if self.data:
+            return self.data.data
+        return None
+    
+    class Config:
+        extra = "allow"
+

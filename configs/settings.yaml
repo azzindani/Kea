@@ -107,6 +107,80 @@ mcp:
       enabled: true
       transport: "stdio"
       command: "uv run --with httpx --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.vision_server.server"
+    
+    # === Financial Data Servers ===
+    - name: "yfinance_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with yfinance --with pandas --with matplotlib --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.yfinance_server.server"
+    - name: "yahooquery_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with yahooquery --with pandas --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.yahooquery_server.server"
+    - name: "ccxt_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with ccxt --with pandas --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.ccxt_server.server"
+    - name: "tradingview_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with tradingview-ta --with pandas --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.tradingview_server.server"
+    
+    # === Technical Analysis Servers ===
+    - name: "pandas_ta_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with pandas-ta --with pandas --with numpy --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.pandas_ta_server.server"
+    - name: "finta_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with finta --with pandas --with numpy --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.finta_server.server"
+    - name: "mibian_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with mibian --with numpy --with scipy --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.mibian_server.server"
+    
+    # === Market Data Servers ===
+    - name: "finviz_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with finviz --with pandas --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.finviz_server.server"
+    - name: "pdr_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with pandas-datareader --with pandas --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.pdr_server.server"
+    - name: "wbgapi_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with wbgapi --with pandas --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.wbgapi_server.server"
+    
+    # === SEC/EDGAR Servers ===
+    - name: "sec_edgar_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with sec-edgar-downloader --with httpx --with beautifulsoup4 --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.sec_edgar_server.server"
+    - name: "python_edgar_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with python-edgar --with pandas --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.python_edgar_server.server"
+    
+    # === Specialized Servers ===
+    - name: "newspaper_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with newspaper3k --with lxml --with nltk --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.newspaper_server.server"
+    - name: "web3_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with web3 --with eth-abi --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.web3_server.server"
+    - name: "analysis_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with pandas --with numpy --with scipy --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.analysis_server.server"
+    - name: "filesystem_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.filesystem_server.server"
 
 # Research Configuration
 research:

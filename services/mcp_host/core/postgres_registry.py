@@ -169,8 +169,13 @@ class PostgresToolRegistry:
             except Exception as e:
                 logger.error(f"Registry embedding failed: {e}")
 
-    async def search_tools(self, query: str, limit: int = 15) -> List[Dict[str, Any]]:
-        """Semantic search for tools."""
+    async def search_tools(self, query: str, limit: int = 1000) -> List[Dict[str, Any]]:
+        """Semantic search for tools.
+        
+        Args:
+            query: Search query for tool discovery
+            limit: Max results (default 1000 for large tool registries)
+        """
         try:
             pool = await self._get_pool()
             query_emb = await self.embedder.embed_query(query)

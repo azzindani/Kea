@@ -5,7 +5,6 @@ Streams datasets from Hugging Face Hub and ingests them into the FactStore.
 """
 import asyncio
 from typing import AsyncGenerator, Any
-import logging
 
 from shared.schemas import AtomicFact
 from shared.logging import get_logger

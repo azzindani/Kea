@@ -163,12 +163,16 @@ def build_tool_inputs(tool_name: str, description: str, original_inputs: dict, c
         # Fallback to description
         return {"text": description}
 
-    # SEARCH TOOLS (default)
+    # SEARCH TOOLS (default) - Hardware-aware limits
     if tool_name in ["web_search", "news_search", "fetch_data"]:
-        args = {"query": description, "max_results": 20}
+        from shared.hardware.detector import detect_hardware
+        hw = detect_hardware()
+        default_limit = hw.optimal_search_limit()
+        
+        args = {"query": description, "max_results": default_limit}
         if "query" in original_inputs: 
             args = original_inputs.copy()
-            if "max_results" not in args: args["max_results"] = 20
+            if "max_results" not in args: args["max_results"] = default_limit
         
         # Pagination / Batch support
         # Detect "page X" or "batch X" or "offset X"
@@ -176,18 +180,19 @@ def build_tool_inputs(tool_name: str, description: str, original_inputs: dict, c
         if page_match:
             try:
                 page = int(page_match.group(1))
-                # Assuming 20 results per page
-                args["offset"] = (page - 1) * 20
-                args["count"] = 20 # Explicit count
+                # Assuming default_limit results per page
+                args["offset"] = (page - 1) * default_limit
+                args["count"] = default_limit # Explicit count
                 logger.info(f"   📄 Added pagination to {tool_name}: page {page} (offset {args['offset']})")
             except:
                 pass
                 
         # Detect "massive" or "10k" intent -> Maximize results
         if any(w in description.lower() for w in ["massive", "10k", "all", "comprehensive"]):
-             args["max_results"] = 50 # Increase limit per call
+             args["max_results"] = hw.optimal_max_results()  # Hardware-aware max
              
         return args
+
     
     # DATA URL TOOLS (data_profiler, data_cleaner, feature_engineer, auto_ml)
     if tool_name in ["data_profiler", "data_cleaner", "feature_engineer", "auto_ml"]:

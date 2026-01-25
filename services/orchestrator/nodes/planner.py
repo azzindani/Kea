@@ -86,11 +86,15 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
     try:
         import asyncio
         from services.rag_service.core.fact_store import FactStore
+        from shared.hardware.detector import detect_hardware
+        
         store = FactStore()
+        hw = detect_hardware()
+        fact_limit = hw.optimal_fact_limit()  # Hardware-aware limit
         
         # Search for related past research with timeout to avoid blocking
         related_facts = await asyncio.wait_for(
-            store.search(query, limit=5),
+            store.search(query, limit=fact_limit),
             timeout=5.0  # 5 second timeout to avoid blocking research
         )
         

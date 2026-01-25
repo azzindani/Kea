@@ -580,9 +580,10 @@ async def researcher_node(state: GraphState) -> GraphState:
                 final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
                 
                 if final_inputs is None:
-                    # Ultimate fallback to web_search
+                    # Ultimate fallback to web_search with hardware-aware limit
+                    from shared.hardware.detector import detect_hardware
                     t_name = "web_search"
-                    final_inputs = {"query": t_desc, "max_results": 10}
+                    final_inputs = {"query": t_desc, "max_results": detect_hardware().optimal_search_limit()}
             
             calls.append(ToolCall(tool_name=t_name, arguments=final_inputs))
             task_map[idx] = task
@@ -1101,7 +1102,8 @@ async def smart_fetch_data(args: dict) -> Any:
     
     wiki_url = "https://en.wikipedia.org/wiki/LQ45" # Default fallback
     try:
-        search_args = {"query": discovery_query, "max_results": 3}
+        from shared.hardware.detector import detect_hardware
+        search_args = {"query": discovery_query, "max_results": detect_hardware().optimal_search_limit()}
         # Use MCP Client for search
         mcp_client = get_mcp_orchestrator()
         search_results = await mcp_client.call_tool("web_search", search_args)

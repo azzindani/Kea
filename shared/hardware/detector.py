@@ -94,6 +94,36 @@ class HardwareProfile:
         """
         return max(20, self.optimal_workers() * 10)
     
+    def optimal_search_limit(self) -> int:
+        """Calculate optimal limit for web/API searches.
+        
+        Uses logarithmic scaling: 10 * log2(RAM + 1)
+        Range: ~10 (1GB) to ~100 (128GB)
+        """
+        import math
+        base = 10 * math.log2(max(1, self.ram_available_gb) + 1)
+        return max(10, min(100, int(base)))
+    
+    def optimal_tool_registry_limit(self) -> int:
+        """Calculate optimal limit for tool registry searches.
+        
+        Uses linear scaling: 300 * RAM (capped)
+        Range: 100 (minimal) to 10000 (32GB+)
+        """
+        limit = int(300 * self.ram_available_gb)
+        return max(100, min(10000, limit))
+    
+    def optimal_fact_limit(self) -> int:
+        """Calculate optimal limit for semantic fact search.
+        
+        Uses square root scaling: 40 * sqrt(RAM)
+        Range: ~20 (1GB) to ~500 (150GB)
+        """
+        import math
+        limit = int(40 * math.sqrt(max(1, self.ram_available_gb)))
+        return max(20, min(500, limit))
+
+    
     def vram_pressure(self) -> float:
         """Calculate VRAM pressure (0.0 = free, 1.0 = full).
         
