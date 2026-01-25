@@ -14,6 +14,8 @@ import dataclasses
 from shared.logging import get_logger
 from shared.mcp.client import MCPClient
 from shared.mcp.transport import SubprocessTransport
+from shared.config import get_settings
+
 
 logger = get_logger(__name__)
 
@@ -156,13 +158,33 @@ class SessionRegistry:
                      uv_path = potential_path
 
             # Check for explicit disable
-            if os.getenv("KEA_DISABLE_UV"):
+            # Check config for UV settings
+            settings = get_settings()
+            jit_config = settings.mcp.jit
+
+            if not jit_config.uv_enabled:
                 uv_path = None
+            elif jit_config.uv_path:
+                 # Use explicit path if configured
+                 uv_path = jit_config.uv_path
+            
+            # Determine CWD and if we are isolated
+            server_dir = config.script_path.parent
+            has_pyproject = (server_dir / "pyproject.toml").exists()
+            cwd = None # Default to inheriting current process CWD (Kea Root)
             
             if uv_path:
                 logger.info(f"⚡ Using UV for {server_name}")
-                # Use --frozen to prevent updates during runtime
-                cmd = [uv_path, "run", "python", str(config.script_path)]
+                
+                if has_pyproject:
+                    logger.info(f"   📦 Isolation Mode: Using pyproject.toml in {server_dir}")
+                    cwd = server_dir
+                    # Run relative to the server dir to ensure UV uses that project
+                    # "uv run python server.py"
+                    cmd = [uv_path, "run", "python", config.script_path.name]
+                else:
+                    # Legacy/Global Mode
+                    cmd = [uv_path, "run", "python", str(config.script_path)]
             else:
                 # Fallback to current interpreter
                 cmd = [sys.executable, str(config.script_path)]
@@ -172,6 +194,7 @@ class SessionRegistry:
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                cwd=cwd,
                 env=config.env
             )
             

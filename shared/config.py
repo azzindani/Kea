@@ -61,10 +61,22 @@ class MCPSettings(BaseModel):
     retry_on_timeout: bool = True
     retry_on_connection_error: bool = True
     
-    # Rate limiting
-    rate_limit_per_second: float = 10.0
     max_concurrent_tools: int = 5
     tool_timeout_seconds: float = 60.0
+    
+    # JIT Configuration
+    jit: JITSettings = Field(default_factory=lambda: JITSettings())
+
+
+class JITSettings(BaseModel):
+    """Just-In-Time Server Spawning Configuration."""
+    enabled: bool = True
+    uv_enabled: bool = True
+    uv_path: str | None = None
+    idle_timeout: float = 300.0  # 5 minutes
+    max_servers: int = 20
+    allowed_dirs: list[str] = Field(default_factory=list)  # Security whitelist (optional)
+
 
 
 class ResearchSettings(BaseModel):

@@ -1,0 +1,15 @@
+[project]
+name = "newspaper-server"
+version = "0.1.0"
+description = "Kea Newspaper3k Server"
+requires-python = ">=3.10"
+dependencies = [
+    "newspaper3k>=0.2.8",
+    "nltk>=3.8.1",
+    "lxml_html_clean>=0.1.0",
+    "requests>=2.31.0"
+]
+
+[tool.uv]
+# Optimization: Don't reinstall if cached
+dev-dependencies = []
