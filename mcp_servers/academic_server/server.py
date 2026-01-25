@@ -38,7 +38,7 @@ class AcademicServer(MCPServerBase):
                     type="object",
                     properties={
                         "query": {"type": "string", "description": "Search query"},
-                        "max_results": {"type": "integer", "description": "Maximum results (1-100)"},
+                        "max_results": {"type": "integer", "description": "Maximum results (1-100000)"},
                         "sort": {"type": "string", "description": "Sort: relevance, date"},
                         "min_date": {"type": "string", "description": "Min date YYYY/MM/DD"},
                         "max_date": {"type": "string", "description": "Max date YYYY/MM/DD"},
@@ -53,7 +53,7 @@ class AcademicServer(MCPServerBase):
                     type="object",
                     properties={
                         "query": {"type": "string", "description": "Search query"},
-                        "max_results": {"type": "integer", "description": "Maximum results (1-50)"},
+                        "max_results": {"type": "integer", "description": "Maximum results (1-100000)"},
                         "category": {"type": "string", "description": "Category: cs.AI, cs.LG, physics, math, etc."},
                         "sort_by": {"type": "string", "description": "Sort: relevance, lastUpdatedDate, submittedDate"},
                     },
@@ -67,7 +67,7 @@ class AcademicServer(MCPServerBase):
                     type="object",
                     properties={
                         "query": {"type": "string", "description": "Search query"},
-                        "max_results": {"type": "integer", "description": "Maximum results (1-100)"},
+                        "max_results": {"type": "integer", "description": "Maximum results (1-100000)"},
                         "year": {"type": "string", "description": "Year range: 2020-2024"},
                         "fields_of_study": {"type": "array", "description": "Fields: Computer Science, Medicine, etc."},
                     },
@@ -142,7 +142,7 @@ class AcademicServer(MCPServerBase):
         from xml.etree import ElementTree
         
         query = args["query"]
-        max_results = min(args.get("max_results", 10), 100)
+        max_results = min(args.get("max_results", 10), 100000)
         sort = args.get("sort", "relevance")
         min_date = args.get("min_date")
         max_date = args.get("max_date")
@@ -208,7 +208,7 @@ class AcademicServer(MCPServerBase):
         from xml.etree import ElementTree
         
         query = args["query"]
-        max_results = min(args.get("max_results", 10), 50)
+        max_results = min(args.get("max_results", 10), 100000)
         category = args.get("category")
         sort_by = args.get("sort_by", "relevance")
         
@@ -268,7 +268,7 @@ class AcademicServer(MCPServerBase):
         import httpx
         
         query = args["query"]
-        max_results = min(args.get("max_results", 10), 100)
+        max_results = min(args.get("max_results", 10), 100000)
         year = args.get("year")
         fields = args.get("fields_of_study")
         

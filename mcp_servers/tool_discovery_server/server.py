@@ -48,7 +48,7 @@ class ToolDiscoveryServer(MCPServerBase):
                     type="object",
                     properties={
                         "query": {"type": "string", "description": "Search query (e.g., 'data analysis', 'web scraping')"},
-                        "max_results": {"type": "integer", "description": "Maximum results (1-20)"},
+                        "max_results": {"type": "integer", "description": "Maximum results (1-1000)"},
                     },
                     required=["query"],
                 ),
@@ -60,7 +60,7 @@ class ToolDiscoveryServer(MCPServerBase):
                     type="object",
                     properties={
                         "query": {"type": "string", "description": "Search query"},
-                        "max_results": {"type": "integer", "description": "Maximum results (1-20)"},
+                        "max_results": {"type": "integer", "description": "Maximum results (1-1000)"},
                     },
                     required=["query"],
                 ),

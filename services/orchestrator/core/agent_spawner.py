@@ -662,8 +662,24 @@ class AgentSpawner:
                     
                     try:
                         session = await registry.get_session(server_name)
+                        # Generate REAL code instead of dummy
+                        from services.orchestrator.agents.code_generator import generate_python_code
+                        
+                        # Gather context for generator
+                        facts = []
+                        if context_results:
+                            for r in context_results:
+                                if r.result:
+                                    facts.append({"text": str(r.result)})
+                        
+                        # Autonomous generation
+                        code = await generate_python_code(
+                            task_description=subtask.query,
+                            facts=facts
+                        )
+                        
                         code_res = await session.call_tool(tool_name, {
-                            "code": f"# Solver for: {subtask.query}\nprint('Analyzing request...')\n# TODO: Implement full solver"
+                            "code": code
                         })
                         response = f"Execution Result: {str(code_res.content)}"
                     except Exception as e:
