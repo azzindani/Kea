@@ -103,3 +103,39 @@ async def get_arbitrage_spread(arguments: dict) -> ToolResult:
 {df[['exchange', 'bid', 'ask', 'last']].sort_values('ask').to_markdown(index=False)}
 """
     return ToolResult(content=[TextContent(text=output)])
+
+async def get_global_funding_spread(arguments: dict) -> ToolResult:
+    """
+    Compare Funding Rates across exchanges.
+    """
+    symbol = arguments.get("symbol", "BTC/USDT:USDT") # Be careful with unified symbols
+    exchanges_to_use = arguments.get("exchanges", ['binance', 'bybit', 'okx', 'gateio', 'bitget'])
+    
+    async def fetch_funding(ex_id):
+        try:
+            ex = await get_exchange_instance(ex_id)
+            if hasattr(ex, 'fetchFundingRate'):
+                # Note: Unified symbol matching is tricky for funding, usually needs :USDT suffix for some.
+                # Just try.
+                rate = await ex.fetch_funding_rate(symbol)
+                return {
+                    "exchange": ex_id,
+                    "fundingRate": rate['fundingRate'],
+                    "nextFundingTime": rate.get('nextFundingTime')
+                }
+            return {"exchange": ex_id, "error": "Not Supported"}
+        except Exception as e:
+            return {"exchange": ex_id, "error": str(e)}
+            
+    tasks = [fetch_funding(ex_id) for ex_id in exchanges_to_use]
+    results = await asyncio.gather(*tasks)
+    
+    valid = [r for r in results if "error" not in r]
+    
+    if not valid:
+         return ToolResult(content=[TextContent(text="No funding data found.")])
+         
+    df = pd.DataFrame(valid)
+    df = df.sort_values('fundingRate', ascending=False)
+    
+    return ToolResult(content=[TextContent(text=f"### Global Funding Rates: {symbol}\n\n{df.to_markdown()}")])
