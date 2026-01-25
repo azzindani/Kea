@@ -61,14 +61,32 @@ sequenceDiagram
 
 ### MCP Message Flow
 
+Kea uses a multi-tier communication pattern to ensure that the "Brain" (Orchestrator) remains decoupled from the "Hands" (MCP Servers).
+
+```mermaid
+sequenceDiagram
+    participant O as Orchestrator (The Brain)
+    participant H as MCP Host (The Registry)
+    participant S as MCP Server (The Tool)
+
+    O->>H: POST /tools/execute {name, args}
+    Note over H: Registry.get_session(name)
+    
+    alt Session Not Active (JIT)
+        H->>S: uv run server.py
+        S-->>H: JSON-RPC Ready
+    end
+    
+    H->>S: jsonrpc: "2.0", method: "tools/call", ...
+    S-->>H: { result: "..." }
+    H-->>O: { status: "success", content: "..." }
 ```
-┌─────────────────┐    JSON-RPC 2.0    ┌─────────────────┐
-│   Orchestrator  │ ←───────────────→  │   MCP Server    │
-│   (MCP Client)  │                    │   (Tool Host)   │
-└─────────────────┘                    └─────────────────┘
-        │                                      │
-...
-```
+
+| Component | MCP Role | Purpose | Communication |
+|:----------|:---------|:--------|:--------------|
+| **Orchestrator** | **User** | High-level planning and reasoning. | HTTP (Port 8001 -> 8002) |
+| **MCP Host** | **Host / Client** | Process lifecycle, JIT spawning, and RPC routing. | JSON-RPC 2.0 |
+| **MCP Server** | **Server** | Domain-specific tool logic (Python/Stdio). | Stdio (Raw JSON) |
 
 ## 🚀 Running the Services (Verified Config)
 
@@ -79,10 +97,10 @@ The easiest way to see Kea in action is to run the stress test, which spins up t
 
 ```bash
 # Windows (PowerShell)
-python tests/stress/stress_test.py --query=21 --concurrent
+python tests/stress/stress_test.py --query=1 --concurrent
 
 # Linux/Mac
-python tests/stress/stress_test.py --query=21 --concurrent
+python tests/stress/stress_test.py --query=1 --concurrent
 ```
 
 ### 2. Manual Start (Fractal Microservices)
@@ -124,6 +142,7 @@ python -m services.swarm_manager.main
 | **API Gateway** | `8000` | Public Entrypoint (Auth & Routing) |
 | **Orchestrator** | `8001` | Research & Reasoning Engine |
 | **MCP Host** | `8002` | Tool Execution Host |
+| **RAG Service** | `8003` | Knowledge & Fact Retrieval |
 | **Vault** | `8004` | Audit & Memory Storage |
 | **Swarm Manager** | `8005` | Compliance & Governance |
 | **Chronos** | `8006` | Scheduling & Time |
@@ -139,6 +158,7 @@ python -m services.swarm_manager.main
 | **Schema Validation** | JSON Schema ensures type-safe tool invocations |
 | **Progress Streaming** | Long-running tools report incremental progress |
 | **Resource Management** | MCP servers can be scaled independently |
+| **RAG-Driven Knowledge** | Automated ingestion of Hugging Face datasets into local memory |
 | **Hot Reload** | Add new tools without restarting orchestrator |
 
 ---
@@ -214,7 +234,7 @@ roles:
 ## 📁 Project Directory Structure
 
 ```
-kea/
+Kea/
 ├── 📁 services/                                # Microservices (The Core)
 │   │
 │   ├── 📁 orchestrator/                        # [BRAIN] Main Orchestrator (Reasoning & Planning)
@@ -252,7 +272,7 @@ kea/
 │       ├── service_registry.py                 # 🕸️ Service Discovery & Ports
 │       └── ...
 │
-├── 📁 mcp_servers/                             # [TOOLS] 17 MCP Tool Servers
+├── 📁 mcp_servers/                             # [TOOLS] 33 MCP Tool Servers
 │   ├── README.md                               # 📖 Tool Catalog
 │   ├── 📁 scraper_server/                      # 🕷️ Web scraping (fetch, browser, PDF)
 │   ├── 📁 python_server/                       # 🐍 Code execution (sandbox)
@@ -270,7 +290,23 @@ kea/
 │   ├── 📁 browser_agent_server/                # 🌐 Browser automation
 │   ├── 📁 security_server/                     # 🔒 Security scanning
 │   ├── 📁 visualization_server/                # 📉 Chart generation
-│   └── 📁 tool_discovery_server/               # 🔎 Dynamic tool discovery
+│   ├── 📁 tool_discovery_server/               # 🔎 Dynamic tool discovery
+│   ├── 📁 ccxt_server/                         # 💱 Crypto markets (CCXT)
+│   ├── 📁 finta_server/                        # 📈 Financial Technical Analysis (Finta)
+│   ├── 📁 finviz_server/                       # 📊 Stock screener (Finviz)
+│   ├── 📁 mibian_server/                       # 📉 Options pricing (Mibian)
+│   ├── 📁 newspaper_server/                    # 📰 News article extraction
+│   ├── 📁 pandas_ta_server/                    # 📊 Technical analysis (Pandas TA)
+│   ├── 📁 pdr_server/                          # 📡 Pandas Data Reader
+│   ├── 📁 python_edgar_server/                 # 🏢 SEC EDGAR data
+│   ├── 📁 sec_edgar_server/                    # 🏢 SEC EDGAR content/bulk
+│   ├── 📁 tradingview_server/                  # 👁️ TradingView analysis
+│   ├── 📁 wbgapi_server/                       # 🌐 World Bank data
+│   ├── 📁 web3_server/                         # 🔗 Blockchain/Web3
+│   ├── 📁 yahooquery_server/                   # 🏭 Yahoo Finance bulk
+│   ├── 📁 yfinance_server/                     # 📈 Yahoo Finance deep
+│   ├── 📁 filesystem_server/                   # 📂 Local file management
+│   └── 📁 ... (Additional utility servers)
 │
 ├── 📁 shared/                                  # [COMMON] Shared Utilities
 │   ├── README.md                               # 📖 Common Libs Doc
@@ -300,14 +336,14 @@ All core components implemented and functional:
 |:----------|:------:|:------------|
 | **Orchestrator** | ✅ | LangGraph state machine, research pipeline |
 | **RAG Service** | ✅ | External Knowledge Engine, Hugging Face ingestion |
-| **17 MCP Servers** | ✅ | Scraper, Python, Search, Vision, Analysis, + 12 more |
+| **33 MCP Servers** | ✅ | Scraper, Python, Search, Vision, Analysis, + 28 more |
 | **LLM Integration** | ✅ | OpenRouter, query classification, agent personas |
 | **Hardware Adaptation** | ✅ | Auto-detect CPU/RAM/GPU, graceful degradation |
 | **Agent System** | ✅ | Generator/Critic/Judge consensus, agent spawning |
 | **Conversational Memory** | ✅ | Intent detection (DEEPER/REVISE/NEW), context injection |
 | **Curiosity Engine** | ✅ | WHY questions, WHAT-IF scenarios |
-| **Audit Trail** | ✅ | SQLite logging, checkpointing |
-| **API Gateway** | ✅ | 8 route modules, JWT auth, rate limiting |
+| **Audit Trail** | ✅ | PostgreSQL logging, checkpointing |
+| **API Gateway** | ✅ | 12 route modules, JWT auth, rate limiting |
 | **Test Suite** | ✅ | Unit, integration, stress tests |
 
 ### Known Limitations
@@ -450,17 +486,25 @@ graph TD
         OrchAPI[FastAPI Endpoint]
         
         subgraph "LangGraph State Machine"
+            Router[Router Node]
             Planner[Planner Node]
             Researcher[Researcher Node]
             Keeper[Keeper Node]
+            Generator[Generator Node]
+            Critic[Critic Node]
+            Judge[Judge Node]
             Synthesizer[Synthesizer Node]
         end
         
-        OrchAPI --> Planner
+        OrchAPI --> Router
+        Router --> Planner
         Planner --> Researcher
         Researcher --> Keeper
-        Keeper --"Refine"--> Researcher
-        Keeper --"Approved"--> Synthesizer
+        Keeper --> Generator
+        Generator --> Critic
+        Critic --> Judge
+        Judge --"Refine"--> Researcher
+        Judge --"Approved"--> Synthesizer
     end
     
     %% -- EXECUTION LAYER (The Hands) --
@@ -534,13 +578,13 @@ graph TD
     style ChronosAPI fill:#fff8e1,stroke:#fbc02d
 ```
 
-### The 6 Core Services (Plus Gateway)
+### The 7 Core Services (Unified via Gateway)
 
 1. **API Gateway (Port 8000)**: The single entry point. Handles Auth, Rate Limiting, and routing to internal services.
-2. **Orchestrator (Port 8001)**: The "Brain". Runs the LangGraph state machine, plans research, and synthesizes results. It contains *zero* tool code.
-3. **MCP Host (Port 8002)**: The "Hands". Manages the 17 MCP tools, handles parallel execution, and maintains the Tool Registry.
-4. **Vault (Port 8004)**: The "Memory". Centralized storage for Vector Search (pgvector), SQL (Postgres), Audit Logs, and Graph Checkpoints.
-5. **RAG Service (Port 8003)**: The "Library". External Knowledge Engine for ingesting and searching Hugging Face datasets.
+2. **Orchestrator (Port 8001)**: The "Brain". Runs the LangGraph state machine, plans research, and synthesizes results.
+3. **MCP Host (Port 8002)**: The "Hands". Manages the 33 MCP tools, handles parallel execution, and maintains the Tool Registry.
+4. **RAG Service (Port 8003)**: The "Library". External Knowledge Engine for ingesting and searching Hugging Face datasets and atomic facts.
+5. **Vault (Port 8004)**: The "Memory". Centralized storage for Audit Logs, Graph Checkpoints, and sensitive credentials.
 6. **Swarm Manager (Port 8005)**: The "Conscience". Enforces ISO/SOC2 Compliance, runs the "Kill Switch", and supervises Agent Health.
 7. **Chronos (Port 8006)**: The "Timekeeper". Manages scheduled jobs and "Time-Travel" debugging.
 
@@ -684,7 +728,7 @@ Kea v3.0 introduces a hardware-aware parallel dispatcher that maximizes throughp
 | **Orchestrator** | **Python / LangGraph** | Cyclic state management and consensus loops. |
 | **API Interface** | **FastAPI** | Asynchronous microservice communication. |
 | **Analysis** | **Pandas / DuckDB** | In-memory SQL/Dataframe manipulation for "Shadow Lab". |
-| **Memory** | **PostgreSQL + pgvector** | Unified storage for Atomic Facts, Tool Registry, Embeddings, and Audit Logs. | |
+| **Memory** | **PostgreSQL + pgvector** | Unified storage for Atomic Facts, Tool Registry, Embeddings, and Audit Logs. |
 | **Storage** | **Parquet / S3** | Efficient storage of "Artifacts" (Raw DataFrames). |
 | **Isolation** | **Docker / E2B** | Sandboxed code execution environment. |
 | **Browser** | **Playwright** | Headless, stealthy web scraping with vision capabilities. |
@@ -876,7 +920,7 @@ Please see **[services/api_gateway/README.md](services/api_gateway/README.md)** 
 
 ### ✅ Completed (v1.0 - v3.0)
 - Microservice Architecture, LangGraph cyclic state machine
-- 16 MCP Servers, 12 API Routes, 3 Background Workers
+- 33 MCP Servers, 12 API Routes, 3 Background Workers
 - Hardware detection, graceful degradation, circuit breakers
 - JIT dependencies with `uv`, tool isolation
 - System Prompt Factory (7 domains, 8 task types)
@@ -892,12 +936,12 @@ Please see **[services/api_gateway/README.md](services/api_gateway/README.md)** 
 - **JIT Execution**: Implemented `uv` integration for on-demand dependency installation.
 
 ### ✅ Completed (v3.2)
-- **JIT Audit & Hardening**: Audited all 16 servers for dependency correctness.
+- **JIT Audit & Hardening**: Audited all 33 servers for dependency correctness.
 - **Robust Configuration**: `settings.yaml` now defines isolated `uv run` environments for every server.
 - **Self-Healing**: Automated browser installation and dependency injection.
 
 ### ✅ Completed (v3.3)
-- **Scalable Tool Discovery**: Implemented "Jarvis" Persistent Registry (SQLite + Qwen3-0.6B).
+- **Scalable Tool Discovery**: Implemented "Jarvis" Persistent Registry (PostgreSQL + pgvector).
 - **Planner Intelligence**: Upgraded "Tony Stark" prompt for improvisation and tool building.
 - **Incremental Sync**: Registry auto-updates by hashing schemas (Zero-Maintenance).
 

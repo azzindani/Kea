@@ -9,7 +9,7 @@ The **Vault Service** is the comprehensive data layer for Kea. It centralizes al
 The Vault aggregates three distinct types of storage behind a single API:
 
 1.  **Vector Store (Postgres + pgvector)**: Stores "Atomic Facts" for GraphRAG and semantic search.
-2.  **Relational DB (Postgres/SQLite)**: Stores Service State, Job History, and Checkpoints.
+2.  **Relational DB (Postgres)**: Stores Service State, Job History, and Checkpoints.
 3.  **Audit Trail (Immutable Log)**: Stores a sequential history of every Agent Action, Tool Call, and Compliance Decision.
 
 ```mermaid

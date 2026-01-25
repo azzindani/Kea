@@ -19,8 +19,8 @@ The Gateway implements a **4-Layer Defense-in-Depth Architecture**:
     *   **Route Dispatching**: 11 polymorphic route modules (Jobs, Graph, Memory, etc.) proxying to specialized upstream services.
     *   **Polymorphic Jobs**: The `/jobs` endpoint handles Research, Synthesis, and Calculation job types.
 4.  **Persistence Layer**:
-    *   **Event Bus**: Redis-backed message distribution.
-    *   **Unlogged Postgres State**: Used for high-frequency tracking (rate limits, session metrics) without WAL overhead.
+    *   **Event Bus**: Internal service-to-service communication hooks.
+    *   **Postgres State**: Used for high-frequency tracking (rate limits, session metrics).
 
 ```mermaid
 graph TD

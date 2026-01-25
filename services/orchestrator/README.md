@@ -46,14 +46,22 @@ graph TD
 
 ### 🧩 Domain-Specific Specialization
 - **Domain Registry**: Dynamically configures agent personas via `configs/prompts.yaml` (Finance, Legal, Research, etc.).
-- **Dynamic Capabilities**: Maps user keywords to the **MCP Host** registry via `tool_registry.yaml`, enabling the Planner to discover and use new servers without code changes.
+- **Dynamic Capabilities**: Discovers and uses tools via the **Persistent Tool Registry** (Postgres), enabling hot-swapping without code changes.
+
+```mermaid
+graph TD
+    User((User)) -->|Query| OrchAPI[Orchestrator API]
+    OrchAPI --> Router[Router Node]
+    Router --> Planner[Planner Node]
+    Planner --> Researcher[Researcher Node]
+    Researcher --> MCP[MCP Host]
     
     subgraph Audit Wire
         Researcher -.->|HTTP Post| Vault[Vault Service]
         Planner -.->|HTTP Post| Vault
     end
         
-    Keeper --"Sufficient"--> Generator[Generator Agent]
+    Researcher --"Sufficient Facts"--> Generator[Generator Agent]
     
     subgraph Consensus Engine
         Generator --> Critic[Critic Agent]

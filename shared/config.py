@@ -163,10 +163,6 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://localhost/research_engine"
     redis_url: str = "redis://localhost:6379"
     
-    # Vector DB
-    qdrant_url: str = "http://localhost:6333"
-    qdrant_api_key: str = ""
-    
     # Storage
     s3_bucket: str = "research-artifacts"
     s3_endpoint: str = ""

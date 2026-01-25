@@ -10,6 +10,7 @@ class ServiceName(str, Enum):
     GATEWAY = "gateway"
     ORCHESTRATOR = "orchestrator"
     MCP_HOST = "mcp_host"
+    RAG_SERVICE = "rag_service"
     VAULT = "vault"
     SWARM_MANAGER = "swarm_manager"
     CHRONOS = "chronos"
@@ -23,7 +24,8 @@ class ServiceRegistry:
     _DEFAULTS = {
         ServiceName.GATEWAY: "http://localhost:8000",
         ServiceName.ORCHESTRATOR: "http://localhost:8001",
-        ServiceName.MCP_HOST: "http://localhost:8003",
+        ServiceName.MCP_HOST: "http://localhost:8002",
+        ServiceName.RAG_SERVICE: "http://localhost:8003",
         ServiceName.VAULT: "http://localhost:8004",
         ServiceName.SWARM_MANAGER: "http://localhost:8005",
         ServiceName.CHRONOS: "http://localhost:8006",
@@ -47,7 +49,8 @@ class ServiceRegistry:
             defaults = {
                 ServiceName.GATEWAY: 8000,
                 ServiceName.ORCHESTRATOR: 8001,
-                ServiceName.MCP_HOST: 8003,
+                ServiceName.MCP_HOST: 8002,
+                ServiceName.RAG_SERVICE: 8003,
                 ServiceName.VAULT: 8004,
                 ServiceName.SWARM_MANAGER: 8005,
                 ServiceName.CHRONOS: 8006,

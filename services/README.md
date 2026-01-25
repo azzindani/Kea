@@ -10,7 +10,7 @@ Kea is built as a modular system of specialized microservices. This directory co
 | **MCP Host** | `mcp_host/` | **The Hands**. Manages tool execution, hardware governance (Supervisor), and JIT server spawning. | 🟢 Active |
 | **API Gateway** | `api_gateway/` | **The Mouth**. Exposes REST/WebSocket endpoints for clients. Handles auth and routing. | 🟢 Active |
 | **Vault** | `vault/` | **The Memory**. Secure storage for keys, audit logs, and sensitive session data. | 🟢 Active |
-| **RAG Service** | `rag_service/` | **The Knowledge**. Vector database integration (Qdrant) for long-term memory and document retrieval. | 🟢 Active |
+| **RAG Service** | `rag_service/` | **The Knowledge**. External Knowledge Engine for ingesting and searching Hugging Face datasets and atomic facts. | 🟢 Active |
 
 ## 🔗 Interaction Flow
 
@@ -22,7 +22,7 @@ Kea is built as a modular system of specialized microservices. This directory co
 6.  Result → `Orchestrator` (Synthesis) → `API Gateway` → **User**
 
 ## ⚙️ Configuration
-All services share unified configuration from `d:\Antigravity\Kea\configs\settings.yaml`.
+All services share unified configuration from `configs/settings.yaml`.
 - Models: `config.models.*`
 - Timeouts: `config.timeouts.*`
 - Governance: `config.governance.*`

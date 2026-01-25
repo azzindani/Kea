@@ -56,6 +56,65 @@ services:
       - orchestrator
       - rag-service
 
+  mcp-host:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: mcp-host
+    ports:
+      - "8002:8002"
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - DATABASE_URL=postgresql://user:password@postgres:5432/research_engine
+    depends_on:
+      - postgres
+    volumes:
+      - ./artifacts:/app/artifacts
+      - ./mcp_servers:/app/mcp_servers
+
+  vault:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: vault
+    ports:
+      - "8004:8004"
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - DATABASE_URL=postgresql://user:password@postgres:5432/research_engine
+    depends_on:
+      - postgres
+
+  swarm-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: swarm-manager
+    ports:
+      - "8005:8005"
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - DATABASE_URL=postgresql://user:password@postgres:5432/research_engine
+    depends_on:
+      - postgres
+
+  chronos:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: chronos
+    ports:
+      - "8006:8006"
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - DATABASE_URL=postgresql://user:password@postgres:5432/research_engine
+    depends_on:
+      - postgres
+
   # =========================================================================
   # Background Workers
   # =========================================================================

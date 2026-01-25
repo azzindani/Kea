@@ -30,7 +30,7 @@ graph TD
 
 1.  **Fault Isolation**: Each server runs in a separate OS process. A crash in the `scraper` does not affect the `python` sandbox.
 2.  **Stateless Execution**: Servers are largely stateless, receiving all necessary context in the JSON-RPC request.
-3.  **Unified Interface**: All 17+ servers follow the same MCP handshake and tool discovery protocol.
+3.  **Unified Interface**: All 32 servers follow the same MCP handshake and tool discovery protocol.
 
 ---
 
@@ -39,28 +39,52 @@ graph TD
 We categorize servers by their cognitive domain.
 
 ### 1. Core Execution & Retrieval
-| Server | Directory | Key Tools | Description |
-|:-------|:----------|:----------|:------------|
-| **Scraper** | `scraper_server/` | `fetch_url`, `pdf_extract` | Stealthy browsing and document extraction. |
-| **Search** | `search_server/` | `web_search`, `news_search` | Global information discovery via Tavily/Brave. |
-| **Python** | `python_server/` | `execute_code`, `sql_query` | Sandboxed computation and DB interaction. |
-| **Vision** | `vision_server/` | `read_image`, `analyze_chart` | Multimodal analysis of screenshots and plots. |
+| Server | Directory | Description |
+|:-------|:----------|:------------|
+| **Scraper** | `scraper_server/` | Stealthy browsing and document extraction. |
+| **Search** | `search_server/` | Global information discovery via Tavily/Brave. |
+| **Python** | `python_server/` | Sandboxed computation and DB interaction. |
+| **Vision** | `vision_server/` | Multimodal analysis of screenshots and plots. |
+| **Crawler** | `crawler_server/` | Targeted site crawling and indexing. |
+| **Browser** | `browser_agent_server/`| Specialized browser automation agent. |
+| **Newspaper** | `newspaper_server/` | Structured news article/metadata extraction. |
+| **Document** | `document_server/` | PDF and structured document parsing. |
+| **Filesystem**| `filesystem_server/` | Isolated local file management. |
+| **Analysis** | `analysis_server/` | Meta-analysis and trend detection. |
+| **Analytics** | `analytics_server/` | Exploratory Data Analysis (EDA) and profiling. |
 
-### 2. Analytics & Data Science
-| Server | Directory | Key Tools | Description |
-|:-------|:----------|:----------|:------------|
-| **Analytics** | `analytics_server/` | `calculate_stats`, `run_eda` | Descriptive and inferential statistics. |
-| **ML** | `ml_server/` | `train_model`, `predict` | Scikit-learn based trend prediction. |
-| **FinData** | `data_sources_server/`| `get_stock_price` | Real-time financial market data APIs. |
-| **Vis** | `visualization_server/`| `create_line_chart` | Generates interactive Plotly/MPL artifacts. |
+### 2. Quant & Market Analytics
+| Server | Directory | Description |
+|:-------|:----------|:------------|
+| **TradingView**| `tradingview_server/` | Consensus TA and market screening. |
+| **CCXT** | `ccxt_server/` | Unified crypto exchange data and trading. |
+| **Finta** | `finta_server/` | Financial Technical Analysis indicators. |
+| **Pandas TA** | `pandas_ta_server/` | High-perf TA for dataframe pipelines. |
+| **Mibian** | `mibian_server/` | Advanced options pricing models. |
+| **Finviz** | `finviz_server/` | Visual stock screening and heatmaps. |
+| **ML** | `ml_server/` | Machine learning training and inference. |
+| **Vis** | `visualization_server/`| Interactive Plotly/Table visualization. |
 
-### 3. Knowledge & Reasoning
-| Server | Directory | Key Tools | Description |
-|:-------|:----------|:----------|:------------|
-| **Academic** | `academic_server/` | `search_papers` | ArXiv and Semantic Scholar integration. |
-| **Regulatory**| `regulatory_server/` | `search_laws` | Access to government and legal databases. |
-| **Qualitative**| `qualitative_server/` | `analyze_sentiment` | NLP-based thematic and emotional analysis. |
-| **Discovery** | `tool_discovery_server/`| `list_tools` | Self-indexing and tool health monitoring. |
+### 3. Global Data & Economies
+| Server | Directory | Description |
+|:-------|:----------|:------------|
+| **WBGAPI** | `wbgapi_server/` | World Bank global development indicators. |
+| **YahooQuery** | `yahooquery_server/` | High-speed Yahoo Finance bulk retrieval. |
+| **yFinance** | `yfinance_server/` | Deep historical and fundamental data. |
+| **PDR** | `pdr_server/` | Remote data retrieval (Fred, Stlouis, etc). |
+| **SEC Edgar** | `sec_edgar_server/` | Bulk SEC filing downloads and parsing. |
+| **Py Edgar** | `python_edgar_server/` | Metadata-focused SEC research. |
+| **Data Src** | `data_sources_server/`| Unified external API gateway. |
+
+### 4. Knowledge, Logic & Web3
+| Server | Directory | Description |
+|:-------|:----------|:------------|
+| **Qualitative**| `qualitative_server/` | Forensics, mapping and thematic NLP. |
+| **Web3** | `web3_server/` | Blockchain RPC, DeFi, and Smart Contracts. |
+| **Regulatory**| `regulatory_server/` | Compliance tracking and legal research. |
+| **Academic** | `academic_server/` | ArXiv and Semantic Scholar search. |
+| **Security** | `security_server/` | URL scanning and code safety auditing. |
+| **Discovery** | `tool_discovery_server/`| Self-expansion and tool stub generation. |
 
 ---
 

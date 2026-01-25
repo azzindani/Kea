@@ -1,6 +1,6 @@
 # Application Settings
 app:
-  name: "research-engine"
+  name: "Kea Research Engine"
   version: "0.1.0"
   environment: "${ENVIRONMENT:development}"
 
