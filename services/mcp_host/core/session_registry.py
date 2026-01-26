@@ -237,27 +237,41 @@ class SessionRegistry:
         """
         Aggregates tools from ALL registered servers.
         Syncs them to Postgres for RAG.
+        Parallelized for faster startup.
         """
         all_tools_dict = []
         all_tools_objs = []
         
-        # Iterate over all KNOWN configs (spawning them if needed)
-        for name in self.server_configs.keys():
+        async def _fetch_server_tools(name: str):
             try:
                 session = await self.get_session(name)
-                tools = await session.list_tools()
-                
-                # Tag tools with their server source
-                for tool in tools:
-                    tool_dict = tool.model_dump()
-                    tool_dict['server'] = name
-                    all_tools_dict.append(tool_dict)
-                    
-                    self.tool_to_server[tool.name] = name
-                    all_tools_objs.append(tool)
-                    
+                return name, await session.list_tools()
             except Exception as e:
                 logger.warning(f"⚠️ Could not fetch tools from {name}: {e}")
+                return name, []
+
+        # Gather all tools concurrently
+        # Limit concurrency to 5 to avoid CPU/IO storm if starting fresh
+        # But for 'list_tools' calls on active sessions, it's fast.
+        # For fresh JIT spawns, we want some parallelism but not 50.
+        
+        semaphore = asyncio.Semaphore(5)
+        
+        async def _bounded_fetch(name):
+            async with semaphore:
+                return await _fetch_server_tools(name)
+
+        tasks = [_bounded_fetch(name) for name in self.server_configs.keys()]
+        results = await asyncio.gather(*tasks)
+        
+        for name, tools in results:
+             for tool in tools:
+                tool_dict = tool.model_dump()
+                tool_dict['server'] = name
+                all_tools_dict.append(tool_dict)
+                
+                self.tool_to_server[tool.name] = name
+                all_tools_objs.append(tool)
                 
         # Sync to RAG (Backgroundable, but fast enough for small sets)
         if self.pg_registry and all_tools_objs:

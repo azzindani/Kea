@@ -162,7 +162,7 @@ mcp:
     - name: "python_edgar_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with python-edgar --with pandas --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.python_edgar_server.server"
+      command: "uv run --with edgartools --with pandas --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.python_edgar_server.server"
     
     # === Specialized Servers ===
     - name: "newspaper_server"
