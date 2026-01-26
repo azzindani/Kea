@@ -212,7 +212,7 @@ class SessionRegistry:
             
             # Create Transport
             transport = SubprocessTransport(process)
-            client = MCPClient()
+            client = MCPClient(timeout=300.0)
             
             # Connect
             await client.connect(transport)
