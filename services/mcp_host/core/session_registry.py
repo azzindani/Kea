@@ -153,9 +153,15 @@ class SessionRegistry:
             
             # Fallback for Windows Conda environment if not found in PATH
             if not uv_path and os.name == 'nt':
-                 potential_path = r"C:\Users\422in\miniconda3\Scripts\uv.exe"
-                 if os.path.exists(potential_path):
-                     uv_path = potential_path
+                 user_home = os.path.expanduser("~")
+                 common_paths = [
+                     os.path.join(user_home, "miniconda3", "Scripts", "uv.exe"),
+                     os.path.join(user_home, "anaconda3", "Scripts", "uv.exe"),
+                 ]
+                 for potential_path in common_paths:
+                     if os.path.exists(potential_path):
+                         uv_path = potential_path
+                         break
 
             # Check for explicit disable
             # Check config for UV settings
