@@ -90,7 +90,7 @@ class AddFactRequest(BaseModel):
 class SearchRequest(BaseModel):
     """Search request."""
     query: str
-    limit: int = Field(default=10, ge=1, le=100)
+    limit: int = Field(default=10, ge=1, le=10000, description="Max results (up to 10000 for large-scale searches)")
     entity: str | None = None
     dataset_id: str | None = None
     min_confidence: float = Field(default=0.0, ge=0.0, le=1.0)

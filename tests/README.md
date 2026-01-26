@@ -87,3 +87,51 @@ If running integration tests, ensure your environment matches the **Service Regi
 | `-s` | Show `print()` output (useful for debugging LLM turns) |
 | `-k "keyword"` | Run tests matching a name pattern |
 | `--log-cli-level=INFO` | Show service logs in the terminal |
+
+---
+
+## 🔥 Stress Test Usage
+
+The stress test runner supports both **predefined queries** (by ID) and **custom query strings**.
+
+### Predefined Queries (by ID)
+```bash
+# Run predefined query #1 (Indonesian Alpha Hunt)
+python -m pytest tests/stress/stress_test.py --query=1 -v -s --log-cli-level=DEBUG
+
+# Run multiple predefined queries
+python -m pytest tests/stress/stress_test.py --query=1,2,3 -v -s
+
+# List all available predefined queries
+python tests/stress/stress_test.py --list
+```
+
+### Custom Query Strings
+```bash
+# Run with a custom research query
+python -m pytest tests/stress/stress_test.py --query="Analyze Apple stock performance Q4 2024" -v -s --log-cli-level=DEBUG
+
+# Another custom query example
+python -m pytest tests/stress/stress_test.py --query="What are the top 10 AI companies by market cap?" -v -s
+
+# Direct execution (without pytest)
+python tests/stress/stress_test.py --query="Compare Tesla vs BYD financials" -v
+```
+
+### Prerequisites
+Before running stress tests, ensure all services are running:
+```bash
+# Terminal 1: API Gateway
+python -m services.api_gateway.main
+
+# Terminal 2: Orchestrator  
+python -m services.orchestrator.main
+
+# Terminal 3: RAG Service
+python -m services.rag_service.main
+```
+
+### Output
+Results are saved to `tests/stress/results/` including:
+- `query_X_result.json` - Individual query metrics
+- `stress_test_report.json` - Overall test summary

@@ -6,11 +6,14 @@ Runs stress tests via API Gateway endpoints, properly exercising
 the full microservices stack with authentication.
 
 Usage:
-    # Via pytest (recommended)
+    # Via pytest with predefined query ID
     python -m pytest tests/stress/stress_test.py --query=1 -v -s --log-cli-level=DEBUG
     
-    # Direct execution
-    python tests/stress/stress_test.py --query=1 -v
+    # Via pytest with CUSTOM QUERY STRING
+    python -m pytest tests/stress/stress_test.py --query="Analyze Apple stock performance" -v -s --log-cli-level=DEBUG
+    
+    # Direct execution with custom query
+    python tests/stress/stress_test.py --query="What are the top 10 AI companies?" -v
     python tests/stress/stress_test.py --list
     
 Prerequisites:
@@ -81,7 +84,7 @@ def pytest_addoption(parser):
         "--query",
         action="store",
         default=None,
-        help="Query ID(s) to run, comma-separated (e.g., '1' or '1,2,3')",
+        help="Query ID(s) comma-separated (e.g., '1' or '1,2,3') OR a custom query string (e.g., 'Analyze AAPL stock')",
     )
     parser.addoption(
         "--output-dir",
@@ -437,10 +440,20 @@ def runner(request):
 
 @pytest.fixture
 def query_ids(request):
-    """Get query IDs from command line."""
+    """Get query IDs or custom query from command line.
+    
+    Returns list of either:
+    - int: predefined query ID
+    - str: custom query string
+    """
     query_arg = request.config.getoption("--query")
     if query_arg:
-        return [int(q.strip()) for q in query_arg.split(",")]
+        # Check if it looks like numeric ID(s)
+        if query_arg.replace(",", "").replace(" ", "").isdigit():
+            return [int(q.strip()) for q in query_arg.split(",")]
+        else:
+            # It's a custom query string
+            return [query_arg]  # Return as single-item list of string
     return [1]  # Default to Query 1 (Indonesian Alpha Hunt)
 
 
@@ -456,10 +469,23 @@ class TestStressQueries:
         Usage:
             pytest tests/stress/stress_test.py --query=1 -v -s --log-cli-level=DEBUG
         """
-        for query_id in query_ids:
-            query = get_query(query_id)
-            if query is None:
-                pytest.fail(f"Query {query_id} not found")
+        for query_item in query_ids:
+            # Handle both numeric IDs and custom query strings
+            if isinstance(query_item, int):
+                query = get_query(query_item)
+                if query is None:
+                    pytest.fail(f"Query {query_item} not found")
+                query_id = query_item
+            else:
+                # Custom query string - create ad-hoc StressQuery
+                query = StressQuery(
+                    id=0,
+                    name="Custom Query",
+                    prompt=query_item,
+                    expected_tool_iterations=100,
+                    expected_llm_calls=10,
+                )
+                query_id = "custom"
             
             logger.info(f"Running query {query_id}: {query.name}")
             
@@ -601,18 +627,35 @@ Prerequisites:
     
     if not args.query:
         print("Defaulting to Query 1")
-        query_ids = [1]
+        query_items = [1]
     else:
-        query_ids = [int(q.strip()) for q in args.query.split(",")]
+        # Check if it looks like numeric ID(s)
+        if args.query.replace(",", "").replace(" ", "").isdigit():
+            query_items = [int(q.strip()) for q in args.query.split(",")]
+        else:
+            # It's a custom query string
+            query_items = [args.query]
     
     runner = StressTestRunner(output_dir=args.output)
     
     try:
-        for qid in query_ids:
-            query = get_query(qid)
-            if query is None:
-                print(f"Error: Query {qid} not found")
-                sys.exit(1)
+        for query_item in query_items:
+            # Handle both numeric IDs and custom query strings
+            if isinstance(query_item, int):
+                query = get_query(query_item)
+                if query is None:
+                    print(f"Error: Query {query_item} not found")
+                    sys.exit(1)
+            else:
+                # Custom query string - create ad-hoc StressQuery
+                query = StressQuery(
+                    id=0,
+                    name="Custom Query",
+                    prompt=query_item,
+                    expected_tool_iterations=100,
+                    expected_llm_calls=10,
+                )
+                print(f"Running custom query: {query_item[:50]}...")
             
             if args.stream:
                 await runner.run_query_streaming(query)
