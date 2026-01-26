@@ -96,9 +96,9 @@ class SessionRegistry:
             script_path=script_path,
             env=env
         )
-        # Static Analysis: Discover tools without spawning
+        logger.info(f"✅ Registered JIT Server: {server_name}")
+        # Static Analysis: Discover tools without spawning (logs at DEBUG level)
         self._scan_tools_static(server_name, script_path)
-        logger.info(f"✅ Registered JIT Server Configuration: {server_name}")
 
     def _scan_tools_static(self, server_name: str, script_path: Path):
         """
@@ -173,7 +173,19 @@ class SessionRegistry:
             has_pyproject = (server_dir / "pyproject.toml").exists()
             cwd = None # Default to inheriting current process CWD (Kea Root)
             
-            if uv_path:
+            # Check if we have a pre-configured command in settings.yaml
+            configured_cmd = None
+            if settings.mcp and settings.mcp.servers:
+                for srv in settings.mcp.servers:
+                    if srv.name == server_name and srv.enabled and srv.command:
+                        import shlex
+                        configured_cmd = shlex.split(srv.command)
+                        logger.info(f"⚡ Using configured command for {server_name}")
+                        break
+
+            if configured_cmd:
+                cmd = configured_cmd
+            elif uv_path:
                 logger.info(f"⚡ Using UV for {server_name}")
                 
                 if has_pyproject:
