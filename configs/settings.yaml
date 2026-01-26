@@ -177,6 +177,66 @@ mcp:
       enabled: true
       transport: "stdio"
       command: "uv run --with pandas --with numpy --with scipy --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.analysis_server.server"
+    - name: "openpyxl_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with openpyxl --with pandas --with pillow --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.openpyxl_server.server"
+    - name: "pandas_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with pandas --with numpy --with pyarrow --with openpyxl --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.pandas_server.server"
+    - name: "playwright_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with playwright --with structlog --with python-dotenv python -m mcp_servers.playwright_server.server"
+    - name: "bs4_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with beautifulsoup4 --with lxml --with html5lib --with structlog --with python-dotenv python -m mcp_servers.bs4_server.server"
+    - name: "google_search_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with googlesearch-python --with beautifulsoup4 --with structlog --with python-dotenv python -m mcp_servers.google_search_server.server"
+    - name: "ddg_search_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with duckduckgo_search --with structlog --with python-dotenv python -m mcp_servers.ddg_search_server.server"
+    - name: "scipy_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with scipy --with numpy --with pandas --with structlog --with python-dotenv python -m mcp_servers.scipy_server.server"
+    - name: "numpy_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with numpy --with pandas --with structlog --with python-dotenv python -m mcp_servers.numpy_server.server"
+    - name: "statsmodels_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with statsmodels --with scipy --with numpy --with pandas --with structlog --with python-dotenv python -m mcp_servers.statsmodels_server.server"
+    - name: "networkx_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with networkx --with scipy --with numpy --with pandas --with structlog --with python-dotenv python -m mcp_servers.networkx_server.server"
+    - name: "sklearn_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with scikit-learn --with joblib --with threadpoolctl --with scipy --with numpy --with pandas --with structlog --with python-dotenv python -m mcp_servers.sklearn_server.server"
+    - name: "xgboost_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with xgboost --with scikit-learn --with joblib --with scipy --with numpy --with pandas --with structlog --with python-dotenv python -m mcp_servers.xgboost_server.server"
+    - name: "matplotlib_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with matplotlib --with seaborn --with scipy --with numpy --with pandas --with structlog --with python-dotenv python -m mcp_servers.matplotlib_server.server"
+    - name: "seaborn_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with seaborn --with matplotlib --with scipy --with numpy --with pandas --with structlog --with python-dotenv python -m mcp_servers.seaborn_server.server"
+    - name: "plotly_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with plotly --with kaleido --with scipy --with numpy --with pandas --with structlog --with python-dotenv python -m mcp_servers.plotly_server.server"
     - name: "filesystem_server"
       enabled: true
       transport: "stdio"
