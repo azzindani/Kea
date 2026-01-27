@@ -181,7 +181,7 @@ def generate_fallback_code(task_description: str, facts: list[dict] | None = Non
             data_str += f"# Context: {text[:200]}\n"
     
     # Generic wrapper for data processing
-    code = f'''{data_str}# Task: {desc[:80]}
+    code = rf'''{data_str}# Task: {desc[:80]}
 # WARNING: Live Logic Required.
 # This fallback code suggests ensuring data is available.
 
