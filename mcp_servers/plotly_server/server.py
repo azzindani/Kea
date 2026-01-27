@@ -1,7 +1,8 @@
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.plotly_server.tools import (
     basic_ops, distribution_ops, finance_ops, 
-    map_ops, hierarchical_ops, three_d_ops, super_ops
+    map_ops, hierarchical_ops, three_d_ops, super_ops,
+    animation_ops, parallel_ops, network_ops, polar_ops
 )
 import structlog
 from typing import List, Dict, Any, Optional, Union
@@ -79,7 +80,39 @@ async def plot_surface(z: List[List[float]], x: Optional[List[Any]] = None, y: O
 async def plot_mesh3d(data: DataInput, x: str, y: str, z: str, alphahull: int = 0, title: Optional[str] = None, format: str = 'png') -> str: return await three_d_ops.plot_mesh3d(data, x, y, z, alphahull, title, format)
 
 # ==========================================
-# 6. Super
+# 6. Animation
+# ==========================================
+@mcp.tool()
+async def plot_animated_scatter(data: DataInput, x: str, y: str, animation_frame: str, animation_group: Optional[str] = None, color: Optional[str] = None, size: Optional[str] = None, range_x: Optional[List[float]] = None, range_y: Optional[List[float]] = None, title: Optional[str] = None, format: str = 'png') -> str: return await animation_ops.plot_animated_scatter(data, x, y, animation_frame, animation_group, color, size, range_x, range_y, title, format)
+@mcp.tool()
+async def plot_animated_bar(data: DataInput, x: str, y: str, animation_frame: str, color: Optional[str] = None, range_y: Optional[List[float]] = None, title: Optional[str] = None, format: str = 'png') -> str: return await animation_ops.plot_animated_bar(data, x, y, animation_frame, color, range_y, title, format)
+@mcp.tool()
+async def plot_animated_choropleth(data: DataInput, locations: str, color: str, animation_frame: str, locationmode: str = 'ISO-3', title: Optional[str] = None, format: str = 'png') -> str: return await animation_ops.plot_animated_choropleth(data, locations, color, animation_frame, locationmode, title, format)
+
+# ==========================================
+# 7. Parallel & Network
+# ==========================================
+@mcp.tool()
+async def plot_parallel_coordinates(data: DataInput, dimensions: Optional[List[str]] = None, color: Optional[str] = None, title: Optional[str] = None, format: str = 'png') -> str: return await parallel_ops.plot_parallel_coordinates(data, dimensions, color, title, format)
+@mcp.tool()
+async def plot_parallel_categories(data: DataInput, dimensions: Optional[List[str]] = None, color: Optional[str] = None, title: Optional[str] = None, format: str = 'png') -> str: return await parallel_ops.plot_parallel_categories(data, dimensions, color, title, format)
+@mcp.tool()
+async def plot_sankey(labels: List[str], source: List[int], target: List[int], value: List[float], title: Optional[str] = None, format: str = 'png') -> str: return await network_ops.plot_sankey(labels, source, target, value, title, format)
+@mcp.tool()
+async def plot_table(header: List[str], cells: List[List[Any]], title: Optional[str] = None, format: str = 'png') -> str: return await network_ops.plot_table(header, cells, title, format)
+
+# ==========================================
+# 8. Polar
+# ==========================================
+@mcp.tool()
+async def plot_scatter_polar(data: DataInput, r: str, theta: str, color: Optional[str] = None, size: Optional[str] = None, title: Optional[str] = None, format: str = 'png') -> str: return await polar_ops.plot_scatter_polar(data, r, theta, color, size, title, format)
+@mcp.tool()
+async def plot_line_polar(data: DataInput, r: str, theta: str, color: Optional[str] = None, line_close: bool = True, title: Optional[str] = None, format: str = 'png') -> str: return await polar_ops.plot_line_polar(data, r, theta, color, line_close, title, format)
+@mcp.tool()
+async def plot_bar_polar(data: DataInput, r: str, theta: str, color: Optional[str] = None, title: Optional[str] = None, format: str = 'png') -> str: return await polar_ops.plot_bar_polar(data, r, theta, color, title, format)
+
+# ==========================================
+# 9. Super
 # ==========================================
 @mcp.tool()
 async def auto_plot(data: DataInput, x: str, y: Optional[str] = None, color: Optional[str] = None, format: str = 'png') -> str: return await super_ops.auto_plot(data, x, y, color, format)

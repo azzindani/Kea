@@ -163,6 +163,14 @@ mcp:
       enabled: true
       transport: "stdio"
       command: "uv run --with edgartools --with pandas --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.python_edgar_server.server"
+    - name: "pdfplumber_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with pdfplumber --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.pdfplumber_server.server"
+    - name: "docx_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with python-docx --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.docx_server.server"
     
     # === Specialized Servers ===
     - name: "newspaper_server"
@@ -241,6 +249,46 @@ mcp:
       enabled: true
       transport: "stdio"
       command: "uv run --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.filesystem_server.server"
+    - name: "portfolio_server"
+      enabled: true
+      transport: "stdio"
+      command: "python -m mcp_servers.portfolio_server.server"
+    - name: "quantstats_server"
+      enabled: true
+      transport: "stdio"
+      command: "python -m mcp_servers.quantstats_server.server"
+    - name: "spacy_server"
+      enabled: true
+      transport: "stdio"
+      command: "python -m mcp_servers.spacy_server.server"
+    - name: "rapidfuzz_server"
+      enabled: true
+      transport: "stdio"
+      command: "python -m mcp_servers.rapidfuzz_server.server"
+    - name: "textblob_server"
+      enabled: true
+      transport: "stdio"
+      command: "python -m mcp_servers.textblob_server.server"
+    - name: "shutil_server"
+      enabled: true
+      transport: "stdio"
+      command: "python -m mcp_servers.shutil_server.server"
+    - name: "zipfile_server"
+      enabled: true
+      transport: "stdio"
+      command: "python -m mcp_servers.zipfile_server.server"
+    - name: "ytdlp_server"
+      enabled: true
+      transport: "stdio"
+      command: "python -m mcp_servers.ytdlp_server.server"
+    - name: "ffmpeg_server"
+      enabled: true
+      transport: "stdio"
+      command: "python -m mcp_servers.ffmpeg_server.server"
+    - name: "geopy_server"
+      enabled: true
+      transport: "stdio"
+      command: "python -m mcp_servers.geopy_server.server"
 
 # Research Configuration
 research:
