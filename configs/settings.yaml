@@ -269,6 +269,22 @@ mcp:
       enabled: true
       transport: "stdio"
       command: "python -m mcp_servers.textblob_server.server"
+    - name: "xmltodict_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with xmltodict --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.xmltodict_server.server"
+    - name: "lxml_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with lxml --with cssselect --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.lxml_server.server"
+    - name: "html5lib_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with html5lib --with lxml --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.html5lib_server.server"
+    - name: "hashlib_server"
+      enabled: true
+      transport: "stdio"
+      command: "python -m mcp_servers.hashlib_server.server"
     - name: "shutil_server"
       enabled: true
       transport: "stdio"
@@ -289,6 +305,10 @@ mcp:
       enabled: true
       transport: "stdio"
       command: "python -m mcp_servers.geopy_server.server"
+    - name: "duckdb_server"
+      enabled: true
+      transport: "stdio"
+      command: "uv run --with duckdb --with pandas --with pyarrow --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.duckdb_server.server"
 
 # Research Configuration
 research:
