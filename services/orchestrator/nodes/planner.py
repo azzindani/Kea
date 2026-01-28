@@ -123,42 +123,58 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
                 max_tokens=32768,  # Maximum for task generation
             )
             
-            # Discover relevant tools (INTELLIGENCE INJECTION)
+            # Discover relevant tools (INTELLIGENCE INJECTION - RAG)
             try:
                 from services.mcp_host.core.session_registry import get_session_registry
                 registry = get_session_registry()
-                # Get all tools (Plan: Maybe in future use vector search here?)
-                # For now, listing all is safer for "Awareness"
                 
-                # Check if registry is populated, if not, might need a moment or just rely on what's there
-                # Since Planner is usually called AFTER host start, it should be fine.
-                # If running purely standalone without host, this might be empty.
-                
-                # We can't easily wait for async list_all_tools inside this sync/async boundary without blocking
-                # But planner_node is async.
-                
-                # NOTE: listing all tools on every request might be slow if many tools.
-                # Optimization: Cache this or use search_tools if implemented in SessionRegistry
-                # SessionRegistry doesn't have search_tools yet.
-                # Let's just peer into registry.tool_to_server which is instant RAM access
-                
-                if not registry.tool_to_server:
-                     # Try to list if empty (First run)
-                     # Use quiet timeout
-                     try:
-                        await asyncio.wait_for(registry.list_all_tools(), timeout=2.0)
-                     except asyncio.TimeoutError:
-                        pass
-                
-                known_tools = list(registry.tool_to_server.keys())
-                
+                # 1. Try High-Limit Semantic Search (RAG)
+                # This scales to 10k+ tools by finding only relevant ones
+                relevant_tools = []
+                try:
+                    # Search specifically for tools that match the query intention
+                    search_results = await asyncio.wait_for(
+                        registry.search_tools(query, limit=100), 
+                        timeout=3.0
+                    )
+                    
+                    if search_results:
+                        logger.info(f"Planner: RAG found {len(search_results)} relevant tools")
+                        # Format: "tool_name: description" for better LLM understanding
+                        relevant_tools = [
+                            f"{t.get('name', 'N/A')}: {t.get('description', '')[:100]}" 
+                            for t in search_results
+                        ]
+                except Exception as search_err:
+                    logger.warning(f"Planner RAG Search failed: {search_err}. Falling back to active list.")
+
+                # 2. Fallback: List Active/Cached Tools (Safety Net)
+                if not relevant_tools:
+                    if registry.tool_to_server:
+                        known_tools = list(registry.tool_to_server.keys())
+                        # If list is HUGE, we slice it to avoid context overflow (first 200)
+                        # Ideally, RAG should always work in prod
+                        relevant_tools = known_tools[:200]
+                        logger.info(f"Planner: Using fallback list of {len(relevant_tools)} tools")
+                    else:
+                        # 3. Last Resort: Try to force discovery once
+                        try:
+                            logger.info("Planner: Registry empty, forcing tool scan...")
+                            all_tools = await asyncio.wait_for(registry.list_all_tools(), timeout=5.0)
+                            relevant_tools = [t['name'] for t in all_tools][:200]
+                        except asyncio.TimeoutError:
+                             pass
+
                 # Format for LLM
-                tools_context = f"ACTIVE SYSTEM TOOLS ({len(known_tools)} available):\n"
-                tools_context += ", ".join(known_tools)
+                if relevant_tools:
+                    tools_context = f"RELEVANT TOOLS ({len(relevant_tools)} found):\n"
+                    tools_context += "\n".join(relevant_tools) if ":" in relevant_tools[0] else ", ".join(relevant_tools)
+                else:
+                    tools_context = "No specific tools found. Rely on 'web_search' and 'execute_code'."
                 
             except Exception as e:
-                logger.warning(f"Planner tool discovery failed: {e}")
-                tools_context = "Basic tools available (Discovery Failed)."
+                logger.warning(f"Planner tool discovery CRITICAL FAILURE: {e}")
+                tools_context = "Tool Discovery Unavailable."
 
             messages = [
                 LLMMessage(

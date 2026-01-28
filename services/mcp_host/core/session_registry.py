@@ -103,7 +103,9 @@ class SessionRegistry:
     def _scan_tools_static(self, server_name: str, script_path: Path):
         """
         Parse the server script statically to find tool definitions.
-        Looks for: self.register_tool(name="tool_name", ...)
+        Supports:
+        1. Legacy: self.register_tool(name="tool")
+        2. FastMCP: @mcp.tool() decorators
         """
         import ast
         try:
@@ -111,20 +113,41 @@ class SessionRegistry:
                 tree = ast.parse(f.read())
             
             for node in ast.walk(tree):
+                # 1. Legacy: self.register_tool(...)
                 if isinstance(node, ast.Call):
-                    # Check for self.register_tool(...)
                     if isinstance(node.func, ast.Attribute) and node.func.attr == "register_tool":
-                        # Extract 'name' argument
                         tool_name = None
                         for keyword in node.keywords:
                             if keyword.arg == "name" and isinstance(keyword.value, ast.Constant):
                                 tool_name = keyword.value.value
                                 break
-                        
                         if tool_name:
                             self.tool_to_server[tool_name] = server_name
                             logger.debug(f"   🔍 Discovered tool '{tool_name}' in {server_name}")
-                            
+
+                # 2. FastMCP: @mcp.tool() decorators on functions
+                elif isinstance(node, ast.FunctionDef):
+                    is_tool = False
+                    for decorator in node.decorator_list:
+                        # Case A: @mcp.tool() - Call
+                        if isinstance(decorator, ast.Call):
+                            func = decorator.func
+                            if isinstance(func, ast.Attribute) and func.attr == "tool":
+                                is_tool = True
+                            elif isinstance(func, ast.Name) and func.id == "tool":
+                                is_tool = True
+                        
+                        # Case B: @mcp.tool - Attribute/Name (rare but possible)
+                        elif isinstance(decorator, ast.Attribute) and decorator.attr == "tool":
+                            is_tool = True
+                        elif isinstance(decorator, ast.Name) and decorator.id == "tool":
+                            is_tool = True
+
+                    if is_tool:
+                        tool_name = node.name
+                        self.tool_to_server[tool_name] = server_name
+                        logger.debug(f"   🔍 Discovered FastMCP tool '{tool_name}' in {server_name}")
+
         except Exception as e:
             logger.warning(f"Static scan failed for {server_name}: {e}")
 

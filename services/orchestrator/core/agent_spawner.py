@@ -615,7 +615,9 @@ class AgentSpawner:
                                             logger.error("   🛑 Giving up on code generation.")
                             
                             else:
+                            else:
                                 # STANDARD TOOL EXECUTION (Non-Code)
+                                # 1. Try heuristic mapping first
                                 args = build_tool_inputs(
                                     tool_name=tool_name, 
                                     description=subtask.query, 
@@ -623,6 +625,51 @@ class AgentSpawner:
                                     collected_facts=collected_facts
                                 )
                                 
+                                # 2. DYNAMIC ARGUMENT GENERATION (The "Smart Hands" fix)
+                                # If heuristics failed (returned None or generic 'query') and it's complex tool
+                                # We MUST ask the LLM how to call it based on the schema.
+                                is_generic_arg = args is None or (len(args) == 1 and "query" in args)
+                                is_known_simple = tool_name in ["web_search", "news_search", "fetch_data"]
+                                
+                                if is_generic_arg and not is_known_simple:
+                                    try:
+                                        logger.info(f"   🔧 Fetching schema for complex tool: {tool_name}")
+                                        # Fetch schema from the live session
+                                        tools_list = await session.list_tools()
+                                        target_tool = next((t for t in tools_list if t.name == tool_name), None)
+                                        
+                                        if target_tool:
+                                            # Use LLM to map Task -> Arguments
+                                            schema_str = str(target_tool.inputSchema)
+                                            logger.info(f"   🧠 Mapping arguments using LLM for {tool_name}...")
+                                            
+                                            arg_prompt = f"""You are an API Argument Generator.
+Tool: {tool_name}
+Schema: {schema_str}
+Task: {subtask.query}
+
+Context Facts:
+{str(collected_facts)[:1000] if collected_facts else "None"}
+
+CRITICAL: Return ONLY valid JSON for the tool arguments. No markdown, no explanation."""
+                                            
+                                            arg_json = await self._call_llm(arg_prompt, "Generate JSON")
+                                            
+                                            # Clean and parse JSON
+                                            import json
+                                            cleaned_json = arg_json.replace("```json", "").replace("```", "").strip()
+                                            try:
+                                                args = json.loads(cleaned_json)
+                                                logger.info(f"   🎯 Generated Dynamic Args: {args}")
+                                            except:
+                                                logger.warning(f"   ⚠️ Failed to parse generated args: {cleaned_json[:50]}")
+                                                # Fallback to generic
+                                                if args is None: args = {"query": subtask.query}
+                                        else:
+                                            logger.warning(f"   ⚠️ Tool {tool_name} not found in session list.")
+                                    except Exception as map_err:
+                                        logger.warning(f"   ⚠️ Dynamic Argument Generation Failed: {map_err}")
+
                                 if args is None:
                                     args = {"query": subtask.query}
 
