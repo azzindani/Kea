@@ -37,8 +37,8 @@ async def lifespan(app: FastAPI):
     
     # Initialize Registry (Auto-Discovery)
     registry = get_session_registry()
-    await registry.list_all_tools() # Warmup
-    logger.info(f"Registry initialized with {len(registry.tool_to_server)} tools")
+    # await registry.list_all_tools() # DISABLED: Warmup causes hangs in threaded startup. Rely on JIT.
+    logger.info(f"Registry initialized (Lazy Mode)")
 
     # =========================================================================
     # Initialize Enterprise Subsystems
