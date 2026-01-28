@@ -190,8 +190,9 @@ async def start_research(request: ResearchRequest):
         )
         
     except Exception as e:
-        logger.error(f"Research job {job_id} failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        error_msg = str(e) or f"Unknown error ({type(e).__name__})"
+        logger.error(f"Research job {job_id} failed: {error_msg}", exc_info=True)
+        raise HTTPException(status_code=500, detail=error_msg)
 
 
 @app.post("/tools/{tool_name}")
