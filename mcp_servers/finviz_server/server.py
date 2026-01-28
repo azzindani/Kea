@@ -1,174 +1,178 @@
+from mcp.server.fastmcp import FastMCP
+from mcp_servers.finviz_server.tools import (
+    screener, quote, groups, insider, global_markets, calendar_news,
+    strategy, charts, financials, bulk_ta
+)
+import structlog
 
-from __future__ import annotations
-import asyncio
-from shared.mcp.server_base import MCPServer
-from shared.mcp.protocol import ToolResult, TextContent
-from shared.logging import get_logger
+logger = structlog.get_logger()
 
-# Tools
-from mcp_servers.finviz_server.tools.screener import get_screener_signal, get_signal_map
-from mcp_servers.finviz_server.tools.quote import get_stock_depth
-from mcp_servers.finviz_server.tools.groups import get_group_data
-from mcp_servers.finviz_server.tools.insider import get_insider_market
+# Create the FastMCP server
+mcp = FastMCP("finviz_server", dependencies=["finvizfinance", "pandas"])
 
-logger = get_logger(__name__)
-
-class FinvizServer(MCPServer):
+# --- 1. SCREENER TOOLS ---
+@mcp.tool()
+async def screen_signal(signal: str, limit: int = 100000) -> str:
     """
-    Finviz MCP Server.
-    Focus: Screening, Signals, and Visual Sentiment.
+    SIGNAL: Get stocks matching a specific Finviz Signal.
+    signal: 'top_gainers', 'new_highs', 'major_news', etc.
     """
-    
-    def __init__(self) -> None:
-        super().__init__(name="finviz_server", version="1.0.0")
-        self._register_tools()
-        
-    def _register_tools(self) -> None:
-        
-        # --- 1. SCREENER TOOLS (Dynamic Unrolling of Signals) ---
-        # 27+ Tools
-        
-        SIGNALS = get_signal_map()
-        
-        for key, nice_name in SIGNALS.items():
-            name = f"screen_{key}"
-            desc = f"SIGNAL: Get stocks matching '{nice_name}'."
-            
-            async def scr_handler(args: dict, k=key) -> ToolResult:
-                args["signal"] = k
-                return await get_screener_signal(args)
-                
-            self.register_tool(
-                name=name, description=desc, handler=scr_handler,
-                parameters={"limit": {"type": "integer", "description": "Max results (default 30)"}}
-            )
+    return await screener.get_screener_signal(limit, signal)
 
-        # --- 2. QUOTE TOOLS (Ticker Depth) ---
-        # 5 Tools
-        
-        modes = [
-            ("description", "Get company description."),
-            ("ratings", "Get analyst ratings (Upgrades/Downgrades)."),
-            ("news", "Get latest news headlines for ticker."),
-            ("insider", "Get insider trading for this ticker."),
-            ("fundament", "Get fundamental ratios (P/E, EPS, etc).")
-        ]
-        
-        for m, d in modes:
-            name = f"get_stock_{m}"
-            desc = f"QUOTE: {d}"
-            
-            async def q_handler(args: dict, mode=m) -> ToolResult:
-                return await get_stock_depth(args, mode)
-                
-            self.register_tool(
-                name=name, description=desc, handler=q_handler,
-                parameters={"ticker": {"type": "string"}}, required=["ticker"]
-            )
+# Register Shortcuts for Popular Signals
+SIGNALS = screener.get_signal_map()
+# In FastMCP, we can't loop to create decorators dynamically easily at top level 
+# without some wrapper logic.
+# But we can define a generic 'screen_generic' above.
+# To maintain 50+ tool count parity with legacy, we might want manual shortcuts?
+# Or just rely on the 'screen_signal' tool which is cleaner.
+# "Tools matching 'nice_name'"...
+# Legacy server registered 'screen_top_gainers', 'screen_new_highs', etc.
+# If we want to preserve that UX, we need to create them.
 
-        # --- 3. GROUPS TOOLS (Market Map) ---
-        # 3 major modes x 3 groups = 9 Tools
-        
-        groups = ["Sector", "Industry", "Country"]
-        views = ["overview", "valuation", "performance"]
-        
-        for g in groups:
-            for v in views:
-                name = f"get_{g.lower()}_{v}"
-                desc = f"GROUP: Get {g} {v} table."
-                
-                async def g_handler(args: dict, grp=g, view=v) -> ToolResult:
-                    args["group_by"] = grp
-                    return await get_group_data(args, view)
-                    
-                self.register_tool(name=name, description=desc, handler=g_handler)
+# Let's create a few high-value shortcuts manually, effectively.
+# Or just one 'screen_stocks_by_signal'.
+# The legacy approach of expanding 27+ separate tools is bloat.
+# Better: One Powerful Tool with Enum/Description?
+# FastMCP handles Enums well.
+# But for now, let's just stick to the generic one, OR replicate a few major ones.
 
-        # --- 4. INSIDER TOOLS (Market Flow) ---
-        # 6 Tools
-        
-        insider_opts = [
-            "latest_buys", "latest_sales", 
-            "top_week_buys", "top_week_sales",
-            "top_owner_buys", "top_owner_sales"
-        ]
-        
-        for opt in insider_opts:
-            name = f"get_{opt}"
-            desc = f"INSIDER: Get {opt.replace('_', ' ')}."
-            
-            async def i_handler(args: dict, o=opt) -> ToolResult:
-                args["subset"] = o
-                return await get_insider_market(args)
-            
-            self.register_tool(name=name, description=desc, handler=i_handler)
+@mcp.tool()
+async def screen_top_gainers(limit: int = 100000) -> str:
+    """SIGNAL: Top Gainers."""
+    return await screener.get_screener_signal(limit, "top_gainers")
 
-        # --- 5. PHASE 2: GLOBAL MARKETS ---
-        
-        from mcp_servers.finviz_server.tools.global_markets import get_global_performance
-        
-        self.register_tool(
-            name="get_forex_performance", description="GLOBAL: Get Forex performance table.",
-            handler=lambda args: get_global_performance(args, "forex")
-        )
-        self.register_tool(
-            name="get_crypto_performance", description="GLOBAL: Get Crypto performance table.",
-            handler=lambda args: get_global_performance(args, "crypto")
-        )
+@mcp.tool()
+async def screen_top_losers(limit: int = 100000) -> str:
+    """SIGNAL: Top Losers."""
+    return await screener.get_screener_signal(limit, "top_losers")
 
-        # --- 6. PHASE 2: CALENDAR & NEWS ---
-        
-        from mcp_servers.finviz_server.tools.calendar_news import get_earnings_calendar, get_market_news
-        
-        self.register_tool(
-            name="get_earnings_calendar", description="CALENDAR: Get Earnings for 'This Week', 'Next Week', etc.",
-            handler=get_earnings_calendar, parameters={"period": {"type": "string"}}
-        )
-        
-        self.register_tool(
-            name="get_market_news", description="NEWS: Get General Market News or Blogs.",
-            handler=get_market_news, parameters={"mode": {"type": "string"}}
-        )
+@mcp.tool()
+async def screen_new_highs(limit: int = 100000) -> str:
+    """SIGNAL: New Highs."""
+    return await screener.get_screener_signal(limit, "new_highs")
 
-        # --- 7. PHASE 2: STRATEGY PRESETS ---
-        
-        from mcp_servers.finviz_server.tools.strategy import get_strategy_screen, PRESETS
-        
-        for strat in PRESETS:
-            name = f"screen_strat_{strat}"
-            desc = f"STRATEGY: Screen for '{strat.replace('_', ' ').title()}'."
-            
-            async def s_handler(args: dict, s=strat) -> ToolResult:
-                args["strategy"] = s
-                return await get_strategy_screen(args)
-                
-            self.register_tool(name=name, description=desc, handler=s_handler)
+@mcp.tool()
+async def screen_major_news(limit: int = 100000) -> str:
+    """SIGNAL: Major News."""
+    return await screener.get_screener_signal(limit, "major_news")
 
-        # --- 8. PHASE 3: DEEP EXPANSION (Charts, Financials, TA) ---
-        
-        from mcp_servers.finviz_server.tools.charts import get_chart_url
-        from mcp_servers.finviz_server.tools.financials import get_finviz_statement
-        from mcp_servers.finviz_server.tools.bulk_ta import get_technical_table
-        
-        self.register_tool(
-            name="get_chart_url", description="CHART: Get Finviz Chart image URL.",
-            handler=get_chart_url, parameters={"ticker": {"type": "string"}}
-        )
-        
-        self.register_tool(
-            name="get_finviz_statement", description="FINANCIALS: Get Income/Balance/Cash Flow table.",
-            handler=get_finviz_statement, parameters={"ticker": {"type": "string"}, "statement": {"type": "string"}}
-        )
-        
-        self.register_tool(
-            name="get_technical_table", description="TA: Get Bulk Technical Indicators (RSI, SMA, ATR).",
-            handler=get_technical_table, parameters={"limit": {"type": "integer"}}
-        )
+@mcp.tool()
+async def screen_insider_buying(limit: int = 100000) -> str:
+    """SIGNAL: Insider Buying."""
+    return await screener.get_screener_signal(limit, "insider_buying")
 
-async def main():
-    from shared.logging import setup_logging, LogConfig
-    setup_logging(LogConfig(level="DEBUG", format="console", service_name="finviz_server"))
-    server = FinvizServer()
-    await server.run()
+# --- 2. QUOTE TOOLS ---
+@mcp.tool()
+async def get_company_description(ticker: str) -> str:
+    """QUOTE: Get company description."""
+    return await quote.get_stock_depth(ticker, "description")
+
+@mcp.tool()
+async def get_analyst_ratings(ticker: str) -> str:
+    """QUOTE: Get analyst ratings."""
+    return await quote.get_stock_depth(ticker, "ratings")
+
+@mcp.tool()
+async def get_stock_news(ticker: str) -> str:
+    """QUOTE: Get latest news headlines for ticker."""
+    return await quote.get_stock_depth(ticker, "news")
+
+@mcp.tool()
+async def get_insider_trading(ticker: str) -> str:
+    """QUOTE: Get insider trading for this ticker."""
+    return await quote.get_stock_depth(ticker, "insider")
+
+@mcp.tool()
+async def get_fundamental_ratios(ticker: str) -> str:
+    """QUOTE: Get fundamental ratios (P/E, EPS, etc)."""
+    return await quote.get_stock_depth(ticker, "fundament")
+
+# --- 3. GROUPS ---
+@mcp.tool()
+async def get_sector_performance() -> str:
+    """GROUP: Sector Performance."""
+    return await groups.get_group_data("performance", "Sector")
+
+@mcp.tool()
+async def get_sector_valuation() -> str:
+    """GROUP: Sector Valuation."""
+    return await groups.get_group_data("valuation", "Sector")
+
+@mcp.tool()
+async def get_industry_performance() -> str:
+    """GROUP: Industry Performance."""
+    return await groups.get_group_data("performance", "Industry")
+
+@mcp.tool()
+async def get_country_performance() -> str:
+    """GROUP: Country Performance."""
+    return await groups.get_group_data("performance", "Country")
+
+# --- 4. INSIDER MARKET ---
+@mcp.tool()
+async def get_latest_insider_buys() -> str:
+    """INSIDER: Latest Buys."""
+    return await insider.get_insider_market("latest_buys")
+
+@mcp.tool()
+async def get_latest_insider_sales() -> str:
+    """INSIDER: Latest Sales."""
+    return await insider.get_insider_market("latest_sales")
+
+@mcp.tool()
+async def get_top_insider_buys_week() -> str:
+    """INSIDER: Top Week Buys."""
+    return await insider.get_insider_market("top_week_buys")
+
+# --- 5. GLOBAL ---
+@mcp.tool()
+async def get_forex_performance() -> str:
+    """GLOBAL: Get Forex performance table."""
+    return await global_markets.get_global_performance("forex")
+
+@mcp.tool()
+async def get_crypto_performance() -> str:
+    """GLOBAL: Get Crypto performance table."""
+    return await global_markets.get_global_performance("crypto")
+
+# --- 6. CALENDAR ---
+@mcp.tool()
+async def get_earnings_calendar(period: str = "This Week") -> str:
+    """CALENDAR: Get Earnings for 'This Week', 'Next Week', etc."""
+    return await calendar_news.get_earnings_calendar(period)
+
+@mcp.tool()
+async def get_market_news_feed(mode: str = "news") -> str:
+    """NEWS: Get General Market News or Blogs."""
+    return await calendar_news.get_market_news(mode)
+
+# --- 7. STRATEGY ---
+@mcp.tool()
+async def screen_strategy(strategy: str, limit: int = 100000) -> str:
+    """
+    STRATEGY: Run a preset strategy screen.
+    strategies: 'value_stocks', 'growth_stocks', 'high_yield_dividend', 
+                'oversold_bounce', 'new_highs_volume', 'short_squeeze_candidate',
+                'undervalued_growth', 'penny_stock_volume'.
+    """
+    return await strategy.get_strategy_screen(limit, strategy)
+
+# --- 8. ADVANCED ---
+@mcp.tool()
+async def get_chart_url(ticker: str, timeframe: str = "daily", type: str = "candle") -> str:
+    """CHART: Get Finviz Chart image URL."""
+    return await charts.get_chart_url(ticker, timeframe, type)
+
+@mcp.tool()
+async def get_finviz_statement(ticker: str, statement: str = "I", timeframe: str = "A") -> str:
+    """FINANCIALS: Get Income(I)/Balance(B)/Cash(C) Flow table."""
+    return await financials.get_finviz_statement(ticker, statement, timeframe)
+
+@mcp.tool()
+async def get_technical_table(limit: int = 100000, signal: str = "") -> str:
+    """TA: Get Bulk Technical Indicators (RSI, SMA, ATR)."""
+    return await bulk_ta.get_technical_table(limit, signal)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    mcp.run()

@@ -1,13 +1,14 @@
 
 import pandas_datareader.data as web
-from shared.mcp.protocol import ToolResult, TextContent
+
 from shared.logging import get_logger
 import pandas as pd
 from pandas_datareader.nasdaq_trader import get_nasdaq_symbols
 
 logger = get_logger(__name__)
 
-async def get_nasdaq_symbol_list(arguments: dict) -> ToolResult:
+
+async def get_nasdaq_symbol_list(query: str = None) -> str:
     """
     Get list of all symbols traded on Nasdaq (includes NYSE/AMEX).
     Returns metadata: Symbol, Security Name, ETF, Test Issue, etc.
@@ -18,7 +19,7 @@ async def get_nasdaq_symbol_list(arguments: dict) -> ToolResult:
         
         # Filter options?
         # Maybe just return top N or filtering by query
-        query = arguments.get("query")
+        # query = arguments.get("query")
         
         if query:
             # Case insensitive search in Symbol or Security Name
@@ -26,8 +27,9 @@ async def get_nasdaq_symbol_list(arguments: dict) -> ToolResult:
                    df['Security Name'].astype(str).str.contains(query, case=False)
             df = df[mask]
             
-        return ToolResult(content=[TextContent(text=f"### Nasdaq Trader Symbols\nTotal: {len(df)}\n\n{df.head(100).to_markdown()}")])
+        return f"### Nasdaq Trader Symbols\nTotal: {len(df)}\n\n{df.head(100).to_markdown()}"
         
     except Exception as e:
         logger.error(f"Nasdaq Symbols error: {e}")
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+

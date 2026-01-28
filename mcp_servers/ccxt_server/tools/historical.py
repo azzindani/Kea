@@ -8,25 +8,21 @@ import asyncio
 
 logger = get_logger(__name__)
 
-async def download_history(arguments: dict) -> ToolResult:
+
+async def download_history(exchange: str = "binance", symbol: str = "BTC/USDT", timeframe: str = "1h", days: int = 30) -> str:
     """
     Download Historical OHLCV (Pagination).
     Fetches MORE than exchange limit by looping.
     """
-    exchange_id = arguments.get("exchange", "binance")
-    symbol = arguments.get("symbol")
-    timeframe = arguments.get("timeframe", "1h")
-    # 'days' back or 'limit'
-    days = arguments.get("days", 30)
     
     # Calculate start time
     now = pd.Timestamp.now(tz='UTC')
     start_ts = int((now - pd.Timedelta(days=days)).timestamp() * 1000)
     
     try:
-        exchange = await get_exchange_instance(exchange_id)
-        if not exchange.has['fetchOHLCV']:
-             return ToolResult(content=[TextContent(text=f"{exchange_id} does not support fetchOHLCV.")])
+        ex = await get_exchange_instance(exchange)
+        if not ex.has['fetchOHLCV']:
+             return f"{exchange} does not support fetchOHLCV."
              
         all_ohlcv = []
         since = start_ts
@@ -35,7 +31,7 @@ async def download_history(arguments: dict) -> ToolResult:
         limit_per_req = 1000
         
         while True:
-            ohlcv = await exchange.fetch_ohlcv(symbol, timeframe, since, limit_per_req)
+            ohlcv = await ex.fetch_ohlcv(symbol, timeframe, since, limit_per_req)
             if not ohlcv:
                 break
             
@@ -51,7 +47,7 @@ async def download_history(arguments: dict) -> ToolResult:
                 
             # Rate limit sleep slightly if needed?
             # CCXT usually handles it if enableRateLimit=True
-            await asyncio.sleep(exchange.rateLimit / 1000 * 1.1)
+            await asyncio.sleep(ex.rateLimit / 1000 * 1.1)
             
             # Safety break
             if len(all_ohlcv) > 50000:
@@ -62,7 +58,7 @@ async def download_history(arguments: dict) -> ToolResult:
         
         info = f"""### Historical Data Download
 **Symbol**: {symbol}
-**Exchange**: {exchange_id}
+**Exchange**: {exchange}
 **Timeframe**: {timeframe}
 **Total Candles**: {len(df)}
 **Range**: {df['datetime'].min()} - {df['datetime'].max()}
@@ -72,7 +68,8 @@ Sample (Head/Tail):
 ...
 {df.tail(5).to_markdown()}
 """
-        return ToolResult(content=[TextContent(text=info)])
+        return info
         
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+

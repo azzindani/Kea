@@ -1,65 +1,55 @@
 
-from shared.mcp.protocol import ToolResult
+
 from mcp_servers.pandas_ta_server.tools.universal import calculate_indicator
 
+
 # Volatility
-async def calculate_bbands(arguments: dict) -> ToolResult:
+async def calculate_bbands(data: list[dict], params: dict = None) -> str:
     """Bollinger Bands."""
-    arguments['indicator'] = 'bbands'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'bbands', params)
 
-async def calculate_atr(arguments: dict) -> ToolResult:
+async def calculate_atr(data: list[dict], params: dict = None) -> str:
     """ATR - Average True Range."""
-    arguments['indicator'] = 'atr'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'atr', params)
 
-async def calculate_kc(arguments: dict) -> ToolResult:
+async def calculate_kc(data: list[dict], params: dict = None) -> str:
     """Keltner Channels."""
-    arguments['indicator'] = 'kc'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'kc', params)
 
-async def calculate_donchian(arguments: dict) -> ToolResult:
+async def calculate_donchian(data: list[dict], params: dict = None) -> str:
     """Donchian Channels."""
-    arguments['indicator'] = 'donchian'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'donchian', params)
 
-async def calculate_accbands(arguments: dict) -> ToolResult:
+async def calculate_accbands(data: list[dict], params: dict = None) -> str:
     """Acceleration Bands."""
-    arguments['indicator'] = 'accbands'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'accbands', params)
 
 # Volume
-async def calculate_obv(arguments: dict) -> ToolResult:
+async def calculate_obv(data: list[dict], params: dict = None) -> str:
     """OBV - On Balance Volume."""
-    arguments['indicator'] = 'obv'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'obv', params)
 
-async def calculate_cmf(arguments: dict) -> ToolResult:
+async def calculate_cmf(data: list[dict], params: dict = None) -> str:
     """CMF - Chaikin Money Flow."""
-    arguments['indicator'] = 'cmf'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'cmf', params)
 
-async def calculate_mfi(arguments: dict) -> ToolResult:
+async def calculate_mfi(data: list[dict], params: dict = None) -> str:
     """MFI - Money Flow Index."""
-    arguments['indicator'] = 'mfi'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'mfi', params)
 
-async def calculate_vwap(arguments: dict) -> ToolResult:
+async def calculate_vwap(data: list[dict], params: dict = None) -> str:
     """VWAP - Volume Weighted Average Price."""
-    arguments['indicator'] = 'vwap'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'vwap', params)
 
-async def calculate_adl(arguments: dict) -> ToolResult:
+async def calculate_adl(data: list[dict], params: dict = None) -> str:
     """ADL - Accumulation/Distribution Line."""
-    arguments['indicator'] = 'adl'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'adl', params)
 
-async def calculate_pvi(arguments: dict) -> ToolResult:
+async def calculate_pvi(data: list[dict], params: dict = None) -> str:
     """PVI - Positive Volume Index."""
-    arguments['indicator'] = 'pvi'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'pvi', params)
 
-async def calculate_nvi(arguments: dict) -> ToolResult:
+async def calculate_nvi(data: list[dict], params: dict = None) -> str:
     """NVI - Negative Volume Index."""
-    arguments['indicator'] = 'nvi'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'nvi', params)
+

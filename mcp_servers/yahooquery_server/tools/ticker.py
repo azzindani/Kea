@@ -75,70 +75,67 @@ class SmartTicker:
             
             df = self.yq.option_chain
             if isinstance(df, pd.DataFrame):
-                # Only head 100 to prevent massive overflow if not filtered
-                return df.head(100).to_markdown()
+                # Only head 100000 to prevent massive overflow if not filtered
+                return df.head(100000).to_markdown()
             return str(df)
         except Exception as e:
             logger.error(f"Options error: {e}")
             return f"Error: {e}"
 
+
 # --- GENERIC HANDLER FOR ALL MODULES ---
 
-async def generic_ticker_handler(arguments: dict, module_name: str) -> ToolResult:
+async def generic_ticker_handler(tickers: str, module_name: str) -> str:
     """
     Generic handler for all Ticker attributes.
     Args:
         tickers (list[str] | str): List of symbols or space-separated string.
     """
-    tickers = arguments.get("tickers")
     if not tickers:
-        return ToolResult(isError=True, content=[TextContent(text="No tickers provided")])
+        return "Error: No tickers provided"
     
     try:
         st = SmartTicker(tickers)
         result = st.get_module(module_name)
         
         # Add summary header
-        count = len(tickers) if isinstance(tickers, list) else len(tickers.split())
+        count = len(tickers.split()) if isinstance(tickers, str) else len(tickers)
         header = f"### Bulk Data: {module_name} ({count} tickers)\n\n"
         
-        return ToolResult(content=[TextContent(text=header + result)])
+        return header + result
     except Exception as e:
         logger.error(f"Handler error for {module_name}: {e}")
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
 
-async def get_bulk_financials_handler(arguments: dict, module_name: str) -> ToolResult:
+
+async def get_bulk_financials_handler(tickers: str, module_name: str, frequency: str = "a") -> str:
     """Handler for Balance Sheet, Cash Flow, Income Statement."""
-    tickers = arguments.get("tickers")
-    frequency = arguments.get("frequency", "a") # 'a' or 'q'
-    
     try:
         st = SmartTicker(tickers)
         # module_name example: "balance_sheet"
         result = st.get_finance(module_name, freq=frequency)
-        return ToolResult(content=[TextContent(text=f"### Bulk {module_name} ({frequency})\n\n" + result)])
+        return f"### Bulk {module_name} ({frequency})\n\n" + result
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_bulk_options_handler(arguments: dict) -> ToolResult:
+async def get_bulk_options_handler(tickers: str) -> str:
     """Handler for Options Chain."""
-    tickers = arguments.get("tickers")
     try:
         st = SmartTicker(tickers)
         result = st.get_options()
-        return ToolResult(content=[TextContent(text=f"### Bulk Option Chain (Top 100 Rows)\n\n" + result)])
+        return f"### Bulk Option Chain (Top 100 Rows)\n\n" + result
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+
+
 
 # --- SPECIFIC HANDLERS (Registered in server.py loop, but we can define custom ones here) ---
 
-async def get_fundamental_snapshot(arguments: dict) -> ToolResult:
+async def get_fundamental_snapshot(tickers: str) -> str:
     """
     MULTI-TALENT: Get Price, Key Stats, and Summary Detail in one go.
     """
-    tickers = arguments.get("tickers")
     try:
         st = SmartTicker(tickers)
         # Fetch multiple modules
@@ -146,46 +143,44 @@ async def get_fundamental_snapshot(arguments: dict) -> ToolResult:
         data = st.yq.get_modules("price keyStats summaryDetail financialData")
         
         if isinstance(data, dict):
-            return ToolResult(content=[TextContent(text=json.dumps(data, indent=2, default=str))])
+            return json.dumps(data, indent=2, default=str)
         elif isinstance(data, pd.DataFrame):
-             return ToolResult(content=[TextContent(text=data.to_markdown())])
-        return ToolResult(content=[TextContent(text=str(data))])
+             return data.to_markdown()
+        return str(data)
         
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_ownership_report(arguments: dict) -> ToolResult:
+async def get_ownership_report(tickers: str) -> str:
     """MULTI-TALENT: Major Holders, Insiders, Institutions."""
-    tickers = arguments.get("tickers")
     try:
         st = SmartTicker(tickers)
         data = st.yq.get_modules("majorHolders insiderHolders institutionOwnership fundOwnership")
         if isinstance(data, dict):
-            return ToolResult(content=[TextContent(text=json.dumps(data, indent=2, default=str))])
-        return ToolResult(content=[TextContent(text=str(data))])
+            return json.dumps(data, indent=2, default=str)
+        return str(data)
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_earnings_report(arguments: dict) -> ToolResult:
+async def get_earnings_report(tickers: str) -> str:
     """MULTI-TALENT: Earnings history, trend, and calendar events."""
-    tickers = arguments.get("tickers")
     try:
         st = SmartTicker(tickers)
         data = st.yq.get_modules("earnings earningsTrend calendarEvents")
         if isinstance(data, dict):
-             return ToolResult(content=[TextContent(text=json.dumps(data, indent=2, default=str))])
-        return ToolResult(content=[TextContent(text=str(data))])
+             return json.dumps(data, indent=2, default=str)
+        return str(data)
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_technical_snapshot(arguments: dict) -> ToolResult:
+async def get_technical_snapshot(tickers: str) -> str:
     """MULTI-TALENT: Price, Recommendation Trend, and Index Trend."""
-    tickers = arguments.get("tickers")
     try:
         st = SmartTicker(tickers)
         data = st.yq.get_modules("price recommendationTrend indexTrend industryTrend")
         if isinstance(data, dict):
-             return ToolResult(content=[TextContent(text=json.dumps(data, indent=2, default=str))])
-        return ToolResult(content=[TextContent(text=str(data))])
+             return json.dumps(data, indent=2, default=str)
+        return str(data)
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+

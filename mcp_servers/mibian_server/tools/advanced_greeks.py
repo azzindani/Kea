@@ -1,11 +1,11 @@
 
-from shared.mcp.protocol import ToolResult, TextContent
-from mcp_servers.mibian_server.tools.core import MibianCore, dict_to_result
+from mcp_servers.mibian_server.tools.core import MibianCore, dict_to_json
 
 def _calc_raw(model, args, vol):
     return MibianCore.calculate(model, args, volatility=vol)
 
-async def calculate_advanced_greeks(arguments: dict) -> ToolResult:
+
+async def calculate_advanced_greeks(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str:
     """
     Calculate 2nd/3rd Order Greeks via Finite Difference.
     - Vanna: dDelta/dVol
@@ -16,11 +16,11 @@ async def calculate_advanced_greeks(arguments: dict) -> ToolResult:
     """
     try:
         model = "BS" # Default to BS, could param
-        u = arguments['underlying']
-        s = arguments['strike']
-        r = arguments['interest']
-        d = arguments['days']
-        v = arguments['volatility']
+        u = underlying # arguments['underlying']
+        s = strike # arguments['strike']
+        r = interest # arguments['interest']
+        d = days # arguments['days']
+        v = volatility # arguments['volatility']
         
         # Base
         base = _calc_raw(model, [u, s, r, d], v)
@@ -57,7 +57,7 @@ async def calculate_advanced_greeks(arguments: dict) -> ToolResult:
         # Zomma: (Gamma(v+dv) - Gamma) / dv
         zomma = (res_v_plus['gamma'] - base['gamma']) / dv
         
-        return dict_to_result({
+        return dict_to_json({
             "vanna_call": vanna_call,
             "vanna_put": vanna_put,
             "vomma": vomma,
@@ -68,10 +68,14 @@ async def calculate_advanced_greeks(arguments: dict) -> ToolResult:
         }, "Advanced Greeks")
         
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+
 
 # Wrapper aliases
-async def calculate_vanna(arguments: dict) -> ToolResult: return await calculate_advanced_greeks(arguments)
-async def calculate_vomma(arguments: dict) -> ToolResult: return await calculate_advanced_greeks(arguments)
-async def calculate_charm(arguments: dict) -> ToolResult: return await calculate_advanced_greeks(arguments)
-async def calculate_speed(arguments: dict) -> ToolResult: return await calculate_advanced_greeks(arguments)
+
+# Wrapper aliases
+async def calculate_vanna(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str: return await calculate_advanced_greeks(underlying, strike, interest, days, volatility)
+async def calculate_vomma(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str: return await calculate_advanced_greeks(underlying, strike, interest, days, volatility)
+async def calculate_charm(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str: return await calculate_advanced_greeks(underlying, strike, interest, days, volatility)
+async def calculate_speed(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str: return await calculate_advanced_greeks(underlying, strike, interest, days, volatility)
+

@@ -88,7 +88,7 @@ def filter_xml_stream(file_path: str, key: str, value: str, item_depth: int = 2)
 @mcp.tool()
 def stream_to_jsonl(file_path: str, output_path: str, item_depth: int = 2) -> str: return file_ops.stream_to_jsonl(file_path, output_path, item_depth)
 @mcp.tool()
-def sample_xml_stream(file_path: str, limit: int = 5, item_depth: int = 2) -> List[Dict[str, Any]]: return file_ops.sample_xml_stream(file_path, limit, item_depth)
+def sample_xml_stream(file_path: str, limit: int = 100000, item_depth: int = 2) -> List[Dict[str, Any]]: return file_ops.sample_xml_stream(file_path, limit, item_depth)
 
 # ==========================================
 # 4. Bulk

@@ -1,12 +1,13 @@
 
 import pandas_datareader.data as web
-from shared.mcp.protocol import ToolResult, TextContent
+
 from shared.logging import get_logger
 import datetime
 
 logger = get_logger(__name__)
 
-async def get_bank_of_canada_data(arguments: dict) -> ToolResult:
+
+async def get_bank_of_canada_data(symbols: list[str] = None, start_date: str = None) -> str:
     """
     Get Bank of Canada Data (Forex, Rates).
     """
@@ -14,9 +15,8 @@ async def get_bank_of_canada_data(arguments: dict) -> ToolResult:
     # Actually PDR uses 'wk' or similar codes.
     # Typical codes: FXUSDCAD (USD/CAD).
     
-    symbols = arguments.get("symbols") or ["FXUSDCAD"]
+    s_list = symbols or ["FXUSDCAD"]
     
-    start_date = arguments.get("start_date")
     if not start_date:
         start = datetime.datetime.now() - datetime.timedelta(days=365)
     else:
@@ -32,8 +32,9 @@ async def get_bank_of_canada_data(arguments: dict) -> ToolResult:
         # Actually, let's just stick to what works.
         # If PDR is broken for this, we'll fail gracefully.
         
-        df = web.DataReader(symbols, "bankofcanada", start=start)
+        df = web.DataReader(s_list, "bankofcanada", start=start)
         
-        return ToolResult(content=[TextContent(text=f"### Bank of Canada Data\n\n{df.tail(20).to_markdown()}")])
+        return f"### Bank of Canada Data\n\n{df.tail(20).to_markdown()}"
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+

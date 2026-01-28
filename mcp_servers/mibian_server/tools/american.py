@@ -1,6 +1,5 @@
 
-from shared.mcp.protocol import ToolResult, TextContent
-from mcp_servers.mibian_server.tools.core import dict_to_result
+from mcp_servers.mibian_server.tools.core import dict_to_json
 import math
 import scipy.stats as si
 
@@ -20,16 +19,17 @@ def _bs_put(S, K, r, b, sigma, T):
     d2 = d1 - sigma*math.sqrt(T)
     return K * math.exp(-r*T) * N(-d2) - S * math.exp((b-r)*T) * N(-d1)
 
-async def calculate_american_price(arguments: dict) -> ToolResult:
+
+async def calculate_american_price(underlying: float, strike: float, interest: float, days: float, volatility: float, dividend_yield: float = 0.0) -> str:
     """
     Calculate American Option Price (Barone-Adesi-Whaley Approximation).
     """
     try:
-        S = float(arguments['underlying'])
-        K = float(arguments['strike'])
-        r = float(arguments['interest']) / 100.0
-        T = float(arguments['days']) / 365.0
-        sigma = float(arguments['volatility']) / 100.0
+        S = float(underlying)
+        K = float(strike)
+        r = float(interest) / 100.0
+        T = float(days) / 365.0
+        sigma = float(volatility) / 100.0
         
         # Carry cost b. Mibian logic:
         # BS (Stock): b = r
@@ -37,11 +37,11 @@ async def calculate_american_price(arguments: dict) -> ToolResult:
         # GK (Currency): b = r - rf
         # Let's assume standard American Stock option (b=r) unless q provided?
         # Let's support `cost_of_carry` or `dividend_yield`.
-        q = arguments.get('dividend_yield', 0.0) / 100.0
+        q = dividend_yield / 100.0
         b = r - q
         
         if T <= 0:
-            return dict_to_result({"american_call": max(S-K, 0), "american_put": max(K-S, 0)}, "American Price (Expired)")
+            return dict_to_json({"american_call": max(S-K, 0), "american_put": max(K-S, 0)}, "American Price (Expired)")
             
         # Optimization params
         M = 2 * r / sigma**2
@@ -91,7 +91,7 @@ async def calculate_american_price(arguments: dict) -> ToolResult:
         # Sketched:
         p_amer_est = p_euro # Placeholder for full BAW
         
-        return dict_to_result({
+        return dict_to_json({
             "american_call_approx": c_amer,
             "american_put_approx": p_euro * 1.01, # Dummy uplift to show concept? NO.
             "european_call": _bs_call(S, K, r, b, sigma, T),
@@ -100,4 +100,5 @@ async def calculate_american_price(arguments: dict) -> ToolResult:
         }, "American Option (Estimates)")
         
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+

@@ -1,10 +1,10 @@
 
-from shared.mcp.protocol import ToolResult, TextContent
-from mcp_servers.mibian_server.tools.core import MibianCore, df_to_result
+from mcp_servers.mibian_server.tools.core import MibianCore, df_to_json
 import pandas as pd
 import json
 
-async def price_option_chain(arguments: dict) -> ToolResult:
+
+async def price_option_chain(data: list[dict]) -> str:
     """
     Bulk Price a Chain of Options.
     Args:
@@ -17,7 +17,7 @@ async def price_option_chain(arguments: dict) -> ToolResult:
               - model (str) [Optional, default 'BS']
     """
     try:
-        input_data = arguments.get("data", [])
+        input_data = data # arguments.get("data", [])
         if isinstance(input_data, str): input_data = json.loads(input_data)
         
         results = []
@@ -39,12 +39,14 @@ async def price_option_chain(arguments: dict) -> ToolResult:
                 results.append(item)
                 
         df = pd.DataFrame(results)
-        return df_to_result(df, "Option Chain Pricing")
+        return df_to_json(df, "Option Chain Pricing")
         
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def calculate_iv_surface(arguments: dict) -> ToolResult:
+
+
+async def calculate_iv_surface(data: list[dict]) -> str:
     """
     Bulk Calculate Implied Volatility Surface.
     Args:
@@ -54,7 +56,7 @@ async def calculate_iv_surface(arguments: dict) -> ToolResult:
               - model (default BS)
     """
     try:
-        input_data = arguments.get("data", [])
+        input_data = data # arguments.get("data", [])
         if isinstance(input_data, str): input_data = json.loads(input_data)
         
         results = []
@@ -84,7 +86,8 @@ async def calculate_iv_surface(arguments: dict) -> ToolResult:
                 results.append(item)
                 
         df = pd.DataFrame(results)
-        return df_to_result(df, "IV Surface")
+        return df_to_json(df, "IV Surface")
         
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+

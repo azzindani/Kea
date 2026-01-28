@@ -1,18 +1,17 @@
 
-from shared.mcp.protocol import ToolResult
+
 from mcp_servers.finta_server.tools.universal import calculate_indicator
 
-async def calculate_pzo(arguments: dict) -> ToolResult:
+
+async def calculate_pzo(data: list[dict], params: dict = None) -> str:
     """PZO - Price Zone Oscillator."""
-    arguments['indicator'] = 'PZO'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'PZO', params)
 
-async def calculate_cfi(arguments: dict) -> ToolResult:
+async def calculate_cfi(data: list[dict], params: dict = None) -> str:
     """CFI - Cumulative Force Index."""
-    arguments['indicator'] = 'CFI'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'CFI', params)
 
-async def calculate_tp(arguments: dict) -> ToolResult:
+async def calculate_tp(data: list[dict], params: dict = None) -> str:
     """TP - Typical Price."""
-    arguments['indicator'] = 'TP'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'TP', params)
+

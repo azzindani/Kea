@@ -1,37 +1,33 @@
 
 import ccxt.async_support as ccxt
-from shared.mcp.protocol import ToolResult, TextContent
+import ccxt.async_support as ccxt
 from shared.logging import get_logger
 from mcp_servers.ccxt_server.tools.exchange_manager import get_exchange_instance
 import pandas as pd
 
 logger = get_logger(__name__)
 
-async def get_positions(arguments: dict) -> ToolResult:
+
+# --- PRIVATE TOOLS ---
+
+async def get_positions(exchange: str = "binance", api_key: str = None, secret: str = None, symbols: list[str] = None) -> str:
     """
     Get Active Positions (Futures/Perps). Requires API Key.
     """
-    exchange_id = arguments.get("exchange", "binance")
-    
     try:
-        api_key = arguments.get("api_key")
-        secret = arguments.get("secret")
-        # Optional: symbols filter
-        symbols = arguments.get("symbols") # list or None
-        
-        exchange = await get_exchange_instance(exchange_id)
+        ex = await get_exchange_instance(exchange)
         
         if api_key and secret:
-            exchange.apiKey = api_key
-            exchange.secret = secret
+            ex.apiKey = api_key
+            ex.secret = secret
             
-        if not exchange.apiKey:
-            return ToolResult(isError=True, content=[TextContent(text="API Key/Secret required.")])
+        if not ex.apiKey:
+            return "API Key/Secret required."
             
-        if exchange.has['fetchPositions']:
-            positions = await exchange.fetch_positions(symbols)
+        if ex.has['fetchPositions']:
+            positions = await ex.fetch_positions(symbols)
             if not positions:
-                return ToolResult(content=[TextContent(text="No active positions found.")])
+                return "No active positions found."
                 
             # Flatten
             df = pd.DataFrame(positions)
@@ -39,66 +35,60 @@ async def get_positions(arguments: dict) -> ToolResult:
             cols = ['symbol', 'side', 'contracts', 'contractSize', 'unrealizedPnl', 'leverage', 'collateral', 'entryPrice', 'markPrice']
             cols = [c for c in cols if c in df.columns]
             
-            return ToolResult(content=[TextContent(text=f"### Positions: {exchange_id}\n\n{df[cols].to_markdown()}")])
+            return f"### Positions: {exchange}\n\n{df[cols].to_markdown()}"
         else:
-             return ToolResult(content=[TextContent(text=f"{exchange_id} does not support fetchPositions.")])
+             return f"{exchange} does not support fetchPositions."
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_open_orders(arguments: dict) -> ToolResult:
+
+
+async def get_open_orders(exchange: str = "binance", symbol: str = None, api_key: str = None, secret: str = None) -> str:
     """
     Get Open Orders. Requires API Key.
     """
-    exchange_id = arguments.get("exchange", "binance")
-    symbol = arguments.get("symbol")
-    
     try:
-        api_key = arguments.get("api_key")
-        secret = arguments.get("secret")
-        exchange = await get_exchange_instance(exchange_id)
+        ex = await get_exchange_instance(exchange)
         if api_key and secret:
-            exchange.apiKey = api_key
-            exchange.secret = secret
+            ex.apiKey = api_key
+            ex.secret = secret
             
-        if not exchange.apiKey:
-             return ToolResult(isError=True, content=[TextContent(text="API Key/Secret required.")])
+        if not ex.apiKey:
+             return "API Key/Secret required."
              
-        orders = await exchange.fetch_open_orders(symbol)
+        orders = await ex.fetch_open_orders(symbol)
         if not orders:
-            return ToolResult(content=[TextContent(text="No open orders.")])
+            return "No open orders."
             
         df = pd.DataFrame(orders)
         cols = ['id', 'datetime', 'symbol', 'type', 'side', 'price', 'amount', 'filled', 'remaining', 'status']
         cols = [c for c in cols if c in df.columns]
         
-        return ToolResult(content=[TextContent(text=f"### Open Orders: {exchange_id} ({symbol or 'All'})\n\n{df[cols].to_markdown()}")])
+        return f"### Open Orders: {exchange} ({symbol or 'All'})\n\n{df[cols].to_markdown()}"
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_my_trades(arguments: dict) -> ToolResult:
+
+
+async def get_my_trades(exchange: str = "binance", symbol: str = None, limit: int = 100000, api_key: str = None, secret: str = None) -> str:
     """
     Get My Trades History. Requires API Key.
     """
-    exchange_id = arguments.get("exchange", "binance")
-    symbol = arguments.get("symbol")
-    limit = arguments.get("limit", 20)
-    
     try:
-        api_key = arguments.get("api_key")
-        secret = arguments.get("secret")
-        exchange = await get_exchange_instance(exchange_id)
+        ex = await get_exchange_instance(exchange)
         if api_key and secret:
-            exchange.apiKey = api_key
-            exchange.secret = secret
+            ex.apiKey = api_key
+            ex.secret = secret
             
-        if not exchange.apiKey:
-             return ToolResult(isError=True, content=[TextContent(text="API Key/Secret required.")])
+        if not ex.apiKey:
+             return "API Key/Secret required."
              
-        trades = await exchange.fetch_my_trades(symbol, limit=limit)
+        trades = await ex.fetch_my_trades(symbol, limit=limit)
         df = pd.DataFrame(trades)
         cols = ['id', 'datetime', 'symbol', 'side', 'price', 'amount', 'cost', 'fee']
         cols = [c for c in cols if c in df.columns]
         
-        return ToolResult(content=[TextContent(text=f"### My Trades: {exchange_id} ({symbol})\n\n{df[cols].to_markdown()}")])
+        return f"### My Trades: {exchange} ({symbol})\n\n{df[cols].to_markdown()}"
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+

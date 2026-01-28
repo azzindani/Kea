@@ -1,8 +1,8 @@
 
-from shared.mcp.protocol import ToolResult, TextContent
-from mcp_servers.mibian_server.tools.core import MibianCore, dict_to_result
+from mcp_servers.mibian_server.tools.core import MibianCore, dict_to_json
 
-async def calculate_strategy_price(arguments: dict) -> ToolResult:
+
+async def calculate_strategy_price(legs: list[dict]) -> str:
     """
     Calculate Multi-Leg Strategy Price & Greeks.
     Args:
@@ -14,7 +14,7 @@ async def calculate_strategy_price(arguments: dict) -> ToolResult:
               - underlying, strike, interest, days, volatility
     """
     try:
-        legs_input = arguments.get("legs", [])
+        legs_input = legs # arguments.get("legs", [])
         
         total_data = {
             "price": 0.0,
@@ -64,10 +64,11 @@ async def calculate_strategy_price(arguments: dict) -> ToolResult:
                 "contribution": price * multiplier
             })
             
-        return dict_to_result({
+        return dict_to_json({
             "strategy_totals": total_data,
             "legs": leg_details
         }, "Strategy Analysis")
         
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+

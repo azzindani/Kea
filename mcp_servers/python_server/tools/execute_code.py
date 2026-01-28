@@ -9,6 +9,7 @@ from __future__ import annotations
 import io
 import sys
 import asyncio
+import json
 from contextlib import redirect_stdout, redirect_stderr
 from typing import Any
 
@@ -115,28 +116,28 @@ async def execute_code_tool(arguments: dict) -> ToolResult:
         stdout_str = stdout.decode().strip()
         stderr_str = stderr.decode().strip()
         
-        output_parts = []
-        if stdout_str:
-            output_parts.append(f"## Output\n```\n{stdout_str}\n```")
+        output_data = {
+            "status": "success",
+            "stdout": stdout_str,
+            "stderr": stderr_str,
+            "returncode": process.returncode
+        }
         
-        # Treat stderr as warnings unless exit code != 0
-        if stderr_str:
-             if process.returncode != 0:
-                 output_parts.append(f"## Error Log\n```\n{stderr_str}\n```")
-             else:
-                 # Filter out uv noise like "Resolved 1 package..."
-                 clean_stderr = [l for l in stderr_str.split('\n') if not l.startswith("Resolved ") and not l.startswith("Audited ")]
-                 if clean_stderr:
-                     output_parts.append(f"## Warnings\n```\n{chr(10).join(clean_stderr)}\n```")
+        # Filter uv noise from stderr if successful
+        if process.returncode == 0 and stderr_str:
+             clean_stderr = [l for l in stderr_str.split('\n') if not l.startswith("Resolved ") and not l.startswith("Audited ")]
+             output_data["stderr"] = "\n".join(clean_stderr)
 
         if process.returncode != 0:
+            output_data["status"] = "error"
+            output_data["error"] = stderr_str or "Unknown Error"
             return ToolResult(
-                content=[TextContent(text="\n\n".join(output_parts) or "Unknown Error")],
+                content=[TextContent(text=json.dumps(output_data, indent=2))],
                 isError=True
             )
             
         return ToolResult(
-            content=[TextContent(text="\n\n".join(output_parts) or "Code executed successfully.")]
+            content=[TextContent(text=json.dumps(output_data, indent=2))]
         )
 
     except Exception as e:

@@ -1,10 +1,10 @@
 
-from shared.mcp.protocol import ToolResult, TextContent
-from mcp_servers.pandas_ta_server.tools.core import process_ohlcv, df_to_result
+from mcp_servers.pandas_ta_server.tools.core import process_ohlcv, df_to_json
 import pandas_ta as ta
 import pandas as pd
 
-async def construct_ml_dataset(arguments: dict) -> ToolResult:
+
+async def construct_ml_dataset(data: list[dict], lags: list[int] = [1, 2, 3, 5], target_horizon: int = 1) -> str:
     """
     Construct Machine Learning Dataset.
     Features:
@@ -22,9 +22,9 @@ async def construct_ml_dataset(arguments: dict) -> ToolResult:
                   Efficiency: Use `df.ta.strategy` if provided.
     """
     try:
-        data = arguments.get("data")
-        lags = arguments.get("lags", [1, 2, 3, 5])
-        target_horizon = arguments.get("target_horizon", 1) # Predict N days ahead
+        # data = arguments.get("data")
+        # lags = arguments.get("lags", [1, 2, 3, 5])
+        # target_horizon = arguments.get("target_horizon", 1) # Predict N days ahead
         
         df = process_ohlcv(data)
         
@@ -51,7 +51,8 @@ async def construct_ml_dataset(arguments: dict) -> ToolResult:
         # 4. Clean
         df.dropna(inplace=True)
         
-        return df_to_result(df, "ML Dataset")
+        return df_to_json(df, "ML Dataset")
         
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+

@@ -1,6 +1,5 @@
 
 from finvizfinance.screener.overview import Overview
-from shared.mcp.protocol import ToolResult, TextContent
 from shared.logging import get_logger
 
 logger = get_logger(__name__)
@@ -36,16 +35,17 @@ PRESETS = {
     "institution_buying": {"InstitutionalOwnership": "Over 70%", "InstitutionalTransactions": "Positive (>0.1%)"}
 }
 
-async def get_strategy_screen(arguments: dict) -> ToolResult:
+
+async def get_strategy_screen(limit: int = 100000, strategy: str = None) -> str:
     """
     Run a complex strategy filter preset.
     strategy: "value_stocks", "growth_stocks", etc.
     """
-    strategy = arguments.get("strategy")
-    limit = arguments.get("limit", 30)
+    # strategy = arguments.get("strategy")
+    # limit = arguments.get("limit", 30)
     
     if strategy not in PRESETS:
-        return ToolResult(isError=True, content=[TextContent(text="Invalid strategy")])
+        return "Invalid strategy"
         
     filters = PRESETS[strategy]
     
@@ -55,13 +55,14 @@ async def get_strategy_screen(arguments: dict) -> ToolResult:
         
         df = foverview.screener_view()
         if df is None or df.empty:
-            return ToolResult(content=[TextContent(text="No results found for strategy.")])
+            return "No results found for strategy."
             
         cols = ["Ticker", "Company", "Sector", "Price", "Change", "Volume"]
         cols = [c for c in cols if c in df.columns]
         
-        return ToolResult(content=[TextContent(text=f"### Strategy: {strategy}\nFilters: {filters}\n\n{df[cols].head(limit).to_markdown(index=False)}")])
+        return f"### Strategy: {strategy}\nFilters: {filters}\n\n{df[cols].head(limit).to_markdown(index=False)}"
         
     except Exception as e:
         logger.error(f"Strategy error {strategy}: {e}")
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+

@@ -53,7 +53,7 @@ def list_views() -> List[str]: return query_ops.list_views()
 @mcp.tool()
 def check_table_exists(table_name: str) -> bool: return query_ops.check_table_exists(table_name)
 @mcp.tool()
-def preview_table(table_name: str, limit: int = 5) -> List[Dict[str, Any]]: return query_ops.preview_table(table_name, limit)
+def preview_table(table_name: str, limit: int = 100000) -> List[Dict[str, Any]]: return query_ops.preview_table(table_name, limit)
 
 # ==========================================
 # 3. Schema
@@ -107,7 +107,7 @@ def read_parquet_as_view(file_path: str, view_name: str) -> str: return io_ops.r
 @mcp.tool()
 def get_column_stats(table_name: str, column_name: str) -> Dict[str, Any]: return analysis_ops.get_column_stats(table_name, column_name)
 @mcp.tool()
-def value_counts(table_name: str, column_name: str, limit: int = 20) -> List[Dict[str, Any]]: return analysis_ops.value_counts(table_name, column_name, limit)
+def value_counts(table_name: str, column_name: str, limit: int = 100000) -> List[Dict[str, Any]]: return analysis_ops.value_counts(table_name, column_name, limit)
 @mcp.tool()
 def correlation_matrix(table_name: str, col1: str, col2: str) -> float: return analysis_ops.correlation_matrix(table_name, col1, col2)
 @mcp.tool()
@@ -169,7 +169,7 @@ def st_as_geojson(wkt_geom: str) -> str: return spatial_ops.st_as_geojson(wkt_ge
 @mcp.tool()
 def fts_create_index(table_name: str, id_col: str, text_cols: List[str]) -> str: return text_ops.fts_create_index(table_name, id_col, text_cols)
 @mcp.tool()
-def fts_search(table_name: str, keyword: str, limit: int = 20) -> List[Dict[str, Any]]: return text_ops.fts_search(table_name, keyword, limit)
+def fts_search(table_name: str, keyword: str, limit: int = 100000) -> List[Dict[str, Any]]: return text_ops.fts_search(table_name, keyword, limit)
 @mcp.tool()
 def json_extract_path(table_name: str, json_col: str, path: str) -> List[Any]: return text_ops.json_extract_path(table_name, json_col, path)
 @mcp.tool()

@@ -1,66 +1,52 @@
-
-from __future__ import annotations
-import asyncio
-from shared.mcp.server_base import MCPServer
-from shared.logging import get_logger
-
-# Tools
-from mcp_servers.newspaper_server.tools.article_single import (
-    get_article_title, get_article_text, get_article_authors, get_article_pubdate,
-    get_article_top_image, get_article_nlp, get_article_meta
+from mcp.server.fastmcp import FastMCP
+from mcp_servers.newspaper_server.tools import (
+    article_single, source_discovery, bulk_processor, nlp_trends
 )
-from mcp_servers.newspaper_server.tools.source_discovery import (
-    build_source, get_source_categories, get_source_feeds, get_source_articles_list
-)
-from mcp_servers.newspaper_server.tools.bulk_processor import (
-    bulk_article_extraction, analyze_news_source
-)
-from mcp_servers.newspaper_server.tools.nlp_trends import (
-    get_google_trending_terms, get_popular_news_sources
-)
+import structlog
+from typing import List, Dict, Any
 
-logger = get_logger(__name__)
+logger = structlog.get_logger()
 
-class NewspaperServer(MCPServer):
-    """
-    Newspaper3k (Paper-boy) MCP Server.
-    Massive News Extraction and NLP.
-    """
-    
-    def __init__(self) -> None:
-        super().__init__(name="newspaper_server", version="1.0.0")
-        self._register_tools()
-        
-    def _register_tools(self) -> None:
-        # 1. Single Article Intelligence
-        self.register_tool(name="get_article_title", description="ARTICLE: Get Title.", handler=get_article_title, parameters={"url": {"type": "string"}})
-        self.register_tool(name="get_article_text", description="ARTICLE: Get Body Text.", handler=get_article_text, parameters={"url": {"type": "string"}})
-        self.register_tool(name="get_article_authors", description="ARTICLE: Get Authors.", handler=get_article_authors, parameters={"url": {"type": "string"}})
-        self.register_tool(name="get_article_pubdate", description="ARTICLE: Get Pub Date.", handler=get_article_pubdate, parameters={"url": {"type": "string"}})
-        self.register_tool(name="get_article_top_image", description="ARTICLE: Get Top Image.", handler=get_article_top_image, parameters={"url": {"type": "string"}})
-        self.register_tool(name="get_article_nlp", description="ARTICLE: Get NLP Summary & Keywords.", handler=get_article_nlp, parameters={"url": {"type": "string"}})
-        self.register_tool(name="get_article_meta", description="ARTICLE: Get Metadata.", handler=get_article_meta, parameters={"url": {"type": "string"}})
+# Create the FastMCP server
+mcp = FastMCP("newspaper_server", dependencies=["newspaper3k"])
 
-        # 2. Source Intelligence
-        self.register_tool(name="build_source", description="SOURCE: Scan & Build.", handler=build_source, parameters={"url": {"type": "string"}})
-        self.register_tool(name="get_source_categories", description="SOURCE: List Categories.", handler=get_source_categories, parameters={"url": {"type": "string"}})
-        self.register_tool(name="get_source_feeds", description="SOURCE: List RSS Feeds.", handler=get_source_feeds, parameters={"url": {"type": "string"}})
-        self.register_tool(name="get_source_articles_list", description="SOURCE: List Article URLs.", handler=get_source_articles_list, parameters={"url": {"type": "string"}, "limit": {"type": "number"}})
+# 1. Single Article Intelligence
+@mcp.tool()
+async def get_article_title(url: str) -> str: return await article_single.get_article_title(url)
+@mcp.tool()
+async def get_article_text(url: str) -> str: return await article_single.get_article_text(url)
+@mcp.tool()
+async def get_article_authors(url: str) -> List[str]: return await article_single.get_article_authors(url)
+@mcp.tool()
+async def get_article_pubdate(url: str) -> str: return await article_single.get_article_pubdate(url)
+@mcp.tool()
+async def get_article_top_image(url: str) -> str: return await article_single.get_article_top_image(url)
+@mcp.tool()
+async def get_article_nlp(url: str) -> Dict[str, Any]: return await article_single.get_article_nlp(url)
+@mcp.tool()
+async def get_article_meta(url: str) -> Dict[str, Any]: return await article_single.get_article_meta(url)
 
-        # 3. Multitalent / Bulk (The Workhorses)
-        self.register_tool(name="analyze_news_source", description="MULTITALENT: Scan Source & Analyze Top N.", handler=analyze_news_source, parameters={"url": {"type": "string"}, "limit": {"type": "number"}})
-        self.register_tool(name="bulk_article_extraction", description="BULK: Threaded Download.", handler=bulk_article_extraction, parameters={"urls": {"type": "string"}, "workers": {"type": "number"}})
+# 2. Source Intelligence
+@mcp.tool()
+async def build_source(url: str, memoize: bool = True) -> Dict[str, Any]: return await source_discovery.build_source(url, memoize)
+@mcp.tool()
+async def get_source_categories(url: str) -> List[Dict[str, str]]: return await source_discovery.get_source_categories(url)
+@mcp.tool()
+async def get_source_feeds(url: str) -> List[str]: return await source_discovery.get_source_feeds(url)
+@mcp.tool()
+async def get_source_articles_list(url: str, limit: int = 100000) -> List[str]: return await source_discovery.get_source_articles_list(url, limit)
 
-        # 4. Trends
-        self.register_tool(name="get_google_trending_terms", description="TRENDS: Google Hot.", handler=get_google_trending_terms, parameters={})
-        self.register_tool(name="get_popular_news_sources", description="TRENDS: Popular Sources.", handler=get_popular_news_sources, parameters={})
+# 3. Multitalent / Bulk
+@mcp.tool()
+async def analyze_news_source(url: str, limit: int = 100000) -> Dict[str, Any]: return await bulk_processor.analyze_news_source(url, limit)
+@mcp.tool()
+async def bulk_article_extraction(urls: List[str], workers: int = 10) -> Dict[str, Any]: return await bulk_processor.bulk_article_extraction(urls, workers)
 
-async def main() -> None:
-    from shared.logging import setup_logging, LogConfig
-    setup_logging(LogConfig(level="DEBUG", format="console", service_name="newspaper_server"))
-    server = NewspaperServer()
-    logger.info(f"Starting NewspaperServer with {len(server.get_tools())} tools")
-    await server.run()
+# 4. Trends
+@mcp.tool()
+async def get_google_trending_terms() -> List[str]: return await nlp_trends.get_google_trending_terms()
+@mcp.tool()
+async def get_popular_news_sources() -> List[str]: return await nlp_trends.get_popular_news_sources()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    mcp.run()

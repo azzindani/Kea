@@ -101,6 +101,6 @@ def check_table_exists(table_name: str) -> bool:
     tables = list_tables()
     return table_name in tables
 
-def preview_table(table_name: str, limit: int = 5) -> List[Dict[str, Any]]:
+def preview_table(table_name: str, limit: int = 100000) -> List[Dict[str, Any]]:
     """SELECT * LIMIT N."""
     return fetch_all(f"SELECT * FROM {table_name} LIMIT {limit}")

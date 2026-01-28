@@ -1,6 +1,5 @@
 
-from shared.mcp.protocol import ToolResult, TextContent
-from mcp_servers.pandas_ta_server.tools.core import process_ohlcv, df_to_result
+from mcp_servers.pandas_ta_server.tools.core import process_ohlcv, df_to_json
 import pandas_ta as ta
 import pandas as pd
 from shared.logging import get_logger
@@ -49,7 +48,8 @@ async def run_indicators_manually(df: pd.DataFrame, category: str) -> pd.DataFra
             
     return df
 
-async def get_category_suite(arguments: dict) -> ToolResult:
+
+async def get_category_suite(data: list[dict], category: str = "Momentum") -> str:
     """
     Run a Specific Category Suite.
     Args:
@@ -57,9 +57,6 @@ async def get_category_suite(arguments: dict) -> ToolResult:
         category: "Momentum", "Trend", "Volatility", "Volume", "Overlap".
     """
     try:
-        data = arguments.get("data")
-        category = arguments.get("category", "Momentum")
-        
         df = process_ohlcv(data)
         
         # Try Standard Strategy
@@ -72,36 +69,32 @@ async def get_category_suite(arguments: dict) -> ToolResult:
             # logger.warning(f"Strategy '{category}' failed ({e}). Running manual fallback.")
             await run_indicators_manually(df, category)
         
-        return df_to_result(df, f"{category} Suite")
+        return df_to_json(df, f"{category} Suite")
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_all_indicators(arguments: dict) -> ToolResult:
+async def get_all_indicators(data: list[dict]) -> str:
     """Run 'All' Strategy."""
-    arguments['category'] = "All"
-    return await get_category_suite(arguments)
+    return await get_category_suite(data, "All")
+
+
 
 # Wrappers (Same as before)
-async def get_momentum_suite(arguments: dict) -> ToolResult:
-    arguments['category'] = "Momentum"
-    return await get_category_suite(arguments)
+async def get_momentum_suite(data: list[dict]) -> str:
+    return await get_category_suite(data, "Momentum")
 
-async def get_trend_suite(arguments: dict) -> ToolResult:
-    arguments['category'] = "Trend"
-    return await get_category_suite(arguments)
+async def get_trend_suite(data: list[dict]) -> str:
+    return await get_category_suite(data, "Trend")
 
-async def get_volatility_suite(arguments: dict) -> ToolResult:
-    arguments['category'] = "Volatility"
-    return await get_category_suite(arguments)
+async def get_volatility_suite(data: list[dict]) -> str:
+    return await get_category_suite(data, "Volatility")
 
-async def get_volume_suite(arguments: dict) -> ToolResult:
-    arguments['category'] = "Volume"
-    return await get_category_suite(arguments)
+async def get_volume_suite(data: list[dict]) -> str:
+    return await get_category_suite(data, "Volume")
 
-async def get_candle_patterns_suite(arguments: dict) -> ToolResult:
-    arguments['category'] = "Candles"
-    return await get_category_suite(arguments)
+async def get_candle_patterns_suite(data: list[dict]) -> str:
+    return await get_category_suite(data, "Candles")
 
-async def get_statistics_suite(arguments: dict) -> ToolResult:
-    arguments['category'] = "Statistics"
-    return await get_category_suite(arguments)
+async def get_statistics_suite(data: list[dict]) -> str:
+    return await get_category_suite(data, "Statistics")
+

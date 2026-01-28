@@ -7,17 +7,15 @@ import uuid
 
 logger = get_logger(__name__)
 
-async def get_history_bulk(arguments: dict) -> ToolResult:
+
+async def get_history_bulk(tickers: str, period: str = "1mo", interval: str = "1d") -> str:
     """
     Bulk Download Historical Data.
     Args:
-        tickers (list[str]): Symbols
+        tickers (list[str] | str): Symbols
         period (str): "1mo", "1y", "ytd", "max"
         interval (str): "1d", "1wk", "1mo"
     """
-    tickers = arguments.get("tickers")
-    period = arguments.get("period", "1mo")
-    interval = arguments.get("interval", "1d")
     
     try:
         st = SmartTicker(tickers, asynchronous=True)
@@ -26,10 +24,10 @@ async def get_history_bulk(arguments: dict) -> ToolResult:
         
         if isinstance(df, dict):
              # Usually means error or single result dict
-             return ToolResult(content=[TextContent(text=str(df))])
+             return str(df)
              
         if df.empty:
-             return ToolResult(isError=True, content=[TextContent(text="No data found")])
+             return "No data found"
 
         # Reset index to make it flat CSV-friendly (Symbol, Date, Open, High...)
         df_flat = df.reset_index()
@@ -39,11 +37,10 @@ async def get_history_bulk(arguments: dict) -> ToolResult:
         file_path = f"/tmp/yq_history_{report_id}.csv"
         df_flat.to_csv(file_path, index=False)
         
-        return ToolResult(content=[
-            TextContent(text=f"Fetched history for {len(tickers) if isinstance(tickers, list) else 1} tickers. Rows: {len(df)}"),
-            FileContent(path=file_path, mimeType="text/csv", description=f"Bulk History ({period})")
-        ])
+        count = len(tickers.split()) if isinstance(tickers, str) else len(tickers)
+        return f"Fetched history for {count} tickers. Rows: {len(df)}. Data saved to file: {file_path}"
         
     except Exception as e:
         logger.error(f"History error: {e}")
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+

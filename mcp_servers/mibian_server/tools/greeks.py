@@ -1,8 +1,8 @@
 
-from shared.mcp.protocol import ToolResult, TextContent
-from mcp_servers.mibian_server.tools.core import MibianCore, dict_to_result
+from mcp_servers.mibian_server.tools.core import MibianCore, dict_to_json
 
-async def _calc_greek(arguments: dict, model: str, greek: str) -> ToolResult:
+
+async def _calc_greek(arguments: dict, model: str, greek: str) -> str:
     try:
         min_args = ['underlying', 'strike', 'interest', 'days', 'volatility']
         for a in min_args:
@@ -27,17 +27,21 @@ async def _calc_greek(arguments: dict, model: str, greek: str) -> ToolResult:
         else:
             filtered = res
             
-        return dict_to_result(filtered, f"{model} {greek}")
+        return dict_to_json(filtered, f"{model} {greek}")
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+
 
 # Wrappers
-async def calculate_bs_delta(arguments: dict) -> ToolResult: return await _calc_greek(arguments, "BS", "delta")
-async def calculate_bs_theta(arguments: dict) -> ToolResult: return await _calc_greek(arguments, "BS", "theta")
-async def calculate_bs_gamma(arguments: dict) -> ToolResult: return await _calc_greek(arguments, "BS", "gamma")
-async def calculate_bs_vega(arguments: dict) -> ToolResult: return await _calc_greek(arguments, "BS", "vega")
-async def calculate_bs_rho(arguments: dict) -> ToolResult: return await _calc_greek(arguments, "BS", "rho")
 
-async def calculate_gk_delta(arguments: dict) -> ToolResult: return await _calc_greek(arguments, "GK", "delta")
-async def calculate_gk_theta(arguments: dict) -> ToolResult: return await _calc_greek(arguments, "GK", "theta")
+# Wrappers
+async def calculate_bs_delta(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str: return await _calc_greek({"underlying": underlying, "strike": strike, "interest": interest, "days": days, "volatility": volatility}, "BS", "delta")
+async def calculate_bs_theta(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str: return await _calc_greek({"underlying": underlying, "strike": strike, "interest": interest, "days": days, "volatility": volatility}, "BS", "theta")
+async def calculate_bs_gamma(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str: return await _calc_greek({"underlying": underlying, "strike": strike, "interest": interest, "days": days, "volatility": volatility}, "BS", "gamma")
+async def calculate_bs_vega(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str: return await _calc_greek({"underlying": underlying, "strike": strike, "interest": interest, "days": days, "volatility": volatility}, "BS", "vega")
+async def calculate_bs_rho(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str: return await _calc_greek({"underlying": underlying, "strike": strike, "interest": interest, "days": days, "volatility": volatility}, "BS", "rho")
+
+async def calculate_gk_delta(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str: return await _calc_greek({"underlying": underlying, "strike": strike, "interest": interest, "days": days, "volatility": volatility}, "GK", "delta")
+async def calculate_gk_theta(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str: return await _calc_greek({"underlying": underlying, "strike": strike, "interest": interest, "days": days, "volatility": volatility}, "GK", "theta")
 # ... Add others as needed
+

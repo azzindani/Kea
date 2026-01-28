@@ -2,7 +2,9 @@
 import ccxt.async_support as ccxt
 import asyncio
 import pandas as pd
-from shared.mcp.protocol import ToolResult, TextContent
+import ccxt.async_support as ccxt
+import asyncio
+import pandas as pd
 from shared.logging import get_logger
 from mcp_servers.ccxt_server.tools.exchange_manager import get_exchange_instance
 
@@ -25,16 +27,19 @@ async def fetch_price_safe(exchange_id, symbol):
     except Exception as e:
         return {"exchange": exchange_id, "error": str(e)}
 
-async def get_global_price(arguments: dict) -> ToolResult:
+
+# --- AGGREGATOR ---
+
+async def get_global_price(symbol: str = "BTC/USDT", exchanges: list[str] = None) -> str:
     """
     Get Global Price Aggregation for a symbol (e.g. BTC/USDT).
     Fetches from multiple exchanges in parallel.
     """
-    symbol = arguments.get("symbol", "BTC/USDT")
-    exchanges_to_use = arguments.get("exchanges", TOP_EXCHANGES)
+    if exchanges is None:
+        exchanges = TOP_EXCHANGES
     
     # Run parallel
-    tasks = [fetch_price_safe(ex_id, symbol) for ex_id in exchanges_to_use]
+    tasks = [fetch_price_safe(ex_id, symbol) for ex_id in exchanges]
     results = await asyncio.gather(*tasks)
     
     # Filter valid
@@ -42,7 +47,7 @@ async def get_global_price(arguments: dict) -> ToolResult:
     errors = [r for r in results if "error" in r]
     
     if not valid_data:
-        return ToolResult(isError=True, content=[TextContent(text=f"Failed to fetch {symbol} from any exchange. Errors: {errors}")])
+        return f"Failed to fetch {symbol} from any exchange. Errors: {errors}"
         
     df = pd.DataFrame(valid_data)
     
@@ -59,27 +64,28 @@ async def get_global_price(arguments: dict) -> ToolResult:
     summary = f"""### Global Price: {symbol}
 **Mean Price**: {mean_price:.4f}
 **Spread Range**: {spread_pct:.2f}% (Diff between lowest and highest exchange)
-**Sources**: {len(valid_data)} / {len(exchanges_to_use)}
+**Sources**: {len(valid_data)} / {len(exchanges)}
 
 {df[['exchange', 'last', 'bid', 'ask', 'volume']].sort_values('last').to_markdown(index=False)}
 """
-    return ToolResult(content=[TextContent(text=summary)])
+    return summary
 
-async def get_arbitrage_spread(arguments: dict) -> ToolResult:
+
+
+async def get_arbitrage_spread(symbol: str = "BTC/USDT", exchanges: list[str] = None) -> str:
     """
     Scan for Arbitrage Opportunities (Simple Spatial).
     Compare Buy Low (Min Ask) vs Sell High (Max Bid).
     """
-    symbol = arguments.get("symbol", "BTC/USDT")
-    exchanges_to_use = arguments.get("exchanges", TOP_EXCHANGES)
+    if exchanges is None: exchanges = TOP_EXCHANGES
     
-    tasks = [fetch_price_safe(ex_id, symbol) for ex_id in exchanges_to_use]
+    tasks = [fetch_price_safe(ex_id, symbol) for ex_id in exchanges]
     results = await asyncio.gather(*tasks)
     
     valid = [r for r in results if "error" not in r and r['bid'] and r['ask']]
     
     if len(valid) < 2:
-        return ToolResult(isError=True, content=[TextContent(text="Need at least 2 exchanges with valid data.")])
+        return "Need at least 2 exchanges with valid data."
         
     df = pd.DataFrame(valid)
     
@@ -102,14 +108,16 @@ async def get_arbitrage_spread(arguments: dict) -> ToolResult:
 #### Details
 {df[['exchange', 'bid', 'ask', 'last']].sort_values('ask').to_markdown(index=False)}
 """
-    return ToolResult(content=[TextContent(text=output)])
+    return output
 
-async def get_global_funding_spread(arguments: dict) -> ToolResult:
+
+
+async def get_global_funding_spread(symbol: str = "BTC/USDT", exchanges: list[str] = None) -> str:
     """
     Compare Funding Rates across exchanges.
     """
-    symbol = arguments.get("symbol", "BTC/USDT:USDT") # Be careful with unified symbols
-    exchanges_to_use = arguments.get("exchanges", ['binance', 'bybit', 'okx', 'gateio', 'bitget'])
+    # symbol "BTC/USDT:USDT" usually
+    if exchanges is None: exchanges = ['binance', 'bybit', 'okx', 'gateio', 'bitget']
     
     async def fetch_funding(ex_id):
         try:
@@ -127,15 +135,16 @@ async def get_global_funding_spread(arguments: dict) -> ToolResult:
         except Exception as e:
             return {"exchange": ex_id, "error": str(e)}
             
-    tasks = [fetch_funding(ex_id) for ex_id in exchanges_to_use]
+    tasks = [fetch_funding(ex_id) for ex_id in exchanges]
     results = await asyncio.gather(*tasks)
     
     valid = [r for r in results if "error" not in r]
     
     if not valid:
-         return ToolResult(content=[TextContent(text="No funding data found.")])
+         return "No funding data found."
          
     df = pd.DataFrame(valid)
     df = df.sort_values('fundingRate', ascending=False)
     
-    return ToolResult(content=[TextContent(text=f"### Global Funding Rates: {symbol}\n\n{df.to_markdown()}")])
+    return f"### Global Funding Rates: {symbol}\n\n{df.to_markdown()}"
+

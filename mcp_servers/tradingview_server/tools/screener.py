@@ -2,7 +2,9 @@
 import json
 import requests
 import asyncio
-from shared.mcp.protocol import ToolResult, TextContent, ImageContent
+import json
+import requests
+import asyncio
 from shared.logging import get_logger
 
 logger = get_logger(__name__)
@@ -68,7 +70,8 @@ class TvScreener:
 
 # --- TOOL HANDLERS ---
 
-async def scan_market(arguments: dict) -> ToolResult:
+
+async def scan_market(market: str = "america", limit: int = 100000, preset: str = "market_cap") -> str:
     """
     General Screener Tool.
     Args:
@@ -76,10 +79,6 @@ async def scan_market(arguments: dict) -> ToolResult:
         limit (int): Max results (default 50).
         preset (str): "top_gainers", "top_losers", "most_active", "oversold", "overbought".
     """
-    market = arguments.get("market", "america")
-    limit = int(arguments.get("limit", 50))
-    preset = arguments.get("preset", "market_cap")
-    
     screener = TvScreener()
     query = {"sort": {"sortBy": "market_cap_basic", "sortOrder": "desc"}}
     
@@ -98,25 +97,27 @@ async def scan_market(arguments: dict) -> ToolResult:
         query["sort"] = {"sortBy": "RSI", "sortOrder": "desc"}
         
     data = screener.fetch(market=market, query=query, range_limit=limit)
-    return ToolResult(content=[TextContent(text=json.dumps(data, indent=2))])
+    return json.dumps(data, indent=2)
 
 
-async def get_bulk_data(arguments: dict) -> ToolResult:
+
+
+async def get_bulk_data(tickers: list[str], columns: list[str] = None, market: str = "america") -> str:
     """
     MULTI-TALENT: Fetch specific data columns for a list of tickers.
     Args:
         tickers (list[str]): ["NASDAQ:AAPL", "IDX:BBCA"]
-        columns (list[str]): ["close", "RSI", "volume", "sector"]
+        columns (list[str] | None): ["close", "RSI", "volume", "sector"]
         market (str): "america", "indonesia" (Required if not fully qualified)
     """
-    tickers = arguments.get("tickers")
-    columns = arguments.get("columns", ["close", "change", "volume", "RSI", "MACD.macd"])
-    market = arguments.get("market", "america")
-    
+    if columns is None:
+        columns = ["close", "change", "volume", "RSI", "MACD.macd"]
+        
     screener = TvScreener()
     # "symbol_list" triggers the bulk mode in fetch()
     query = {"symbol_list": tickers}
     
     data = screener.fetch(market=market, query=query, columns=columns, range_limit=len(tickers))
-    return ToolResult(content=[TextContent(text=json.dumps(data, indent=2))])
+    return json.dumps(data, indent=2)
+
 

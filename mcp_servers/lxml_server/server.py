@@ -104,7 +104,7 @@ def data_element_create(value: Any, type_annotation: str = None) -> str: return 
 @mcp.tool()
 def iterparse_counts(file_path: str, tag: str) -> int: return bulk_ops.iterparse_counts(file_path, tag)
 @mcp.tool()
-def iterparse_extract(file_path: str, tag: str, limit: int = 20) -> List[str]: return bulk_ops.iterparse_extract(file_path, tag, limit)
+def iterparse_extract(file_path: str, tag: str, limit: int = 100000) -> List[str]: return bulk_ops.iterparse_extract(file_path, tag, limit)
 @mcp.tool()
 def bulk_xpath_files(directory: str, xpath: str, extension: str = "*.xml") -> Dict[str, List[str]]: return bulk_ops.bulk_xpath_files(directory, xpath, extension)
 @mcp.tool()

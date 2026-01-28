@@ -1,8 +1,9 @@
 
-from shared.mcp.protocol import ToolResult
+
 from mcp_servers.finta_server.tools.universal import calculate_indicator
 
-async def calculate_chandelier(arguments: dict) -> ToolResult:
+
+async def calculate_chandelier(data: list[dict], params: dict = None) -> str:
     """CHANDELIER - Chandelier Exit."""
-    arguments['indicator'] = 'CHANDELIER'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'CHANDELIER', params)
+

@@ -1,18 +1,17 @@
 
-from shared.mcp.protocol import ToolResult, TextContent
+
 from mcp_servers.pandas_ta_server.tools.universal import calculate_indicator
 
-async def calculate_log_return(arguments: dict) -> ToolResult:
+
+async def calculate_log_return(data: list[dict], params: dict = None) -> str:
     """Calculate Logarithmic Returns."""
-    arguments['indicator'] = 'log_return'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'log_return', params)
 
-async def calculate_percent_return(arguments: dict) -> ToolResult:
+async def calculate_percent_return(data: list[dict], params: dict = None) -> str:
     """Calculate Percentage Returns."""
-    arguments['indicator'] = 'percent_return'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'percent_return', params)
 
-async def calculate_drawdown(arguments: dict) -> ToolResult:
+async def calculate_drawdown(data: list[dict], params: dict = None) -> str:
     """Calculate Drawdown."""
-    arguments['indicator'] = 'drawdown'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'drawdown', params)
+

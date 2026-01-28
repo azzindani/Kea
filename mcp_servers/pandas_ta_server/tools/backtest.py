@@ -1,10 +1,10 @@
 
-from shared.mcp.protocol import ToolResult, TextContent
-from mcp_servers.pandas_ta_server.tools.core import process_ohlcv, df_to_result
+from mcp_servers.pandas_ta_server.tools.core import process_ohlcv, df_to_json
 import pandas_ta as ta
 import pandas as pd
 
-async def simple_backtest(arguments: dict) -> ToolResult:
+
+async def simple_backtest(data: list[dict], entry_signal: str, exit_signal: str) -> str:
     """
     Run a Simple Backtest.
     Args:
@@ -14,9 +14,9 @@ async def simple_backtest(arguments: dict) -> ToolResult:
         # Simplistic: Buy on Entry, Sell on Exit.
     """
     try:
-        data = arguments.get("data")
-        entry_query = arguments.get("entry_signal")
-        exit_query = arguments.get("exit_signal")
+        # data = arguments.get("data")
+        # entry_query = arguments.get("entry_signal")
+        # exit_query = arguments.get("exit_signal")
         
         df = process_ohlcv(data)
         
@@ -24,8 +24,8 @@ async def simple_backtest(arguments: dict) -> ToolResult:
         df.ta.strategy("All", verbose=False)
         
         # 1. Identify Entry Points
-        entries = df.eval(entry_query) # Series of Booleans
-        exits = df.eval(exit_query)    # Series of Booleans
+        entries = df.eval(entry_signal) # Series of Booleans
+        exits = df.eval(exit_signal)    # Series of Booleans
         
         # 2. Simulate Trades (Vectorized-ish loop)
         in_trade = False
@@ -53,20 +53,21 @@ async def simple_backtest(arguments: dict) -> ToolResult:
                 
         # 3. Summarize
         if not trades:
-             return ToolResult(content=[TextContent(text="No trades generated.")])
+             return "No trades generated."
              
         df_trades = pd.DataFrame(trades)
         total_return = df_trades['pnl'].sum() * 100
         win_rate = len(df_trades[df_trades['pnl'] > 0]) / len(df_trades) * 100
         
         summary = f"### Backtest Results\n"
-        summary += f"**Entries**: {entry_query}\n"
-        summary += f"**Exits**: {exit_query}\n"
+        summary += f"**Entries**: {entry_signal}\n"
+        summary += f"**Exits**: {exit_signal}\n"
         summary += f"**Total Trades**: {len(trades)}\n"
         summary += f"**Total Return**: {total_return:.2f}%\n"
         summary += f"**Win Rate**: {win_rate:.2f}%\n"
         
-        return ToolResult(content=[TextContent(text=summary)])
+        return summary
         
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+

@@ -1,68 +1,57 @@
 
-from shared.mcp.protocol import ToolResult
+
 from mcp_servers.finta_server.tools.universal import calculate_indicator
 
-async def calculate_sma(arguments: dict) -> ToolResult:
+
+async def calculate_sma(data: list[dict], params: dict = None) -> str:
     """SMA - Simple Moving Average."""
-    arguments['indicator'] = 'SMA'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'SMA', params)
 
-async def calculate_ema(arguments: dict) -> ToolResult:
+async def calculate_ema(data: list[dict], params: dict = None) -> str:
     """EMA - Exponential Moving Average."""
-    arguments['indicator'] = 'EMA'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'EMA', params)
 
-async def calculate_dema(arguments: dict) -> ToolResult:
+async def calculate_dema(data: list[dict], params: dict = None) -> str:
     """DEMA - Double Exponential Moving Average."""
-    arguments['indicator'] = 'DEMA'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'DEMA', params)
 
-async def calculate_tema(arguments: dict) -> ToolResult:
+async def calculate_tema(data: list[dict], params: dict = None) -> str:
     """TEMA - Triple Exponential Moving Average."""
-    arguments['indicator'] = 'TEMA'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'TEMA', params)
 
-async def calculate_trima(arguments: dict) -> ToolResult:
+async def calculate_trima(data: list[dict], params: dict = None) -> str:
     """TRIMA - Triangular Moving Average."""
-    arguments['indicator'] = 'TRIMA'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'TRIMA', params)
 
-async def calculate_wma(arguments: dict) -> ToolResult:
+async def calculate_wma(data: list[dict], params: dict = None) -> str:
     """WMA - Weighted Moving Average."""
-    arguments['indicator'] = 'WMA'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'WMA', params)
 
-async def calculate_hma(arguments: dict) -> ToolResult:
+async def calculate_hma(data: list[dict], params: dict = None) -> str:
     """HMA - Hull Moving Average."""
-    arguments['indicator'] = 'HMA'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'HMA', params)
 
-async def calculate_zlema(arguments: dict) -> ToolResult:
+async def calculate_zlema(data: list[dict], params: dict = None) -> str:
     """ZLEMA - Zero Lag EMA."""
-    arguments['indicator'] = 'ZLEMA'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'ZLEMA', params)
 
-async def calculate_adx(arguments: dict) -> ToolResult:
+async def calculate_adx(data: list[dict], params: dict = None) -> str:
     """ADX - Average Directional Index."""
-    arguments['indicator'] = 'ADX'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'ADX', params)
 
-async def calculate_ssma(arguments: dict) -> ToolResult:
+async def calculate_ssma(data: list[dict], params: dict = None) -> str:
     """SSMA - Smoothed SMA."""
-    arguments['indicator'] = 'SSMA'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'SSMA', params)
 
-async def calculate_smma(arguments: dict) -> ToolResult:
+async def calculate_smma(data: list[dict], params: dict = None) -> str:
     """SMMA - Smoothed Moving Average."""
-    arguments['indicator'] = 'SMMA'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'SMMA', params)
 
-async def calculate_frama(arguments: dict) -> ToolResult:
+async def calculate_frama(data: list[dict], params: dict = None) -> str:
     """FRAMA - Fractal Adaptive Moving Average."""
-    arguments['indicator'] = 'FRAMA'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'FRAMA', params)
 
-async def calculate_sar(arguments: dict) -> ToolResult:
+async def calculate_sar(data: list[dict], params: dict = None) -> str:
     """SAR - Stop and Reverse."""
-    arguments['indicator'] = 'SAR'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'SAR', params)
+

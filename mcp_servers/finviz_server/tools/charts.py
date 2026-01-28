@@ -1,19 +1,21 @@
 
 from finvizfinance.quote import finvizfinance
-from shared.mcp.protocol import ToolResult, TextContent
+
 from shared.logging import get_logger
 
 logger = get_logger(__name__)
 
-async def get_chart_url(arguments: dict) -> ToolResult:
+
+async def get_chart_url(ticker: str, timeframe: str = "daily", type: str = "candle") -> str:
     """
     Get Finviz Chart Image URL.
     timeframe: "daily" (d), "weekly" (w), "monthly" (m)
     type: "candle", "line"
     """
-    ticker = arguments.get("ticker")
-    timeframe = arguments.get("timeframe", "daily")
-    chart_type = arguments.get("type", "candle")
+    # ticker = arguments.get("ticker")
+    # timeframe = arguments.get("timeframe", "daily")
+    # chart_type = arguments.get("type", "candle")
+    chart_type = type # Rename to avoid conflict with 'type' builtin (though ok in signature)
     
     try:
         # Map nice names to finviz codes if needed
@@ -34,7 +36,8 @@ async def get_chart_url(arguments: dict) -> ToolResult:
         
         url = f"https://finviz.com/chart.ashx?t={ticker}&ty={ty_code}&ta=1&p={tf_code}&s=l"
         
-        return ToolResult(content=[TextContent(text=url)])
+        return url
         
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+

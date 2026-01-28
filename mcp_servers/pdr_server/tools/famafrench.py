@@ -1,21 +1,19 @@
 
 import pandas_datareader.data as web
 import pandas_datareader.famafrench as ff
-from shared.mcp.protocol import ToolResult, TextContent
+
 from shared.logging import get_logger
 import pandas as pd
 import datetime
 
 logger = get_logger(__name__)
 
-async def get_fama_french_data(arguments: dict, dataset_name: str = None) -> ToolResult:
+async def get_fama_french_data(dataset_name: str = None, start_date: str = None, end_date: str = None) -> str:
     """
     Get Fama-French Data.
     dataset_name: Code (e.g., 'F-F_Research_Data_Factors').
     """
-    name = dataset_name or arguments.get("dataset_name")
-    start_date = arguments.get("start_date")
-    end_date = arguments.get("end_date")
+    name = dataset_name
     
     if not start_date:
         # Default to last 5 years
@@ -29,7 +27,7 @@ async def get_fama_french_data(arguments: dict, dataset_name: str = None) -> Too
         ds = web.DataReader(name, "famafrench", start=start, end=end_date)
         
         if not ds:
-            return ToolResult(content=[TextContent(text="No data found.")])
+            return "No data found."
             
         # Format output
         # Keys are usually integers 0, 1, ... describing the tables (Monthly, Annual)
@@ -43,11 +41,12 @@ async def get_fama_french_data(arguments: dict, dataset_name: str = None) -> Too
             if k == 'DESCR': continue
             output += f"#### Table {k}\n{v.tail(20).to_markdown()}\n\n"
             
-        return ToolResult(content=[TextContent(text=output)])
+        return output
         
     except Exception as e:
         logger.error(f"FamaFrench error {name}: {e}")
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+
 
 # Mapping of Friendly Name -> Code
 # Source: http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html

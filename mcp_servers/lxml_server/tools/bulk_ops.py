@@ -18,7 +18,7 @@ def iterparse_counts(file_path: str, tag: str) -> int:
     except Exception:
         return -1
 
-def iterparse_extract(file_path: str, tag: str, limit: int = 20) -> List[str]:
+def iterparse_extract(file_path: str, tag: str, limit: int = 100000) -> List[str]:
     """Extract specific subtrees via streaming."""
     try:
         items = []

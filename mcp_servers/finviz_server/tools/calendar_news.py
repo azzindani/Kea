@@ -1,18 +1,18 @@
 
 from finvizfinance.earnings import Earnings
 from finvizfinance.news import News
-from shared.mcp.protocol import ToolResult, TextContent
 from shared.logging import get_logger
 import pandas as pd
 
 logger = get_logger(__name__)
 
-async def get_earnings_calendar(arguments: dict) -> ToolResult:
+
+async def get_earnings_calendar(period: str = "This Week") -> str:
     """
     Get Earnings Calendar.
     period: "This Week", "Next Week", "Previous Week", "This Month"
     """
-    period = arguments.get("period", "This Week")
+    # period = arguments.get("period", "This Week")
     try:
         earn = Earnings()
         # Returns dict of dataframes or single df? Library varies.
@@ -47,7 +47,7 @@ async def get_earnings_calendar(arguments: dict) -> ToolResult:
         # Let's assume `screener_view` exists or `get_data`.
         # Actually, let's look at `News`.
         
-        return ToolResult(content=[TextContent(text=f"### Earnings: {period}\n\n{df.head(50).to_markdown()}")])
+        return f"### Earnings: {period}\n\n{df.head(50).to_markdown()}"
 
     except Exception as e:
         # Try generic "Overview" with earnings filter if simpler?
@@ -56,16 +56,18 @@ async def get_earnings_calendar(arguments: dict) -> ToolResult:
            # Retry with .main() if it exists (common in some forks)
            earn = Earnings()
            # Some versions use .get_earnings() or similar
-           return ToolResult(isError=True, content=[TextContent(text=f"Library specifics ambiguous: {e}")])
+           return f"Library specifics ambiguous: {e}"
         except:
-           return ToolResult(isError=True, content=[TextContent(text=str(e))])
+           return f"Error: {str(e)}"
 
-async def get_market_news(arguments: dict) -> ToolResult:
+
+
+async def get_market_news(mode: str = "news") -> str:
     """
     Get General Market News.
     mode: "news" or "blogs"
     """
-    mode = arguments.get("mode", "news")
+    # mode = arguments.get("mode", "news")
     try:
         n = News()
         # get_news returns dict {'news': df, 'blogs': df}
@@ -73,9 +75,10 @@ async def get_market_news(arguments: dict) -> ToolResult:
         
         if mode in data:
             df = data[mode]
-            return ToolResult(content=[TextContent(text=f"### Market {mode.title()}\n\n{df.head(20).to_markdown()}")])
+            return f"### Market {mode.title()}\n\n{df.head(20).to_markdown()}"
             
-        return ToolResult(content=[TextContent(text=str(data.keys()))])
+        return str(data.keys())
     except Exception as e:
         logger.error(f"News error: {e}")
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+

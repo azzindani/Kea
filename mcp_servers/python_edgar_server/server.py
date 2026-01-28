@@ -1,68 +1,114 @@
 
-from __future__ import annotations
+from mcp.server.fastmcp import FastMCP
+from mcp_servers.python_edgar_server.tools import (
+    discovery, content, financials, ownership, 
+    sections_deep, bulk_analysis, xbrl_deep, funds
+)
+import structlog
 import asyncio
-from shared.mcp.server_base import MCPServer
-from shared.logging import get_logger
 
-# Tools
-from mcp_servers.python_edgar_server.tools.discovery import analyze_company_profile, find_filings
-from mcp_servers.python_edgar_server.tools.content import get_filing_text, get_filing_sections
-from mcp_servers.python_edgar_server.tools.financials import get_financial_statements, get_key_metrics
-# Phase 2
-from mcp_servers.python_edgar_server.tools.ownership import get_insider_trades, get_institutional_holdings
-from mcp_servers.python_edgar_server.tools.sections_deep import get_filing_section_content
-# Phase 3
-from mcp_servers.python_edgar_server.tools.bulk_analysis import get_bulk_company_facts, get_financial_history
-from mcp_servers.python_edgar_server.tools.xbrl_deep import get_xbrl_tag_values, search_xbrl_tags
-from mcp_servers.python_edgar_server.tools.funds import get_fund_portfolio
+logger = structlog.get_logger()
 
-logger = get_logger(__name__)
+# Create the FastMCP server
+mcp = FastMCP("python_edgar_server", dependencies=["edgartools", "pandas"])
 
-class PythonEdgarServer(MCPServer):
-    """
-    Python-Edgar (EdgarTools) MCP Server.
-    Object-Oriented Parsing and XBRL Extraction.
-    """
-    
-    def __init__(self) -> None:
-        super().__init__(name="python_edgar_server", version="1.0.0")
-        self._register_tools()
+async def run_op(op_func, **kwargs):
+    """Helper to run legacy tool ops that expect a dict and return ToolResult."""
+    try:
+        # The tools expect a single 'arguments' dict.
+        result = await op_func(kwargs)
         
-    def _register_tools(self) -> None:
-        # 1. Discovery
-        self.register_tool(name="analyze_company_profile", description="PROFILE: Facts & Recent Filings.", handler=analyze_company_profile, parameters={"ticker": {"type": "string"}})
-        self.register_tool(name="find_filings", description="SEARCH: Find Filings.", handler=find_filings, parameters={"ticker": {"type": "string"}, "form": {"type": "string"}, "limit": {"type": "number"}})
+        # Unwrap ToolResult
+        if hasattr(result, 'content') and result.content:
+            text_content = ""
+            for item in result.content:
+                if hasattr(item, 'text'):
+                    text_content += item.text + "\n"
+            return text_content.strip()
         
-        # 2. Content
-        self.register_tool(name="get_filing_text", description="PARSE: Get Markdown Content.", handler=get_filing_text, parameters={"ticker": {"type": "string"}, "form": {"type": "string"}})
-        self.register_tool(name="get_filing_sections", description="PARSE: List Sections (Items).", handler=get_filing_sections, parameters={"ticker": {"type": "string"}, "form": {"type": "string"}})
-        
-        # 3. Financials
-        self.register_tool(name="get_financial_statements", description="XBRL: Income/Balance/Cash.", handler=get_financial_statements, parameters={"ticker": {"type": "string"}, "statement": {"type": "string"}})
-        self.register_tool(name="get_financial_metrics", description="XBRL: Key Metrics.", handler=get_key_metrics, parameters={"ticker": {"type": "string"}})
+        if hasattr(result, 'isError') and result.isError:
+            return "Error: Tool returned error status."
+            
+        return str(result)
+    except Exception as e:
+        return f"Error executing tool: {e}"
 
-        # 4. Ownership & Intelligence (Phase 2)
-        self.register_tool(name="get_insider_trades", description="OWNERSHIP: Insider Forms.", handler=get_insider_trades, parameters={"ticker": {"type": "string"}, "limit": {"type": "number"}})
-        self.register_tool(name="get_institutional_holdings", description="OWNERSHIP: 13F Funds.", handler=get_institutional_holdings, parameters={"ticker": {"type": "string"}})
-        self.register_tool(name="get_filing_section_content", description="PARSE: Get Item Text.", handler=get_filing_section_content, parameters={"ticker": {"type": "string"}, "form": {"type": "string"}, "item": {"type": "string"}})
+# 1. Discovery
+@mcp.tool()
+async def analyze_company_profile(ticker: str) -> str:
+    """PROFILE: Facts & Recent Filings."""
+    return await run_op(discovery.analyze_company_profile, ticker=ticker)
 
-        # 5. Bulk Analysis (Phase 3)
-        self.register_tool(name="get_bulk_company_facts", description="BULK: Metadata Map.", handler=get_bulk_company_facts, parameters={"tickers": {"type": "string"}}) # Comma-sep
-        self.register_tool(name="get_financial_history", description="BULK: History.", handler=get_financial_history, parameters={"ticker": {"type": "string"}})
+@mcp.tool()
+async def find_filings(ticker: str, form: str = None, limit: int = 100000) -> str:
+    """SEARCH: Find Filings."""
+    return await run_op(discovery.find_filings, ticker=ticker, form=form, limit=limit)
 
-        # Phase 4
-        self.register_tool(name="get_xbrl_tag_values", description="XBRL: Deep Tag Extraction.", handler=get_xbrl_tag_values, parameters={"ticker": {"type": "string"}, "tag": {"type": "string"}})
-        self.register_tool(name="search_xbrl_tags", description="XBRL: Tag Search.", handler=search_xbrl_tags, parameters={"ticker": {"type": "string"}, "query": {"type": "string"}})
+# 2. Content
+@mcp.tool()
+async def get_filing_text(ticker: str, form: str) -> str:
+    """PARSE: Get Markdown Content."""
+    return await run_op(content.get_filing_text, ticker=ticker, form=form)
 
-        # Phase 5
-        self.register_tool(name="get_fund_portfolio", description="FUNDS: 13F Portfolio.", handler=get_fund_portfolio, parameters={"ticker": {"type": "string"}})
+@mcp.tool()
+async def get_filing_sections(ticker: str, form: str) -> str:
+    """PARSE: List Sections (Items)."""
+    return await run_op(content.get_filing_sections, ticker=ticker, form=form)
 
-async def main() -> None:
-    from shared.logging import setup_logging, LogConfig
-    setup_logging(LogConfig(level="DEBUG", format="console", service_name="python_edgar_server"))
-    server = PythonEdgarServer()
-    logger.info(f"Starting PythonEdgarServer with {len(server.get_tools())} tools")
-    await server.run()
+# 3. Financials
+@mcp.tool()
+async def get_financial_statements(ticker: str, statement: str) -> str:
+    """XBRL: Income/Balance/Cash."""
+    return await run_op(financials.get_financial_statements, ticker=ticker, statement=statement)
+
+@mcp.tool()
+async def get_financial_metrics(ticker: str) -> str:
+    """XBRL: Key Metrics."""
+    return await run_op(financials.get_key_metrics, ticker=ticker)
+
+# 4. Ownership & Intelligence (Phase 2)
+@mcp.tool()
+async def get_insider_trades(ticker: str, limit: int = None) -> str:
+    """OWNERSHIP: Insider Forms."""
+    return await run_op(ownership.get_insider_trades, ticker=ticker, limit=limit)
+
+@mcp.tool()
+async def get_institutional_holdings(ticker: str) -> str:
+    """OWNERSHIP: 13F Funds."""
+    return await run_op(ownership.get_institutional_holdings, ticker=ticker)
+
+@mcp.tool()
+async def get_filing_section_content(ticker: str, form: str, item: str) -> str:
+    """PARSE: Get Item Text."""
+    return await run_op(sections_deep.get_filing_section_content, ticker=ticker, form=form, item=item)
+
+# 5. Bulk Analysis (Phase 3)
+@mcp.tool()
+async def get_bulk_company_facts(tickers: str) -> str:
+    """BULK: Metadata Map (Comma-sep tickers)."""
+    return await run_op(bulk_analysis.get_bulk_company_facts, tickers=tickers)
+
+@mcp.tool()
+async def get_financial_history(ticker: str) -> str:
+    """BULK: History."""
+    return await run_op(bulk_analysis.get_financial_history, ticker=ticker)
+
+# Phase 4
+@mcp.tool()
+async def get_xbrl_tag_values(ticker: str, tag: str) -> str:
+    """XBRL: Deep Tag Extraction."""
+    return await run_op(xbrl_deep.get_xbrl_tag_values, ticker=ticker, tag=tag)
+
+@mcp.tool()
+async def search_xbrl_tags(ticker: str, query: str) -> str:
+    """XBRL: Tag Search."""
+    return await run_op(xbrl_deep.search_xbrl_tags, ticker=ticker, query=query)
+
+# Phase 5
+@mcp.tool()
+async def get_fund_portfolio(ticker: str) -> str:
+    """FUNDS: 13F Portfolio."""
+    return await run_op(funds.get_fund_portfolio, ticker=ticker)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    mcp.run()

@@ -2,73 +2,71 @@
 import pandas as pd
 import yfinance as yf
 import numpy as np
-from shared.mcp.protocol import ToolResult, TextContent
+
+import pandas as pd
+import yfinance as yf
+import numpy as np
+from typing import List, Optional
 from shared.logging import get_logger
 
 logger = get_logger(__name__)
 
-async def get_analyst_recommendations(arguments: dict) -> ToolResult:
+async def get_analyst_recommendations(ticker: str) -> str:
     """Get analyst recommendations."""
-    ticker = arguments.get("ticker")
     try:
         df = yf.Ticker(ticker).recommendations
-        return ToolResult(content=[TextContent(text=df.to_markdown() if df is not None and not df.empty else "N/A")])
+        return df.to_markdown() if df is not None and not df.empty else "N/A"
     except Exception as e:
         logger.error(f"Error in recommendations for {ticker}: {e}")
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_price_targets(arguments: dict) -> ToolResult:
+async def get_price_targets(ticker: str) -> str:
     """Get analyst price targets."""
-    ticker = arguments.get("ticker")
     try:
         info = yf.Ticker(ticker).info
         targets = {k: info.get(k) for k in ["targetHighPrice", "targetLowPrice", "targetMeanPrice", "targetMedianPrice", "numberOfAnalystOpinions"]}
-        return ToolResult(content=[TextContent(text=str(targets))])
+        return str(targets)
     except Exception as e:
         logger.error(f"Error in price targets for {ticker}: {e}")
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_earnings_calendar(arguments: dict) -> ToolResult:
+async def get_earnings_calendar(ticker: str) -> str:
     """Get earnings calendar."""
-    ticker = arguments.get("ticker")
     try:
         cal = yf.Ticker(ticker).calendar
-        return ToolResult(content=[TextContent(text=str(cal))])
+        return str(cal)
     except Exception as e:
         logger.error(f"Error in calendar for {ticker}: {e}")
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_upgrades_downgrades(arguments: dict) -> ToolResult:
+async def get_upgrades_downgrades(ticker: str) -> str:
     """Get upgrades and downgrades."""
-    ticker = arguments.get("ticker")
     try:
         df = yf.Ticker(ticker).upgrades_downgrades
-        return ToolResult(content=[TextContent(text=df.head(20).to_markdown() if df is not None and not df.empty else "N/A")])
+        return df.head(20).to_markdown() if df is not None and not df.empty else "N/A"
     except Exception as e:
         logger.error(f"Error in upgrades for {ticker}: {e}")
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_dividends_history(arguments: dict) -> ToolResult:
+async def get_dividends_history(ticker: str) -> str:
     """Get dividends history."""
-    ticker = arguments.get("ticker")
     try:
         s = yf.Ticker(ticker).dividends
-        return ToolResult(content=[TextContent(text=s.to_markdown() if s is not None and not s.empty else "N/A")])
+        return s.to_markdown() if s is not None and not s.empty else "N/A"
     except Exception as e:
         logger.error(f"Error in dividends for {ticker}: {e}")
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_splits_history(arguments: dict) -> ToolResult:
+async def get_splits_history(ticker: str) -> str:
     """Get splits history."""
-    ticker = arguments.get("ticker")
     try:
         s = yf.Ticker(ticker).splits
-        return ToolResult(content=[TextContent(text=s.to_markdown() if s is not None and not s.empty else "N/A")])
+        return s.to_markdown() if s is not None and not s.empty else "N/A"
     except Exception as e:
         logger.error(f"Error in splits for {ticker}: {e}")
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def calculate_indicators(arguments: dict) -> ToolResult:
+async def calculate_indicators(ticker: str, indicators: List[str] = ["sma", "rsi"], period: str = "1y", interval: str = "1d") -> str:
     """
     Calculate technical indicators for a given ticker.
     Args:
@@ -77,15 +75,11 @@ async def calculate_indicators(arguments: dict) -> ToolResult:
         period (str): "1y" (default)
         interval (str): "1d" (default)
     """
-    ticker = arguments.get("ticker")
-    indicators = arguments.get("indicators", ["sma", "rsi"])
-    period = arguments.get("period", "1y")
-    interval = arguments.get("interval", "1d")
     
     try:
         df = yf.Ticker(ticker).history(period=period, interval=interval)
         if df.empty:
-            return ToolResult(isError=True, content=[TextContent(text=f"No data found for {ticker}")])
+            return f"No data found for {ticker}"
             
         # Ensure we have data
         # Calculate requested indicators using Standard Pandas
@@ -143,10 +137,9 @@ async def calculate_indicators(arguments: dict) -> ToolResult:
         # Convert to CSV string for the model to read
         csv_data = output_df.to_csv()
         
-        return ToolResult(content=[
-            TextContent(text=f"Technical indicators for {ticker} ({', '.join(summary)}):\n\n{csv_data}")
-        ])
+        return f"Technical indicators for {ticker} ({', '.join(summary)}):\n\n{csv_data}"
 
     except Exception as e:
         logger.error(f"Analysis failed for {ticker}: {e}")
-        return ToolResult(isError=True, content=[TextContent(text=f"Analysis failed: {str(e)}")])
+        return f"Analysis failed: {str(e)}"
+

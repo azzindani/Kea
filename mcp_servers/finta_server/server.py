@@ -1,170 +1,418 @@
-
-from __future__ import annotations
-import asyncio
-from shared.mcp.server_base import MCPServer
-from shared.logging import get_logger
-
-# Import Tools
-from mcp_servers.finta_server.tools.bulk import (
-    get_all_indicators, get_momentum_suite, get_trend_suite, 
-    get_volatility_suite, get_volume_suite
+from mcp.server.fastmcp import FastMCP
+from mcp_servers.finta_server.tools import (
+    bulk, universal, momentum, trend, volatility, volume, 
+    exotics, levels, pressure, clouds, advanced_oscillators, 
+    volume_flow, weighted, zones, exits_math
 )
-from mcp_servers.finta_server.tools.universal import calculate_indicator
+import structlog
 
-# Shortcuts
-from mcp_servers.finta_server.tools.momentum import (
-    calculate_rsi, calculate_macd, calculate_stoch, calculate_tsi, calculate_uo,
-    calculate_roc, calculate_mom, calculate_ao, calculate_williams, calculate_cmo,
-    calculate_coppock, calculate_fish, calculate_kama, calculate_vortex, calculate_kst
-)
-from mcp_servers.finta_server.tools.trend import (
-    calculate_sma, calculate_ema, calculate_dema, calculate_tema, calculate_trima,
-    calculate_wma, calculate_hma, calculate_zlema, calculate_adx, calculate_ssma,
-    calculate_smma, calculate_frama, calculate_sar
-)
-from mcp_servers.finta_server.tools.volatility import (
-    calculate_atr, calculate_bbands, calculate_kc, calculate_do, calculate_mobo,
-    calculate_tr, calculate_bbwidth, calculate_percent_b, calculate_apz, calculate_massi
-)
-from mcp_servers.finta_server.tools.volume import (
-    calculate_obv, calculate_mfi, calculate_adl, calculate_chaikin, calculate_efi,
-    calculate_vpt, calculate_emv, calculate_nvi, calculate_pvi, calculate_vzo
-)
-from mcp_servers.finta_server.tools.exotics import (
-    calculate_wto, calculate_stc, calculate_ev_macd, calculate_alma, calculate_vama
-)
-from mcp_servers.finta_server.tools.levels import calculate_pivot, calculate_fib_pivot
-from mcp_servers.finta_server.tools.pressure import calculate_basp, calculate_ebbp
-# Phase 3
-from mcp_servers.finta_server.tools.clouds import calculate_ichimoku
-from mcp_servers.finta_server.tools.advanced_oscillators import (
-    calculate_trix, calculate_ift_rsi, calculate_sqzmi, calculate_mi
-)
-from mcp_servers.finta_server.tools.volume_flow import (
-    calculate_vfi, calculate_fve, calculate_qstick, calculate_msd
-)
-# Phase 4
-from mcp_servers.finta_server.tools.weighted import calculate_vwap, calculate_evwma, calculate_wobv
-from mcp_servers.finta_server.tools.zones import calculate_pzo, calculate_cfi, calculate_tp
-from mcp_servers.finta_server.tools.exits_math import calculate_chandelier
+logger = structlog.get_logger()
 
-logger = get_logger(__name__)
+# Create the FastMCP server
+mcp = FastMCP("finta_server", dependencies=["pandas", "finta"])
 
-class FintaServer(MCPServer):
-    """
-    Finta MCP Server.
-    Provides 50+ Technical Analysis Tools.
-    """
-    
-    def __init__(self) -> None:
-        super().__init__(name="finta_server", version="1.0.0")
-        self._register_tools()
-        
-    def _register_tools(self) -> None:
-        # 1. Bulk / Multitalent (High Value)
-        self.register_tool(name="get_all_indicators", description="BULK: Calculate 80+ Indicators.", handler=get_all_indicators, parameters={"data": {"type": "array"}})
-        self.register_tool(name="get_momentum_suite", description="BULK: All Momentum Indicators.", handler=get_momentum_suite, parameters={"data": {"type": "array"}})
-        self.register_tool(name="get_trend_suite", description="BULK: All Trend Indicators.", handler=get_trend_suite, parameters={"data": {"type": "array"}})
-        self.register_tool(name="get_volatility_suite", description="BULK: All Volatility Indicators.", handler=get_volatility_suite, parameters={"data": {"type": "array"}})
-        self.register_tool(name="get_volume_suite", description="BULK: All Volume Indicators.", handler=get_volume_suite, parameters={"data": {"type": "array"}})
-        
-        # 2. Universal
-        self.register_tool(name="calculate_indicator", description="UNIVERSAL: Calculate Any Indicator (SMA, RSI, etc).", handler=calculate_indicator, parameters={"data": {"type": "array"}, "indicator": {"type": "string"}, "params": {"type": "object"}})
-        
-        # 3. Momentum Shortcuts (15)
-        self.register_tool(name="calculate_rsi", description="MOMENTUM: RSI.", handler=calculate_rsi, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_macd", description="MOMENTUM: MACD.", handler=calculate_macd, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_stoch", description="MOMENTUM: Stochastic.", handler=calculate_stoch, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_tsi", description="MOMENTUM: TSI.", handler=calculate_tsi, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_uo", description="MOMENTUM: Ultimate Osc.", handler=calculate_uo, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_roc", description="MOMENTUM: Rate of Change.", handler=calculate_roc, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_mom", description="MOMENTUM: Momentum.", handler=calculate_mom, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_ao", description="MOMENTUM: AO.", handler=calculate_ao, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_williams", description="MOMENTUM: Williams %R.", handler=calculate_williams, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_cmo", description="MOMENTUM: CMO.", handler=calculate_cmo, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_coppock", description="MOMENTUM: Coppock Curve.", handler=calculate_coppock, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_fish", description="MOMENTUM: Fisher Transform.", handler=calculate_fish, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_kama", description="MOMENTUM: KAMA.", handler=calculate_kama, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_vortex", description="MOMENTUM: Vortex.", handler=calculate_vortex, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_kst", description="MOMENTUM: KST.", handler=calculate_kst, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
+# --- 1. BULK / SUITE TOOLS ---
+@mcp.tool()
+async def get_all_indicators(data: list[dict]) -> str:
+    """BULK: Calculate 80+ Indicators."""
+    return await bulk.get_all_indicators(data)
 
-        # 4. Trend Shortcuts (13)
-        self.register_tool(name="calculate_sma", description="TREND: SMA.", handler=calculate_sma, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_ema", description="TREND: EMA.", handler=calculate_ema, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_dema", description="TREND: DEMA.", handler=calculate_dema, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_tema", description="TREND: TEMA.", handler=calculate_tema, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_trima", description="TREND: TRIMA.", handler=calculate_trima, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_wma", description="TREND: WMA.", handler=calculate_wma, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_hma", description="TREND: HMA.", handler=calculate_hma, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_zlema", description="TREND: ZLEMA.", handler=calculate_zlema, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_adx", description="TREND: ADX.", handler=calculate_adx, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_ssma", description="TREND: SSMA.", handler=calculate_ssma, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_smma", description="TREND: SMMA.", handler=calculate_smma, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_frama", description="TREND: FRAMA.", handler=calculate_frama, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_sar", description="TREND: SAR.", handler=calculate_sar, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
+@mcp.tool()
+async def get_momentum_suite(data: list[dict]) -> str:
+    """BULK: All Momentum Indicators."""
+    return await bulk.get_momentum_suite(data)
 
-        # 5. Volatility Shortcuts (10)
-        self.register_tool(name="calculate_atr", description="VOLATILITY: ATR.", handler=calculate_atr, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_bbands", description="VOLATILITY: Bollinger Bands.", handler=calculate_bbands, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_kc", description="VOLATILITY: Keltner Channels.", handler=calculate_kc, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_do", description="VOLATILITY: Donchian Channels.", handler=calculate_do, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_mobo", description="VOLATILITY: MOBO Bands.", handler=calculate_mobo, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_tr", description="VOLATILITY: True Range.", handler=calculate_tr, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_bbwidth", description="VOLATILITY: BB Width.", handler=calculate_bbwidth, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_percent_b", description="VOLATILITY: Percent B.", handler=calculate_percent_b, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_apz", description="VOLATILITY: APZ.", handler=calculate_apz, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_massi", description="VOLATILITY: Mass Index.", handler=calculate_massi, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
+@mcp.tool()
+async def get_trend_suite(data: list[dict]) -> str:
+    """BULK: All Trend Indicators."""
+    return await bulk.get_trend_suite(data)
 
-        # 6. Volume Shortcuts (10)
-        self.register_tool(name="calculate_obv", description="VOLUME: OBV.", handler=calculate_obv, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_mfi", description="VOLUME: MFI.", handler=calculate_mfi, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_adl", description="VOLUME: ADL.", handler=calculate_adl, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_chaikin", description="VOLUME: Chaikin Osc.", handler=calculate_chaikin, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_efi", description="VOLUME: Force Index.", handler=calculate_efi, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_vpt", description="VOLUME: Volume Price Trend.", handler=calculate_vpt, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_emv", description="VOLUME: Ease of Move.", handler=calculate_emv, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_nvi", description="VOLUME: NVI.", handler=calculate_nvi, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_pvi", description="VOLUME: PVI.", handler=calculate_pvi, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_vzo", description="VOLUME: VZO.", handler=calculate_vzo, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
+@mcp.tool()
+async def get_volatility_suite(data: list[dict]) -> str:
+    """BULK: All Volatility Indicators."""
+    return await bulk.get_volatility_suite(data)
 
-        # 7. Exotics & Levels (Phase 2)
-        self.register_tool(name="calculate_wto", description="EXOTIC: Wave Trend.", handler=calculate_wto, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_stc", description="EXOTIC: STC.", handler=calculate_stc, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_ev_macd", description="EXOTIC: Elastic Volume MACD.", handler=calculate_ev_macd, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_alma", description="EXOTIC: ALMA.", handler=calculate_alma, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_vama", description="EXOTIC: VAMA.", handler=calculate_vama, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        
-        self.register_tool(name="calculate_pivot", description="LEVELS: Pivot Points.", handler=calculate_pivot, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_fib_pivot", description="LEVELS: Fibonacci Pivots.", handler=calculate_fib_pivot, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        
-        self.register_tool(name="calculate_basp", description="PRESSURE: Buy/Sell Pressure.", handler=calculate_basp, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_ebbp", description="PRESSURE: Bull/Bear Power.", handler=calculate_ebbp, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
+@mcp.tool()
+async def get_volume_suite(data: list[dict]) -> str:
+    """BULK: All Volume Indicators."""
+    return await bulk.get_volume_suite(data)
 
-        # 8. Clouds & Flow (Phase 3)
-        self.register_tool(name="calculate_ichimoku", description="CLOUD: Ichimoku.", handler=calculate_ichimoku, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_trix", description="OSC: TRIX.", handler=calculate_trix, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_ift_rsi", description="OSC: Inverse Fisher RSI.", handler=calculate_ift_rsi, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_sqzmi", description="OSC: Squeeze Momentum.", handler=calculate_sqzmi, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_vfi", description="FLOW: Volume Flow.", handler=calculate_vfi, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_fve", description="FLOW: Finite Volume Element.", handler=calculate_fve, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_qstick", description="FLOW: QStick.", handler=calculate_qstick, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_msd", description="MATH: Moving Std Dev.", handler=calculate_msd, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
+# --- 2. UNIVERSAL ---
+@mcp.tool()
+async def calculate_indicator(data: list[dict], indicator: str, params: dict = None) -> str:
+    """UNIVERSAL: Calculate Any Indicator (e.g. 'RSI')."""
+    return await universal.calculate_indicator(data, indicator, params)
 
-        # 9. Precision & Weighted (Phase 4)
-        self.register_tool(name="calculate_vwap", description="WEIGHTED: VWAP.", handler=calculate_vwap, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_evwma", description="WEIGHTED: EVWMA.", handler=calculate_evwma, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_wobv", description="WEIGHTED: Weighted OBV.", handler=calculate_wobv, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_pzo", description="ZONE: Price Zone Osc.", handler=calculate_pzo, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_cfi", description="ZONE: Cumulative Force.", handler=calculate_cfi, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_tp", description="MATH: Typical Price.", handler=calculate_tp, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
-        self.register_tool(name="calculate_chandelier", description="EXIT: Chandelier.", handler=calculate_chandelier, parameters={"data": {"type": "array"}, "params": {"type": "object"}})
+# --- 3. MOMENTUM SHORTCUTS ---
+@mcp.tool()
+async def calculate_rsi(data: list[dict], params: dict = None) -> str:
+    """MOMENTUM: RSI."""
+    return await momentum.calculate_rsi(data, params)
 
-async def main() -> None:
-    from shared.logging import setup_logging, LogConfig
-    setup_logging(LogConfig(level="DEBUG", format="console", service_name="finta_server"))
-    server = FintaServer()
-    logger.info(f"Starting FintaServer with {len(server.get_tools())} tools")
-    await server.run()
+@mcp.tool()
+async def calculate_macd(data: list[dict], params: dict = None) -> str:
+    """MOMENTUM: MACD."""
+    return await momentum.calculate_macd(data, params)
+
+@mcp.tool()
+async def calculate_stoch(data: list[dict], params: dict = None) -> str:
+    """MOMENTUM: Stochastic."""
+    return await momentum.calculate_stoch(data, params)
+
+# ... (We can expose all shortcuts if desired, but Universal covers everything)
+# Let's verify instructions: "Refactor ... remaining finance servers -> FastMCP".
+# I should expose the tools listed in the original server.py to maintain parity.
+
+@mcp.tool()
+async def calculate_tsi(data: list[dict], params: dict = None) -> str:
+    """MOMENTUM: TSI."""
+    return await momentum.calculate_tsi(data, params)
+
+@mcp.tool()
+async def calculate_uo(data: list[dict], params: dict = None) -> str:
+    """MOMENTUM: Ultimate Oscillator."""
+    return await momentum.calculate_uo(data, params)
+
+@mcp.tool()
+async def calculate_roc(data: list[dict], params: dict = None) -> str:
+    """MOMENTUM: Rate of Change."""
+    return await momentum.calculate_roc(data, params)
+
+@mcp.tool()
+async def calculate_mom(data: list[dict], params: dict = None) -> str:
+    """MOMENTUM: Momentum."""
+    return await momentum.calculate_mom(data, params)
+
+@mcp.tool()
+async def calculate_ao(data: list[dict], params: dict = None) -> str:
+    """MOMENTUM: AO."""
+    return await momentum.calculate_ao(data, params)
+
+@mcp.tool()
+async def calculate_williams(data: list[dict], params: dict = None) -> str:
+    """MOMENTUM: Williams %R."""
+    return await momentum.calculate_williams(data, params)
+
+@mcp.tool()
+async def calculate_cmo(data: list[dict], params: dict = None) -> str:
+    """MOMENTUM: CMO."""
+    return await momentum.calculate_cmo(data, params)
+
+@mcp.tool()
+async def calculate_coppock(data: list[dict], params: dict = None) -> str:
+    """MOMENTUM: Coppock Curve."""
+    return await momentum.calculate_coppock(data, params)
+
+@mcp.tool()
+async def calculate_fish(data: list[dict], params: dict = None) -> str:
+    """MOMENTUM: Fisher Transform."""
+    return await momentum.calculate_fish(data, params)
+
+@mcp.tool()
+async def calculate_kama(data: list[dict], params: dict = None) -> str:
+    """MOMENTUM: KAMA."""
+    return await momentum.calculate_kama(data, params)
+
+@mcp.tool()
+async def calculate_vortex(data: list[dict], params: dict = None) -> str:
+    """MOMENTUM: Vortex."""
+    return await momentum.calculate_vortex(data, params)
+
+@mcp.tool()
+async def calculate_kst(data: list[dict], params: dict = None) -> str:
+    """MOMENTUM: KST."""
+    return await momentum.calculate_kst(data, params)
+
+# --- 4. TREND SHORTCUTS ---
+@mcp.tool()
+async def calculate_sma(data: list[dict], params: dict = None) -> str:
+    """TREND: SMA."""
+    return await trend.calculate_sma(data, params)
+
+@mcp.tool()
+async def calculate_ema(data: list[dict], params: dict = None) -> str:
+    """TREND: EMA."""
+    return await trend.calculate_ema(data, params)
+
+@mcp.tool()
+async def calculate_dema(data: list[dict], params: dict = None) -> str:
+    """TREND: DEMA."""
+    return await trend.calculate_dema(data, params)
+
+@mcp.tool()
+async def calculate_tema(data: list[dict], params: dict = None) -> str:
+    """TREND: TEMA."""
+    return await trend.calculate_tema(data, params)
+
+@mcp.tool()
+async def calculate_trima(data: list[dict], params: dict = None) -> str:
+    """TREND: TRIMA."""
+    return await trend.calculate_trima(data, params)
+
+@mcp.tool()
+async def calculate_wma(data: list[dict], params: dict = None) -> str:
+    """TREND: WMA."""
+    return await trend.calculate_wma(data, params)
+
+@mcp.tool()
+async def calculate_hma(data: list[dict], params: dict = None) -> str:
+    """TREND: HMA."""
+    return await trend.calculate_hma(data, params)
+
+@mcp.tool()
+async def calculate_zlema(data: list[dict], params: dict = None) -> str:
+    """TREND: ZLEMA."""
+    return await trend.calculate_zlema(data, params)
+
+@mcp.tool()
+async def calculate_adx(data: list[dict], params: dict = None) -> str:
+    """TREND: ADX."""
+    return await trend.calculate_adx(data, params)
+
+@mcp.tool()
+async def calculate_ssma(data: list[dict], params: dict = None) -> str:
+    """TREND: SSMA."""
+    return await trend.calculate_ssma(data, params)
+
+@mcp.tool()
+async def calculate_smma(data: list[dict], params: dict = None) -> str:
+    """TREND: SMMA."""
+    return await trend.calculate_smma(data, params)
+
+@mcp.tool()
+async def calculate_frama(data: list[dict], params: dict = None) -> str:
+    """TREND: FRAMA."""
+    return await trend.calculate_frama(data, params)
+
+@mcp.tool()
+async def calculate_sar(data: list[dict], params: dict = None) -> str:
+    """TREND: SAR."""
+    return await trend.calculate_sar(data, params)
+
+# --- 5. VOLATILITY ---
+@mcp.tool()
+async def calculate_atr(data: list[dict], params: dict = None) -> str:
+    """VOLATILITY: ATR."""
+    return await volatility.calculate_atr(data, params)
+
+@mcp.tool()
+async def calculate_bbands(data: list[dict], params: dict = None) -> str:
+    """VOLATILITY: Bollinger Bands."""
+    return await volatility.calculate_bbands(data, params)
+
+@mcp.tool()
+async def calculate_kc(data: list[dict], params: dict = None) -> str:
+    """VOLATILITY: Keltner Channels."""
+    return await volatility.calculate_kc(data, params)
+
+@mcp.tool()
+async def calculate_do(data: list[dict], params: dict = None) -> str:
+    """VOLATILITY: Donchian Channels."""
+    return await volatility.calculate_do(data, params)
+
+@mcp.tool()
+async def calculate_mobo(data: list[dict], params: dict = None) -> str:
+    """VOLATILITY: MOBO Bands."""
+    return await volatility.calculate_mobo(data, params)
+
+@mcp.tool()
+async def calculate_tr(data: list[dict], params: dict = None) -> str:
+    """VOLATILITY: True Range."""
+    return await volatility.calculate_tr(data, params)
+
+@mcp.tool()
+async def calculate_bbwidth(data: list[dict], params: dict = None) -> str:
+    """VOLATILITY: BB Width."""
+    return await volatility.calculate_bbwidth(data, params)
+
+@mcp.tool()
+async def calculate_percent_b(data: list[dict], params: dict = None) -> str:
+    """VOLATILITY: Percent B."""
+    return await volatility.calculate_percent_b(data, params)
+
+@mcp.tool()
+async def calculate_apz(data: list[dict], params: dict = None) -> str:
+    """VOLATILITY: APZ."""
+    return await volatility.calculate_apz(data, params)
+
+@mcp.tool()
+async def calculate_massi(data: list[dict], params: dict = None) -> str:
+    """VOLATILITY: Mass Index."""
+    return await volatility.calculate_massi(data, params)
+
+# --- 6. VOLUME ---
+@mcp.tool()
+async def calculate_obv(data: list[dict], params: dict = None) -> str:
+    """VOLUME: OBV."""
+    return await volume.calculate_obv(data, params)
+
+@mcp.tool()
+async def calculate_mfi(data: list[dict], params: dict = None) -> str:
+    """VOLUME: MFI."""
+    return await volume.calculate_mfi(data, params)
+
+@mcp.tool()
+async def calculate_adl(data: list[dict], params: dict = None) -> str:
+    """VOLUME: ADL."""
+    return await volume.calculate_adl(data, params)
+
+@mcp.tool()
+async def calculate_chaikin(data: list[dict], params: dict = None) -> str:
+    """VOLUME: Chaikin Osc."""
+    return await volume.calculate_chaikin(data, params)
+
+@mcp.tool()
+async def calculate_efi(data: list[dict], params: dict = None) -> str:
+    """VOLUME: Force Index."""
+    return await volume.calculate_efi(data, params)
+
+@mcp.tool()
+async def calculate_vpt(data: list[dict], params: dict = None) -> str:
+    """VOLUME: Volume Price Trend."""
+    return await volume.calculate_vpt(data, params)
+
+@mcp.tool()
+async def calculate_emv(data: list[dict], params: dict = None) -> str:
+    """VOLUME: Ease of Movement."""
+    return await volume.calculate_emv(data, params)
+
+@mcp.tool()
+async def calculate_nvi(data: list[dict], params: dict = None) -> str:
+    """VOLUME: NVI."""
+    return await volume.calculate_nvi(data, params)
+
+@mcp.tool()
+async def calculate_pvi(data: list[dict], params: dict = None) -> str:
+    """VOLUME: PVI."""
+    return await volume.calculate_pvi(data, params)
+
+@mcp.tool()
+async def calculate_vzo(data: list[dict], params: dict = None) -> str:
+    """VOLUME: VZO."""
+    return await volume.calculate_vzo(data, params)
+
+# --- 7. EXOTICS & LEVELS ---
+@mcp.tool()
+async def calculate_wto(data: list[dict], params: dict = None) -> str:
+    """EXOTIC: Wave Trend."""
+    return await exotics.calculate_wto(data, params)
+
+@mcp.tool()
+async def calculate_stc(data: list[dict], params: dict = None) -> str:
+    """EXOTIC: STC."""
+    return await exotics.calculate_stc(data, params)
+
+@mcp.tool()
+async def calculate_ev_macd(data: list[dict], params: dict = None) -> str:
+    """EXOTIC: Elastic Volume MACD."""
+    return await exotics.calculate_ev_macd(data, params)
+
+@mcp.tool()
+async def calculate_alma(data: list[dict], params: dict = None) -> str:
+    """EXOTIC: ALMA."""
+    return await exotics.calculate_alma(data, params)
+
+@mcp.tool()
+async def calculate_vama(data: list[dict], params: dict = None) -> str:
+    """EXOTIC: VAMA."""
+    return await exotics.calculate_vama(data, params)
+
+@mcp.tool()
+async def calculate_pivot(data: list[dict], params: dict = None) -> str:
+    """LEVELS: Pivot Points."""
+    return await levels.calculate_pivot(data, params)
+
+@mcp.tool()
+async def calculate_fib_pivot(data: list[dict], params: dict = None) -> str:
+    """LEVELS: Fibonacci Pivots."""
+    return await levels.calculate_fib_pivot(data, params)
+
+@mcp.tool()
+async def calculate_basp(data: list[dict], params: dict = None) -> str:
+    """PRESSURE: Buy/Sell Pressure."""
+    return await pressure.calculate_basp(data, params)
+
+@mcp.tool()
+async def calculate_ebbp(data: list[dict], params: dict = None) -> str:
+    """PRESSURE: Bull/Bear Power."""
+    return await pressure.calculate_ebbp(data, params)
+
+# --- 8. PHASES 3 & 4 (Clouds, Flow, Weighted, etc) ---
+@mcp.tool()
+async def calculate_ichimoku(data: list[dict], params: dict = None) -> str:
+    """CLOUD: Ichimoku."""
+    return await clouds.calculate_ichimoku(data, params)
+
+@mcp.tool()
+async def calculate_trix(data: list[dict], params: dict = None) -> str:
+    """OSC: TRIX."""
+    return await advanced_oscillators.calculate_trix(data, params)
+
+@mcp.tool()
+async def calculate_ift_rsi(data: list[dict], params: dict = None) -> str:
+    """OSC: Inverse Fisher RSI."""
+    return await advanced_oscillators.calculate_ift_rsi(data, params)
+
+@mcp.tool()
+async def calculate_sqzmi(data: list[dict], params: dict = None) -> str:
+    """OSC: Squeeze Momentum."""
+    return await advanced_oscillators.calculate_sqzmi(data, params)
+
+@mcp.tool()
+async def calculate_vfi(data: list[dict], params: dict = None) -> str:
+    """FLOW: Volume Flow."""
+    return await volume_flow.calculate_vfi(data, params)
+
+@mcp.tool()
+async def calculate_fve(data: list[dict], params: dict = None) -> str:
+    """FLOW: Finite Volume Element."""
+    return await volume_flow.calculate_fve(data, params)
+
+@mcp.tool()
+async def calculate_qstick(data: list[dict], params: dict = None) -> str:
+    """FLOW: QStick."""
+    return await volume_flow.calculate_qstick(data, params)
+
+@mcp.tool()
+async def calculate_msd(data: list[dict], params: dict = None) -> str:
+    """MATH: Moving Std Dev."""
+    return await volume_flow.calculate_msd(data, params)
+
+@mcp.tool()
+async def calculate_vwap_finta(data: list[dict], params: dict = None) -> str:
+    """WEIGHTED: VWAP."""
+    return await weighted.calculate_vwap(data, params)
+
+@mcp.tool()
+async def calculate_evwma(data: list[dict], params: dict = None) -> str:
+    """WEIGHTED: EVWMA."""
+    return await weighted.calculate_evwma(data, params)
+
+@mcp.tool()
+async def calculate_wobv(data: list[dict], params: dict = None) -> str:
+    """WEIGHTED: Weighted OBV."""
+    return await weighted.calculate_wobv(data, params)
+
+@mcp.tool()
+async def calculate_pzo(data: list[dict], params: dict = None) -> str:
+    """ZONE: Price Zone Osc."""
+    return await zones.calculate_pzo(data, params)
+
+@mcp.tool()
+async def calculate_cfi(data: list[dict], params: dict = None) -> str:
+    """ZONE: Cumulative Force."""
+    return await zones.calculate_cfi(data, params)
+
+@mcp.tool()
+async def calculate_tp(data: list[dict], params: dict = None) -> str:
+    """MATH: Typical Price."""
+    return await zones.calculate_tp(data, params)
+
+@mcp.tool()
+async def calculate_chandelier(data: list[dict], params: dict = None) -> str:
+    """EXIT: Chandelier."""
+    return await exits_math.calculate_chandelier(data, params)
+
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    mcp.run()

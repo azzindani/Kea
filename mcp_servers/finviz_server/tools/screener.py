@@ -4,26 +4,27 @@ try:
 except ImportError:
     Overview = None # Fallback or handle graceful failure if install failed
     
-from shared.mcp.protocol import ToolResult, TextContent
+
 from shared.logging import get_logger
 import pandas as pd
 import json
 
 logger = get_logger(__name__)
 
-async def get_screener_signal(arguments: dict) -> ToolResult:
+
+async def get_screener_signal(limit: int = 100000, signal: str = None) -> str:
     """
     Get generic screener signal.
     Args:
         signal (str): The specific signal key (e.g. "ta_topgainers")
         limit (int): Number of results (default 30)
     """
-    signal = arguments.get("signal")
-    limit = arguments.get("limit", 30)
+    # signal = arguments.get("signal")
+    # limit = arguments.get("limit", 30)
     
     try:
         if Overview is None:
-            return ToolResult(isError=True, content=[TextContent(text="finvizfinance not installed")])
+            return "finvizfinance not installed"
 
         foverview = Overview()
         
@@ -41,7 +42,7 @@ async def get_screener_signal(arguments: dict) -> ToolResult:
         df = foverview.screener_view()
         
         if df is None or df.empty:
-            return ToolResult(content=[TextContent(text="No results found.")])
+            return "No results found."
             
         # Simplify columns for LLM
         # Keep: Ticker, Company, Sector, Price, Change, Volume
@@ -51,11 +52,12 @@ async def get_screener_signal(arguments: dict) -> ToolResult:
         
         df_lite = df[cols].head(limit)
         
-        return ToolResult(content=[TextContent(text=f"### Signal: {real_signal}\n\n{df_lite.to_markdown(index=False)}")])
+        return f"### Signal: {real_signal}\n\n{df_lite.to_markdown(index=False)}"
         
     except Exception as e:
         logger.error(f"Screener error {signal}: {e}")
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+
 
 # Map "Nice Name" to Finviz Signal Key
 SIGNALS = {

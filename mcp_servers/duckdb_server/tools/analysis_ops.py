@@ -16,7 +16,7 @@ def get_column_stats(table_name: str, column_name: str) -> Dict[str, Any]:
     except Exception as e:
         return {"error": str(e)}
 
-def value_counts(table_name: str, column_name: str, limit: int = 20) -> List[Dict[str, Any]]:
+def value_counts(table_name: str, column_name: str, limit: int = 100000) -> List[Dict[str, Any]]:
     """GROUP BY column COUNT(*)."""
     con = core_ops.get_connection()
     try:

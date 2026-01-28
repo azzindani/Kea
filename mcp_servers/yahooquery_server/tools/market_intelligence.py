@@ -6,15 +6,14 @@ import json
 
 logger = get_logger(__name__)
 
-async def get_market_trending(arguments: dict) -> ToolResult:
+
+async def get_market_trending(country: str = "united states", count: int = 10) -> str:
     """
     Get trending securities for a specific region.
     Args:
         country (str): "US", "ID", "AU", "GB", etc. (Default: US)
         count (int): (Optional) Limit results (default 10)
     """
-    country = arguments.get("country", "united states").lower()
-    count = arguments.get("count", 10)
     
     # Map common codes to full names if needed by yahooquery trending
     MAPPING = {
@@ -29,20 +28,24 @@ async def get_market_trending(arguments: dict) -> ToolResult:
         "de": "germany",
     }
     
-    if country in MAPPING:
-        country = MAPPING[country]
+    country_lower = country.lower()
+    if country_lower in MAPPING:
+        country_code = MAPPING[country_lower]
+    else:
+        country_code = country
         
     try:
         # yahooquery.get_trending returns a dict
-        data = get_trending(country)
+        data = get_trending(country_code)
         
         if "quotes" in data:
             # Simplify
             quotes = data["quotes"][:count]
-            return ToolResult(content=[TextContent(text=json.dumps(quotes, indent=2))])
+            return json.dumps(quotes, indent=2)
             
-        return ToolResult(content=[TextContent(text=json.dumps(data, indent=2, default=str))])
+        return json.dumps(data, indent=2, default=str)
         
     except Exception as e:
         logger.error(f"Trending error for {country}: {e}")
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+

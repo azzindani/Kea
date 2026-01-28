@@ -1,64 +1,54 @@
 
-from shared.mcp.protocol import ToolResult
+
 from mcp_servers.pandas_ta_server.tools.universal import calculate_indicator
 
 # Wrappers
-async def calculate_rsi(arguments: dict) -> ToolResult:
+
+async def calculate_rsi(data: list[dict], params: dict = None) -> str:
     """RSI - Relative Strength Index. Default: length=14."""
-    arguments['indicator'] = 'rsi'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'rsi', params)
 
-async def calculate_macd(arguments: dict) -> ToolResult:
+async def calculate_macd(data: list[dict], params: dict = None) -> str:
     """MACD - Moving Average Convergence Divergence."""
-    arguments['indicator'] = 'macd'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'macd', params)
 
-async def calculate_stoch(arguments: dict) -> ToolResult:
+async def calculate_stoch(data: list[dict], params: dict = None) -> str:
     """Stochastic Oscillator."""
-    arguments['indicator'] = 'stoch'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'stoch', params)
 
-async def calculate_cci(arguments: dict) -> ToolResult:
+async def calculate_cci(data: list[dict], params: dict = None) -> str:
     """CCI - Commodity Channel Index."""
-    arguments['indicator'] = 'cci'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'cci', params)
 
-async def calculate_roc(arguments: dict) -> ToolResult:
+async def calculate_roc(data: list[dict], params: dict = None) -> str:
     """ROC - Rate of Change."""
-    arguments['indicator'] = 'roc'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'roc', params)
 
-async def calculate_ao(arguments: dict) -> ToolResult:
+async def calculate_ao(data: list[dict], params: dict = None) -> str:
     """AO - Awesome Oscillator."""
-    arguments['indicator'] = 'ao'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'ao', params)
 
-async def calculate_apo(arguments: dict) -> ToolResult:
+async def calculate_apo(data: list[dict], params: dict = None) -> str:
     """APO - Absolute Price Oscillator."""
-    arguments['indicator'] = 'apo'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'apo', params)
 
-async def calculate_mom(arguments: dict) -> ToolResult:
+async def calculate_mom(data: list[dict], params: dict = None) -> str:
     """MOM - Momentum."""
-    arguments['indicator'] = 'mom'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'mom', params)
 
-async def calculate_tsi(arguments: dict) -> ToolResult:
+async def calculate_tsi(data: list[dict], params: dict = None) -> str:
     """TSI - True Strength Index."""
-    arguments['indicator'] = 'tsi'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'tsi', params)
 
-async def calculate_uo(arguments: dict) -> ToolResult:
+async def calculate_uo(data: list[dict], params: dict = None) -> str:
     """UO - Ultimate Oscillator."""
-    arguments['indicator'] = 'uo'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'uo', params)
 
-async def calculate_stochrsi(arguments: dict) -> ToolResult:
+async def calculate_stochrsi(data: list[dict], params: dict = None) -> str:
     """StochRSI - Stochastic RSI."""
-    arguments['indicator'] = 'stochrsi'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'stochrsi', params)
 
-async def calculate_squeeze(arguments: dict) -> ToolResult:
+async def calculate_squeeze(data: list[dict], params: dict = None) -> str:
     """Squeeze - TTM Squeeze/Momentum."""
-    arguments['indicator'] = 'squeeze'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'squeeze', params)
+

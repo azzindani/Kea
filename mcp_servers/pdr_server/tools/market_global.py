@@ -1,19 +1,20 @@
 
 import pandas_datareader.data as web
-from shared.mcp.protocol import ToolResult, TextContent
+
 from shared.logging import get_logger
 import pandas as pd
 import datetime
 
 logger = get_logger(__name__)
 
-async def get_stooq_data(arguments: dict) -> ToolResult:
+
+async def get_stooq_data(symbols: list[str], start_date: str = None) -> str:
     """
     Get Stooq Data (Indices, Macro, ETFs).
     Useful for: US Bonds (US10Y.B), Currencies, Commodities.
     """
-    symbols = arguments.get("symbols") # List of symbols
-    start_date = arguments.get("start_date")
+    # symbols = arguments.get("symbols") # List of symbols
+    # start_date = arguments.get("start_date")
     
     if not start_date:
         start = datetime.datetime.now() - datetime.timedelta(days=365)
@@ -24,13 +25,13 @@ async def get_stooq_data(arguments: dict) -> ToolResult:
         # Returns DataFrame with MultiIndex columns if multiple symbols
         df = web.DataReader(symbols, "stooq", start=start) # End default is now
         
-        return ToolResult(content=[TextContent(text=f"### Stooq Data (Last 50 rows)\n\n{df.head(50).to_markdown()}")])
+        return f"### Stooq Data (Last 50 rows)\n\n{df.head(50).to_markdown()}"
         
     except Exception as e:
         logger.error(f"Stooq error {symbols}: {e}")
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_tsp_fund_data(arguments: dict) -> ToolResult:
+async def get_tsp_fund_data() -> str:
     """
     Get Thrift Savings Plan (TSP) Fund Data.
     """
@@ -38,17 +39,17 @@ async def get_tsp_fund_data(arguments: dict) -> ToolResult:
         start = datetime.datetime.now() - datetime.timedelta(days=365)
         df = web.DataReader("TSP", "tsp", start=start)
         
-        return ToolResult(content=[TextContent(text=f"### TSP Funds (Last 50 days)\n\n{df.tail(50).to_markdown()}")])
+        return f"### TSP Funds (Last 50 days)\n\n{df.tail(50).to_markdown()}"
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_moex_data(arguments: dict) -> ToolResult:
+async def get_moex_data(symbols: list[str], start_date: str = None) -> str:
     """
     Get Moscow Exchange (MOEX) Data.
     Unlocks Russian market data.
     """
-    symbols = arguments.get("symbols")
-    start_date = arguments.get("start_date")
+    # symbols = arguments.get("symbols")
+    # start_date = arguments.get("start_date")
     
     if not start_date:
         start = datetime.datetime.now() - datetime.timedelta(days=365)
@@ -58,6 +59,7 @@ async def get_moex_data(arguments: dict) -> ToolResult:
     try:
         # PDR source 'moex'
         df = web.DataReader(symbols, "moex", start=start)
-        return ToolResult(content=[TextContent(text=f"### MOEX Data\n\n{df.tail(50).to_markdown()}")])
+        return f"### MOEX Data\n\n{df.tail(50).to_markdown()}"
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+

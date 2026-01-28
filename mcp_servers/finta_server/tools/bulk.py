@@ -1,6 +1,5 @@
 
-from shared.mcp.protocol import ToolResult, TextContent
-from mcp_servers.finta_server.tools.core import process_ohlcv, df_to_result
+from mcp_servers.finta_server.tools.core import process_ohlcv, df_to_json
 from finta import TA
 import pandas as pd
 from shared.logging import get_logger
@@ -43,13 +42,14 @@ async def run_suite(df: pd.DataFrame, inds: list) -> pd.DataFrame:
             
     return results
 
-async def get_all_indicators(arguments: dict) -> ToolResult:
+
+async def get_all_indicators(data: list[dict]) -> str:
     """
     Run ALL available Finta indicators.
     WARNING: Heavy computation.
     """
     try:
-        data = arguments.get("data")
+        # data = arguments.get("data")
         df = process_ohlcv(data)
         
         # Combine all lists
@@ -60,46 +60,45 @@ async def get_all_indicators(arguments: dict) -> ToolResult:
         # Usually users want indicators appended.
         final_df = df.join(res_df, how='outer')
         
-        return df_to_result(final_df, "All Indicators")
+        return df_to_json(final_df, "All Indicators")
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_momentum_suite(arguments: dict) -> ToolResult:
+
+
+async def get_momentum_suite(data: list[dict]) -> str:
     """Run Momentum Suite."""
     try:
-        data = arguments.get("data")
         df = process_ohlcv(data)
         res_df = await run_suite(df, MOMENTUM_INDS)
-        return df_to_result(df.join(res_df, how='outer'), "Momentum Suite")
+        return df_to_json(df.join(res_df, how='outer'), "Momentum Suite")
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_trend_suite(arguments: dict) -> ToolResult:
+async def get_trend_suite(data: list[dict]) -> str:
     """Run Trend Suite."""
     try:
-        data = arguments.get("data")
         df = process_ohlcv(data)
         res_df = await run_suite(df, TREND_INDS)
-        return df_to_result(df.join(res_df, how='outer'), "Trend Suite")
+        return df_to_json(df.join(res_df, how='outer'), "Trend Suite")
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_volatility_suite(arguments: dict) -> ToolResult:
+async def get_volatility_suite(data: list[dict]) -> str:
     """Run Volatility Suite."""
     try:
-        data = arguments.get("data")
         df = process_ohlcv(data)
         res_df = await run_suite(df, VOLATILITY_INDS)
-        return df_to_result(df.join(res_df, how='outer'), "Volatility Suite")
+        return df_to_json(df.join(res_df, how='outer'), "Volatility Suite")
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_volume_suite(arguments: dict) -> ToolResult:
+async def get_volume_suite(data: list[dict]) -> str:
     """Run Volume Suite."""
     try:
-        data = arguments.get("data")
         df = process_ohlcv(data)
         res_df = await run_suite(df, VOLUME_INDS)
-        return df_to_result(df.join(res_df, how='outer'), "Volume Suite")
+        return df_to_json(df.join(res_df, how='outer'), "Volume Suite")
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+

@@ -1,48 +1,14 @@
-"""
-Web Search Tool.
-
-Multi-provider web search (Tavily, Brave, DuckDuckGo fallback).
-"""
-
 from __future__ import annotations
-
 import os
-from typing import Any
-
 import httpx
+from typing import Any
+import logging
 
-from shared.mcp.protocol import ToolResult, TextContent
-from shared.logging import get_logger
+logger = logging.getLogger(__name__)
 
-
-logger = get_logger(__name__)
-
-
-async def web_search_tool(arguments: dict) -> ToolResult:
-    """
-    Execute web search.
-    
-    Args:
-        arguments: Tool arguments containing:
-            - query: Search query
-            - max_results: Max results (default: hardware-aware)
-            - search_depth: basic or advanced
-    
-    Returns:
-        ToolResult with search results
-    """
-    from shared.hardware.detector import detect_hardware
-    
-    query = arguments.get("query", "")
-    hw = detect_hardware()
-    max_results = arguments.get("max_results", hw.optimal_max_results())
-    search_depth = arguments.get("search_depth", "basic")
-    
-    if not query:
-        return ToolResult(
-            content=[TextContent(text="Error: Query is required")],
-            isError=True
-        )
+async def web_search_tool(query: str, max_results: int = 10, search_depth: str = "basic") -> str:
+    """Execute web search."""
+    if not query: return "Error: Query is required"
     
     # Try Tavily first
     tavily_key = os.getenv("TAVILY_API_KEY", "")
@@ -57,8 +23,7 @@ async def web_search_tool(arguments: dict) -> ToolResult:
     # Fallback to DuckDuckGo (no API key needed)
     return await _duckduckgo_search(query, max_results)
 
-
-async def _tavily_search(query: str, max_results: int, search_depth: str, api_key: str) -> ToolResult:
+async def _tavily_search(query: str, max_results: int, search_depth: str, api_key: str) -> str:
     """Search using Tavily API."""
     try:
         async with httpx.AsyncClient(timeout=30) as client:
@@ -76,28 +41,19 @@ async def _tavily_search(query: str, max_results: int, search_depth: str, api_ke
             data = response.json()
         
         output = f"## Web Search Results\n\n**Query:** {query}\n\n"
-        
-        # Include AI answer if available
         if data.get("answer"):
             output += f"### Quick Answer\n{data['answer']}\n\n"
         
         output += "### Results\n\n"
-        
         for i, result in enumerate(data.get("results", []), 1):
             output += f"**{i}. [{result.get('title', 'No title')}]({result.get('url', '')})**\n"
             output += f"{result.get('content', '')[:300]}...\n\n"
         
-        return ToolResult(content=[TextContent(text=output)])
-        
+        return output
     except Exception as e:
-        logger.error(f"Tavily search error: {e}")
-        return ToolResult(
-            content=[TextContent(text=f"Search Error: {str(e)}")],
-            isError=True
-        )
+        return f"Search Error: {str(e)}"
 
-
-async def _brave_search(query: str, max_results: int, api_key: str) -> ToolResult:
+async def _brave_search(query: str, max_results: int, api_key: str) -> str:
     """Search using Brave Search API."""
     try:
         async with httpx.AsyncClient(timeout=30) as client:
@@ -110,22 +66,15 @@ async def _brave_search(query: str, max_results: int, api_key: str) -> ToolResul
             data = response.json()
         
         output = f"## Web Search Results (Brave)\n\n**Query:** {query}\n\n"
-        
         for i, result in enumerate(data.get("web", {}).get("results", []), 1):
             output += f"**{i}. [{result.get('title', 'No title')}]({result.get('url', '')})**\n"
             output += f"{result.get('description', '')[:300]}...\n\n"
         
-        return ToolResult(content=[TextContent(text=output)])
-        
+        return output
     except Exception as e:
-        logger.error(f"Brave search error: {e}")
-        return ToolResult(
-            content=[TextContent(text=f"Search Error: {str(e)}")],
-            isError=True
-        )
+        return f"Search Error: {str(e)}"
 
-
-async def _duckduckgo_search(query: str, max_results: int) -> ToolResult:
+async def _duckduckgo_search(query: str, max_results: int) -> str:
     """Fallback search using DuckDuckGo HTML scraping."""
     try:
         async with httpx.AsyncClient(timeout=30) as client:
@@ -138,9 +87,7 @@ async def _duckduckgo_search(query: str, max_results: int) -> ToolResult:
             )
             response.raise_for_status()
         
-        # Parse results (basic extraction)
         from html.parser import HTMLParser
-        
         results = []
         
         class DDGParser(HTMLParser):
@@ -149,8 +96,7 @@ async def _duckduckgo_search(query: str, max_results: int) -> ToolResult:
                 self.in_result = False
                 self.current_title = ""
                 self.current_url = ""
-                self.current_snippet = ""
-            
+                
             def handle_starttag(self, tag, attrs):
                 attrs_dict = dict(attrs)
                 if tag == "a" and "result__a" in attrs_dict.get("class", ""):
@@ -164,10 +110,7 @@ async def _duckduckgo_search(query: str, max_results: int) -> ToolResult:
             def handle_endtag(self, tag):
                 if tag == "a" and self.in_result:
                     if self.current_title and self.current_url:
-                        results.append({
-                            "title": self.current_title.strip(),
-                            "url": self.current_url
-                        })
+                        results.append({"title": self.current_title.strip(), "url": self.current_url})
                     self.in_result = False
                     self.current_title = ""
                     self.current_url = ""
@@ -176,18 +119,11 @@ async def _duckduckgo_search(query: str, max_results: int) -> ToolResult:
         parser.feed(response.text)
         
         output = f"## Web Search Results (DuckDuckGo)\n\n**Query:** {query}\n\n"
-        
         for i, result in enumerate(results[:max_results], 1):
             output += f"**{i}. [{result['title']}]({result['url']})**\n\n"
         
-        if not results:
-            output += "*No results found*"
-        
-        return ToolResult(content=[TextContent(text=output)])
+        if not results: output += "*No results found*"
+        return output
         
     except Exception as e:
-        logger.error(f"DuckDuckGo search error: {e}")
-        return ToolResult(
-            content=[TextContent(text=f"Search Error: {str(e)}")],
-            isError=True
-        )
+        return f"Search Error: {str(e)}"

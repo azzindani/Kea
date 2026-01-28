@@ -1,7 +1,8 @@
 
 import pandas as pd
 import json
-from shared.mcp.protocol import ToolResult, TextContent
+import json
+
 
 def process_ohlcv(data_input) -> pd.DataFrame:
     """
@@ -59,8 +60,9 @@ def process_ohlcv(data_input) -> pd.DataFrame:
             
     return df
 
-def df_to_result(df: pd.DataFrame, title: str = "TA Result") -> ToolResult:
-    """Convert Result DataFrame to ToolResult (JSON)."""
+
+def df_to_json(df: pd.DataFrame, title: str = "TA Result") -> str:
+    """Convert Result DataFrame to JSON."""
     # If df is a Series, convert to DF
     if isinstance(df, pd.Series):
         df = df.to_frame()
@@ -68,4 +70,5 @@ def df_to_result(df: pd.DataFrame, title: str = "TA Result") -> ToolResult:
     out_df = df.reset_index()
     out_df = out_df.where(pd.notnull(out_df), None)
     records = out_df.to_dict(orient='records')
-    return ToolResult(content=[TextContent(text=json.dumps(records, default=str, indent=2))])
+    return json.dumps(records, default=str, indent=2)
+

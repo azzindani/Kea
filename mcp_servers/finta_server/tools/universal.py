@@ -1,27 +1,25 @@
 
-from shared.mcp.protocol import ToolResult, TextContent
-from mcp_servers.finta_server.tools.core import process_ohlcv, df_to_result
+from mcp_servers.finta_server.tools.core import process_ohlcv, df_to_json
 from finta import TA
 import pandas as pd
 
-async def calculate_indicator(arguments: dict) -> ToolResult:
+
+async def calculate_indicator(data: list[dict], indicator: str, params: dict = None) -> str:
     """
     Universal Indicator Calculator for Finta.
     Args:
         data: OHLCV.
         indicator: Name (e.g. "SMA", "RSI").
-        params: Dict of parameters (e.g. {"period": 14}). Note: Finta args are positional usually, or named.
-                Wrapper will try to map params or pass as kwargs.
+        params: Dict of parameters (e.g. {"period": 14}).
     """
     try:
-        data = arguments.get("data")
-        indicator = arguments.get("indicator").upper() # Finta uses uppercase
-        params = arguments.get("params", {})
+        indicator = indicator.upper() # Finta uses uppercase
+        if params is None: params = {}
         
         df = process_ohlcv(data)
         
         if not hasattr(TA, indicator):
-             return ToolResult(isError=True, content=[TextContent(text=f"Indicator '{indicator}' not found in finta.")])
+             return f"Indicator '{indicator}' not found in finta."
         
         method = getattr(TA, indicator)
         
@@ -46,7 +44,8 @@ async def calculate_indicator(arguments: dict) -> ToolResult:
              res.columns = [f"{indicator}_{c}" for c in res.columns]
              df = df.join(res, how='outer')
              
-        return df_to_result(df, f"Indicator: {indicator}")
+        return df_to_json(df, f"Indicator: {indicator}")
         
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=f"Calculation Error: {str(e)}")])
+        return f"Calculation Error: {str(e)}"
+

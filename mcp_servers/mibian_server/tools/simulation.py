@@ -1,10 +1,10 @@
 
-from shared.mcp.protocol import ToolResult, TextContent
-from mcp_servers.mibian_server.tools.core import MibianCore, df_to_result
+from mcp_servers.mibian_server.tools.core import MibianCore, df_to_json
 import pandas as pd
 import numpy as np
 
-async def simulate_greek_scenario(arguments: dict) -> ToolResult:
+
+async def simulate_greek_scenario(underlying_start: float, underlying_end: float, steps: float, strike: float, interest: float, days: float, volatility: float) -> str:
     """
     Simulate Option behavior across a price range.
     Args:
@@ -13,14 +13,14 @@ async def simulate_greek_scenario(arguments: dict) -> ToolResult:
     Returns: DataFrame of Price/Delta/Gamma/Theta at each price step.
     """
     try:
-        start = arguments['underlying_start']
-        end = arguments['underlying_end']
-        steps = arguments.get('steps', 20)
+        start = underlying_start
+        end = underlying_end
+        steps = int(steps) # arguments.get('steps', 20)
         
-        s = arguments['strike']
-        r = arguments['interest']
-        d = arguments['days']
-        v = arguments['volatility']
+        s = strike
+        r = interest
+        d = days
+        v = volatility
         
         prices = np.linspace(start, end, steps)
         results = []
@@ -33,6 +33,7 @@ async def simulate_greek_scenario(arguments: dict) -> ToolResult:
             results.append(res)
             
         df = pd.DataFrame(results)
-        return df_to_result(df, "Scenario Simulation")
+        return df_to_json(df, "Scenario Simulation")
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+

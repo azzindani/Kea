@@ -1,27 +1,27 @@
 
-from shared.mcp.protocol import ToolResult, TextContent
-from mcp_servers.mibian_server.tools.core import dict_to_result
+from mcp_servers.mibian_server.tools.core import dict_to_json
 import math
 import scipy.stats as si
 
 def N(x): return si.norm.cdf(x)
 
-async def calculate_barrier_price(arguments: dict) -> ToolResult:
+
+async def calculate_barrier_price(underlying: float, strike: float, barrier: float, interest: float, days: float, volatility: float, barrier_type: str = 'down-and-out', option_type: str = 'call', rebate: float = 0.0) -> str:
     """
     Calculate Standard Barrier Option (Reiner-Rubinstein).
     Types: 'down-and-in', 'down-and-out', 'up-and-in', 'up-and-out'.
     Option Type: 'call', 'put'.
     """
     try:
-        S = arguments['underlying']
-        K = arguments['strike']
-        H = arguments['barrier'] # Barrier Level
-        r = arguments['interest'] / 100.0
-        T = arguments['days'] / 365.0
-        v = arguments['volatility'] / 100.0
-        barrier_type = arguments.get('barrier_type', 'down-and-out').lower()
-        option_type = arguments.get('type', 'call').lower()
-        rebate = arguments.get('rebate', 0.0) # Standard 0
+        S = underlying
+        K = strike
+        H = barrier # Barrier Level
+        r = interest / 100.0
+        T = days / 365.0
+        v = volatility / 100.0
+        # barrier_type = arguments.get('barrier_type', 'down-and-out').lower()
+        # option_type = arguments.get('type', 'call').lower()
+        # rebate = arguments.get('rebate', 0.0) # Standard 0
         
         # Lambda and exponents
         mu = (r - 0.5 * v**2) / (v**2)
@@ -66,7 +66,7 @@ async def calculate_barrier_price(arguments: dict) -> ToolResult:
                 adjustment = (H/S)**gamma * c_reflected
                 price = c_std - adjustment
 
-        return dict_to_result({
+        return dict_to_json({
             "price": price,
             "barrier_type": barrier_type,
             "option_type": option_type,
@@ -74,4 +74,5 @@ async def calculate_barrier_price(arguments: dict) -> ToolResult:
         }, "Barrier Option Price")
         
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+

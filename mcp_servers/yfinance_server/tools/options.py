@@ -1,15 +1,15 @@
 
 import yfinance as yf
 import pandas as pd
-from shared.mcp.protocol import ToolResult, TextContent
+
+import yfinance as yf
+import pandas as pd
 from shared.logging import get_logger
 
 logger = get_logger(__name__)
 
-async def get_options_chain(arguments: dict) -> ToolResult:
+async def get_options_chain(ticker: str, date: str) -> str:
     """Get Options Chain for a specific date."""
-    ticker = arguments.get("ticker")
-    date = arguments.get("date") # YYYY-MM-DD
     
     try:
         stock = yf.Ticker(ticker)
@@ -19,7 +19,7 @@ async def get_options_chain(arguments: dict) -> ToolResult:
         calls = opt.calls[['contractSymbol', 'strike', 'lastPrice', 'volume', 'impliedVolatility']].head(10).to_markdown()
         puts = opt.puts[['contractSymbol', 'strike', 'lastPrice', 'volume', 'impliedVolatility']].head(10).to_markdown()
         
-        return ToolResult(content=[TextContent(text=f"""
+        return f"""
 ### Options Chain ({ticker} @ {date})
 
 **Calls (Top 10)**
@@ -27,17 +27,17 @@ async def get_options_chain(arguments: dict) -> ToolResult:
 
 **Puts (Top 10)**
 {puts}
-""")])
+"""
     except Exception as e:
         logger.error(f"Options tool error: {e}")
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_option_expirations(arguments: dict) -> ToolResult:
+async def get_option_expirations(ticker: str) -> str:
     """Get available option expiration dates."""
-    ticker = arguments.get("ticker")
     try:
         exps = yf.Ticker(ticker).options
-        return ToolResult(content=[TextContent(text=str(exps))])
+        return str(exps)
     except Exception as e:
         logger.error(f"Options tool error: {e}")
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+

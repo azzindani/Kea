@@ -1,10 +1,10 @@
 
-from shared.mcp.protocol import ToolResult, TextContent
-from mcp_servers.pandas_ta_server.tools.core import process_ohlcv, df_to_result
+from mcp_servers.pandas_ta_server.tools.core import process_ohlcv, df_to_json
 import pandas_ta as ta
 import pandas as pd
 
-async def generate_signals(arguments: dict) -> ToolResult:
+
+async def generate_signals(data: list[dict], condition: str) -> str:
     """
     Generate Signals based on a Condition.
     Args:
@@ -23,8 +23,8 @@ async def generate_signals(arguments: dict) -> ToolResult:
                    Let's calculate "All" for now to allow flexible querying.
     """
     try:
-        data = arguments.get("data")
-        condition = arguments.get("condition")
+        # data = arguments.get("data")
+        # condition = arguments.get("condition")
         
         df = process_ohlcv(data)
         
@@ -55,28 +55,23 @@ async def generate_signals(arguments: dict) -> ToolResult:
              # Let's let the user guess or provide help.
              signals = df.query(condition)
              
-             return df_to_result(signals, "Signals")
+             return df_to_json(signals, "Signals")
         except Exception as e:
-             return ToolResult(isError=True, content=[TextContent(text=f"Query Error: {str(e)}. Available Cols: {list(df.columns)}")])
+             return f"Query Error: {str(e)}. Available Cols: {list(df.columns)}"
              
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def calculate_tsignals(arguments: dict) -> ToolResult:
+
+
+async def calculate_tsignals(data: list[dict], params: dict = None) -> str:
     """
-    Calculate Algorithmic Trend Signals.
-    Wraps separate Trend Indicator + tsignals?
-    Actually tsignals needs 'trend' input column.
-    Simplification: Can we run it on Price? No.
-    It processes a Trend Series.
-    Maybe skip for now as it requires complex chaining (User calculate trend -> User passes trend -> calculate_tsignals).
-    Let's rely on 'generate_signals' which is more robust for LLM logic.
-    Instead, let's implement 'calculate_chop' (Choppiness Index) - valuable for filtering trends.
+    Calculate Choppiness Index (Used as Signal Filter).
     """
     # Chop Index is simpler and standalone.
     # arguments['indicator'] = 'chop'
     # return await calculate_indicator(arguments)
     # Moving tsignals idea to 'Choppiness Index' which is more useful "out of the box".
     from mcp_servers.pandas_ta_server.tools.universal import calculate_indicator
-    arguments['indicator'] = 'chop'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'chop', params)
+

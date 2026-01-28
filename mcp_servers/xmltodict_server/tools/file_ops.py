@@ -162,7 +162,7 @@ def stream_to_jsonl(file_path: str, output_path: str, item_depth: int = 2) -> st
     except Exception as e:
         return f"Error: {e}"
 
-def sample_xml_stream(file_path: str, limit: int = 5, item_depth: int = 2) -> List[Dict[str, Any]]:
+def sample_xml_stream(file_path: str, limit: int = 100000, item_depth: int = 2) -> List[Dict[str, Any]]:
     items = []
     try:
         with open(file_path, 'rb') as f:

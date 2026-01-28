@@ -1,174 +1,305 @@
 
-from shared.mcp.server_base import MCPServer
-from shared.mcp.protocol import ToolResult, TextContent
-from shared.logging import get_logger
+from mcp.server.fastmcp import FastMCP
+from mcp_servers.web3_server.tools import (
+    rpc, erc20, erc721, multicall, ens, utils, network,
+    staking, stableswap, security, contract_interaction, identity, weth,
+    lending, oracle, defi, events, action, wallet, gas
+)
+import structlog
+import asyncio
 
-# Import Tools
-from mcp_servers.web3_server.tools.rpc import get_block, get_transaction, get_balance, get_gas_price, get_block_number, get_transaction_count, get_chain_id, get_code
-from mcp_servers.web3_server.tools.erc20 import get_token_balance, get_token_metadata, get_token_allowance, get_token_total_supply
-from mcp_servers.web3_server.tools.erc721 import get_nft_owner, get_nft_metadata_uri
-from mcp_servers.web3_server.tools.multicall import get_bulk_balances, get_bulk_token_balances
-from mcp_servers.web3_server.tools.ens import resolve_ens
-from mcp_servers.web3_server.tools.utils import to_wei, from_wei
-from mcp_servers.web3_server.tools.network import switch_chain
+logger = structlog.get_logger()
 
-class Web3Server(MCPServer):
-    def __init__(self):
-        super().__init__(name="web3_server", version="1.0.0")
-        self.logger = get_logger(__name__)
-        self._register_tools()
+# Create the FastMCP server
+mcp = FastMCP("web3_server", dependencies=["web3"])
 
-    def _register_tools(self):
-        # 1. CORE RPC
-        self.register_tool(name="get_block", description="RPC: Get Block Info (Hash/Number).", handler=get_block, parameters={"block_id": {"type": "string"}, "full_transactions": {"type": "boolean"}, "rpc_url": {"type": "string"}})
-        self.register_tool(name="get_transaction", description="RPC: Get Tx Details.", handler=get_transaction, parameters={"tx_hash": {"type": "string"}, "rpc_url": {"type": "string"}})
-        self.register_tool(name="get_balance", description="RPC: Get Native Balance.", handler=get_balance, parameters={"address": {"type": "string"}, "block_id": {"type": "string"}, "rpc_url": {"type": "string"}})
-        self.register_tool(name="get_gas_price", description="RPC: Get Gas Prices.", handler=get_gas_price, parameters={"rpc_url": {"type": "string"}})
-        self.register_tool(name="get_block_number", description="RPC: Get Current Height.", handler=get_block_number, parameters={"rpc_url": {"type": "string"}})
-        self.register_tool(name="get_transaction_count", description="RPC: Get Nonce.", handler=get_transaction_count, parameters={"address": {"type": "string"}, "rpc_url": {"type": "string"}})
-        self.register_tool(name="get_chain_id", description="RPC: Get Chain ID.", handler=get_chain_id, parameters={"rpc_url": {"type": "string"}})
-        self.register_tool(name="get_code", description="RPC: Get Contract Code.", handler=get_code, parameters={"address": {"type": "string"}, "rpc_url": {"type": "string"}})
-        self.register_tool(name="switch_chain", description="NET: Switch Default Chain (ethereum, arbitrum, optimism, polygon, bsc, base).", handler=switch_chain, parameters={"chain": {"type": "string"}})
-        
-        # 2. MARKETS (ERC20/721)
-        self.register_tool(name="get_token_balance", description="ERC20: Get Token Balance.", handler=get_token_balance, parameters={"token_address": {"type": "string"}, "wallet_address": {"type": "string"}, "rpc_url": {"type": "string"}})
-        self.register_tool(name="get_token_metadata", description="ERC20: Get Metadata.", handler=get_token_metadata, parameters={"token_address": {"type": "string"}, "rpc_url": {"type": "string"}})
-        self.register_tool(name="get_token_allowance", description="ERC20: Get Allowance.", handler=get_token_allowance, parameters={"token_address": {"type": "string"}, "owner_address": {"type": "string"}, "spender_address": {"type": "string"}})
-        self.register_tool(name="get_token_total_supply", description="ERC20: Get Total Supply.", handler=get_token_total_supply, parameters={"token_address": {"type": "string"}})
-        
-        self.register_tool(name="get_nft_owner", description="ERC721: Get Owner.", handler=get_nft_owner, parameters={"token_address": {"type": "string"}, "token_id": {"type": "string"}, "rpc_url": {"type": "string"}})
-        self.register_tool(name="get_nft_metadata_uri", description="ERC721: Get Metadata URI.", handler=get_nft_metadata_uri, parameters={"token_address": {"type": "string"}, "token_id": {"type": "string"}, "rpc_url": {"type": "string"}})
-        
-        # 3. MULTICALL (BULK)
-        self.register_tool(name="get_bulk_balances", description="MULTICALL: Get ETH Balances for Multiple Addresses.", handler=get_bulk_balances, parameters={"addresses": {"type": "array", "items": {"type": "string"}}, "rpc_url": {"type": "string"}})
-        self.register_tool(name="get_bulk_token_balances", description="MULTICALL: Get Balances for 1 Wallet across Tokens.", handler=get_bulk_token_balances, parameters={"wallet_address": {"type": "string"}, "token_addresses": {"type": "array", "items": {"type": "string"}}, "rpc_url": {"type": "string"}})
-        
-        # 4. UTILS/ENS
-        self.register_tool(name="resolve_ens", description="ENS: Resolve Name (Mainnet).", handler=resolve_ens, parameters={"name": {"type": "string"}, "rpc_url": {"type": "string"}})
-        self.register_tool(name="to_wei", description="UTIL: Convert to Wei.", handler=to_wei, parameters={"amount": {"type": "number"}, "unit": {"type": "string"}})
-        self.register_tool(name="from_wei", description="UTIL: Convert from Wei.", handler=from_wei, parameters={"amount": {"type": "number"}, "unit": {"type": "string"}})
-
-        # --- 9. PHASE 6: YIELD & SAFETY ---
-        from mcp_servers.web3_server.tools.staking import stake_eth_lido
-        from mcp_servers.web3_server.tools.stableswap import get_curve_quote
-        from mcp_servers.web3_server.tools.security import simulate_transaction
-        
-        self.register_tool(name="stake_eth_lido", description="YIELD: Stake ETH on Lido.", handler=stake_eth_lido, parameters={"amount": {"type": "number"}, "private_key": {"type": "string"}, "rpc_url": {"type": "string"}})
-        self.register_tool(name="get_curve_quote", description="YIELD: Curve Stable Quote.", handler=get_curve_quote, parameters={"token_in": {"type": "string"}, "token_out": {"type": "string"}, "amount_in": {"type": "number"}, "rpc_url": {"type": "string"}})
-        self.register_tool(name="simulate_transaction", description="SAFETY: Simulate Tx (Dry Run).", handler=simulate_transaction, parameters={"to_address": {"type": "string"}, "value": {"type": "number"}, "data": {"type": "string"}, "from_address": {"type": "string"}, "rpc_url": {"type": "string"}})
-        
-        # --- 8. PHASE 5: UNIVERSAL & IDENTITY ---
-        from mcp_servers.web3_server.tools.contract_interaction import read_contract, decode_transaction
-        from mcp_servers.web3_server.tools.identity import get_ens_reverse_record
-        from mcp_servers.web3_server.tools.weth import wrap_eth, unwrap_eth
-        
-        self.register_tool(name="read_contract", description="UNIVERSAL: Call Any Contract View Function.", handler=read_contract, parameters={"address": {"type": "string"}, "function_signature": {"type": "string"}, "args": {"type": "array"}, "arg_types": {"type": "array"}, "return_types": {"type": "array"}, "rpc_url": {"type": "string"}})
-        self.register_tool(name="decode_transaction", description="UNIVERSAL: Decode Input Data.", handler=decode_transaction, parameters={"tx_hash": {"type": "string"}, "abi": {"type": "string"}, "rpc_url": {"type": "string"}})
-        
-        self.register_tool(name="get_ens_reverse_record", description="IDENTITY: Address to Name.", handler=get_ens_reverse_record, parameters={"address": {"type": "string"}, "rpc_url": {"type": "string"}})
-        
-        self.register_tool(name="wrap_eth", description="WETH: Wrap ETH.", handler=wrap_eth, parameters={"amount": {"type": "number"}, "private_key": {"type": "string"}, "rpc_url": {"type": "string"}})
-        self.register_tool(name="unwrap_eth", description="WETH: Unwrap WETH.", handler=unwrap_eth, parameters={"amount": {"type": "number"}, "private_key": {"type": "string"}, "rpc_url": {"type": "string"}})
-        
-        # --- 7. PHASE 4: LENDING & ORACLES ---
-        from mcp_servers.web3_server.tools.lending import get_aave_reserve_data, get_aave_user_account_data
-        from mcp_servers.web3_server.tools.oracle import get_chainlink_price
-        
-        self.register_tool(name="get_aave_reserve_data", description="LENDING: Aave V3 APY Data.", handler=get_aave_reserve_data, parameters={"asset": {"type": "string"}, "rpc_url": {"type": "string"}})
-        self.register_tool(name="get_aave_user_account_data", description="LENDING: Aave User Health.", handler=get_aave_user_account_data, parameters={"user_address": {"type": "string"}, "rpc_url": {"type": "string"}})
-        
-        self.register_tool(name="get_chainlink_price", description="ORACLE: Chainlink Feed Price.", handler=get_chainlink_price, parameters={"feed_address": {"type": "string"}, "rpc_url": {"type": "string"}})
-        
-        # --- 6. PHASE 3: DEFI, EVENTS, ACTION ---
-        from mcp_servers.web3_server.tools.defi import get_uniswap_price
-        from mcp_servers.web3_server.tools.events import get_contract_events
-        from mcp_servers.web3_server.tools.action import send_eth, approve_token
-        from mcp_servers.web3_server.tools.wallet import generate_wallet
-        from mcp_servers.web3_server.tools.gas import estimate_gas
-        
-        self.register_tool(name="get_uniswap_price", description="DEFI: Get Token Price (Uniswap V3).", handler=get_uniswap_price, parameters={"token_in": {"type": "string"}, "token_out": {"type": "string"}, "amount_in": {"type": "number"}, "fee": {"type": "integer"}, "rpc_url": {"type": "string"}})
-        self.register_tool(name="get_contract_events", description="EVENTS: Get Contract Logs.", handler=get_contract_events, parameters={"address": {"type": "string"}, "from_block": {"type": "string"}, "topics": {"type": "array"}, "rpc_url": {"type": "string"}})
-        
-        self.register_tool(name="send_eth", description="ACTION: Send ETH (Native).", handler=send_eth, parameters={"to_address": {"type": "string"}, "amount": {"type": "number"}, "private_key": {"type": "string"}, "rpc_url": {"type": "string"}})
-        self.register_tool(name="approve_token", description="ACTION: Approve Token Spender.", handler=approve_token, parameters={"token_address": {"type": "string"}, "spender_address": {"type": "string"}, "amount": {"type": "number"}, "private_key": {"type": "string"}, "rpc_url": {"type": "string"}})
-        
-        self.register_tool(name="generate_wallet", description="WALLET: Generate New Wallet.", handler=generate_wallet)
-        self.register_tool(name="estimate_gas", description="GAS: Estimate Transaction Gas.", handler=estimate_gas, parameters={"to_address": {"type": "string"}, "data": {"type": "string"}, "value": {"type": "number"}, "rpc_url": {"type": "string"}})
-
-        # 5. TOKEN SHORTCUTS (Top 15)
-        # Mainnet Addresses
-        tokens = {
-            "usdt": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
-            "usdc": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-            "weth": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
-            "dai": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
-            "shib": "0x95aD61b0a150d79219dCF64E1E6Cc01f0B64C4cE",
-            "pepe": "0x6982508145454Ce325dDbE47a25d4ec3d2311933",
-            "wbtc": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
-            "link": "0x514910771AF9Ca656af840dff83E8264EcF986CA",
-            "uni": "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
-            "matic": "0x7D1AfA7B718fb893dB30A3aBc0Cfc608AaCfeBB0",
-            "steth": "0xae7ab96520DE3A18E5e111B5Ee5B82061ZL270310", # Intentional typo to test error handling? No, copy paste carefully. 0xae7ab96520DE3A18E5e111B5Ee5B82061ce70310
-            "fet": "0xaea46A60368A7bD060eec7DF8CBa43b7EF41Ad85",
-            "rndr": "0x6De037ef9aD2725EB404906F1CC53138EA7Fb6E5",
-            "aave": "0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9"
-        }
-        
-        # Valid stETH: 0xae7ab96520DE3A18E5e111B5Ee5B82061ce70310
-        tokens['steth'] = "0xae7ab96520DE3A18E5e111B5Ee5B82061ce70310"
-
-        for sym, addr in tokens.items():
-            # Balance Shortcut
-            tool_name = f"get_{sym}_balance"
-            async def token_handler(args: dict, a=addr) -> ToolResult:
-                args['token_address'] = a
-                return await get_token_balance(args)
+async def run_op(op_func, diff_args=None, **kwargs):
+    """
+    Helper to run legacy tool ops.
+    diff_args: dict of overrides/additions to kwargs before passing to op.
+    """
+    try:
+        # Combine args
+        final_args = kwargs.copy()
+        if diff_args:
+            final_args.update(diff_args)
             
-            self.register_tool(name=tool_name, description=f"SHORTCUT: Get {sym.upper()} Balance.", handler=token_handler, parameters={"wallet_address": {"type": "string"}})
-            
-            # Price Shortcut (Uniswap V3 vs USDC/WETH)
-            # Default to pricing against USDC
-            tool_name_price = f"get_{sym}_price"
-            async def price_handler(args: dict, a=addr) -> ToolResult:
-                args['token_in'] = a
-                args['token_out'] = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" # USDC
-                return await get_uniswap_price(args)
-            # Shortcut for stablecoins? USDC vs USDT
-            
-            self.register_tool(name=tool_name_price, description=f"SHORTCUT: Get {sym.upper()} Price (in USDC).", handler=price_handler)
-
-
-            # Aave Shortcut (Reserve Data)
-            tool_name_aave = f"get_{sym}_aave_data"
-            async def aave_handler(args: dict, a=addr) -> ToolResult:
-                args['asset'] = a
-                return await get_aave_reserve_data(args)
-            self.register_tool(name=tool_name_aave, description=f"SHORTCUT: Get {sym.upper()} Aave Rates.", handler=aave_handler)
-            
-            # Chainlink Shortcut (Requires mapping feed addresses... skipping for loop unless I map them all)
-            # Instead, just register ETH USD and BTC USD manually below loop
-            
-
-        # Chainlink Shortcuts (Mainnet)
-        # ETH/USD
-        async def cl_eth_usd(args: dict) -> ToolResult:
-            args['feed_address'] = "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
-            return await get_chainlink_price(args)
-        self.register_tool(name="get_chainlink_eth_usd", description="SHORTCUT: Chainlink ETH/USD.", handler=cl_eth_usd)
+        # The tools expect a single 'arguments' dict.
+        result = await op_func(final_args)
         
-        # BTC/USD
-        async def cl_btc_usd(args: dict) -> ToolResult:
-            args['feed_address'] = "0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c"
-            return await get_chainlink_price(args)
-        self.register_tool(name="get_chainlink_btc_usd", description="SHORTCUT: Chainlink BTC/USD.", handler=cl_btc_usd)
+        # Unwrap ToolResult
+        if hasattr(result, 'content') and result.content:
+            text_content = ""
+            for item in result.content:
+                if hasattr(item, 'text'):
+                    text_content += item.text + "\n"
+            return text_content.strip()
         
-        # USDC/USD
-        async def cl_usdc_usd(args: dict) -> ToolResult:
-            args['feed_address'] = "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6"
-            return await get_chainlink_price(args)
-        self.register_tool(name="get_chainlink_usdc_usd", description="SHORTCUT: Chainlink USDC/USD.", handler=cl_usdc_usd)
+        if hasattr(result, 'isError') and result.isError:
+            return "Error: Tool returned error status."
+            
+        return str(result)
+    except Exception as e:
+        return f"Error executing tool: {e}"
+
+# 1. CORE RPC
+@mcp.tool()
+async def get_block(block_id: str = "latest", full_transactions: bool = False, rpc_url: str = None) -> str:
+    """RPC: Get Block Info (Hash/Number)."""
+    return await run_op(rpc.get_block, block_id=block_id, full_transactions=full_transactions, rpc_url=rpc_url)
+
+@mcp.tool()
+async def get_transaction(tx_hash: str, rpc_url: str = None) -> str:
+    """RPC: Get Tx Details."""
+    return await run_op(rpc.get_transaction, tx_hash=tx_hash, rpc_url=rpc_url)
+
+@mcp.tool()
+async def get_balance(address: str, block_id: str = "latest", rpc_url: str = None) -> str:
+    """RPC: Get Native Balance."""
+    return await run_op(rpc.get_balance, address=address, block_id=block_id, rpc_url=rpc_url)
+
+@mcp.tool()
+async def get_gas_price(rpc_url: str = None) -> str:
+    """RPC: Get Gas Prices."""
+    return await run_op(rpc.get_gas_price, rpc_url=rpc_url)
+
+@mcp.tool()
+async def get_block_number(rpc_url: str = None) -> str:
+    """RPC: Get Current Height."""
+    return await run_op(rpc.get_block_number, rpc_url=rpc_url)
+
+@mcp.tool()
+async def get_transaction_count(address: str, rpc_url: str = None) -> str:
+    """RPC: Get Nonce."""
+    return await run_op(rpc.get_transaction_count, address=address, rpc_url=rpc_url)
+
+@mcp.tool()
+async def get_chain_id(rpc_url: str = None) -> str:
+    """RPC: Get Chain ID."""
+    return await run_op(rpc.get_chain_id, rpc_url=rpc_url)
+
+@mcp.tool()
+async def get_code(address: str, rpc_url: str = None) -> str:
+    """RPC: Get Contract Code."""
+    return await run_op(rpc.get_code, address=address, rpc_url=rpc_url)
+
+@mcp.tool()
+async def switch_chain(chain: str) -> str:
+    """NET: Switch Default Chain (ethereum, arbitrum, optimism, polygon, bsc, base)."""
+    return await run_op(network.switch_chain, chain=chain)
+
+# 2. MARKETS (ERC20/721)
+@mcp.tool()
+async def get_token_balance(token_address: str, wallet_address: str, rpc_url: str = None) -> str:
+    """ERC20: Get Token Balance."""
+    return await run_op(erc20.get_token_balance, token_address=token_address, wallet_address=wallet_address, rpc_url=rpc_url)
+
+@mcp.tool()
+async def get_token_metadata(token_address: str, rpc_url: str = None) -> str:
+    """ERC20: Get Metadata."""
+    return await run_op(erc20.get_token_metadata, token_address=token_address, rpc_url=rpc_url)
+
+@mcp.tool()
+async def get_token_allowance(token_address: str, owner_address: str, spender_address: str) -> str:
+    """ERC20: Get Allowance."""
+    return await run_op(erc20.get_token_allowance, token_address=token_address, owner_address=owner_address, spender_address=spender_address)
+
+@mcp.tool()
+async def get_token_total_supply(token_address: str) -> str:
+    """ERC20: Get Total Supply."""
+    return await run_op(erc20.get_token_total_supply, token_address=token_address)
+
+@mcp.tool()
+async def get_nft_owner(token_address: str, token_id: str, rpc_url: str = None) -> str:
+    """ERC721: Get Owner."""
+    return await run_op(erc721.get_nft_owner, token_address=token_address, token_id=token_id, rpc_url=rpc_url)
+
+@mcp.tool()
+async def get_nft_metadata_uri(token_address: str, token_id: str, rpc_url: str = None) -> str:
+    """ERC721: Get Metadata URI."""
+    return await run_op(erc721.get_nft_metadata_uri, token_address=token_address, token_id=token_id, rpc_url=rpc_url)
+
+# 3. MULTICALL (BULK)
+@mcp.tool()
+async def get_bulk_balances(addresses: list[str], rpc_url: str = None) -> str:
+    """MULTICALL: Get ETH Balances for Multiple Addresses."""
+    return await run_op(multicall.get_bulk_balances, addresses=addresses, rpc_url=rpc_url)
+
+@mcp.tool()
+async def get_bulk_token_balances(wallet_address: str, token_addresses: list[str], rpc_url: str = None) -> str:
+    """MULTICALL: Get Balances for 1 Wallet across Tokens."""
+    return await run_op(multicall.get_bulk_token_balances, wallet_address=wallet_address, token_addresses=token_addresses, rpc_url=rpc_url)
+
+# 4. UTILS/ENS
+@mcp.tool()
+async def resolve_ens(name: str, rpc_url: str = None) -> str:
+    """ENS: Resolve Name (Mainnet)."""
+    return await run_op(ens.resolve_ens, name=name, rpc_url=rpc_url)
+
+@mcp.tool()
+async def to_wei(amount: float, unit: str) -> str:
+    """UTIL: Convert to Wei."""
+    return await run_op(utils.to_wei, amount=amount, unit=unit)
+
+@mcp.tool()
+async def from_wei(amount: float, unit: str) -> str:
+    """UTIL: Convert from Wei."""
+    return await run_op(utils.from_wei, amount=amount, unit=unit)
+
+# 6. PHASE 3: DEFI, EVENTS, ACTION
+@mcp.tool()
+async def get_uniswap_price(token_in: str, token_out: str, amount_in: float, fee: int, rpc_url: str = None) -> str:
+    """DEFI: Get Token Price (Uniswap V3)."""
+    return await run_op(defi.get_uniswap_price, token_in=token_in, token_out=token_out, amount_in=amount_in, fee=fee, rpc_url=rpc_url)
+
+@mcp.tool()
+async def get_contract_events(address: str, from_block: str, topics: list, rpc_url: str = None) -> str:
+    """EVENTS: Get Contract Logs."""
+    return await run_op(events.get_contract_events, address=address, from_block=from_block, topics=topics, rpc_url=rpc_url)
+
+@mcp.tool()
+async def send_eth(to_address: str, amount: float, private_key: str, rpc_url: str = None) -> str:
+    """ACTION: Send ETH (Native)."""
+    return await run_op(action.send_eth, to_address=to_address, amount=amount, private_key=private_key, rpc_url=rpc_url)
+
+@mcp.tool()
+async def approve_token(token_address: str, spender_address: str, amount: float, private_key: str, rpc_url: str = None) -> str:
+    """ACTION: Approve Token Spender."""
+    return await run_op(action.approve_token, token_address=token_address, spender_address=spender_address, amount=amount, private_key=private_key, rpc_url=rpc_url)
+
+@mcp.tool()
+async def generate_wallet() -> str:
+    """WALLET: Generate New Wallet."""
+    return await run_op(wallet.generate_wallet)
+
+@mcp.tool()
+async def estimate_gas(to_address: str, data: str, value: float, rpc_url: str = None) -> str:
+    """GAS: Estimate Transaction Gas."""
+    return await run_op(gas.estimate_gas, to_address=to_address, data=data, value=value, rpc_url=rpc_url)
+
+# 7. PHASE 4: LENDING & ORACLES
+@mcp.tool()
+async def get_aave_reserve_data(asset: str, rpc_url: str = None) -> str:
+    """LENDING: Aave V3 APY Data."""
+    return await run_op(lending.get_aave_reserve_data, asset=asset, rpc_url=rpc_url)
+
+@mcp.tool()
+async def get_aave_user_account_data(user_address: str, rpc_url: str = None) -> str:
+    """LENDING: Aave User Health."""
+    return await run_op(lending.get_aave_user_account_data, user_address=user_address, rpc_url=rpc_url)
+
+@mcp.tool()
+async def get_chainlink_price(feed_address: str, rpc_url: str = None) -> str:
+    """ORACLE: Chainlink Feed Price."""
+    return await run_op(oracle.get_chainlink_price, feed_address=feed_address, rpc_url=rpc_url)
+
+# 8. PHASE 5: UNIVERSAL & IDENTITY
+@mcp.tool()
+async def read_contract(address: str, function_signature: str, args: list, arg_types: list, return_types: list, rpc_url: str = None) -> str:
+    """UNIVERSAL: Call Any Contract View Function."""
+    return await run_op(contract_interaction.read_contract, address=address, function_signature=function_signature, args=args, arg_types=arg_types, return_types=return_types, rpc_url=rpc_url)
+
+@mcp.tool()
+async def decode_transaction(tx_hash: str, abi: str, rpc_url: str = None) -> str:
+    """UNIVERSAL: Decode Input Data."""
+    return await run_op(contract_interaction.decode_transaction, tx_hash=tx_hash, abi=abi, rpc_url=rpc_url)
+
+@mcp.tool()
+async def get_ens_reverse_record(address: str, rpc_url: str = None) -> str:
+    """IDENTITY: Address to Name."""
+    return await run_op(identity.get_ens_reverse_record, address=address, rpc_url=rpc_url)
+
+@mcp.tool()
+async def wrap_eth(amount: float, private_key: str, rpc_url: str = None) -> str:
+    """WETH: Wrap ETH."""
+    return await run_op(weth.wrap_eth, amount=amount, private_key=private_key, rpc_url=rpc_url)
+
+@mcp.tool()
+async def unwrap_eth(amount: float, private_key: str, rpc_url: str = None) -> str:
+    """WETH: Unwrap WETH."""
+    return await run_op(weth.unwrap_eth, amount=amount, private_key=private_key, rpc_url=rpc_url)
+
+# 9. PHASE 6: YIELD & SAFETY
+@mcp.tool()
+async def stake_eth_lido(amount: float, private_key: str, rpc_url: str = None) -> str:
+    """YIELD: Stake ETH on Lido."""
+    return await run_op(staking.stake_eth_lido, amount=amount, private_key=private_key, rpc_url=rpc_url)
+
+@mcp.tool()
+async def get_curve_quote(token_in: str, token_out: str, amount_in: float, rpc_url: str = None) -> str:
+    """YIELD: Curve Stable Quote."""
+    return await run_op(stableswap.get_curve_quote, token_in=token_in, token_out=token_out, amount_in=amount_in, rpc_url=rpc_url)
+
+@mcp.tool()
+async def simulate_transaction(to_address: str, value: float, data: str, from_address: str, rpc_url: str = None) -> str:
+    """SAFETY: Simulate Tx (Dry Run)."""
+    return await run_op(security.simulate_transaction, to_address=to_address, value=value, data=data, from_address=from_address, rpc_url=rpc_url)
+
+# --- DYNAMIC TOKEN SHORTCUTS ---
+tokens = {
+    "usdt": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+    "usdc": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    "weth": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    "dai": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+    "shib": "0x95aD61b0a150d79219dCF64E1E6Cc01f0B64C4cE",
+    "pepe": "0x6982508145454Ce325dDbE47a25d4ec3d2311933",
+    "wbtc": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
+    "link": "0x514910771AF9Ca656af840dff83E8264EcF986CA",
+    "uni": "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
+    "matic": "0x7D1AfA7B718fb893dB30A3aBc0Cfc608AaCfeBB0",
+    "steth": "0xae7ab96520DE3A18E5e111B5Ee5B82061ce70310",
+    "fet": "0xaea46A60368A7bD060eec7DF8CBa43b7EF41Ad85",
+    "rndr": "0x6De037ef9aD2725EB404906F1CC53138EA7Fb6E5",
+    "aave": "0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9"
+}
+
+# Chainlink Shortcuts
+@mcp.tool()
+async def get_chainlink_eth_usd() -> str:
+    """SHORTCUT: Chainlink ETH/USD."""
+    return await run_op(oracle.get_chainlink_price, feed_address="0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419")
+
+@mcp.tool()
+async def get_chainlink_btc_usd() -> str:
+    """SHORTCUT: Chainlink BTC/USD."""
+    return await run_op(oracle.get_chainlink_price, feed_address="0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c")
+
+@mcp.tool()
+async def get_chainlink_usdc_usd() -> str:
+    """SHORTCUT: Chainlink USDC/USD."""
+    return await run_op(oracle.get_chainlink_price, feed_address="0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6")
+
+# Register dynamic shortcuts
+for sym, addr in tokens.items():
+    # Balance
+    async def make_bal_handler(a=addr):
+        async def handler(wallet_address: str):
+            return await run_op(erc20.get_token_balance, token_address=a, wallet_address=wallet_address)
+        return handler
+    
+    mcp.tool(name=f"get_{sym}_balance", description=f"SHORTCUT: Get {sym.upper()} Balance.")(
+        make_bal_handler()
+    )
+
+    # Price
+    async def make_price_handler(a=addr):
+        async def handler():
+            return await run_op(defi.get_uniswap_price, token_in=a, token_out="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", amount_in=1.0, fee=3000)
+        return handler
+
+    mcp.tool(name=f"get_{sym}_price", description=f"SHORTCUT: Get {sym.upper()} Price (in USDC).")(
+        make_price_handler()
+    )
+
+    # Aave
+    async def make_aave_handler(a=addr):
+        async def handler():
+            return await run_op(lending.get_aave_reserve_data, asset=a)
+        return handler
+
+    mcp.tool(name=f"get_{sym}_aave_data", description=f"SHORTCUT: Get {sym.upper()} Aave Rates.")(
+        make_aave_handler()
+    )
 
 if __name__ == "__main__":
-    import asyncio
-    server = Web3Server()
-    asyncio.run(server.run())
+    mcp.run()

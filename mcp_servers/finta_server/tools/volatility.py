@@ -1,53 +1,45 @@
 
-from shared.mcp.protocol import ToolResult
+
 from mcp_servers.finta_server.tools.universal import calculate_indicator
 
-async def calculate_atr(arguments: dict) -> ToolResult:
+
+async def calculate_atr(data: list[dict], params: dict = None) -> str:
     """ATR - Average True Range."""
-    arguments['indicator'] = 'ATR'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'ATR', params)
 
-async def calculate_bbands(arguments: dict) -> ToolResult:
+async def calculate_bbands(data: list[dict], params: dict = None) -> str:
     """BBANDS - Bollinger Bands."""
-    arguments['indicator'] = 'BBANDS'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'BBANDS', params)
 
-async def calculate_kc(arguments: dict) -> ToolResult:
+async def calculate_kc(data: list[dict], params: dict = None) -> str:
     """KC - Keltner Channels."""
-    arguments['indicator'] = 'KC'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'KC', params)
 
-async def calculate_do(arguments: dict) -> ToolResult:
+async def calculate_do(data: list[dict], params: dict = None) -> str:
     """DO - Donchian Channels."""
-    arguments['indicator'] = 'DO'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'DO', params)
 
-async def calculate_mobo(arguments: dict) -> ToolResult:
+async def calculate_mobo(data: list[dict], params: dict = None) -> str:
     """MOBO - Momentum Breakout Bands."""
-    arguments['indicator'] = 'MOBO'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'MOBO', params)
 
-async def calculate_tr(arguments: dict) -> ToolResult:
+async def calculate_tr(data: list[dict], params: dict = None) -> str:
     """TR - True Range."""
-    arguments['indicator'] = 'TR'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'TR', params)
 
-async def calculate_bbwidth(arguments: dict) -> ToolResult:
+async def calculate_bbwidth(data: list[dict], params: dict = None) -> str:
     """BBWIDTH - Bollinger Band Width."""
-    arguments['indicator'] = 'BBWIDTH'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'BBWIDTH', params)
 
-async def calculate_percent_b(arguments: dict) -> ToolResult:
+async def calculate_percent_b(data: list[dict], params: dict = None) -> str:
     """PERCENT_B - Percent B."""
-    arguments['indicator'] = 'PERCENT_B'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'PERCENT_B', params)
 
-async def calculate_apz(arguments: dict) -> ToolResult:
+async def calculate_apz(data: list[dict], params: dict = None) -> str:
     """APZ - Adaptive Price Zone."""
-    arguments['indicator'] = 'APZ'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'APZ', params)
 
-async def calculate_massi(arguments: dict) -> ToolResult:
+async def calculate_massi(data: list[dict], params: dict = None) -> str:
     """MASSI - Mass Index."""
-    arguments['indicator'] = 'MASSI'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'MASSI', params)
+

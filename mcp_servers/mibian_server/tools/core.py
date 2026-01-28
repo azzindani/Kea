@@ -1,6 +1,6 @@
 
 import mibian
-from shared.mcp.protocol import ToolResult, TextContent
+
 import pandas as pd
 import json
 
@@ -58,8 +58,10 @@ class MibianCore:
         except Exception as e:
             raise ValueError(f"Mibian Error: {str(e)}")
 
-def dict_to_result(data: dict, title: str = "Result") -> ToolResult:
-    return ToolResult(content=[TextContent(text=json.dumps(data, indent=2))])
 
-def df_to_result(df: pd.DataFrame, title: str = "Result") -> ToolResult:
-    return ToolResult(content=[TextContent(text=json.dumps(df.to_dict(orient='records'), indent=2))])
+def dict_to_json(data: dict, title: str = "Result") -> str:
+    return json.dumps(data, indent=2)
+
+def df_to_json(df: pd.DataFrame, title: str = "Result") -> str:
+    return json.dumps(df.to_dict(orient='records'), indent=2)
+

@@ -1,176 +1,189 @@
 
-from __future__ import annotations
+from mcp.server.fastmcp import FastMCP
+from mcp_servers.wbgapi_server.tools import (
+    indicators, economy, discovery, dashboards, specialized, aggregates,
+    sdg, granular_dashboards, debt, governance, metadata_deep
+)
+import structlog
 import asyncio
-from shared.mcp.server_base import MCPServer
-from shared.mcp.protocol import ToolResult, TextContent
-from shared.logging import get_logger
 
-# Tools
-from mcp_servers.wbgapi_server.tools.indicators import get_indicator_data, get_indicator_map
-from mcp_servers.wbgapi_server.tools.economy import get_country_info, search_economies, get_region_list
-from mcp_servers.wbgapi_server.tools.discovery import search_indicators, get_indicators_by_topic, get_topic_list
-from mcp_servers.wbgapi_server.tools.dashboards import get_dashboard
+logger = structlog.get_logger()
 
-logger = get_logger(__name__)
+# Create the FastMCP server
+mcp = FastMCP("wbgapi_server", dependencies=["wbgapi", "pandas"])
 
-class WbgapiServer(MCPServer):
+async def run_op(op_func, diff_args=None, **kwargs):
     """
-    World Bank API (wbgapi) MCP Server.
-    Focus: Global Development Data, Long-term Trends.
+    Helper to run legacy tool ops.
+    diff_args: dict of overrides/additions to kwargs before passing to op.
     """
+    try:
+        # Combine args
+        final_args = kwargs.copy()
+        if diff_args:
+            final_args.update(diff_args)
+            
+        # The tools expect a single 'arguments' dict.
+        result = await op_func(final_args)
+        
+        # Unwrap ToolResult
+        if hasattr(result, 'content') and result.content:
+            text_content = ""
+            for item in result.content:
+                if hasattr(item, 'text'):
+                    text_content += item.text + "\n"
+            return text_content.strip()
+        
+        if hasattr(result, 'isError') and result.isError:
+            return "Error: Tool returned error status."
+            
+        return str(result)
+    except Exception as e:
+        return f"Error executing tool: {e}"
+
+# --- 1. INDICATOR TOOLS ---
+INDICATORS = indicators.get_indicator_map()
+
+@mcp.tool()
+async def get_indicator_data(indicator_code: str, economies: list[str] = None, mrv: int = 5) -> str:
+    """BULK: Fetch data for ANY indicator code (e.g. 'NY.GDP.MKTP.CD')."""
+    return await run_op(indicators.get_indicator_data, indicator_code=indicator_code, economies=economies, mrv=mrv)
+
+# --- 2. ECONOMY TOOLS ---
+@mcp.tool()
+async def get_country_info(country_codes: list[str] = None) -> str:
+    """ECONOMY: Get info for countries."""
+    return await run_op(economy.get_country_info, country_codes=country_codes)
+
+@mcp.tool()
+async def search_economies(query: str) -> str:
+    """ECONOMY: Search countries by name."""
+    return await run_op(economy.search_economies, query=query)
+
+@mcp.tool()
+async def get_region_list() -> str:
+    """ECONOMY: List all regions."""
+    return await run_op(economy.get_region_list)
+
+# --- 3. DISCOVERY TOOLS ---
+@mcp.tool()
+async def search_indicators(query: str) -> str:
+    """DISCOVERY: Search indicators by keyword."""
+    return await run_op(discovery.search_indicators, query=query)
+
+@mcp.tool()
+async def get_indicators_by_topic(topic_id: int) -> str:
+    """DISCOVERY: Browse Topic."""
+    return await run_op(discovery.get_indicators_by_topic, topic_id=topic_id)
+
+@mcp.tool()
+async def get_topic_list() -> str:
+    """DISCOVERY: List all Topics."""
+    return await run_op(discovery.get_topic_list)
+
+# --- 4. DASHBOARD TOOLS ---
+@mcp.tool()
+async def get_growth_dashboard(economies: list[str] = None) -> str:
+    """DASHBOARD: Get Growth indicators aggregated."""
+    return await run_op(dashboards.get_dashboard, diff_args={"dashboard_type": "growth"}, economies=economies)
+
+@mcp.tool()
+async def get_poverty_dashboard(economies: list[str] = None) -> str:
+    """DASHBOARD: Get Poverty indicators aggregated."""
+    return await run_op(dashboards.get_dashboard, diff_args={"dashboard_type": "poverty"}, economies=economies)
+
+@mcp.tool()
+async def get_climate_dashboard(economies: list[str] = None) -> str:
+    """DASHBOARD: Get Climate indicators aggregated."""
+    return await run_op(dashboards.get_dashboard, diff_args={"dashboard_type": "climate"}, economies=economies)
+
+@mcp.tool()
+async def get_tech_dashboard(economies: list[str] = None) -> str:
+    """DASHBOARD: Get Tech indicators aggregated."""
+    return await run_op(dashboards.get_dashboard, diff_args={"dashboard_type": "tech"}, economies=economies)
+
+# --- 5. SPECIALIZED & HISTORY ---
+@mcp.tool()
+async def get_gender_stats(economies: list[str] = None) -> str:
+    """SPECIAL: Get stats from Gender Database."""
+    return await run_op(specialized.get_specialized_data, diff_args={"db_type": "gender"}, economies=economies)
+
+@mcp.tool()
+async def get_education_stats(economies: list[str] = None) -> str:
+    """SPECIAL: Get stats from Education Database."""
+    return await run_op(specialized.get_specialized_data, diff_args={"db_type": "education"}, economies=economies)
+
+@mcp.tool()
+async def get_historical_data(indicator_code: str, economies: list[str] = None) -> str:
+    """HISTORY: Get 50-year trend for any indicator."""
+    return await run_op(specialized.get_historical_data, indicator_code=indicator_code, economies=economies)
+
+# --- 6. AGGREGATES ---
+@mcp.tool()
+async def get_region_data(indicator_code: str) -> str:
+    """AGGREGATE: Get data for all Regions (EAS, SAS, etc)."""
+    return await run_op(aggregates.get_region_data, indicator_code=indicator_code)
+
+@mcp.tool()
+async def get_income_level_data(indicator_code: str) -> str:
+    """AGGREGATE: Get data for Income Groups (HIC, LIC, etc)."""
+    return await run_op(aggregates.get_income_level_data, indicator_code=indicator_code)
+
+# --- 7. SDGs & MICRO-DASHBOARDS ---
+@mcp.tool()
+async def get_sdg_data(goal: int, economies: list[str] = None) -> str:
+    """SDG: Get Key Indicators for a specific Goal."""
+    return await run_op(sdg.get_sdg_data, goal=goal, economies=economies)
+
+@mcp.tool()
+async def get_poverty_equity_data(economies: list[str] = None) -> str:
+    """WT: Get Deep Poverty & Equity stats (DB 24/2)."""
+    return await run_op(sdg.get_poverty_equity_data, economies=economies)
+
+@mcp.tool()
+async def get_food_security_dashboard(economies: list[str] = None) -> str:
+    """DASHBOARD: Get Food Security indicators."""
+    return await run_op(granular_dashboards.get_granular_dashboard, diff_args={"dashboard_type": "food_security"}, economies=economies)
+
+@mcp.tool()
+async def get_digital_dashboard(economies: list[str] = None) -> str:
+    """DASHBOARD: Get Digital indicators."""
+    return await run_op(granular_dashboards.get_granular_dashboard, diff_args={"dashboard_type": "digital"}, economies=economies)
+
+@mcp.tool()
+async def get_energy_dashboard(economies: list[str] = None) -> str:
+    """DASHBOARD: Get Energy indicators."""
+    return await run_op(granular_dashboards.get_granular_dashboard, diff_args={"dashboard_type": "energy"}, economies=economies)
+
+# --- 8. DEEP DIVE ---
+@mcp.tool()
+async def get_debt_stats(economies: list[str] = None) -> str:
+    """DEBT: Get International Debt (IDS, DB 6)."""
+    return await run_op(debt.get_debt_stats, economies=economies)
+
+@mcp.tool()
+async def get_governance_data(economies: list[str] = None) -> str:
+    """GOVERNANCE: Get Corruption/Stability (WGI, DB 3)."""
+    return await run_op(governance.get_governance_data, economies=economies)
+
+@mcp.tool()
+async def get_indicator_metadata(indicator_code: str) -> str:
+    """META: Get Definitions & Source Notes."""
+    return await run_op(metadata_deep.get_indicator_metadata, indicator_code=indicator_code)
+
+
+# Register dynamic shortcuts
+for name, code in INDICATORS.items():
+    tool_name = f"get_{name}"
+    desc = f"INDICATOR: Get '{name}' ({code}) for economies."
     
-    def __init__(self) -> None:
-        super().__init__(name="wbgapi_server", version="1.0.0")
-        self._register_tools()
-        
-    def _register_tools(self) -> None:
-        
-        # --- 1. INDICATOR TOOLS (Unrolled) ---
-        # 30+ Tools
-        
-        INDICATORS = get_indicator_map()
-        
-        for name, code in INDICATORS.items():
-            tool_name = f"get_{name}"
-            desc = f"INDICATOR: Get '{name}' ({code}) for economies."
-            
-            async def ind_handler(args: dict, c=code) -> ToolResult:
-                args["indicator_code"] = c
-                return await get_indicator_data(args)
-                
-            self.register_tool(
-                name=tool_name, description=desc, handler=ind_handler,
-                parameters={
-                    "economies": {"type": "array", "description": "List of country codes (e.g. ['USA', 'CHN']). Default: All."},
-                    "mrv": {"type": "integer", "description": "Most Recent Values to fetch (Default 5)."}
-                }
-            )
-
-        # Generic Indicator
-        self.register_tool(
-            name="get_indicator_data",
-            description="BULK: Fetch data for ANY indicator code (e.g. 'NY.GDP.MKTP.CD').",
-            handler=get_indicator_data,
-            parameters={
-                 "indicator_code": {"type": "string"},
-                 "economies": {"type": "array"},
-                 "mrv": {"type": "integer"}
-            }
-        )
-
-        # --- 2. ECONOMY TOOLS ---
-        self.register_tool(name="get_country_info", description="ECONOMY: Get info for countries.", handler=get_country_info, parameters={"country_codes": {"type": "array"}})
-        self.register_tool(name="search_economies", description="ECONOMY: Search countries by name.", handler=search_economies, parameters={"query": {"type": "string"}})
-        self.register_tool(name="get_region_list", description="ECONOMY: List all regions.", handler=get_region_list)
-
-        # --- 3. DISCOVERY TOOLS ---
-        self.register_tool(name="search_indicators", description="DISCOVERY: Search indicators by keyword.", handler=search_indicators, parameters={"query": {"type": "string"}})
-        self.register_tool(name="get_indicators_by_topic", description="DISCOVERY: Browse Topic.", handler=get_indicators_by_topic, parameters={"topic_id": {"type": "integer"}})
-        self.register_tool(name="get_topic_list", description="DISCOVERY: List all Topics.", handler=get_topic_list)
-
-        # --- 4. DASHBOARD TOOLS ---
-        dashboards = ["growth", "poverty", "climate", "tech"]
-        for d in dashboards:
-            name = f"get_{d}_dashboard"
-            desc = f"DASHBOARD: Get {d.title()} indicators aggregated."
-             
-            async def d_handler(args: dict, dt=d) -> ToolResult:
-                return await get_dashboard(args, dt)
-            
-            self.register_tool(
-                name=name, description=desc, handler=d_handler,
-                parameters={"economies": {"type": "array"}}
-            )
-
-        # --- 5. PHASE 2: SPECIALIZED & HISTORY ---
-        
-        from mcp_servers.wbgapi_server.tools.specialized import get_specialized_data, get_historical_data
-        
-        self.register_tool(
-            name="get_gender_stats", description="SPECIAL: Get stats from Gender Database.",
-            handler=lambda args: get_specialized_data(args, "gender"),
-            parameters={"economies": {"type": "array"}}
-        )
-        self.register_tool(
-            name="get_education_stats", description="SPECIAL: Get stats from Education Database.",
-            handler=lambda args: get_specialized_data(args, "education"),
-            parameters={"economies": {"type": "array"}}
-        )
-        self.register_tool(
-            name="get_historical_data", description="HISTORY: Get 50-year trend for any indicator.",
-            handler=get_historical_data,
-            parameters={"indicator_code": {"type": "string"}, "economies": {"type": "array"}}
-        )
-
-        # --- 6. PHASE 2: AGGREGATES ---
-        
-        from mcp_servers.wbgapi_server.tools.aggregates import get_region_data, get_income_level_data
-        
-        self.register_tool(
-            name="get_region_data", description="AGGREGATE: Get data for all Regions (EAS, SAS, etc).",
-            handler=get_region_data, parameters={"indicator_code": {"type": "string"}}
-        )
-        self.register_tool(
-            name="get_income_level_data", description="AGGREGATE: Get data for Income Groups (HIC, LIC, etc).",
-            handler=get_income_level_data, parameters={"indicator_code": {"type": "string"}}
-        )
-
-        self.register_tool(
-            name="get_income_level_data", description="AGGREGATE: Get data for Income Groups (HIC, LIC, etc).",
-            handler=get_income_level_data, parameters={"indicator_code": {"type": "string"}}
-        )
-
-        # --- 7. PHASE 3: SDGs & MICRO-DASHBOARDS ---
-        
-        from mcp_servers.wbgapi_server.tools.sdg import get_sdg_data, get_poverty_equity_data
-        from mcp_servers.wbgapi_server.tools.granular_dashboards import get_granular_dashboard
-        
-        self.register_tool(
-            name="get_sdg_data", description="SDG: Get Key Indicators for a specific Goal.",
-            handler=get_sdg_data, parameters={"goal": {"type": "integer"}, "economies": {"type": "array"}}
-        )
-        self.register_tool(
-            name="get_poverty_equity_data", description="WT: Get Deep Poverty & Equity stats (DB 24/2).",
-            handler=get_poverty_equity_data, parameters={"economies": {"type": "array"}}
-        )
-        
-        mdashes = ["food_security", "digital", "energy"]
-        for md in mdashes:
-            name = f"get_{md}_dashboard"
-            desc = f"DASHBOARD: Get {md.replace('_', ' ').title()} indicators."
-            
-            async def md_handler(args: dict, m=md) -> ToolResult:
-                return await get_granular_dashboard(args, m)
-                
-            self.register_tool(
-                name=name, description=desc, handler=md_handler,
-                parameters={"economies": {"type": "array"}}
-            )
-
-        # --- 8. PHASE 4: DEEP DEEP DIVE (Debt, Governance, Metadata) ---
-        
-        from mcp_servers.wbgapi_server.tools.debt import get_debt_stats
-        from mcp_servers.wbgapi_server.tools.governance import get_governance_data
-        from mcp_servers.wbgapi_server.tools.metadata_deep import get_indicator_metadata
-        
-        self.register_tool(
-            name="get_debt_stats", description="DEBT: Get International Debt (IDS, DB 6).",
-            handler=get_debt_stats, parameters={"economies": {"type": "array"}}
-        )
-        self.register_tool(
-            name="get_governance_data", description="GOVERNANCE: Get Corruption/Stability (WGI, DB 3).",
-            handler=get_governance_data, parameters={"economies": {"type": "array"}}
-        )
-        self.register_tool(
-            name="get_indicator_metadata", description="META: Get Definitions & Source Notes.",
-            handler=get_indicator_metadata, parameters={"indicator_code": {"type": "string"}}
-        )
-
-async def main():
-    from shared.logging import setup_logging, LogConfig
-    setup_logging(LogConfig(level="DEBUG", format="console", service_name="wbgapi_server"))
-    server = WbgapiServer()
-    await server.run()
+    # We must bind 'c=code' to capture the value in the loop
+    async def make_ind_handler(c=code):
+        async def handler(economies: list[str] = None, mrv: int = 5):
+            return await run_op(indicators.get_indicator_data, indicator_code=c, economies=economies, mrv=mrv)
+        return handler
+    
+    mcp.tool(name=tool_name, description=desc)(make_ind_handler())
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    mcp.run()

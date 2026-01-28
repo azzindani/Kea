@@ -8,13 +8,13 @@ import json
 
 logger = get_logger(__name__)
 
+
 # --- FUNDS ENGINE ---
 
-async def get_fund_holdings_formatted(arguments: dict) -> ToolResult:
+async def get_fund_holdings_formatted(tickers: str) -> str:
     """
     Get Table of Top Holdings for ETFs/Mutual Funds.
     """
-    tickers = arguments.get("tickers")
     try:
         st = SmartTicker(tickers)
         # fundHoldingInfo usually contains cashPosition, stockPosition, bondPosition
@@ -22,54 +22,53 @@ async def get_fund_holdings_formatted(arguments: dict) -> ToolResult:
         
         data = st.yq.fund_top_holdings
         if isinstance(data, pd.DataFrame):
-            return ToolResult(content=[TextContent(text=f"### Top Holdings\n\n{data.to_markdown()}")])
+            return f"### Top Holdings\n\n{data.to_markdown()}"
         
         # If dict (multi-ticker or weird format)
-        return ToolResult(content=[TextContent(text=json.dumps(data, indent=2, default=str))])
+        return json.dumps(data, indent=2, default=str)
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_fund_sector_weightings(arguments: dict) -> ToolResult:
+async def get_fund_sector_weightings(tickers: str) -> str:
     """Get Sector Weightings for Funds."""
-    tickers = arguments.get("tickers")
     try:
         st = SmartTicker(tickers)
         data = st.yq.fund_sector_weightings
         if isinstance(data, pd.DataFrame):
-             return ToolResult(content=[TextContent(text=f"### Sector Weightings\n\n{data.to_markdown()}")])
-        return ToolResult(content=[TextContent(text=json.dumps(data, indent=2, default=str))])
+             return f"### Sector Weightings\n\n{data.to_markdown()}"
+        return json.dumps(data, indent=2, default=str)
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
 # --- DISCOVERY ENGINE ---
 
-async def search_instruments(arguments: dict) -> ToolResult:
+async def search_instruments(query: str) -> str:
     """
     Search for ANY financial instrument (Stocks, Forex, Crypto, Bonds).
     Args:
         query (str): "Gold", "Bitcoin", "Vanguard", "EURUSD"
     """
-    q = arguments.get("query")
+    
     try:
         # yahooquery.search returns dict: {'quotes': [...], 'news': [...]}
-        data = search(q)
+        data = search(query)
         if "quotes" in data:
             quotes = data["quotes"]
             # Simplify
             simple = [{k: x.get(k) for k in ["symbol", "shortname", "longname", "score", "quoteType", "exchange"]} for x in quotes]
-            return ToolResult(content=[TextContent(text=f"### Search Results: '{q}'\n\n" + pd.DataFrame(simple).to_markdown())])
+            return f"### Search Results: '{query}'\n\n" + pd.DataFrame(simple).to_markdown()
             
-        return ToolResult(content=[TextContent(text=json.dumps(data, indent=2))])
+        return json.dumps(data, indent=2)
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_ticker_news(arguments: dict) -> ToolResult:
+async def get_ticker_news(tickers: str) -> str:
     """Get News for specific tickers."""
-    tickers = arguments.get("tickers")
     try:
         # news is a property of Ticker
         st = SmartTicker(tickers)
         data = st.yq.news
-        return ToolResult(content=[TextContent(text=json.dumps(data, indent=2))])
+        return json.dumps(data, indent=2)
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+

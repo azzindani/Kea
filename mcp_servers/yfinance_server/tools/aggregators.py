@@ -1,16 +1,16 @@
 
 import yfinance as yf
-from shared.mcp.protocol import ToolResult, TextContent
+
+import yfinance as yf
 from shared.logging import get_logger
 
 logger = get_logger(__name__)
 
-async def get_full_ticker_report(arguments: dict) -> ToolResult:
+async def get_full_ticker_report(ticker: str) -> str:
     """
     MULTI-TALENT: Get Price, Info, Financials, Holders in one go.
     Saves 5+ round trips.
     """
-    ticker = arguments.get("ticker")
     
     try:
         stock = yf.Ticker(ticker)
@@ -48,8 +48,9 @@ async def get_full_ticker_report(arguments: dict) -> ToolResult:
 ## 4. Business Summary
 {info.get("longBusinessSummary", "")[:500]}...
 """
-        return ToolResult(content=[TextContent(text=report)])
+        return report
         
     except Exception as e:
         logger.error(f"Aggregator error: {e}")
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+

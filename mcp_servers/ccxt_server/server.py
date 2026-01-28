@@ -1,227 +1,170 @@
-
-from __future__ import annotations
+from mcp.server.fastmcp import FastMCP
+from mcp_servers.ccxt_server.tools import (
+    public, metadata, aggregator, derivatives, historical, account, private, trading, exchange_manager
+)
+import ccxt.async_support as ccxt
+import structlog
 import asyncio
-from shared.mcp.server_base import MCPServer
-from shared.mcp.protocol import ToolResult, TextContent
-from shared.logging import get_logger
 
-# Tools
-from mcp_servers.ccxt_server.tools.public import get_ticker, get_ohlcv, get_order_book
-from mcp_servers.ccxt_server.tools.metadata import list_exchange_markets, get_exchange_capabilities
-from mcp_servers.ccxt_server.tools.aggregator import get_global_price, get_arbitrage_spread
-from mcp_servers.ccxt_server.tools.exchange_manager import ExchangeManager
-import ccxt
+logger = structlog.get_logger()
 
-logger = get_logger(__name__)
+# Create the FastMCP server
+mcp = FastMCP("ccxt_server", dependencies=["ccxt", "pandas"])
 
-class CcxtServer(MCPServer):
-    """
-    CCXT (Crypto) MCP Server.
-    Unified Access to 100+ Cryptocurrency Exchanges.
-    """
-    
-    def __init__(self) -> None:
-        super().__init__(name="ccxt_server", version="1.0.0")
-        self._register_tools()
+# --- 1. UNIFIED PUBLIC DATA ---
+@mcp.tool()
+async def get_ticker(exchange: str, symbol: str) -> str:
+    """PUBLIC: Get Ticker (Price, Vol) for any exchange."""
+    return await public.get_ticker(exchange, symbol)
+
+@mcp.tool()
+async def get_ohlcv(exchange: str, symbol: str, timeframe: str = "1d", limit: int = 100000) -> str:
+    """PUBLIC: Get Candles (Open/High/Low/Close)."""
+    return await public.get_ohlcv(exchange, symbol, timeframe, limit)
+
+@mcp.tool()
+async def get_order_book(exchange: str, symbol: str, limit: int = 100000) -> str:
+    """PUBLIC: Get Order Book (Bids/Asks Depth)."""
+    return await public.get_order_book(exchange, symbol, limit)
+
+@mcp.tool()
+async def get_trades(exchange: str, symbol: str, limit: int = 100000) -> str:
+    """PUBLIC: Get Recent Trades."""
+    return await public.get_trades(exchange, symbol, limit)
+
+@mcp.tool()
+async def get_exchange_status(exchange: str) -> str:
+    """PUBLIC: Get Exchange Status."""
+    return await public.get_status(exchange)
+
+@mcp.tool()
+async def get_exchange_time(exchange: str) -> str:
+    """PUBLIC: Get Exchange Time."""
+    return await public.get_time(exchange)
+
+# --- 2. AGGREGATOR (MULTITALENT) ---
+@mcp.tool()
+async def get_global_price(symbol: str = "BTC/USDT", exchanges: list[str] = None) -> str:
+    """MACRO: Get Global Price Aggregation (Mean/Spread)."""
+    return await aggregator.get_global_price(symbol, exchanges)
+
+@mcp.tool()
+async def get_arbitrage_scan(symbol: str = "BTC/USDT", exchanges: list[str] = None) -> str:
+    """MACRO: Check Arbitrage (Buy Low/Sell High)."""
+    return await aggregator.get_arbitrage_spread(symbol, exchanges)
+
+# --- 3. METADATA ---
+@mcp.tool()
+async def list_exchange_markets(exchange: str) -> str:
+    """META: List all pairs on an exchange."""
+    return await metadata.list_exchange_markets(exchange)
+
+@mcp.tool()
+async def check_exchange_capabilities(exchange: str) -> str:
+    """META: Check what exchange supports (fetchOHLCV, fetchPositions, etc)."""
+    return await metadata.get_exchange_capabilities(exchange)
+
+# --- 5. PHASE 2: DERIVATIVES & HISTORY ---
+@mcp.tool()
+async def get_funding_rate(exchange: str, symbol: str) -> str:
+    """DERIVATIVES: Get Funding Rate."""
+    return await derivatives.get_funding_rate(exchange, symbol)
+
+@mcp.tool()
+async def get_open_interest(exchange: str, symbol: str) -> str:
+    """DERIVATIVES: Get Open Interest."""
+    return await derivatives.get_open_interest(exchange, symbol)
+
+@mcp.tool()
+async def download_market_history(exchange: str, symbol: str, timeframe: str = "1h", days: int = 30) -> str:
+    """HISTORY: Download Large History (Pagination)."""
+    return await historical.download_history(exchange, symbol, timeframe, days)
+
+@mcp.tool()
+async def get_account_balance(exchange: str, api_key: str = None, secret: str = None) -> str:
+    """ACCOUNT: Get Balance (API Key Required)."""
+    return await account.get_balance(exchange, api_key, secret)
+
+# --- 6. PHASE 3: PRIVATE & ADVANCED ---
+@mcp.tool()
+async def get_positions(exchange: str, api_key: str, secret: str, symbols: list[str] = None) -> str:
+    """PRIVATE: Get Futures Positions."""
+    return await private.get_positions(exchange, api_key, secret, symbols)
+
+@mcp.tool()
+async def get_open_orders(exchange: str, api_key: str, secret: str, symbol: str = None) -> str:
+    """PRIVATE: Get Open Orders."""
+    return await private.get_open_orders(exchange, symbol, api_key, secret)
+
+@mcp.tool()
+async def get_my_trades_history(exchange: str, api_key: str, secret: str, symbol: str = None, limit: int = 100000) -> str:
+    """PRIVATE: Get My Trades."""
+    return await private.get_my_trades(exchange, symbol, limit, api_key, secret)
+
+@mcp.tool()
+async def get_global_funding_rates(symbol: str = "BTC/USDT", exchanges: list[str] = None) -> str:
+    """MACRO: Global Funding Rate Map."""
+    return await aggregator.get_global_funding_spread(symbol, exchanges)
+
+# --- 7. PHASE 4: ACTIVE MANAGEMENT ---
+@mcp.tool()
+async def create_market_order(exchange: str, symbol: str, side: str, amount: float, api_key: str, secret: str) -> str:
+    """TRADING: Create MARKET Order (Buy/Sell). CAUTION."""
+    return await trading.create_order(exchange, symbol, "market", side, amount, None, api_key, secret)
+
+@mcp.tool()
+async def create_limit_order(exchange: str, symbol: str, side: str, amount: float, price: float, api_key: str, secret: str) -> str:
+    """TRADING: Create LIMIT Order (Buy/Sell). CAUTION."""
+    return await trading.create_order(exchange, symbol, "limit", side, amount, price, api_key, secret)
+
+@mcp.tool()
+async def cancel_active_order(exchange: str, id: str, api_key: str, secret: str, symbol: str = None) -> str:
+    """TRADING: Cancel Order."""
+    return await trading.cancel_order(exchange, id, symbol, api_key, secret)
+
+# --- SHORTCUT TOOLS GENERATOR ---
+# We can dynamically register tools for top exchanges to make it easier for the LLM
+TOP_EXCHANGES = ['binance', 'kraken', 'coinbase', 'okx', 'bybit', 'kucoin', 'gateio', 'bitstamp']
+
+def register_shortcuts():
+    for ex in TOP_EXCHANGES:
         
-    def _register_tools(self) -> None:
+        # Ticker Shortcut
+        async def ticker_handler(symbol: str, _ex=ex) -> str:
+            return await public.get_ticker(_ex, symbol)
         
-        # --- 1. UNIFIED PUBLIC DATA ---
-        self.register_tool(
-            name="get_ticker", description="PUBLIC: Get Ticker (Price, Vol) for any exchange.",
-            handler=get_ticker, parameters={"exchange": {"type": "string"}, "symbol": {"type": "string"}}
-        )
-        self.register_tool(
-            name="get_ohlcv", description="PUBLIC: Get Candles (Open/High/Low/Close).",
-            handler=get_ohlcv, parameters={"exchange": {"type": "string"}, "symbol": {"type": "string"}, "timeframe": {"type": "string"}, "limit": {"type": "integer"}}
-        )
-        self.register_tool(
-            name="get_order_book", description="PUBLIC: Get Order Book (Bids/Asks Depth).",
-            handler=get_order_book, parameters={"exchange": {"type": "string"}, "symbol": {"type": "string"}, "limit": {"type": "integer"}}
-        )
-        # New Tools
-        from mcp_servers.ccxt_server.tools.public import get_trades, get_status, get_time
-        self.register_tool(
-            name="get_trades", description="PUBLIC: Get Recent Trades.",
-            handler=get_trades, parameters={"exchange": {"type": "string"}, "symbol": {"type": "string"}, "limit": {"type": "integer"}}
-        )
-        self.register_tool(
-            name="get_status", description="PUBLIC: Get Exchange Status.",
-            handler=get_status, parameters={"exchange": {"type": "string"}}
-        )
-        self.register_tool(
-            name="get_time", description="PUBLIC: Get Exchange Time.",
-            handler=get_time, parameters={"exchange": {"type": "string"}}
-        )
-        
-        # --- 2. AGGREGATOR (MULTITALENT) ---
-        self.register_tool(
-            name="get_global_price", description="MACRO: Get Global Price Aggregation (Mean/Spread).",
-            handler=get_global_price, parameters={"symbol": {"type": "string"}, "exchanges": {"type": "array"}}
-        )
-        self.register_tool(
-            name="get_arbitrage_spread", description="MACRO: Check Arbitrage (Buy Low/Sell High).",
-            handler=get_arbitrage_spread, parameters={"symbol": {"type": "string"}}
-        )
-        
-        # --- 3. METADATA ---
-        self.register_tool(
-            name="list_exchange_markets", description="META: List all pairs on an exchange.",
-            handler=list_exchange_markets, parameters={"exchange": {"type": "string"}}
-        )
-        self.register_tool(
-            name="get_exchange_capabilities", description="META: Check what exchange supports (fetchOHLCV?).",
-            handler=get_exchange_capabilities, parameters={"exchange": {"type": "string"}}
-        )
-        
-        # --- 5. PHASE 2: DERIVATIVES & HISTORY ---
-        from mcp_servers.ccxt_server.tools.derivatives import get_funding_rate, get_open_interest
-        from mcp_servers.ccxt_server.tools.historical import download_history
-        from mcp_servers.ccxt_server.tools.account import get_balance
-        
-        self.register_tool(
-            name="get_funding_rate", description="DERIVATIVES: Get Funding Rate.",
-            handler=get_funding_rate, parameters={"exchange": {"type": "string"}, "symbol": {"type": "string"}}
-        )
-        self.register_tool(
-            name="get_open_interest", description="DERIVATIVES: Get Open Interest.",
-            handler=get_open_interest, parameters={"exchange": {"type": "string"}, "symbol": {"type": "string"}}
-        )
-        self.register_tool(
-            name="download_history", description="HISTORY: Download 10k+ Candles (Pagination).",
-            handler=download_history, parameters={"exchange": {"type": "string"}, "symbol": {"type": "string"}, "timeframe": {"type": "string"}, "days": {"type": "integer"}}
-        )
-        self.register_tool(
-            name="get_balance", description="ACCOUNT: Get Balance (API Key Required).",
-            handler=get_balance, parameters={"exchange": {"type": "string"}, "api_key": {"type": "string"}, "secret": {"type": "string"}}
+        mcp.add_tool(
+            name=f"get_{ex}_ticker",
+            description=f"SHORTCUT: Get {ex.title()} Ticker.",
+            fn=ticker_handler
         )
 
-        # --- 6. PHASE 3: PRIVATE & ADVANCED ---
-        from mcp_servers.ccxt_server.tools.private import get_positions, get_open_orders, get_my_trades
-        from mcp_servers.ccxt_server.tools.advanced_market import get_liquidations, get_long_short_ratio
-        from mcp_servers.ccxt_server.tools.aggregator import get_global_funding_spread
+        # Order Book Shortcut
+        async def book_handler(symbol: str, _ex=ex) -> str:
+            return await public.get_order_book(_ex, symbol)
         
-        self.register_tool(name="get_positions", description="PRIVATE: Get Futures Positions.", handler=get_positions, parameters={"exchange": {"type": "string"}, "api_key": {"type": "string"}, "secret": {"type": "string"}})
-        self.register_tool(name="get_open_orders", description="PRIVATE: Get Open Orders.", handler=get_open_orders, parameters={"exchange": {"type": "string"}, "symbol": {"type": "string"}, "api_key": {"type": "string"}, "secret": {"type": "string"}})
-        self.register_tool(name="get_my_trades", description="PRIVATE: Get My Trades.", handler=get_my_trades, parameters={"exchange": {"type": "string"}, "symbol": {"type": "string"}, "api_key": {"type": "string"}, "secret": {"type": "string"}})
+        mcp.add_tool(
+            name=f"get_{ex}_book",
+            description=f"SHORTCUT: Get {ex.title()} Order Book.",
+            fn=book_handler
+        )
         
-        self.register_tool(name="get_liquidations", description="MARKET: Get Recent Liquidations.", handler=get_liquidations, parameters={"exchange": {"type": "string"}, "symbol": {"type": "string"}})
-        self.register_tool(name="get_long_short_ratio", description="MARKET: Get Long/Short Ratio.", handler=get_long_short_ratio, parameters={"exchange": {"type": "string"}, "symbol": {"type": "string"}, "timeframe": {"type": "string"}})
-        self.register_tool(name="get_global_funding_spread", description="MACRO: Global Funding Rate Map.", handler=get_global_funding_spread, parameters={"symbol": {"type": "string"}})
+        # OHLCV Shortcut
+        async def ohlcv_handler(symbol: str, _ex=ex) -> str:
+            return await public.get_ohlcv(_ex, symbol)
+            
+        mcp.add_tool(
+            name=f"get_{ex}_ohlcv",
+            description=f"SHORTCUT: Get {ex.title()} Candles.",
+            fn=ohlcv_handler
+        )
 
-        # --- 7. PHASE 4: ACTIVE MANAGEMENT ---
-        from mcp_servers.ccxt_server.tools.ledger import get_transaction_history, get_deposit_address
-        from mcp_servers.ccxt_server.tools.margin import get_borrow_rates, get_leverage_tiers
-        from mcp_servers.ccxt_server.tools.trading import create_order, cancel_order
-        
-        self.register_tool(name="get_transaction_history", description="LEDGER: Get Deposits/Withdrawals.", handler=get_transaction_history, parameters={"exchange": {"type": "string"}, "api_key": {"type": "string"}, "secret": {"type": "string"}})
-        self.register_tool(name="get_deposit_address", description="LEDGER: Get Deposit Address.", handler=get_deposit_address, parameters={"exchange": {"type": "string"}, "code": {"type": "string"}, "api_key": {"type": "string"}, "secret": {"type": "string"}})
-        
-        self.register_tool(name="get_borrow_rates", description="MARGIN: Get Borrow Rates.", handler=get_borrow_rates, parameters={"exchange": {"type": "string"}})
-        self.register_tool(name="get_leverage_tiers", description="MARGIN: Get Leverage Tiers.", handler=get_leverage_tiers, parameters={"exchange": {"type": "string"}})
-        
-        self.register_tool(name="create_order", description="TRADING: Create (Buy/Sell) Order. CAUTION.", handler=create_order, parameters={"exchange": {"type": "string"}, "symbol": {"type": "string"}, "side": {"type": "string"}, "type": {"type": "string"}, "amount": {"type": "string"}, "price": {"type": "string"}, "api_key": {"type": "string"}, "secret": {"type": "string"}})
-        self.register_tool(name="cancel_order", description="TRADING: Cancel Order.", handler=cancel_order, parameters={"exchange": {"type": "string"}, "id": {"type": "string"}, "symbol": {"type": "string"}, "api_key": {"type": "string"}, "secret": {"type": "string"}})
+register_shortcuts()  
 
-        # --- 4. SHORTCUT TOOLS (For Top Exchanges) ---
-        # "Prioritize tools... create specific tools"
-        top_exchanges = ['binance', 'kraken', 'coinbase', 'okx', 'bybit', 'kucoin', 'gateio', 'bitstamp']
-        
-        for ex in top_exchanges:
-            # Ticker Shortcut
-            tool_name = f"get_{ex}_ticker"
-            async def ticker_handler(args: dict, e=ex) -> ToolResult:
-                args['exchange'] = e
-                return await get_ticker(args)
-            
-            self.register_tool(
-                name=tool_name, description=f"SHORTCUT: Get {ex.title()} Ticker.",
-                handler=ticker_handler, parameters={"symbol": {"type": "string"}}
-            )
-            
-            # Order Book Shortcut
-            tool_name_ob = f"get_{ex}_book"
-            async def ob_handler(args: dict, e=ex) -> ToolResult:
-                args['exchange'] = e
-                return await get_order_book(args)
-                
-            self.register_tool(
-                name=tool_name_ob, description=f"SHORTCUT: Get {ex.title()} Order Book.",
-                handler=ob_handler, parameters={"symbol": {"type": "string"}}
-            )
-            
-            # Trades Shortcut
-            tool_name_trades = f"get_{ex}_trades"
-            async def trades_handler(args: dict, e=ex) -> ToolResult:
-                args['exchange'] = e
-                return await get_trades(args)
-            self.register_tool(name=tool_name_trades, description=f"SHORTCUT: Get {ex.title()} Trades.", handler=trades_handler, parameters={"symbol": {"type": "string"}})
-            
-            # OHLCV Shortcut
-            tool_name_ohlcv = f"get_{ex}_ohlcv"
-            async def ohlcv_handler(args: dict, e=ex) -> ToolResult:
-                args['exchange'] = e
-                return await get_ohlcv(args)
-            self.register_tool(name=tool_name_ohlcv, description=f"SHORTCUT: Get {ex.title()} Candles.", handler=ohlcv_handler, parameters={"symbol": {"type": "string"}})
-            
-            # Funding Shortcut
-            tool_name_fund = f"get_{ex}_funding"
-            async def fund_handler(args: dict, e=ex) -> ToolResult:
-                args['exchange'] = e
-                return await get_funding_rate(args)
-            self.register_tool(name=tool_name_fund, description=f"SHORTCUT: Get {ex.title()} Funding Rate.", handler=fund_handler, parameters={"symbol": {"type": "string"}})
-            
-            # History Shortcut (Big Data)
-            tool_name_hist = f"download_{ex}_history"
-            async def hist_handler(args: dict, e=ex) -> ToolResult:
-                args['exchange'] = e
-                return await download_history(args)
-            self.register_tool(name=tool_name_hist, description=f"SHORTCUT: Download {ex.title()} History (10k+).", handler=hist_handler, parameters={"symbol": {"type": "string"}, "days": {"type": "integer"}})
-            
-            # Positions Shortcut
-            tool_name_pos = f"get_{ex}_positions"
-            async def pos_handler(args: dict, e=ex) -> ToolResult:
-                args['exchange'] = e
-                return await get_positions(args)
-            self.register_tool(name=tool_name_pos, description=f"SHORTCUT: Get {ex.title()} Positions (Auth).", handler=pos_handler, parameters={"api_key": {"type": "string"}, "secret": {"type": "string"}})
-            
-            # Liquidations Shortcut
-            tool_name_liq = f"get_{ex}_liquidations"
-            async def liq_handler(args: dict, e=ex) -> ToolResult:
-                args['exchange'] = e
-                return await get_liquidations(args)
-            self.register_tool(name=tool_name_liq, description=f"SHORTCUT: Get {ex.title()} Liquidations.", handler=liq_handler, parameters={"symbol": {"type": "string"}})
-            
-            # Ledger Shortcut
-            tool_name_led = f"get_{ex}_ledger"
-            async def led_handler(args: dict, e=ex) -> ToolResult:
-                args['exchange'] = e
-                return await get_transaction_history(args)
-            self.register_tool(name=tool_name_led, description=f"SHORTCUT: Get {ex.title()} Ledger (Auth).", handler=led_handler, parameters={"api_key": {"type": "string"}, "secret": {"type": "string"}})
-             
-            # Trading Shortcut (BUY)
-            tool_name_buy = f"buy_on_{ex}"
-            async def buy_handler(args: dict, e=ex) -> ToolResult:
-                args['exchange'] = e
-                args['side'] = 'buy'
-                return await create_order(args)
-            self.register_tool(name=tool_name_buy, description=f"SHORTCUT: Create BUY Order on {ex.title()}.", handler=buy_handler, parameters={"symbol": {"type": "string"}, "type": {"type": "string"}, "amount": {"type": "string"}, "price": {"type": "string"}, "api_key": {"type": "string"}, "secret": {"type": "string"}})
-            
-            
-        # Generic "List Exchanges"
-        async def list_all_exchanges(args: dict) -> ToolResult:
-            return ToolResult(content=[TextContent(text=str(ccxt.exchanges))])
-            
-        self.register_tool(name="list_all_exchanges", description="META: List all supported CCXT exchanges.", handler=list_all_exchanges)
-
-async def main():
-    from shared.logging import setup_logging, LogConfig
-    setup_logging(LogConfig(level="DEBUG", format="console", service_name="ccxt_server"))
-    server = CcxtServer()
-    try:
-        await server.run()
-    finally:
-        await ExchangeManager.close_all()
+@mcp.tool()
+async def list_all_supported_exchanges() -> str:
+    """META: List all supported CCXT exchanges (~100+)."""
+    return str(ccxt.exchanges)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    mcp.run()

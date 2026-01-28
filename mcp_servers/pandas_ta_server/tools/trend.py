@@ -1,58 +1,49 @@
 
-from shared.mcp.protocol import ToolResult
+
 from mcp_servers.pandas_ta_server.tools.universal import calculate_indicator
 
-async def calculate_sma(arguments: dict) -> ToolResult:
+
+async def calculate_sma(data: list[dict], params: dict = None) -> str:
     """SMA - Simple Moving Average."""
-    arguments['indicator'] = 'sma'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'sma', params)
 
-async def calculate_ema(arguments: dict) -> ToolResult:
+async def calculate_ema(data: list[dict], params: dict = None) -> str:
     """EMA - Exponential Moving Average."""
-    arguments['indicator'] = 'ema'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'ema', params)
 
-async def calculate_wma(arguments: dict) -> ToolResult:
+async def calculate_wma(data: list[dict], params: dict = None) -> str:
     """WMA - Weighted Moving Average."""
-    arguments['indicator'] = 'wma'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'wma', params)
 
-async def calculate_hma(arguments: dict) -> ToolResult:
+async def calculate_hma(data: list[dict], params: dict = None) -> str:
     """HMA - Hull Moving Average."""
-    arguments['indicator'] = 'hma'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'hma', params)
 
-async def calculate_adx(arguments: dict) -> ToolResult:
+async def calculate_adx(data: list[dict], params: dict = None) -> str:
     """ADX - Average Directional Index."""
-    arguments['indicator'] = 'adx'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'adx', params)
 
-async def calculate_supertrend(arguments: dict) -> ToolResult:
+async def calculate_supertrend(data: list[dict], params: dict = None) -> str:
     """Supertrend."""
-    arguments['indicator'] = 'supertrend'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'supertrend', params)
 
-async def calculate_vortex(arguments: dict) -> ToolResult:
+async def calculate_vortex(data: list[dict], params: dict = None) -> str:
     """Vortex Oscillator."""
-    arguments['indicator'] = 'vortex'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'vortex', params)
 
-async def calculate_aroon(arguments: dict) -> ToolResult:
+async def calculate_aroon(data: list[dict], params: dict = None) -> str:
     """Aroon Indicator."""
-    arguments['indicator'] = 'aroon'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'aroon', params)
 
-async def calculate_dpo(arguments: dict) -> ToolResult:
+async def calculate_dpo(data: list[dict], params: dict = None) -> str:
     """DPO - Detrended Price Oscillator."""
-    arguments['indicator'] = 'dpo'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'dpo', params)
 
-async def calculate_psar(arguments: dict) -> ToolResult:
+async def calculate_psar(data: list[dict], params: dict = None) -> str:
     """PSAR - Parabolic SAR."""
-    arguments['indicator'] = 'psar'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'psar', params)
 
-async def calculate_ichimoku(arguments: dict) -> ToolResult:
+async def calculate_ichimoku(data: list[dict], params: dict = None) -> str:
     """Ichimoku Kinko Hyo (Cloud)."""
-    arguments['indicator'] = 'ichimoku'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'ichimoku', params)
+

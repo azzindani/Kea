@@ -1,29 +1,30 @@
 
-from shared.mcp.protocol import ToolResult, TextContent
-from mcp_servers.mibian_server.tools.core import MibianCore, dict_to_result
+from mcp_servers.mibian_server.tools.core import MibianCore, dict_to_json
 
-async def calculate_implied_volatility(arguments: dict) -> ToolResult:
+
+async def calculate_implied_volatility(underlying: float, strike: float, interest: float, days: float, call_price: float = None, put_price: float = None, model: str = "BS") -> str:
     """
     Calculate IV.
     Requires CallPrice OR PutPrice.
     """
     try:
-        model = arguments.get("model", "BS")
-        u = arguments['underlying']
-        s = arguments['strike']
-        r = arguments['interest']
-        d = arguments['days']
+        # model = arguments.get("model", "BS")
+        # u = arguments['underlying']
+        # s = arguments['strike']
+        # r = arguments['interest']
+        # d = arguments['days']
         
-        args = [u, s, r, d]
+        args = [underlying, strike, interest, days]
         
-        cp = arguments.get('call_price')
-        pp = arguments.get('put_price')
+        # cp = arguments.get('call_price')
+        # pp = arguments.get('put_price')
         
-        if cp is None and pp is None:
+        if call_price is None and put_price is None:
              raise ValueError("Must provide call_price or put_price to calc IV.")
         
-        res = MibianCore.calculate(model, args, callPrice=cp, putPrice=pp)
+        res = MibianCore.calculate(model, args, callPrice=call_price, putPrice=put_price)
         
-        return dict_to_result({'implied_volatility': res.get('implied_volatility')}, "Implied Volatility")
+        return dict_to_json({'implied_volatility': res.get('implied_volatility')}, "Implied Volatility")
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+

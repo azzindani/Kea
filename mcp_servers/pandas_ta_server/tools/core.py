@@ -2,7 +2,8 @@
 import pandas as pd
 import pandas_ta as ta
 import json
-from shared.mcp.protocol import ToolResult, TextContent
+import json
+
 
 def process_ohlcv(data_input) -> pd.DataFrame:
     """
@@ -53,9 +54,10 @@ def process_ohlcv(data_input) -> pd.DataFrame:
             
     return df
 
-def df_to_result(df: pd.DataFrame, title: str = "TA Result") -> ToolResult:
+
+def df_to_json(df: pd.DataFrame, title: str = "TA Result") -> str:
     """
-    Convert Result DataFrame to ToolResult (JSON text).
+    Convert Result DataFrame to JSON text.
     Handles NaN values (fills with None/Null for JSON).
     """
     # Reset index to include Date in output
@@ -65,12 +67,7 @@ def df_to_result(df: pd.DataFrame, title: str = "TA Result") -> ToolResult:
     # Replace NaN with None (which becomes null in JSON)
     out_df = out_df.where(pd.notnull(out_df), None)
     
-    # For very large dataframes, maybe return only last N rows?
-    # Or return full structure? Let's return full structure but formatted safely.
-    
     records = out_df.to_dict(orient='records')
     
-    # Clean NaNs in dict
-    # (Pandas 'where' usually handles it, but just in case)
-    
-    return ToolResult(content=[TextContent(text=json.dumps(records, default=str, indent=2))])
+    return json.dumps(records, default=str, indent=2)
+

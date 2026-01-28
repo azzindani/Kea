@@ -6,15 +6,14 @@ import json
 
 logger = get_logger(__name__)
 
-async def get_screen_data(arguments: dict) -> ToolResult:
+
+async def get_screen_data(preset: str = "day_gainers", count: int = 25) -> str:
     """
     Get data from a specific predefined screener list.
     Args:
         preset (str): "day_gainers", "day_losers", "most_actives", "cryptocurrencies"
         count (int): Number of results (default 25)
     """
-    preset = arguments.get("preset", "day_gainers")
-    count = arguments.get("count", 25)
     
     try:
         s = Screener()
@@ -29,10 +28,11 @@ async def get_screen_data(arguments: dict) -> ToolResult:
                 quotes = real_data["quotes"]
                 # Keep only key fields
                 simple = [{k: q.get(k) for k in ["symbol", "shortName", "regularMarketPrice", "regularMarketChangePercent", "marketCap"]} for q in quotes]
-                return ToolResult(content=[TextContent(text=json.dumps(simple, indent=2))])
+                return json.dumps(simple, indent=2)
                 
-        return ToolResult(content=[TextContent(text=json.dumps(data, indent=2, default=str))])
+        return json.dumps(data, indent=2, default=str)
         
     except Exception as e:
         logger.error(f"Screener error for {preset}: {e}")
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+

@@ -28,7 +28,7 @@ def fts_create_index(table_name: str, id_col: str, text_cols: List[str]) -> str:
     except Exception as e:
         return f"Error: {e}"
 
-def fts_search(table_name: str, keyword: str, limit: int = 20) -> List[Dict[str, Any]]:
+def fts_search(table_name: str, keyword: str, limit: int = 100000) -> List[Dict[str, Any]]:
     """Perform full-text search match."""
     # Assuming index exists
     con = core_ops.get_connection()

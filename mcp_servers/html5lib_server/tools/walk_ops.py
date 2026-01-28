@@ -15,7 +15,7 @@ def walk_tree_print(html_input: str) -> str:
     except Exception as e:
         return f"Error: {e}"
 
-def walk_get_tokens(html_input: str, limit: int = 50) -> List[Dict[str, Any]]:
+def walk_get_tokens(html_input: str, limit: int = 100000) -> List[Dict[str, Any]]:
     """Get stream of tokens."""
     try:
         doc = html5lib.parse(html_input)

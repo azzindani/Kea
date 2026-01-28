@@ -1,18 +1,13 @@
+from mcp_servers.newspaper_server.tools.core import NewsClient
+from typing import List, Dict, Any
 
-from shared.mcp.protocol import ToolResult, TextContent
-from mcp_servers.newspaper_server.tools.core import NewsClient, dict_to_result
-import newspaper
-
-async def build_source(arguments: dict) -> ToolResult:
+async def build_source(url: str, memoize: bool = True) -> Dict[str, Any]:
     """Build a news source and return high-level stats."""
     try:
-        url = arguments['url']
-        memoize = arguments.get('memoize', True)
-        
         # Heavy operation
         s = NewsClient.build_source(url, memoize)
         
-        return dict_to_result({
+        return {
             "url": s.url,
             "brand": s.brand,
             "description": s.description,
@@ -21,38 +16,30 @@ async def build_source(arguments: dict) -> ToolResult:
             "feed_count": len(s.feeds),
             "categories": [c.url for c in s.categories],
             "feeds": [f.url for f in s.feeds]
-        }, f"Source Build: {s.brand}")
+        }
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return {"error": str(e)}
 
-async def get_source_categories(arguments: dict) -> ToolResult:
+async def get_source_categories(url: str) -> List[Dict[str, str]]:
     """Get category URLs from a source."""
     try:
-        url = arguments['url']
         s = NewsClient.build_source(url) # Memoized default
-        cats = [{"url": c.url, "title": c.title} for c in s.categories]
-        return dict_to_result(cats, "Source Categories")
+        return [{"url": c.url, "title": c.title} for c in s.categories]
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return [{"error": str(e)}]
 
-async def get_source_feeds(arguments: dict) -> ToolResult:
+async def get_source_feeds(url: str) -> List[str]:
     """Get RSS feed URLs from a source."""
     try:
-        url = arguments['url']
         s = NewsClient.build_source(url)
-        feeds = [f.url for f in s.feeds]
-        return dict_to_result(feeds, "Source Feeds")
+        return [f.url for f in s.feeds]
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return [str(e)]
 
-async def get_source_articles_list(arguments: dict) -> ToolResult:
+async def get_source_articles_list(url: str, limit: int = 100000) -> List[str]:
     """Get list of article URLs found on the source (no download)."""
     try:
-        url = arguments['url']
-        limit = arguments.get('limit', 50)
         s = NewsClient.build_source(url)
-        
-        articles = [a.url for a in s.articles[:limit]]
-        return dict_to_result(articles, f"Source Articles (Top {limit})")
+        return [a.url for a in s.articles[:limit]]
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return [str(e)]

@@ -1,76 +1,67 @@
+from mcp_servers.newspaper_server.tools.core import NewsClient
+from typing import Dict, List, Any
 
-from shared.mcp.protocol import ToolResult, TextContent
-from mcp_servers.newspaper_server.tools.core import NewsClient, dict_to_result
-import json
-
-async def get_article_title(arguments: dict) -> ToolResult:
+async def get_article_title(url: str) -> str:
     """Get the title of an article."""
     try:
-        url = arguments['url']
         a = NewsClient.get_article(url, {})
-        return dict_to_result({"title": a.title}, "Article Title")
+        return a.title
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_article_text(arguments: dict) -> ToolResult:
+async def get_article_text(url: str) -> str:
     """Get the main body text of an article."""
     try:
-        url = arguments['url']
         a = NewsClient.get_article(url, {})
-        return dict_to_result({"text": a.text}, "Article Text")
+        return a.text
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_article_authors(arguments: dict) -> ToolResult:
+async def get_article_authors(url: str) -> List[str]:
     """Get authors of an article."""
     try:
-        url = arguments['url']
         a = NewsClient.get_article(url, {})
-        return dict_to_result({"authors": a.authors}, "Article Authors")
+        return a.authors
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return []
 
-async def get_article_pubdate(arguments: dict) -> ToolResult:
+async def get_article_pubdate(url: str) -> str:
     """Get publication date."""
     try:
-        url = arguments['url']
         a = NewsClient.get_article(url, {})
-        return dict_to_result({"publish_date": a.publish_date}, "Article PubDate")
+        return str(a.publish_date)
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_article_top_image(arguments: dict) -> ToolResult:
+async def get_article_top_image(url: str) -> str:
     """Get the main image URL."""
     try:
-        url = arguments['url']
         a = NewsClient.get_article(url, {})
-        return dict_to_result({"top_image": a.top_image}, "Article Top Image")
+        return a.top_image
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_article_nlp(arguments: dict) -> ToolResult:
+async def get_article_nlp(url: str) -> Dict[str, Any]:
     """Get NLP analysis (Summary & Keywords)."""
     try:
-        url = arguments['url']
         a = NewsClient.get_article(url, {'nlp': True})
-        return dict_to_result({
+        return {
             "summary": a.summary,
             "keywords": a.keywords
-        }, "Article NLP")
+        }
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return {"error": str(e)}
 
-async def get_article_meta(arguments: dict) -> ToolResult:
+async def get_article_meta(url: str) -> Dict[str, Any]:
     """Get robust metadata (lang, description, tags)."""
     try:
-        url = arguments['url']
         a = NewsClient.get_article(url, {})
-        return dict_to_result({
+        return {
             "meta_lang": a.meta_lang,
             "meta_description": a.meta_description,
             "meta_keywords": a.meta_keywords,
             "tags": list(a.tags),
             "canonical_link": a.canonical_link
-        }, "Article Metadata")
+        }
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return {"error": str(e)}

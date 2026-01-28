@@ -1,29 +1,26 @@
 
-from shared.mcp.protocol import ToolResult
+
 from mcp_servers.pandas_ta_server.tools.universal import calculate_indicator
 
+
 # Wrappers for common candle patterns
-async def calculate_cdl_doji(arguments: dict) -> ToolResult:
+async def calculate_cdl_doji(data: list[dict], params: dict = None) -> str:
     """Candle: Doji."""
-    arguments['indicator'] = 'cdl_doji'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'cdl_doji', params)
 
-async def calculate_cdl_hammer(arguments: dict) -> ToolResult:
+async def calculate_cdl_hammer(data: list[dict], params: dict = None) -> str:
     """Candle: Hammer."""
-    arguments['indicator'] = 'cdl_hammer'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'cdl_hammer', params)
 
-async def calculate_cdl_engulfing(arguments: dict) -> ToolResult:
+async def calculate_cdl_engulfing(data: list[dict], params: dict = None) -> str:
     """Candle: Engulfing."""
-    arguments['indicator'] = 'cdl_engulfing'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'cdl_engulfing', params)
 
-async def calculate_cdl_morningstar(arguments: dict) -> ToolResult:
+async def calculate_cdl_morningstar(data: list[dict], params: dict = None) -> str:
     """Candle: Morning Star."""
-    arguments['indicator'] = 'cdl_morningstar'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'cdl_morningstar', params)
 
-async def calculate_cdl_eveningstar(arguments: dict) -> ToolResult:
+async def calculate_cdl_eveningstar(data: list[dict], params: dict = None) -> str:
     """Candle: Evening Star."""
-    arguments['indicator'] = 'cdl_eveningstar'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'cdl_eveningstar', params)
+

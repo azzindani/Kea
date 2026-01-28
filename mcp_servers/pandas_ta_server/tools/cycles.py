@@ -1,10 +1,10 @@
 
-from shared.mcp.protocol import ToolResult, TextContent
-from mcp_servers.pandas_ta_server.tools.core import process_ohlcv, df_to_result
+
+from mcp_servers.pandas_ta_server.tools.core import process_ohlcv, df_to_json
 import pandas_ta as ta
 import pandas as pd
 
-async def calculate_cross(arguments: dict) -> ToolResult:
+async def calculate_cross(data: list[dict]) -> str:
     """
     Calculate Cross (Above/Below).
     Args:
@@ -30,11 +30,12 @@ async def calculate_cross(arguments: dict) -> ToolResult:
     """
     # Skipping direct cross tool as it requires complex dependency injection.
     # User should use generate_signals("close > SMA_50")
-    return ToolResult(content=[TextContent(text="Use 'generate_signals' tool for Crossover logic.")])
+    return "Use 'generate_signals' tool for Crossover logic."
 
-async def calculate_ebsw(arguments: dict) -> ToolResult:
+
+async def calculate_ebsw(data: list[dict], params: dict = None) -> str:
     """Calculate Even Better Sine Wave (Cycle)."""
     # This imports 'calculate_indicator' from universal
     from mcp_servers.pandas_ta_server.tools.universal import calculate_indicator
-    arguments['indicator'] = 'ebsw'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'ebsw', params)
+

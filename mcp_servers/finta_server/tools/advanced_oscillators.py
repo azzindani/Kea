@@ -1,25 +1,21 @@
 
-from shared.mcp.protocol import ToolResult
+
 from mcp_servers.finta_server.tools.universal import calculate_indicator
 
-async def calculate_trix(arguments: dict) -> ToolResult:
+
+async def calculate_trix(data: list[dict], params: dict = None) -> str:
     """TRIX - Triple Exponential Average Oscillator."""
-    arguments['indicator'] = 'TRIX'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'TRIX', params)
 
-async def calculate_ift_rsi(arguments: dict) -> ToolResult:
+async def calculate_ift_rsi(data: list[dict], params: dict = None) -> str:
     """IFT_RSI - Inverse Fisher Transform RSI."""
-    arguments['indicator'] = 'IFT_RSI'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'IFT_RSI', params)
 
-async def calculate_sqzmi(arguments: dict) -> ToolResult:
+async def calculate_sqzmi(data: list[dict], params: dict = None) -> str:
     """SQZMI - Squeeze Momentum Indicator."""
-    arguments['indicator'] = 'SQZMI'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'SQZMI', params)
 
-async def calculate_mi(arguments: dict) -> ToolResult:
+async def calculate_mi(data: list[dict], params: dict = None) -> str:
     """MI - Mass Index (Standard)."""
-    # Note: 'MASSI' is also Mass Index in Finta? 
-    # Let's support MI alias if exists.
-    arguments['indicator'] = 'MI'
-    return await calculate_indicator(arguments)
+    return await calculate_indicator(data, 'MI', params)
+

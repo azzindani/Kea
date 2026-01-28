@@ -36,7 +36,7 @@ def detect_encoding(file_path: str) -> str: return parse_ops.detect_encoding(fil
 @mcp.tool()
 def walk_tree_print(html_input: str) -> str: return walk_ops.walk_tree_print(html_input)
 @mcp.tool()
-def walk_get_tokens(html_input: str, limit: int = 50) -> List[Dict[str, Any]]: return walk_ops.walk_get_tokens(html_input, limit)
+def walk_get_tokens(html_input: str, limit: int = 100000) -> List[Dict[str, Any]]: return walk_ops.walk_get_tokens(html_input, limit)
 @mcp.tool()
 def walk_find_tags(html_input: str, tag_name: str) -> List[str]: return walk_ops.walk_find_tags(html_input, tag_name)
 @mcp.tool()

@@ -1,6 +1,6 @@
 
+
 import pandas_datareader.data as web
-from shared.mcp.protocol import ToolResult, TextContent
 from shared.logging import get_logger
 import datetime
 import pandas as pd
@@ -9,7 +9,8 @@ logger = get_logger(__name__)
 # Importing the map won't work easily here due to circular dep possibility, 
 # but we can redefine or import safely if clean.
 
-async def get_factor_dashboard(arguments: dict) -> ToolResult:
+
+async def get_factor_dashboard() -> str:
     """
     Get Academic Factors Dashboard (Market, Size, Value, Momentum).
     """
@@ -31,12 +32,12 @@ async def get_factor_dashboard(arguments: dict) -> ToolResult:
         # Join
         df_all = df_f5.join(df_mom, how='inner')
         
-        return ToolResult(content=[TextContent(text=f"### Academic Factors Dashboard (Daily %)\n\n{df_all.tail(30).to_markdown()}")])
+        return f"### Academic Factors Dashboard (Daily %)\n\n{df_all.tail(30).to_markdown()}"
         
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_global_factors_dashboard(arguments: dict) -> ToolResult:
+async def get_global_factors_dashboard() -> str:
     """
     Get Global Factors (Developed, Emerging, Europe, Japan).
     """
@@ -61,12 +62,12 @@ async def get_global_factors_dashboard(arguments: dict) -> ToolResult:
                      results[f"{region}"] = df['Mkt-RF']
         
         final_df = pd.DataFrame(results)
-        return ToolResult(content=[TextContent(text=f"### Global Market Factors (Excess Returns)\n\n{final_df.tail(20).to_markdown()}")])
+        return f"### Global Market Factors (Excess Returns)\n\n{final_df.tail(20).to_markdown()}"
         
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_industry_health_dashboard(arguments: dict) -> ToolResult:
+async def get_industry_health_dashboard() -> str:
     """
     Get Fama-French 49 Industry Health Dashboard.
     Shows recent performance of 49 sectors.
@@ -77,12 +78,12 @@ async def get_industry_health_dashboard(arguments: dict) -> ToolResult:
         data = web.DataReader("49_Industry_Portfolios_daily", "famafrench", start=start) # Daily
         df = data[0] # Value weighted returns usually
         
-        return ToolResult(content=[TextContent(text=f"### 49 Industry Health (Daily Returns %)\n\n{df.tail(10).to_markdown()}")])
+        return f"### 49 Industry Health (Daily Returns %)\n\n{df.tail(10).to_markdown()}"
         
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
 
-async def get_liquidity_dashboard(arguments: dict) -> ToolResult:
+async def get_liquidity_dashboard() -> str:
     """
     Get Liquidity Factors (Pastor-Stambaugh).
     """
@@ -90,6 +91,7 @@ async def get_liquidity_dashboard(arguments: dict) -> ToolResult:
     try:
         data = web.DataReader("Liquidity_Factor", "famafrench", start=start)
         df = data[0]
-        return ToolResult(content=[TextContent(text=f"### Market Liquidity Factor\n\n{df.tail(20).to_markdown()}")])
+        return f"### Market Liquidity Factor\n\n{df.tail(20).to_markdown()}"
     except Exception as e:
-        return ToolResult(isError=True, content=[TextContent(text=str(e))])
+        return f"Error: {str(e)}"
+
