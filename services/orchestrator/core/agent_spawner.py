@@ -615,7 +615,7 @@ class AgentSpawner:
                                             logger.error("   🛑 Giving up on code generation.")
                             
                             else:
-                            else:
+
                                 # STANDARD TOOL EXECUTION (Non-Code)
                                 # 1. Try heuristic mapping first
                                 args = build_tool_inputs(
