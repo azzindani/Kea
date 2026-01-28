@@ -152,9 +152,9 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
                 if not relevant_tools:
                     if registry.tool_to_server:
                         known_tools = list(registry.tool_to_server.keys())
-                        # If list is HUGE, we slice it to avoid context overflow (first 200)
-                        # Ideally, RAG should always work in prod
-                        relevant_tools = known_tools[:200]
+                        # If list is HUGE, we slice it to avoid context overflow (first 500)
+                        # LLM Context is 32k, so 500 tools is fine.
+                        relevant_tools = known_tools[:500]
                         logger.info(f"Planner: Using fallback list of {len(relevant_tools)} tools")
                     else:
                         # 3. Last Resort: Try to force discovery once

@@ -10,10 +10,13 @@ logger = get_logger(__name__)
 
 cache = TickerCache()
 
-async def scan_country(country_code: str = "US") -> str:
+async def get_tickers_by_country(country_code: str = "US") -> str:
     """
-    Scan entire country/index for market data.
-    Simulates "Get All Stocks in X" by iterating known lists.
+    Get all stock tickers for a specific country or exchange.
+    
+    Use this tool to find "all companies" or "tickers" for a region.
+    Supported inputs: "US" (USA), "ID" (Indonesia/IDX), "IN" (India), etc.
+    Returns size of universe and sample tickers.
     """
     
     tickers = cache.get_tickers_for_country(country_code)

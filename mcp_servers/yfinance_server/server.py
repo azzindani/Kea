@@ -167,9 +167,9 @@ async def get_option_expirations(ticker: str) -> str:
 
 # --- Aggregators ---
 @mcp.tool()
-async def scan_country(country_code: str) -> str:
-    """Scan entire country."""
-    return await discovery.scan_country(country_code)
+async def get_tickers_by_country(country_code: str) -> str:
+    """Get all tickers (universe) for a country/exchange (e.g. 'ID' for IDX)."""
+    return await discovery.get_tickers_by_country(country_code)
 
 @mcp.tool()
 async def get_full_report(ticker: str) -> str:
