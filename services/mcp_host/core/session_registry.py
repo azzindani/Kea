@@ -13,6 +13,7 @@ import dataclasses
 
 from shared.logging import get_logger
 from shared.mcp.client import MCPClient
+from shared.mcp.protocol import Tool
 from shared.mcp.transport import SubprocessTransport
 from shared.config import get_settings
 
@@ -48,7 +49,23 @@ class SessionRegistry:
             self.pg_registry = None
         
         # Discovery
+        self.discovered_tools: List[Tool] = []
         self._discover_local_servers()
+
+    async def register_discovered_tools(self):
+        """
+        Syncs statically discovered tools to the Postgres RAG backend.
+        Should be called as a background task after initialization.
+        """
+        if self.pg_registry and self.discovered_tools:
+            logger.info(f"🔄 Syncing {len(self.discovered_tools)} statically discovered tools to RAG...")
+            try:
+                await self.pg_registry.sync_tools(self.discovered_tools)
+                # Clear buffer to free memory, or keep if we want to query them locally later?
+                # RAG is persistent, so we can clear. but keep for debugging if needed.
+                self.discovered_tools.clear() 
+            except Exception as e:
+                logger.error(f"❌ Failed to sync discovered tools to RAG: {e}")
 
     def _discover_local_servers(self):
         """
@@ -147,6 +164,19 @@ class SessionRegistry:
                         tool_name = node.name
                         self.tool_to_server[tool_name] = server_name
                         logger.debug(f"   🔍 Discovered FastMCP tool '{tool_name}' in {server_name}")
+                        
+                        # Extract Docstring for RAG
+                        docstring = ast.get_docstring(node)
+                        if docstring:
+                            # Create a lightweight Tool object for RAG indexing
+                            # We don't need full schema here, just name + desc for semantic search.
+                            # Full schema is fetched JIT by AgentSpawner.
+                            tool_obj = Tool(
+                                name=tool_name,
+                                description=docstring,
+                                inputSchema={}, # Empty schema is fine for RAG indexing
+                            )
+                            self.discovered_tools.append(tool_obj)
 
         except Exception as e:
             logger.warning(f"Static scan failed for {server_name}: {e}")

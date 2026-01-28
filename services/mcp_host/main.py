@@ -19,6 +19,11 @@ async def lifespan(app: FastAPI):
     from services.mcp_host.core.session_registry import get_session_registry
     registry = get_session_registry()
     
+    # Static RAG Population (Background)
+    # Ensure MCP Host also populates the registry for standard API usage
+    import asyncio
+    asyncio.create_task(registry.register_discovered_tools())
+    
     # Start the Supervisor (The Factory Manager)
     from services.mcp_host.core.supervisor_engine import get_supervisor
     supervisor = get_supervisor()

@@ -37,8 +37,15 @@ async def lifespan(app: FastAPI):
     
     # Initialize Registry (Auto-Discovery)
     registry = get_session_registry()
+    
+    # Static RAG Population (Background)
+    # This pushes the ~660 discovered tools (name+docstring) to Postgres
+    # so the Planner can find them via semantic search.
+    import asyncio
+    asyncio.create_task(registry.register_discovered_tools())
+    
     # await registry.list_all_tools() # DISABLED: Warmup causes hangs in threaded startup. Rely on JIT.
-    logger.info(f"Registry initialized (Lazy Mode)")
+    logger.info(f"Registry initialized (Lazy Mode + Static RAG)")
 
     # =========================================================================
     # Initialize Enterprise Subsystems
