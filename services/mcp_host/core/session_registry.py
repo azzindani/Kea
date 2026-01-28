@@ -317,11 +317,29 @@ class SessionRegistry:
         self.active_processes.clear()
 
 
-# Global Singleton
-_registry: SessionRegistry | None = None
+# Global Registry Cache (Keyed by Event Loop)
+_registries: Dict[asyncio.AbstractEventLoop, SessionRegistry] = {}
 
 def get_session_registry() -> SessionRegistry:
-    global _registry
-    if _registry is None:
-        _registry = SessionRegistry()
-    return _registry
+    """
+    Get the SessionRegistry instance for the current event loop.
+    
+    In a threaded environment (like the user's startup script), each thread
+    has its own asyncio loop. We must not share the Registry across loops
+    because it holds asyncio primitives (subprocess transports, locks)
+    that are bound to the loop that created them.
+    """
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        # Fallback for scripts/tests not in a loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    if loop not in _registries:
+        _registries[loop] = SessionRegistry()
+        
+        # Optional: Clean up old loops if they are closed?
+        # For now, simplistic memory safety is fine for server lifetime.
+        
+    return _registries[loop]
