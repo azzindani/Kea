@@ -55,7 +55,7 @@ class VectorStore(ABC):
     async def search(
         self,
         query: str,
-        limit: int = 10,
+        limit: int = 100000,
         filter: dict | None = None,
     ) -> list[SearchResult]:
         """Search for similar documents."""
@@ -95,7 +95,7 @@ class InMemoryVectorStore(VectorStore):
     async def search(
         self,
         query: str,
-        limit: int = 10,
+        limit: int = 100000,
         filter: dict | None = None,
     ) -> list[SearchResult]:
         """Search using simple text matching."""

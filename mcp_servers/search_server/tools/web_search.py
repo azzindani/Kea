@@ -2,9 +2,9 @@ from __future__ import annotations
 import os
 import httpx
 from typing import Any
-import logging
+from shared.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 async def web_search_tool(query: str, max_results: int = 10, search_depth: str = "basic") -> str:
     """Execute web search."""

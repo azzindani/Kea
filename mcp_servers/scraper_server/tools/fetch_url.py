@@ -2,9 +2,9 @@ from __future__ import annotations
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 import random
-import logging
+from shared.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # User-Agent pool for rotation
 USER_AGENTS = [

@@ -252,23 +252,23 @@ mcp:
     - name: "portfolio_server"
       enabled: true
       transport: "stdio"
-      command: "python -m mcp_servers.portfolio_server.server"
+      command: "uv run --with quantstats --with pandas --with numpy --with matplotlib --with structlog --with python-dotenv python -m mcp_servers.portfolio_server.server"
     - name: "quantstats_server"
       enabled: true
       transport: "stdio"
-      command: "python -m mcp_servers.quantstats_server.server"
+      command: "uv run --with quantstats --with pandas --with numpy --with matplotlib --with structlog --with python-dotenv python -m mcp_servers.quantstats_server.server"
     - name: "spacy_server"
       enabled: true
       transport: "stdio"
-      command: "python -m mcp_servers.spacy_server.server"
+      command: "uv run --with spacy --with structlog --with python-dotenv python -m mcp_servers.spacy_server.server"
     - name: "rapidfuzz_server"
       enabled: true
       transport: "stdio"
-      command: "python -m mcp_servers.rapidfuzz_server.server"
+      command: "uv run --with rapidfuzz --with structlog --with python-dotenv python -m mcp_servers.rapidfuzz_server.server"
     - name: "textblob_server"
       enabled: true
       transport: "stdio"
-      command: "python -m mcp_servers.textblob_server.server"
+      command: "uv run --with textblob --with structlog --with python-dotenv python -m mcp_servers.textblob_server.server"
     - name: "xmltodict_server"
       enabled: true
       transport: "stdio"
@@ -296,15 +296,15 @@ mcp:
     - name: "ytdlp_server"
       enabled: true
       transport: "stdio"
-      command: "python -m mcp_servers.ytdlp_server.server"
+      command: "uv run --with yt-dlp --with structlog --with python-dotenv python -m mcp_servers.ytdlp_server.server"
     - name: "ffmpeg_server"
       enabled: true
       transport: "stdio"
-      command: "python -m mcp_servers.ffmpeg_server.server"
+      command: "uv run --with ffmpeg-python --with structlog --with python-dotenv python -m mcp_servers.ffmpeg_server.server"
     - name: "geopy_server"
       enabled: true
       transport: "stdio"
-      command: "python -m mcp_servers.geopy_server.server"
+      command: "uv run --with geopy --with structlog --with python-dotenv python -m mcp_servers.geopy_server.server"
     - name: "duckdb_server"
       enabled: true
       transport: "stdio"

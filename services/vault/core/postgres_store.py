@@ -159,7 +159,7 @@ class PostgresVectorStore(VectorStore):
     async def search(
         self,
         query: str,
-        limit: int = 10,
+        limit: int = 100000,
         filter: dict | None = None,
         enable_reranking: bool = True,
     ) -> list[SearchResult]:

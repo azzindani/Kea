@@ -45,7 +45,7 @@ class RAGServiceClient:
     async def search(
         self,
         query: str,
-        limit: int = 10,
+        limit: int = 100000,
         min_score: float = 0.5,
     ) -> list[dict[str, Any]]:
         """

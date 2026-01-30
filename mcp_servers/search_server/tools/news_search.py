@@ -2,9 +2,9 @@ from __future__ import annotations
 import os
 from datetime import datetime
 import httpx
-import logging
+from shared.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 async def news_search_tool(query: str, days: int = 7, max_results: int = 10) -> str:
     """Search for news articles."""

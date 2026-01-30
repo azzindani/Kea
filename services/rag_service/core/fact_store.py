@@ -122,7 +122,7 @@ class FactStore:
     async def search(
         self,
         query: str,
-        limit: int = 10,
+        limit: int = 100000,
         entity: str | None = None,
         dataset_id: str | None = None,
         min_confidence: float = 0.0,

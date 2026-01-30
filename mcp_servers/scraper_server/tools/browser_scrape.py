@@ -1,10 +1,10 @@
 from __future__ import annotations
 import asyncio
-import logging
+from shared.logging import get_logger
 import json
 from typing import Any, Optional
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 async def browser_scrape_tool(url: str, wait_for: Optional[str] = None, extract_tables: bool = True, screenshot: bool = False) -> str:
     """Scrape URL using headless browser with JavaScript execution."""
