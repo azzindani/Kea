@@ -147,27 +147,39 @@ class PostgresToolRegistry:
                 
                 texts.append(desc)
             
-            try:
-                embeddings = await self.embedder.embed(texts)
-                
-                async with pool.acquire() as conn:
-                    await register_vector(conn)
+            # Retry loop to handle race conditions during startup
+            # (e.g., transformers not fully loaded when embedding is first called)
+            max_retries = 3
+            retry_delay = 2.0
+            
+            for attempt in range(max_retries):
+                try:
+                    embeddings = await self.embedder.embed(texts)
                     
-                    for i, (tool, schema, new_hash) in enumerate(updates_needed):
-                        await conn.execute(f"""
-                            INSERT INTO {self.table_name} (tool_name, schema_hash, schema_json, embedding)
-                            VALUES ($1, $2, $3, $4)
-                            ON CONFLICT (tool_name) DO UPDATE SET
-                                schema_hash = EXCLUDED.schema_hash,
-                                schema_json = EXCLUDED.schema_json,
-                                embedding = EXCLUDED.embedding,
-                                last_seen = CURRENT_TIMESTAMP
-                        """, tool.name, new_hash, json.dumps(schema), embeddings[i])
+                    async with pool.acquire() as conn:
+                        await register_vector(conn)
                         
-                logger.info(f"Registry: Updated {len(updates_needed)} tools in Postgres.")
-                
-            except Exception as e:
-                logger.error(f"Registry embedding failed: {e}")
+                        for i, (tool, schema, new_hash) in enumerate(updates_needed):
+                            await conn.execute(f"""
+                                INSERT INTO {self.table_name} (tool_name, schema_hash, schema_json, embedding)
+                                VALUES ($1, $2, $3, $4)
+                                ON CONFLICT (tool_name) DO UPDATE SET
+                                    schema_hash = EXCLUDED.schema_hash,
+                                    schema_json = EXCLUDED.schema_json,
+                                    embedding = EXCLUDED.embedding,
+                                    last_seen = CURRENT_TIMESTAMP
+                            """, tool.name, new_hash, json.dumps(schema), embeddings[i])
+                            
+                    logger.info(f"Registry: Updated {len(updates_needed)} tools in Postgres.")
+                    break  # Success, exit retry loop
+                    
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"Registry embedding failed (attempt {attempt+1}/{max_retries}): {e}. Retrying in {retry_delay}s...")
+                        await asyncio.sleep(retry_delay)
+                        retry_delay *= 2  # Exponential backoff
+                    else:
+                        logger.error(f"Registry embedding failed after {max_retries} attempts: {e}")
 
     async def search_tools(self, query: str, limit: int = 1000) -> List[Dict[str, Any]]:
         """Semantic search for tools.
