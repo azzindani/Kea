@@ -7,6 +7,9 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
 from tools import (
     article_single, source_discovery, bulk_processor, nlp_trends
 )

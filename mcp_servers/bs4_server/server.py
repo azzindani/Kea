@@ -10,6 +10,9 @@
 
 from mcp.server.fastmcp import FastMCP
 from soup_manager import SoupManager
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
 from tools import (
     core_ops, nav_ops, search_ops, extract_ops, mod_ops, super_ops,
     convert_ops, sanitize_ops, analyze_ops, fix_ops, logic_ops,

@@ -1,3 +1,6 @@
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
 # /// script
 # dependencies = [
 #   "mcp",
@@ -115,4 +118,3 @@ mcp.add_tool(calculate_barrier_price)
 
 if __name__ == "__main__":
     mcp.run()
-

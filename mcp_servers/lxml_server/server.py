@@ -6,6 +6,9 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
 from tools import (
     core_ops, xpath_ops, transform_ops, validate_ops, objectify_ops, bulk_ops, super_ops
 )

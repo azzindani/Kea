@@ -10,6 +10,9 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
 from tools import (
     regression_ops, tsa_ops, discrete_ops, multivar_ops, 
     nonparam_ops, stat_tools_ops, super_ops

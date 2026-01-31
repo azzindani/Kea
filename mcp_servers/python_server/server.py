@@ -7,6 +7,9 @@
 
 
 from mcp.server.fastmcp import FastMCP
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
 from tools import execute_code, dataframe_ops, sql_query
 import structlog
 import asyncio

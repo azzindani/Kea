@@ -6,6 +6,9 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
 from tools import pubmed_ops, arxiv_ops, scholar_ops
 import structlog
 from typing import List, Optional

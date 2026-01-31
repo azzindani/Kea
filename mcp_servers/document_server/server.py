@@ -13,6 +13,9 @@
 
 from __future__ import annotations
 from mcp.server.fastmcp import FastMCP
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
 from tools import pdf, word, excel, html, json_tool
 import structlog
 
@@ -56,4 +59,3 @@ async def json_parser(url: str, flatten: bool = False, path: str = None) -> str:
 
 if __name__ == "__main__":
     mcp.run()
-

@@ -7,6 +7,9 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
 from tools import (
     text_ops, media_ops, news_ops, map_ops, ai_ops, bulk_ops
 )

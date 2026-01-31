@@ -8,6 +8,9 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
 from tools import (
     screener, quote, groups, insider, global_markets, calendar_news,
     strategy, charts, financials, bulk_ta

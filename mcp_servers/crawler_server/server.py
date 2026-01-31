@@ -6,6 +6,9 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
 from tools import crawl_ops, extract_ops, inspect_ops
 import structlog
 from typing import Optional

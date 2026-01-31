@@ -9,6 +9,9 @@
 
 
 from mcp.server.fastmcp import FastMCP
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
 from tools import (
     discovery, content, financials, ownership, 
     sections_deep, bulk_analysis, xbrl_deep, funds

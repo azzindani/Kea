@@ -11,6 +11,9 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
 from tools import (
     basic_ops, distribution_ops, finance_ops, 
     map_ops, hierarchical_ops, three_d_ops, super_ops,

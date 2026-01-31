@@ -9,6 +9,9 @@
 
 
 from mcp.server.fastmcp import FastMCP
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
 from tools import (
     indicators, economy, discovery, dashboards, specialized, aggregates,
     sdg, granular_dashboards, debt, governance, metadata_deep

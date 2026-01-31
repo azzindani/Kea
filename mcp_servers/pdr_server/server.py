@@ -1,3 +1,6 @@
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
 # /// script
 # dependencies = [
 #   "mcp",
@@ -103,4 +106,3 @@ async def get_alphavantage_data(symbols: list[str], api_key: str = None, start_d
 
 if __name__ == "__main__":
     mcp.run()
-

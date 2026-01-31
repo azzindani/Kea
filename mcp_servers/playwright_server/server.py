@@ -8,6 +8,9 @@
 
 from mcp.server.fastmcp import FastMCP
 from session_manager import BrowserSession
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
 from tools import (
     nav_ops, input_ops, dom_ops, network_ops, state_ops, chain_ops, scraper_ops,
     frame_ops, dialog_ops, device_ops, extract_ops,

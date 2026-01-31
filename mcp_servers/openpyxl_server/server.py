@@ -10,6 +10,9 @@
 
 
 from mcp.server.fastmcp import FastMCP
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
 from tools import (
     workbook_ops, sheet_ops, read_ops, write_ops, manage_rows_cols,
     style_ops, chart_ops, object_ops, formatting_ops, advanced_features,

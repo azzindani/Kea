@@ -9,6 +9,9 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
 from tools import (
     stats_ops, opt_ops, integ_ops, signal_ops, linalg_ops, spatial_ops, super_ops,
     interp_ops, cluster_ops, ndimage_ops, special_ops
