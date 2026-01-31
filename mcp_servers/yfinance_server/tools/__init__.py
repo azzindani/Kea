@@ -24,7 +24,7 @@ def _discover() -> dict:
                         obj = getattr(module, name, None)
                         if isinstance(obj, type) or callable(obj):
                             exports[name] = module_path
-            except ImportError:
+            except Exception:
                 continue
     _discovered = exports
     return exports
@@ -42,4 +42,6 @@ def __dir__():
     return list(_discover().keys())
 
 
-__all__ = list(_discover())
+# Lazy discovery to prevent import loops
+# __all__ = list(_discover())
+__all__ = []
