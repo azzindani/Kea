@@ -453,13 +453,32 @@ def all_queries():
 
 @pytest.fixture
 def query_ids(request):
-    """Get query IDs or custom query from command line.
+    """Get query IDs or custom query from command line or environment.
     
     Returns list of either:
     - int: predefined query ID
     - str: custom query string
+    
+    Priority:
+    1. STRESS_TEST_QUERY environment variable (for Colab/Kaggle)
+    2. --query command line argument
+    3. Default to Query 1
     """
+    import os
+    
+    # Priority 1: Environment variable (most reliable for Colab/Kaggle)
+    env_query = os.getenv("STRESS_TEST_QUERY")
+    if env_query:
+        print(f"DEBUG: Using env var STRESS_TEST_QUERY = {env_query!r}")
+        if env_query.replace(",", "").replace(" ", "").isdigit():
+            return [int(q.strip()) for q in env_query.split(",")]
+        else:
+            return [env_query]
+    
+    # Priority 2: Command line argument  
     query_arg = request.config.getoption("--query", default=None)
+    print(f"DEBUG: --query arg = {query_arg!r}")
+    
     if query_arg:
         # Check if it looks like numeric ID(s)
         if query_arg.replace(",", "").replace(" ", "").isdigit():
@@ -467,6 +486,7 @@ def query_ids(request):
         else:
             # It's a custom query string
             return [query_arg]  # Return as single-item list of string
+    
     return [1]  # Default to Query 1 (Indonesian Alpha Hunt)
 
 
