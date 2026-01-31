@@ -25,18 +25,33 @@ logger = get_logger(__name__)
 class PostgresToolRegistry:
     """PostgreSQL backend for tool registry."""
     
+    # Class-level lock for pool initialization
+    _init_lock: asyncio.Lock | None = None
+    
     def __init__(self, table_name: str = "tool_registry"):
         self.table_name = table_name
         self.embedder = create_embedding_provider(use_local=True)
         self._pool: asyncpg.Pool | None = None
         self._db_url = os.getenv("DATABASE_URL")
+        self._initialized = False
         
         if not self._db_url:
             raise ValueError("DATABASE_URL environment variable is required for PostgresToolRegistry")
             
     async def _get_pool(self) -> asyncpg.Pool:
-        """Get or create connection pool."""
-        if self._pool is None:
+        """Get or create connection pool with thread-safe initialization."""
+        if self._pool is not None and self._initialized:
+            return self._pool
+        
+        # Use class-level lock to prevent race conditions
+        if PostgresToolRegistry._init_lock is None:
+            PostgresToolRegistry._init_lock = asyncio.Lock()
+        
+        async with PostgresToolRegistry._init_lock:
+            # Double-check pattern
+            if self._pool is not None and self._initialized:
+                return self._pool
+            
             # Create connection pool with limits to prevent exhaustion
             self._pool = await asyncpg.create_pool(
                 self._db_url,
@@ -45,30 +60,37 @@ class PostgresToolRegistry:
             )
             
             async with self._pool.acquire() as conn:
-                await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
-                await register_vector(conn)
-                
-                # Create table
-                # embedding is 1024 dim (Qwen3 default)
-                await conn.execute(f"""
-                    CREATE TABLE IF NOT EXISTS {self.table_name} (
-                        tool_name TEXT PRIMARY KEY,
-                        schema_hash TEXT NOT NULL,
-                        schema_json JSONB NOT NULL,
-                        embedding vector(1024),
-                        last_seen TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-                    )
-                """)
-                
-                # Indexes
+                # Use advisory lock to prevent concurrent schema modifications
+                await conn.execute("SELECT pg_advisory_lock(12345)")
                 try:
+                    await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
+                    await register_vector(conn)
+                    
+                    # Create table
+                    # embedding is 1024 dim (Qwen3 default)
                     await conn.execute(f"""
-                        CREATE INDEX IF NOT EXISTS {self.table_name}_embedding_idx 
-                        ON {self.table_name} 
-                        USING hnsw (embedding vector_cosine_ops)
+                        CREATE TABLE IF NOT EXISTS {self.table_name} (
+                            tool_name TEXT PRIMARY KEY,
+                            schema_hash TEXT NOT NULL,
+                            schema_json JSONB NOT NULL,
+                            embedding vector(1024),
+                            last_seen TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                        )
                     """)
-                except Exception:
-                    pass
+                    
+                    # Indexes
+                    try:
+                        await conn.execute(f"""
+                            CREATE INDEX IF NOT EXISTS {self.table_name}_embedding_idx 
+                            ON {self.table_name} 
+                            USING hnsw (embedding vector_cosine_ops)
+                        """)
+                    except Exception:
+                        pass
+                finally:
+                    await conn.execute("SELECT pg_advisory_unlock(12345)")
+            
+            self._initialized = True
                 
         return self._pool
 
