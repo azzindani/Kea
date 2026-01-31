@@ -146,37 +146,58 @@ class LocalEmbedding(EmbeddingProvider):
             return False
     
     def _load_model(self):
-        """Lazy load model and tokenizer."""
+        """Lazy load model and tokenizer with thread safety."""
         if self._model is None:
+            import threading
             import torch
             from transformers import AutoTokenizer, AutoModel
             
-            # Pin to specific device
-            if self.device == "cuda":
-                self.device = "cuda:0"
+            # Thread-safe model loading
+            if not hasattr(self, '_load_lock'):
+                self._load_lock = threading.Lock()
             
-            self._tokenizer = AutoTokenizer.from_pretrained(
-                self.model_name,
-                padding_side='left',  # Required for Qwen3 embedding
-                trust_remote_code=True,
-            )
-            
-            model_kwargs = {}
-            if self.use_flash_attention:
-                model_kwargs["attn_implementation"] = "flash_attention_2"
-                model_kwargs["torch_dtype"] = torch.float16
-            
-            self._model = AutoModel.from_pretrained(
-                self.model_name,
-                trust_remote_code=True,
-                **model_kwargs,
-            )
-            
-            # Move to device
-            if self.device.startswith("cuda"):
-                self._model = self._model.to(self.device)
-            
-            logger.info(f"Loaded {self.model_name} on {self.device}")
+            with self._load_lock:
+                # Double-check pattern
+                if self._model is not None:
+                    return self._model, self._tokenizer
+                
+                # Pin to specific device
+                if self.device == "cuda":
+                    self.device = "cuda:0"
+                
+                self._tokenizer = AutoTokenizer.from_pretrained(
+                    self.model_name,
+                    padding_side='left',  # Required for Qwen3 embedding
+                    trust_remote_code=True,
+                )
+                
+                model_kwargs = {
+                    "torch_dtype": torch.float32,  # Load in float32 first, then convert
+                }
+                if self.use_flash_attention:
+                    model_kwargs["attn_implementation"] = "flash_attention_2"
+                    model_kwargs["torch_dtype"] = torch.float16
+                
+                # Force CPU load first to avoid meta tensor issues
+                self._model = AutoModel.from_pretrained(
+                    self.model_name,
+                    trust_remote_code=True,
+                    device_map=None,  # Disable auto device mapping
+                    low_cpu_mem_usage=False,  # Disable meta tensor loading
+                    **model_kwargs,
+                )
+                
+                # Materialize fully on CPU before moving to GPU
+                self._model = self._model.to("cpu")
+                
+                # Move to target device
+                if self.device.startswith("cuda"):
+                    self._model = self._model.to(self.device)
+                    if not self.use_flash_attention:
+                        self._model = self._model.half()  # Convert to fp16 on GPU
+                
+                self._model.eval()  # Set to eval mode
+                logger.info(f"Loaded {self.model_name} on {self.device}")
         
         return self._model, self._tokenizer
     

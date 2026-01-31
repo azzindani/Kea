@@ -165,18 +165,19 @@ class SessionRegistry:
                         self.tool_to_server[tool_name] = server_name
                         logger.debug(f"   🔍 Discovered FastMCP tool '{tool_name}' in {server_name}")
                         
-                        # Extract Docstring for RAG
+                        # Extract Docstring for RAG (use function name as fallback)
                         docstring = ast.get_docstring(node)
-                        if docstring:
-                            # Create a lightweight Tool object for RAG indexing
-                            # We don't need full schema here, just name + desc for semantic search.
-                            # Full schema is fetched JIT by AgentSpawner.
-                            tool_obj = Tool(
-                                name=tool_name,
-                                description=docstring,
-                                inputSchema={}, # Empty schema is fine for RAG indexing
-                            )
-                            self.discovered_tools.append(tool_obj)
+                        description = docstring or f"Tool: {tool_name} from {server_name}"
+                        
+                        # Create a lightweight Tool object for RAG indexing
+                        # We don't need full schema here, just name + desc for semantic search.
+                        # Full schema is fetched JIT by AgentSpawner.
+                        tool_obj = Tool(
+                            name=tool_name,
+                            description=description,
+                            inputSchema={}, # Empty schema is fine for RAG indexing
+                        )
+                        self.discovered_tools.append(tool_obj)
 
         except Exception as e:
             logger.warning(f"Static scan failed for {server_name}: {e}")
