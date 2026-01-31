@@ -1,98 +1,96 @@
 # 📚 Shared Libraries ("The Foundation")
 
-The `shared/` directory is the **Standard Library** of the Kea system. It contains the core primitives, data schemas, and infrastructure abstractions that ensure consistency and interoperability across all microservices in the Fractal Corp architecture.
+The `shared/` directory is the **Standard Library** of the Kea system. It contains the core primitives, data schemas, and infrastructure abstractions that ensure consistency and interoperability across all microservices. It is the common substrate upon which the entire "Fractal Corp" architecture is built.
+
+## ✨ Features
+
+- **Unified Configuration**: Strongly-typed settings using Pydantic `BaseSettings` with JIT spawning controls and hardware-aware defaults.
+- **Rich Domain Schemas**: Canonical models for `ResearchState`, `AtomicFact`, and a sophisticated `ToolOutput` container for n8n-style data chaining.
+- **Hardware-Aware Adaptive Execution**: Automated system profiling (CPU, RAM, GPU) to optimize worker counts and batch sizes in real-world environments (Colab, Kaggle, Local).
+- **Zero-Trust Structured Logging**: OpenTelemetry-ready JSON logging with trace correlation across service boundaries.
+- **LLM & MCP Abstractions**: Standardized interfaces for multi-provider LLM access (OpenRouter) and Model Context Protocol (MCP) clients/servers.
+- **Service Discovery**: Centralized registry for inter-service communication URLs and port mapping.
 
 ---
 
-## 🏗️ Architecture Role
+## 📐 Architecture
 
-The Shared Library acts as the "Glue" and "Substrate" for the distributed system. By centralizing core logic, it prevents drift between services and enables a unified development experience.
+The Shared Library acts as the "Glue" and "Substrate" for the distributed system, preventing logic drift between services.
+
+### 🗼 The Shared Substrate
 
 ```mermaid
 graph TD
-    subgraph Services [Fractal Corp Microservices]
+    subgraph Services [Kea Microservices]
         Gateway[API Gateway]
         Orch[Orchestrator]
         Host[MCP Host]
         Vault[Vault]
-        Swarm[Swarm Manager]
-        Chronos[Chronos]
+        Manager[Swarm Manager]
     end
 
     subgraph Shared [shared/ Library]
-        Schemas[schemas.py<br/>Contracts]
-        Context[context_pool.py<br/>Research Flow]
-        Hardware[hardware/<br/>Auto-scaling]
-        LLM[llm/<br/>Provider Abstraction]
-        MCP[mcp/<br/>Protocol SDK]
+        Config[config.py<br/>Global Settings]
+        Schemas[schemas.py<br/>Domain Models]
+        Hardware[hardware/<br/>Resource Monitoring]
         Logging[logging/<br/>Observability]
+        MCP[mcp/<br/>Protocol SDK]
     end
 
     Gateway -.-> Shared
     Orch -.-> Shared
     Host -.-> Shared
     Vault -.-> Shared
-    Swarm -.-> Shared
-    Chronos -.-> Shared
+    Manager -.-> Shared
 ```
 
-1.  **Contract Management**: Canonical Pydantic schemas for inter-service communication.
-2.  **Cognitive State Flow**: Shared memory primitives (`TaskContextPool`) for parallel research.
-3.  **Cross-Platform Adaptation**: Hardware-aware execution strategies.
-4.  **Observer Integrity**: Unified tracing and structured logging.
+---
+
+## 📁 Codebase Structure
+
+- **`config.py`**: Centralized configuration management using environment variables and YAML.
+- **`schemas.py`**: The "Book of Truth" for all inter-service data contracts.
+- **`service_registry.py`**: Maps service names to URLs and ports.
+- **`hardware/`**: Hardware detection, resource pressure monitoring, and optimal execution strategy calculation.
+- **`logging/`**: Structured JSON logging, OpenTelemetry tracing, and performance metrics.
+- **`mcp/`**: Shared implementation of the Model Context Protocol (Client, Server, Transport, Router).
+- **`llm/`**: Abstraction layer for LLM providers with built-in retry logic and token tracking.
+- **`database/`**: Shared connection pool management and database lifecycle utilities.
 
 ---
 
-## 📁 Codebase Structure & Reference
+## 🧠 Deep Dive
 
-| Module / File | Component | Description | Key Classes/Functions |
-|:--------------|:----------|:------------|:----------------------|
-| **`schemas.py`** | **Contracts** | **Critical**. Truth for all API and Graph contracts. | `ResearchState`, `AtomicFact`, `JobRequest` |
-| **`context_pool.py`** | **Memory** | Shared clipboard for parallel agent workers. | `TaskContextPool`, `ExtractionStrategy` |
-| **`hardware/`** | **Infrastructure**| Hardware detection and resource monitoring. | `detect_hardware()`, `HardwareProfile` |
-| **`llm/`** | **Intelligence** | Unified interface for 20+ LLM providers. | `LLMProvider`, `OpenRouter`, `LLMConfig` |
-| **`mcp/`** | **Protocol** | Model Context Protocol SDK implementation. | `MCPClient`, `ToolRouter`, `ToolIndex` |
-| **`logging/`** | **Observability**| Tracing, business metrics, and structured logs. | `get_logger()`, `trace_function`, `record_tool_call` |
-| **`database/`** | **Persistence** | Database connection pooling and health checks. | `DatabasePool`, `DatabaseConfig` |
-| **`tools/`** | **Execution** | JIT tool loading and process isolation. | `JITToolLoader`, `ToolIsolator` |
-| **`tenants/`** | **Security** | Multi-tenancy and data isolation logic. | `TenantContext`, `ResourcePrefix` |
-| **`messaging.py`** | **Event Bus** | Inter-service message passing (Sync/Async). | `Message`, `MessageBus` |
-| **`config.py`** | **Environment** | Strongly-typed configuration management. | `Settings`, `get_settings()` |
+### 1. Hardware-Aware Scaling (`hardware/detector.py`)
+Kea is designed to run anywhere. The `HardwareProfile` detected at startup determines the `optimal_workers()` formula. For example, if it detects only 4GB of RAM (common in standard Colab), it limits concurrent agent swarms to prevent OOM (Out-of-Memory) crashes, while on a 128-core VPS, it scales up to 8+ parallel workers automatically.
+
+### 2. The `ToolOutput` Container (`schemas.py`)
+To enable complex agent chains (n8n-style), the `ToolOutput` model supports more than just text. It can carry structured `DataPayload`s, `FileReference`s for large datasets, and even `next_input` suggestions. This allows a "Search" tool to pass a list of URLs directly to a "Scraper" tool without the LLM having to manually parse and re-format the data in between.
+
+### 3. Trace Correlation (`logging/structured.py`)
+By using a global `ContextVar`, the logging system automatically injects `trace_id` and `span_id` into every log line, even when crossing service boundaries via HTTP. This ensures that a single user query can be traced from the Gateway, through the Orchestrator, into tools executed on the MCP Host, and finally to the persistence layer in the Vault.
 
 ---
 
-## 🔬 Deep Dive: Core Mechanics
+## 📚 Reference
 
-### 1. Research State Flow (`TaskContextPool`)
-Used by the `Researcher` node to manage data flow between 50+ parallel scrapers.
-- **URL Pooling**: Deduplicates and prioritizes URLs discovered during crawling.
-- **Fact Accumulation**: Thread-safe harvesting of atomic data points before final synthesis.
-- **Data Chaining**: Automatically passes context from an "Overview" tool to a "Deep Dive" tool.
+### Core Primitive Reference
 
-### 2. Hardware-Aware Dispatching (`hardware/`)
-Ensures Kea runs efficiently on everything from a Raspberry Pi to a H100 GPU cluster.
-- **Profile Detection**: Probes CPU cores, RAM bandwidth, and GPU VRAM.
-- **Optimal Scaling**: Provides the `optimal_workers()` formula used by the Orchestrator to decide how many agents to spawn without crashing the host.
+| Class | Description | Key Fields |
+|:------|:------------|:-----------|
+| `ResearchState` | The LangGraph state object. | `job_id`, `facts`, `sub_queries`, `report` |
+| `AtomicFact` | High-fidelity data point. | `entity`, `attribute`, `value`, `confidence` |
+| `ToolOutput` | Rich n8n-style result. | `text`, `data`, `files`, `next_input` |
+| `HardwareProfile`| System capability map. | `cpu_threads`, `ram_total_gb`, `gpu_count` |
 
-### 3. JIT Tool Evolution (`tools/jit_loader.py`)
-Enables "Self-Healing" tool execution.
-- **Dependency Sandboxing**: Uses `uv` to dynamically install exact package versions (e.g., `playwright`, `scikit-learn`) for ephemeral tool processes.
-- **Security Whitelisting**: Intercepts `pip/uv` calls to prevent execution of malicious code.
+### Service Port Registry
 
----
-
-## 🔌 Core Type Reference
-
-### Research State primitives
-| Class | Description | Fields |
-|:------|:------------|:-------|
-| `ResearchState` | The LangGraph state object. | `job_id`, `facts`, `hypotheses`, `report`, `path` |
-| `AtomicFact` | Verification unit. | `entity`, `attribute`, `value`, `confidence_score` |
-| `QueryPath` | Enum for routing. | `A (Memory)`, `B (Lab)`, `C (Synthesis)`, `D (Deep)` |
-
-### Transport & API
-| Class | Description | Fields |
-|:------|:------------|:-------|
-| `JobRequest` | Input for `/jobs`. | `query`, `job_type`, `depth`, `domain_hints` |
-| `NodeOutput` | Standardized log entry. | `trace_id`, `source_node`, `content`, `timestamp` |
-| `ToolInvocation` | Execution audit log. | `tool_name`, `arguments`, `result`, `is_error` |
+| Service | Default Port | Environment Variable Override |
+|:--------|:-------------|:------------------------------|
+| Gateway | 8000 | `SERVICE_URL_GATEWAY` |
+| Orchestrator | 8001 | `SERVICE_URL_ORCHESTRATOR` |
+| MCP Host | 8002 | `SERVICE_URL_MCP_HOST` |
+| RAG Service | 8003 | `SERVICE_URL_RAG_SERVICE` |
+| Vault | 8004 | `SERVICE_URL_VAULT` |
+| Swarm Manager| 8005 | `SERVICE_URL_SWARM_MANAGER` |
+| Chronos | 8006 | `SERVICE_URL_CHRONOS` |

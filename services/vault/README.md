@@ -1,106 +1,81 @@
-# 💾 Vault Service ("The Memory")
+# 🏦 The Vault ("The Black Box")
 
-The **Vault Service** is the comprehensive data layer for Kea. It centralizes all persistence, ensuring that the Orchestrator remains stateless and that all actions are audit-logged for compliance.
+The **Vault Service** is the immutable persistence and audit layer of the Kea system. It acts as the system's "Black Box" recorder, ensuring that every cognitive step, tool execution, and compliance decision is logged with cryptographic integrity. It also manages state checkpointing for the Orchestrator's LangGraph.
+
+## ✨ Features
+
+- **Immutable Audit Trail**: Logs all system events with SHA-256 checksums to prevent record tampering.
+- **LangGraph Checkpointing**: Persists the state of research graphs to PostgreSQL, enabling seamless recovery after system restarts or crashes.
+- **Cryptographic Integrity**: Each audit entry is hashed with its predecessor's metadata, creating a verifiable chain of custody for research findings.
+- **High-Fidelity "OODA" Logging**: Specifically captures Observe, Orient, Decide, and Act phases for every agent decision.
+- **Automatic Auditing Decorator**: Easy-to-use `@audited` utility for developers to wrap sensitive functions with persistence logic.
+- **Polymorphic Backends**: Primary support for PostgreSQL with high-performance In-Memory and SQLite fallbacks.
 
 ---
 
-## 🏗️ Architecture Overview
+## 📐 Architecture
 
-The Vault aggregates three distinct types of storage behind a single API:
+The Vault sits at the bottom of the stack, providing a "Source of Truth" for all other services.
 
-1.  **Vector Store (Postgres + pgvector)**: Stores "Atomic Facts" for GraphRAG and semantic search.
-2.  **Relational DB (Postgres)**: Stores Service State, Job History, and Checkpoints.
-3.  **Audit Trail (Immutable Log)**: Stores a sequential history of every Agent Action, Tool Call, and Compliance Decision.
+### 🗼 The Persistence Flow
 
 ```mermaid
 graph TD
-    Clients[Orchestrator / Gateway] -->|HTTP| API[FastAPI Endpoint]
+    Orch[Orchestrator] -->|Event| API[Vault API]
+    API --> Trail[Audit Trail Manager]
+    Trail -->|Hash| Checksum[Checksum Generator]
+    Checksum -->|Verify| Postgres[(PostgreSQL)]
     
-    subgraph "Vault Service (Port 8004)"
-        API --> Router{Data Router}
-        
-        Router -->|Fact| Vector[PGVector Client]
-        Router -->|State| SQL[SQLAlchemy Engine]
-        Router -->|Log| Audit[Audit Manager]
-    end
+    Orch -->|State Snapshot| Checkpoint[Checkpoint Store]
+    Checkpoint -->|JSONB| Postgres
     
-    subgraph "Persistence Layer"
-        Vector --> Postgres[(Postgres + pgvector)]
-        SQL --> Postgres
-        Audit --> Logs[(Audit File/Table)]
-    end
+    Admin[Admin Console] -->|Query| API
+    API -->|Read| Postgres
 ```
 
 ---
 
 ## 📁 Codebase Structure
 
-| File / Directory | Component | Description |
-|:-----------------|:----------|:------------|
-| **`main.py`** | **Entry Point** | FastAPI app (Port 8004). Exposes `audit`, `memory`, `state` routes. |
-| **`core/`** | **Logic** | Data management logic. |
-| ├── `audit_trail.py` | Compliance | Interface for writing structured logs. |
-| ├── `postgres_audit.py`| Storage | **NEW**: Postgres-specific implementation of the audit log. |
-| ├── `postgres_store.py`| Persistence | **NEW**: Robust Postgres client for structured data. |
-| ├── `vector_store.py` | Intelligence | Interface for pgvector operations. |
-| └── `checkpointing.py`| State | LangGraph CheckpointSaver implementation logic. |
+- **`main.py`**: FastAPI entrypoint hosting the audit and checkpointing API.
+- **`core/`**: The implementation of the persistence engines.
+    - `audit_trail.py`: Core logic for managing `AuditEntry` objects and checksum verification.
+    - `checkpointing.py`: Implementation of the PostgreSQL-backed state store for LangGraph.
+    - `postgres_audit.py`: Direct database interactions for the audit trail.
+    - `postgres_store.py`: General-purpose relational storage management.
+    - `vector_store.py`: Base implementation for high-dimensional fact storage used by the RAG service.
 
 ---
 
-## 🔌 API Reference
+## 🧠 Deep Dive
 
-### Audit Logging
+### 1. Immutable Audit Entries
+The `AuditEntry` is the unit of accountability in Kea. Beyond standard fields (Action, Actor, Resource), it calculates a unique `checksum` of its own contents. Any attempt to modify a log entry post-creation will invalidate this checksum, providing a mathematically verifiable audit trail for regulated industries (Finance, Legal, Healthcare).
+
+### 2. LangGraph State Checkpointing
+The `CheckpointStore` allows Kea to handle long-running research jobs (minutes to hours). Every time the Orchestrator moves between nodes (e.g., from Planner to Researcher), a state snapshot is saved as a `JSONB` blob in the `graph_checkpoints` table. If the system fails, the Orchestrator can reload the `latest` checkpoint and resume exactly where it left off.
+
+### 3. Automatic "Chain of Thought" Capture
+By using the `@audited` decorator, the system captures not just the *inputs* and *outputs* of functions, but the entire "Chain of Thought" (CoT). This data is critical for fine-tuning future models and performing forensic analysis on agent hallucinations.
+
+---
+
+## 📚 Reference
+
+### Audit Event Types
+
+| Event Type | Description | Trigger Point |
+|:-----------|:------------|:--------------|
+| `TOOL_CALLED` | Execution of an MCP tool | Researcher Node |
+| `DECISION_MADE` | Agent selecting a specific research path | Planner Node |
+| `SECURITY_CHECK` | Compliance engine validation | Swarm Manager |
+| `APPROVAL_GRANTED`| Human sign-off on high-risk task | API Gateway |
+
+### API Interface
+
 | Endpoint | Method | Description |
 |:---------|:-------|:------------|
-| `/audit/logs` | `POST` | Record a new audit event. |
-| `/audit/logs` | `GET` | Query historical logs with filters. |
-| `/health` | `GET` | Basic service health check. |
-
----
-
-## 🏗️ Technical Deep Dive
-
-### 1. Immutable Audit Integrity (`core/audit_trail.py`)
-The Vault implements a **Hardened Evidence Architecture** to provide a "Memory of Record" for all autonomous actions:
-
-1.  **Immutable Audit Trail**: Based on a **WORM (Write Once, Read Many)** storage pattern. Once an event is logged, it cannot be modified or deleted by systemic agents.
-2.  **Audit Persistence Layer**: Uses a high-integrity Postgres backend with schema-level constraints to prevent record tampering.
-3.  **Encrypted Artifact Store**: Manages binary research artifacts (PDFs, Parquet files) using AES-256 encryption at rest.
-
-```mermaid
-graph TD
-    Services[All Microservices] -->|Log Event| API[Vault API]
-    API --> Trail[Impact-Aware Audit Trail]
-    API --> Store[Artifact Store]
-    
-    subgraph Evidence Storage
-        Trail --> DB[(Immutable Postgres)]
-        Store --> Enc[(Encrypted S3/Local)]
-    end
-    
-    DB -.-> Verification[Integrity Checker]
-```
-
----
-
-## ✨ Features & Audit Integrity
-
-### 📜 The Impact-Aware Audit Trail
-Every entry in the Vault is more than just a log; it is a **Structured Evidence Bundle**:
-- **Actor/Action/Resource**: Full trace of *who* did *what* to *which* data.
-- **Session Correlation**: Every event is tied to a `session_id` or `job_id` for end-to-end timeline reconstruction.
-- **Impact Grading**: Events are tagged by severity (e.g., `DATA_ACCESS`, `SYSTEM_RECOVERY`) to facilitate high-speed compliance reporting.
-
-### 🛡️ Storage Governance
-- **Deletion Gating**: The Vault API requires a multi-signature equivalent (internal specialized keys) to perform data pruning.
-- **Heartbeat Monitoring**: Constantly verifies the connection to the storage backend to ensure zero-loss logging.
-- **Cryptographic Provenance**: Plans for blockchain-backed hashing of audit headers to ensure third-party verifiable integrity.
-
-### 🧩 Artifact Lifecycle Management
-- **Automatic Versioning**: Every artifact uploaded is versioned to prevent "State Overwrite" errors during research.
-- **Streaming Retrieval**: Efficiently handles multi-GB research datasets via direct-to-S3 signed URLs or chunked local streams.
-
-### 2. High-Fidelity Graph Checkpointing (`core/checkpointing.py`)
-Unlike standard state stores, the Vault stores the **entire LangGraph snapshot**:
-- **State Time-Travel**: Every "turn" in the research loop is saved. Chronos can pull these snapshots to "rewind" the brain to a previous state for debugging.
-- **Fact Deduplication**: Before storing a new Atomic Fact in the Vector Store, the Vault performs a semantic similarity check to prevent "Knowledge Bloat".
+| `/audit/logs` | `POST` | Manually log a custom audit event. |
+| `/audit/logs` | `GET` | Query and filter audit history. |
+| `/checkpoints/{job_id}` | `GET` | Retrieve the state of a specific research job. |
+| `/health` | `GET` | Service status and DB connection pool health. |

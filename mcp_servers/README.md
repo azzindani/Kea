@@ -1,131 +1,97 @@
 # 🔌 MCP Servers ("The Hands")
 
-This directory contains the **Model Context Protocol (MCP)** compliant microservices. These are the "Hands" of the AI system, providing the capabilities required to interact with the external world, execute code, and perform complex data analysis.
+The `mcp_servers/` directory contains the **Model Context Protocol (MCP)** compliant microservices. These are the "Hands" of the Kea system, providing the specialized capabilities required to interact with the external world, execute code, and perform deep domain-specific analysis.
+
+## ✨ Features
+
+- **Massive Tool Library**: 68+ specialized servers covering Finance, Web3, Academic Research, GIS, and Data Science.
+- **Hub-and-Spoke Architecture**: Centrally managed by the `MCP Host`, with each server running in an isolated, low-privilege process.
+- **JIT Dependency Resolution**: Servers use `uv` and `FastMCP` to dynamically resolve and install their own dependencies at runtime.
+- **n8n-Style Data Chaining**: Tools are designed to produce structured outputs that can be piped into subsequent tools without LLM intervention.
+- **Stealth Browsing & Extraction**: High-fidelity scraping via Playwright with built-in anti-bot evasion and automatic markdown conversion.
+- **Zero-Trust Tooling**: Every tool execution is logged, audited, and resource-gated by the Swarm Manager.
 
 ---
 
-## 🏗️ Architecture Overview
+## 📐 Architecture
 
-Kea implements a **Hub-and-Spoke** architecture where the **MCP Host** acts as the universal client and process manager for a fleet of specialized tool servers.
+Kea treats tools as isolated micro-agents rather than simple function calls.
+
+### 🗼 The Tool Ecosystem
 
 ```mermaid
 graph TD
     Host[MCP Host Service]
     
-    subgraph Tool Layer [Isolated MCP Servers]
-        Scraper[Scraper Server]
+    subgraph "Core Servers"
+        Scraper[Scraper/Browser]
         Python[Python Sandbox]
-        Search[Search Server]
-        Vision[Vision Server]
-        Analytics[Analytics Server]
+        Search[Global Search]
     end
     
-    Host -->|JSON-RPC via Stdio| Scraper
-    Host -->|JSON-RPC via Stdio| Python
-    Host -->|JSON-RPC via Stdio| Search
+    subgraph "Domain Servers"
+        Quant[Quant/Finance]
+        Academic[arXiv/Scholar]
+        Web3[Blockchain RPC]
+    end
     
-    Scraper -.->|ToolResult| Host
-    Python -.->|ToolResult| Host
+    Host -->|JSON-RPC| Core
+    Host -->|JSON-RPC| Domain
+    
+    Core -->|Structured Data| Vault[(Vault)]
+    Domain -->|Atomic Facts| Vault
 ```
 
-1.  **Fault Isolation**: Each server runs in a separate OS process. A crash in the `scraper` does not affect the `python` sandbox.
-2.  **Stateless Execution**: Servers are largely stateless, receiving all necessary context in the JSON-RPC request.
-3.  **Unified Interface**: All 32 servers follow the same MCP handshake and tool discovery protocol.
+---
+
+## 📁 Codebase Structure
+
+Each server (e.g., `yfinance_server/`) typically follows this structure:
+
+- **`server.py`**: The main entrypoint using `FastMCP` to register tools.
+- **`tools/`**: Modularized tool implementations (Market, Financials, etc.).
+- **`Dockerfile`**: (Optional) For running the server in a containerized sandbox.
+- **`README.md`**: Domain-specific documentation and tool references.
 
 ---
 
-## 🧩 Server Catalog & Reference
+## 🧠 Deep Dive
 
-We categorize servers by their cognitive domain.
+### 1. JIT "Zero-Config" Spawning
+Unlike traditional tool systems that require complex environment setups, Kea servers are self-contained. When the MCP Host needs the `yfinance_server`, it uses the `shared/tools/jit_loader` to parse the `dependencies` list in `server.py` and spawns a `uv` process that ensures the exact versions of `pandas`, `yfinance`, and `matplotlib` are present.
 
-### 1. Core Execution & Retrieval
-| Server | Directory | Description |
-|:-------|:----------|:------------|
-| **Scraper** | `scraper_server/` | Stealthy browsing and document extraction. |
-| **Search** | `search_server/` | Global information discovery via Tavily/Brave. |
-| **Python** | `python_server/` | Sandboxed computation and DB interaction. |
-| **Vision** | `vision_server/` | Multimodal analysis of screenshots and plots. |
-| **Crawler** | `crawler_server/` | Targeted site crawling and indexing. |
-| **Browser** | `browser_agent_server/`| Specialized browser automation agent. |
-| **Newspaper** | `newspaper_server/` | Structured news article/metadata extraction. |
-| **Document** | `document_server/` | PDF and structured document parsing. |
-| **Filesystem**| `filesystem_server/` | Isolated local file management. |
-| **Analysis** | `analysis_server/` | Meta-analysis and trend detection. |
-| **Analytics** | `analytics_server/` | Exploratory Data Analysis (EDA) and profiling. |
+### 2. High-Fidelity Scraping (`playwright_server`)
+The `playwright_server` is one of the most complex "Hands." It exposes 20+ tools for navigation, input, and extraction. It supports "Session Persistence," allowing an agent to log into a portal in one turn and continue browsing in the next without losing state.
 
-### 2. Quant & Market Analytics
-| Server | Directory | Description |
-|:-------|:----------|:------------|
-| **TradingView**| `tradingview_server/` | Consensus TA and market screening. |
-| **CCXT** | `ccxt_server/` | Unified crypto exchange data and trading. |
-| **Finta** | `finta_server/` | Financial Technical Analysis indicators. |
-| **Pandas TA** | `pandas_ta_server/` | High-perf TA for dataframe pipelines. |
-| **Mibian** | `mibian_server/` | Advanced options pricing models. |
-| **Finviz** | `finviz_server/` | Visual stock screening and heatmaps. |
-| **ML** | `ml_server/` | Machine learning training and inference. |
-| **Vis** | `visualization_server/`| Interactive Plotly/Table visualization. |
-
-### 3. Global Data & Economies
-| Server | Directory | Description |
-|:-------|:----------|:------------|
-| **WBGAPI** | `wbgapi_server/` | World Bank global development indicators. |
-| **YahooQuery** | `yahooquery_server/` | High-speed Yahoo Finance bulk retrieval. |
-| **yFinance** | `yfinance_server/` | Deep historical and fundamental data. |
-| **PDR** | `pdr_server/` | Remote data retrieval (Fred, Stlouis, etc). |
-| **SEC Edgar** | `sec_edgar_server/` | Bulk SEC filing downloads and parsing. |
-| **Py Edgar** | `python_edgar_server/` | Metadata-focused SEC research. |
-| **Data Src** | `data_sources_server/`| Unified external API gateway. |
-
-### 4. Knowledge, Logic & Web3
-| Server | Directory | Description |
-|:-------|:----------|:------------|
-| **Qualitative**| `qualitative_server/` | Forensics, mapping and thematic NLP. |
-| **Web3** | `web3_server/` | Blockchain RPC, DeFi, and Smart Contracts. |
-| **Regulatory**| `regulatory_server/` | Compliance tracking and legal research. |
-| **Academic** | `academic_server/` | ArXiv and Semantic Scholar search. |
-| **Security** | `security_server/` | URL scanning and code safety auditing. |
-| **Discovery** | `tool_discovery_server/`| Self-expansion and tool stub generation. |
+### 3. Financial Intelligence Suite
+Kea includes a multi-layered financial stack:
+- **`yfinance` / `yahooquery`**: Fundamental data and history.
+- **`finta` / `pandas_ta`**: Technical indicators (RSI, MACD, etc.).
+- **`mibian`**: Black-Scholes and options Greeks.
+- **`sec_edgar`**: Direct access to corporate filings for regulatory research.
 
 ---
 
-## 🔬 Deep Dive: The MCP Handshake
+## 📚 Reference
 
-The communication between the **MCP Host** and its **Servers** follows the JSON-RPC 2.0 standard.
+### Server Categories
 
-### 1. The Startup Sequence
-1.  **Spawn**: Host spawns the server process (e.g., `uv run python -m mcp_servers.scraper_server.server`).
-2.  **Initialize**: Host sends `initialize` request with client capabilities.
-3.  **Capabilities**: Server responds with its name, version, and supported features (e.g., `listChanged`, `subscribe`).
-4.  **Discovery**: Host calls `tools/list` to retrieve the JSON schemas for every tool the server provides.
+| Category | Primary Servers | Capabilities |
+|:---------|:----------------|:-------------|
+| **Core** | `search`, `scraper`, `python` | Web search, stealth browsing, code execution. |
+| **Quant** | `ccxt`, `yfinance`, `finta` | Crypto, stocks, technical analysis. |
+| **Academic**| `academic`, `document` | arXiv, Semantic Scholar, PDF parsing. |
+| **Analysis**| `pandas`, `sklearn`, `statsmodels`| ML, statistical modeling, data cleaning. |
+| **Web3** | `web3`, `security` | Smart contracts, on-chain data, safety. |
 
-### 2. JIT Dependency Resolution
-Kea's MCP servers are designed to be "Zero-Config." They define their own dependencies in their `main.py` entrypoint. The **JIT Loader** in the shared library parses these requirements and ensures they are installed in the ephemeral `uv` environment before the server enters the ready state.
-
----
-
-## 🛠️ Development Reference
-
-### Adding a New Tool
-To extend the capabilities of an existing server:
-
-1.  **Define**: Add a function in the server's `tools.py` or `server.py`.
-2.  **Decorate**: Use the `@mcp.tool()` decorator to expose it.
-3.  **Document**: Provide a clear docstring and type hints; these are used to generate the JSON Schema for the LLM.
+### Tool Development Pattern
 
 ```python
 @mcp.tool()
-async def analyze_sentiment(text: str) -> str:
+async def my_new_tool(query: str) -> str:
     """
-    Analyze the emotional tone of a text block.
-    
-    Args:
-        text: The raw string to analyze.
+    Clear docstring for the LLM to understand utility.
     """
-    # Logic goes here...
-    return "Positive"
+    # implementation logic
+    return "Result"
 ```
-
-### Standard Response Format
-All tools must return an `MCPResult` (or `ToolResult`), which consists of:
-- `content`: A list of `TextContent` or `ImageContent` objects.
-- `isError`: A boolean flag indicating functional failure.
