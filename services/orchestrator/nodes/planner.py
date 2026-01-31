@@ -176,139 +176,158 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
                 logger.warning(f"Planner tool discovery CRITICAL FAILURE: {e}")
                 tools_context = "Tool Discovery Unavailable."
 
+            # JSON Blueprint System Prompt (Level 30 Architect)
             messages = [
                 LLMMessage(
                     role=LLMRole.SYSTEM,
-                    content=f"""You are a research planner with the resourcefulness of an elite engineer (e.g., Tony Stark).
-Your mission is to decompose complex queries into actionable execution plans, finding creative ways to get data even when no direct tool exists.
+                    content=f"""ACT AS: Execution Architect for Kea (Autonomous Research Engine).
+OBJECTIVE: Convert user intent into an executable JSON Blueprint.
 
-AVAILABLE TOOLS (Use these if relevant):
+AVAILABLE TOOLS:
 {tools_context}
 
-CRITICAL: GENERATE MAXIMUM MICRO-TASKS (up to 32768 tasks).
-- Each individual data point = 1 task
-- If analyzing 800 companies, create 800 individual tasks
-- If scraping 100 pages, create 100 separate tasks
-- MORE GRANULAR is ALWAYS BETTER for parallel execution
+CRITICAL RULES:
+1. OUTPUT ONLY JSON. No prose, no explanations, no "I will now..."
+2. Use exact tool names from the list above. If no tool fits, use "execute_code".
+3. Tasks with same "phase" run in parallel. Higher phase waits for lower phases.
+4. Use artifact keys to pass data between steps: "{{{{step_id.artifact_key}}}}"
 
-CORE PHILOSOPHY: IMPROVISE AND BUILD.
-Do not be limited by "standard" procedures. If a specific dataset/tool is missing, plan to **build it yourself** using the available primitive tools (like Python code and Web Search).
-- Treat the web as a raw database to be scraped and parsed.
-- Treat Python as your universal adapter to process that raw data.
+OUTPUT SCHEMA:
+{{{{
+  "intent": "Brief technical summary (max 10 words)",
+  "blueprint": [
+    {{{{
+      "id": "step_1",
+      "phase": 1,
+      "tool": "web_search",
+      "args": {{{{"query": "..."}}}},
+      "artifact": "search_results"
+    }}}},
+    {{{{
+      "id": "step_2", 
+      "phase": 2,
+      "tool": "execute_code",
+      "args": {{{{"code": "import pandas as pd\\n..."}}}}
+    }}}}
+  ]
+}}}}
 
-RULES FOR FINANCIAL DATA:
-1. Do NOT use `web_search` to find data tables if better tools exist. Use `get_idx_tickers` for identifying companies.
-2. Use `execute_code` (Python) to fetch financial data (e.g. using yfinance) or to perform calculations.
-3. You cannot 'Filter' data you do not have. Your first step must always be 'Acquire Dataset'.
-
-PHASES FOR LARGE TASKS (CRITICAL: PREVENT RACE CONDITIONS):
-1. DISCOVERY - Find all entities (companies, URLs, documents)
-2. COLLECTION - Create ONE task per entity to collect data (e.g. "Download data").
-3. VALIDATION - Verify collected data
-4. ANALYSIS - Process and calculate (MUST depend on Collection)
-5. SYNTHESIS - Combine results
-
-IMPORTANT: Do not mix "Fetching" and "Analyzing" in the same description. Split them.
-- BAD: "Fetch data for ASII and calculate Dupont" (Atomic violation)
-- GOOD: "Task 1: Fetch data for ASII" (Collection) -> "Task 2: Calculate Dupont for ASII" (Analysis)
-
-Output format:
-SUB-QUERIES:
-1. [question]
-...
-
-HYPOTHESES:
-1. [claim]
-...
-
-PHASE: [PHASE_NAME]
-1. [action verb] [what] [where/how]
-2. ...
-
-PHASE: [NEXT_PHASE_NAME]
-1. [action that depends on previous phase]
-...
-
-Be specific about:
-- What data to collect (create one task per item)
-- What calculations to perform
-- What to extract from documents
-- What relationships to map"""
+EXAMPLE for "Compare NVDA vs AMD financials":
+{{{{
+  "intent": "Compare NVDA AMD financial metrics",
+  "blueprint": [
+    {{{{"id": "s1", "phase": 1, "tool": "execute_code", "args": {{{{"code": "import yfinance as yf; nvda = yf.Ticker('NVDA').quarterly_financials; print(nvda.to_json())"}}}},"artifact": "nvda_data"}}}},
+    {{{{"id": "s2", "phase": 1, "tool": "execute_code", "args": {{{{"code": "import yfinance as yf; amd = yf.Ticker('AMD').quarterly_financials; print(amd.to_json())"}}}},"artifact": "amd_data"}}}},
+    {{{{"id": "s3", "phase": 2, "tool": "execute_code", "args": {{{{"code": "# Calculate margins from {{{{s1.nvda_data}}}} and {{{{s2.amd_data}}}}"}}}},"artifact": "comparison"}}}}
+  ]
+}}}}"""
                 ),
-                LLMMessage(role=LLMRole.USER, content=f"Decompose this research query:\n\n{query}")
+                LLMMessage(role=LLMRole.USER, content=query)
             ]
             
             response = await provider.complete(messages, config)
             
-            # Parse response
-            sub_queries = []
-            hypotheses = []
-            # New structure: Ordered dictionary of phases
-            execution_phases = {}  # { "discovery": ["step 1", "step 2"], ... }
-            current_phase_name = "default"
-            
-            lines = response.content.split("\n")
-            current_section = None
-            
-            for line in lines:
-                line = line.strip()
-                if not line:
-                    continue
-                    
-                if "SUB-QUERIES" in line.upper():
-                    current_section = "sub_queries"
-                    continue
-                elif "HYPOTHESES" in line.upper():
-                    current_section = "hypotheses"
-                    continue
-                elif "PHASE:" in line.upper():
-                    current_section = "execution"
-                    # Extract phase name: "PHASE: DISCOVERY" -> "discovery"
-                    try:
-                        current_phase_name = line.split(":", 1)[1].strip().lower()
-                    except:
-                        current_phase_name = "unknown"
-                    if current_phase_name not in execution_phases:
-                        execution_phases[current_phase_name] = []
-                    continue
-                elif "EXECUTION" in line.upper():
-                    # Fallback for old prompt style or if LLM forgets PHASE header
-                    current_section = "execution"
-                    continue
+            # Parse JSON Blueprint response
+            blueprint = None
+            try:
+                import json
+                import re
                 
-                # Extract content
-                text = None
-                if line[0].isdigit() and "." in line:
-                    text = line.split(".", 1)[1].strip()
-                elif line.startswith("-") or line.startswith("*") or line.startswith("•"):
-                    text = line[1:].strip()
+                # Extract JSON from response (handle markdown code blocks)
+                content = response.content.strip()
+                
+                # Try to find JSON in code blocks first
+                json_match = re.search(r'```(?:json)?\s*(\{[\s\S]*\})\s*```', content)
+                if json_match:
+                    content = json_match.group(1)
+                # Or find raw JSON object
+                elif content.startswith('{'):
+                    pass  # Already JSON
                 else:
-                    # Allow non-bullet text if it looks like a task in execution section
-                    if current_section == "execution" and len(line) > 10:
-                        text = line
+                    # Try to find JSON anywhere in response
+                    json_start = content.find('{')
+                    json_end = content.rfind('}') + 1
+                    if json_start >= 0 and json_end > json_start:
+                        content = content[json_start:json_end]
                 
-                if text and current_section:
-                    if current_section == "sub_queries":
-                        sub_queries.append(text)
-                    elif current_section == "hypotheses":
-                        hypotheses.append(text)
-                    elif current_section == "execution":
+                blueprint = json.loads(content)
+                logger.info(f"Planner: Parsed JSON Blueprint with {len(blueprint.get('blueprint', []))} steps")
+                
+            except json.JSONDecodeError as e:
+                logger.warning(f"Planner: JSON parse failed ({e}), falling back to text parsing")
+                blueprint = None
+            
+            if blueprint and "blueprint" in blueprint:
+                # Generate execution plan from JSON Blueprint
+                execution_plan = generate_execution_plan_from_blueprint(query, blueprint)
+                state["execution_plan"] = execution_plan.model_dump()
+                state["sub_queries"] = [blueprint.get("intent", query)]
+                state["hypotheses"] = []
+                
+                logger.info(
+                    f"Planner: Generated {len(execution_plan.micro_tasks)} micro-tasks "
+                    f"across {len(execution_plan.phases)} phases from JSON Blueprint"
+                )
+            else:
+                # Fallback: Parse as text (legacy compatibility)
+                sub_queries = []
+                hypotheses = []
+                execution_phases = {}
+                current_phase_name = "default"
+                
+                lines = response.content.split("\n")
+                current_section = None
+                
+                for line in lines:
+                    line = line.strip()
+                    if not line:
+                        continue
+                        
+                    if "SUB-QUERIES" in line.upper():
+                        current_section = "sub_queries"
+                        continue
+                    elif "HYPOTHESES" in line.upper():
+                        current_section = "hypotheses"
+                        continue
+                    elif "PHASE:" in line.upper():
+                        current_section = "execution"
+                        try:
+                            current_phase_name = line.split(":", 1)[1].strip().lower()
+                        except:
+                            current_phase_name = "unknown"
                         if current_phase_name not in execution_phases:
                             execution_phases[current_phase_name] = []
-                        execution_phases[current_phase_name].append(text)
-            
-            state["sub_queries"] = sub_queries or [query]
-            state["hypotheses"] = hypotheses
-            
-            # Generate execution plan from phases
-            execution_plan = generate_execution_plan_phased(query, execution_phases)
-            state["execution_plan"] = execution_plan.model_dump()
-            
-            logger.info(
-                f"Planner: Generated {len(sub_queries)} sub-queries, "
-                f"{len(hypotheses)} hypotheses, "
-                f"{len(execution_plan.micro_tasks)} micro-tasks across {len(execution_phases)} phases"
-            )
+                        continue
+                    
+                    # Extract content
+                    text = None
+                    if line[0].isdigit() and "." in line:
+                        text = line.split(".", 1)[1].strip()
+                    elif line.startswith(("-", "*", "•")):
+                        text = line[1:].strip()
+                    elif current_section == "execution" and len(line) > 10:
+                        text = line
+                    
+                    if text and current_section:
+                        if current_section == "sub_queries":
+                            sub_queries.append(text)
+                        elif current_section == "hypotheses":
+                            hypotheses.append(text)
+                        elif current_section == "execution":
+                            if current_phase_name not in execution_phases:
+                                execution_phases[current_phase_name] = []
+                            execution_phases[current_phase_name].append(text)
+                
+                state["sub_queries"] = sub_queries or [query]
+                state["hypotheses"] = hypotheses
+                
+                execution_plan = generate_execution_plan_phased(query, execution_phases)
+                state["execution_plan"] = execution_plan.model_dump()
+                
+                logger.info(
+                    f"Planner: Generated {len(execution_plan.micro_tasks)} micro-tasks "
+                    f"(text fallback mode)"
+                )
             
         else:
             # Fallback without LLM
@@ -385,3 +404,81 @@ def generate_execution_plan_phased(query: str, execution_phases: dict[str, list[
         estimated_tools=len(micro_tasks),
     )
 
+
+def generate_execution_plan_from_blueprint(query: str, blueprint: dict) -> ExecutionPlan:
+    """
+    Generate execution plan from JSON Blueprint (new format).
+    
+    Blueprint format:
+    {
+        "intent": "short description",
+        "blueprint": [
+            {"id": "s1", "phase": 1, "tool": "web_search", "args": {...}, "artifact": "key"},
+            ...
+        ]
+    }
+    """
+    import uuid
+    
+    micro_tasks = []
+    steps = blueprint.get("blueprint", [])
+    
+    # Group steps by phase for dependency calculation
+    phase_map: dict[int, list[str]] = {}  # phase_number -> [step_ids]
+    
+    for step in steps:
+        phase_num = step.get("phase", 1)
+        step_id = step.get("id", f"step_{len(micro_tasks) + 1}")
+        if phase_num not in phase_map:
+            phase_map[phase_num] = []
+        phase_map[phase_num].append(step_id)
+    
+    # Sort phases to build dependency chain
+    sorted_phases = sorted(phase_map.keys())
+    
+    for step in steps:
+        step_id = step.get("id", f"step_{len(micro_tasks) + 1}")
+        phase_num = step.get("phase", 1)
+        tool_name = step.get("tool", "execute_code")
+        args = step.get("args", {})
+        artifact_key = step.get("artifact")
+        
+        # Calculate dependencies: all steps from previous phase
+        depends_on = []
+        phase_idx = sorted_phases.index(phase_num)
+        if phase_idx > 0:
+            previous_phase = sorted_phases[phase_idx - 1]
+            depends_on = phase_map.get(previous_phase, [])
+        
+        # Build inputs from args
+        inputs = {}
+        for key, value in args.items():
+            inputs[key] = value
+        
+        # Add artifact reference if present
+        if artifact_key:
+            inputs["_artifact_key"] = artifact_key
+        
+        micro_task = MicroTask(
+            task_id=step_id,
+            description=f"{tool_name}: {args.get('query', args.get('code', str(args)[:100]))}",
+            tool=tool_name,
+            inputs=inputs,
+            depends_on=depends_on,
+            fallback_tools=["execute_code"] if tool_name != "execute_code" else [],
+            persist=True,
+            phase=str(phase_num),
+        )
+        
+        micro_tasks.append(micro_task)
+    
+    # Generate phase names from numbers
+    phase_names = [str(p) for p in sorted_phases]
+    
+    return ExecutionPlan(
+        plan_id=f"plan_{uuid.uuid4().hex[:8]}",
+        query=query,
+        micro_tasks=micro_tasks,
+        phases=phase_names,
+        estimated_tools=len(micro_tasks),
+    )

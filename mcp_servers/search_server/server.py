@@ -8,7 +8,7 @@ logger = structlog.get_logger()
 mcp = FastMCP("search_server")
 
 @mcp.tool()
-async def web_search_tool(query: str, max_results: int = 10, search_depth: str = "basic") -> str:
+async def web_search(query: str, max_results: int = 10, search_depth: str = "basic") -> str:
     """Search the web using Tavily or Brave Search.
     Args:
         query: Search query
@@ -18,7 +18,7 @@ async def web_search_tool(query: str, max_results: int = 10, search_depth: str =
     return await web_search.web_search_tool(query, max_results, search_depth)
 
 @mcp.tool()
-async def news_search_tool(query: str, days: int = 7, max_results: int = 10) -> str:
+async def news_search(query: str, days: int = 7, max_results: int = 10) -> str:
     """Search for news articles with date filtering.
     Args:
         query: Search query

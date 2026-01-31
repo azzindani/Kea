@@ -9,7 +9,7 @@ logger = structlog.get_logger()
 mcp = FastMCP("scraper_server")
 
 @mcp.tool()
-async def fetch_url_content(url: str, timeout: int = 30, headers: Dict[str, str] = {}) -> str:
+async def fetch_url(url: str, timeout: int = 30, headers: Dict[str, str] = {}) -> str:
     """Fetch URL content via HTTP GET request.
     Args:
         url: URL to fetch

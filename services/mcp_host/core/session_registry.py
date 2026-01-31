@@ -27,18 +27,19 @@ class ServerConfig:
     env: Dict[str, str]
 
 class SessionRegistry:
+    # Class-level cache for discovery (shared across all instances)
+    _shared_server_configs: Dict[str, ServerConfig] | None = None
+    _shared_tool_to_server: Dict[str, str] | None = None
+    _shared_discovered_tools: List[Tool] | None = None
+    _discovery_lock = None  # Will be created on first use
+    _discovery_done = False
+    
     def __init__(self):
-        # Active sessions (server_name -> client object)
+        # Active sessions (server_name -> client object) - per-instance
         self.active_sessions: Dict[str, MCPClient] = {}
         
-        # Keep track of processes to terminate them later
+        # Keep track of processes to terminate them later - per-instance
         self.active_processes: Dict[str, asyncio.subprocess.Process] = {}
-        
-        # Registry of discoverable servers (server_name -> config)
-        self.server_configs: Dict[str, ServerConfig] = {}
-        
-        # Tool to Server Map
-        self.tool_to_server: Dict[str, str] = {}
         
         # Postgres Backend (RAG)
         try:
@@ -48,9 +49,44 @@ class SessionRegistry:
             logger.warning(f"Feature degradation: Postgres Registry unavailable: {e}")
             self.pg_registry = None
         
-        # Discovery
-        self.discovered_tools: List[Tool] = []
-        self._discover_local_servers()
+        # Run discovery only once (class-level)
+        self._ensure_discovery()
+    
+    def _ensure_discovery(self):
+        """Ensure discovery runs only once across all instances."""
+        import threading
+        
+        if SessionRegistry._discovery_done:
+            return
+        
+        if SessionRegistry._discovery_lock is None:
+            SessionRegistry._discovery_lock = threading.Lock()
+        
+        with SessionRegistry._discovery_lock:
+            if SessionRegistry._discovery_done:
+                return
+            
+            # Initialize class-level storage
+            SessionRegistry._shared_server_configs = {}
+            SessionRegistry._shared_tool_to_server = {}
+            SessionRegistry._shared_discovered_tools = []
+            
+            # Run discovery
+            self._discover_local_servers()
+            
+            SessionRegistry._discovery_done = True
+    
+    @property
+    def server_configs(self) -> Dict[str, ServerConfig]:
+        return SessionRegistry._shared_server_configs or {}
+    
+    @property
+    def tool_to_server(self) -> Dict[str, str]:
+        return SessionRegistry._shared_tool_to_server or {}
+    
+    @property
+    def discovered_tools(self) -> List[Tool]:
+        return SessionRegistry._shared_discovered_tools or []
 
     async def register_discovered_tools(self):
         """
@@ -108,7 +144,7 @@ class SessionRegistry:
         env["KEA_SERVER_NAME"] = server_name
         env["PYTHONPATH"] = str(Path(__file__).resolve().parents[3]) # Add Kea root to pythonpath
         
-        self.server_configs[server_name] = ServerConfig(
+        SessionRegistry._shared_server_configs[server_name] = ServerConfig(
             name=server_name,
             script_path=script_path,
             env=env
@@ -139,7 +175,7 @@ class SessionRegistry:
                                 tool_name = keyword.value.value
                                 break
                         if tool_name:
-                            self.tool_to_server[tool_name] = server_name
+                            SessionRegistry._shared_tool_to_server[tool_name] = server_name
                             logger.debug(f"   🔍 Discovered tool '{tool_name}' in {server_name}")
 
                 # 2. FastMCP: @mcp.tool() decorators on functions
@@ -162,7 +198,7 @@ class SessionRegistry:
 
                     if is_tool:
                         tool_name = node.name
-                        self.tool_to_server[tool_name] = server_name
+                        SessionRegistry._shared_tool_to_server[tool_name] = server_name
                         logger.debug(f"   🔍 Discovered FastMCP tool '{tool_name}' in {server_name}")
                         
                         # Extract Docstring for RAG (use function name as fallback)
@@ -177,7 +213,7 @@ class SessionRegistry:
                             description=description,
                             inputSchema={}, # Empty schema is fine for RAG indexing
                         )
-                        self.discovered_tools.append(tool_obj)
+                        SessionRegistry._shared_discovered_tools.append(tool_obj)
 
         except Exception as e:
             logger.warning(f"Static scan failed for {server_name}: {e}")
