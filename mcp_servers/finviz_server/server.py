@@ -12,7 +12,7 @@ from tools import (
     screener, quote, groups, insider, global_markets, calendar_news,
     strategy, charts, financials, bulk_ta
 )
-import structlog
+from typing import List, Dict, Any, Optional
 
 logger = structlog.get_logger()
 
@@ -21,7 +21,7 @@ mcp = FastMCP("finviz_server", dependencies=["finvizfinance", "pandas"])
 
 # --- 1. SCREENER TOOLS ---
 @mcp.tool()
-async def screen_signal(signal: str, limit: int = 100000) -> str:
+async def screen_signal(signal: str, limit: int = 100000) -> Any:
     """
     SIGNAL: Get stocks matching a specific Finviz Signal.
     signal: 'top_gainers', 'new_highs', 'major_news', etc.
@@ -30,44 +30,29 @@ async def screen_signal(signal: str, limit: int = 100000) -> str:
 
 # Register Shortcuts for Popular Signals
 SIGNALS = screener.get_signal_map()
-# In FastMCP, we can't loop to create decorators dynamically easily at top level 
-# without some wrapper logic.
-# But we can define a generic 'screen_generic' above.
-# To maintain 50+ tool count parity with legacy, we might want manual shortcuts?
-# Or just rely on the 'screen_signal' tool which is cleaner.
-# "Tools matching 'nice_name'"...
-# Legacy server registered 'screen_top_gainers', 'screen_new_highs', etc.
-# If we want to preserve that UX, we need to create them.
-
-# Let's create a few high-value shortcuts manually, effectively.
-# Or just one 'screen_stocks_by_signal'.
-# The legacy approach of expanding 27+ separate tools is bloat.
-# Better: One Powerful Tool with Enum/Description?
-# FastMCP handles Enums well.
-# But for now, let's just stick to the generic one, OR replicate a few major ones.
 
 @mcp.tool()
-async def screen_top_gainers(limit: int = 100000) -> str:
+async def screen_top_gainers(limit: int = 100000) -> Any:
     """SIGNAL: Top Gainers."""
     return await screener.get_screener_signal(limit, "top_gainers")
 
 @mcp.tool()
-async def screen_top_losers(limit: int = 100000) -> str:
+async def screen_top_losers(limit: int = 100000) -> Any:
     """SIGNAL: Top Losers."""
     return await screener.get_screener_signal(limit, "top_losers")
 
 @mcp.tool()
-async def screen_new_highs(limit: int = 100000) -> str:
+async def screen_new_highs(limit: int = 100000) -> Any:
     """SIGNAL: New Highs."""
     return await screener.get_screener_signal(limit, "new_highs")
 
 @mcp.tool()
-async def screen_major_news(limit: int = 100000) -> str:
+async def screen_major_news(limit: int = 100000) -> Any:
     """SIGNAL: Major News."""
     return await screener.get_screener_signal(limit, "major_news")
 
 @mcp.tool()
-async def screen_insider_buying(limit: int = 100000) -> str:
+async def screen_insider_buying(limit: int = 100000) -> Any:
     """SIGNAL: Insider Buying."""
     return await screener.get_screener_signal(limit, "insider_buying")
 

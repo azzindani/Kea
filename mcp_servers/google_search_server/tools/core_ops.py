@@ -1,7 +1,7 @@
 from mcp_servers.google_search_server.search_client import GoogleSearchClient
 from typing import List, Any, Union, Dict
 
-async def search_google(query: str, num: int = 10, lang: str = "en", region: str = "us") -> List[Any]:
+async def search_google(query: str, num: int = 100, lang: str = "en", region: str = "us") -> List[Any]:
     """
     Standard Google Search.
     query: The search terms.
@@ -11,7 +11,7 @@ async def search_google(query: str, num: int = 10, lang: str = "en", region: str
     """
     return await GoogleSearchClient.search(query, num_results=num, lang=lang, region=region)
 
-async def search_basic(query: str, num: int = 10) -> List[str]:
+async def search_basic(query: str, num: int = 100) -> List[str]:
     """
     Simplified search returning ONLY URLs.
     """
@@ -19,13 +19,13 @@ async def search_basic(query: str, num: int = 10) -> List[str]:
     # Ensure list of strings
     return [str(r) for r in results]
 
-async def search_safe(query: str, num: int = 10) -> List[Any]:
+async def search_safe(query: str, num: int = 100) -> List[Any]:
     """
     Perform a SafeSearch-enabled query.
     """
     return await GoogleSearchClient.safe_search(query, num_results=num)
 
-async def search_images(query: str, num: int = 10) -> List[str]:
+async def search_images(query: str, num: int = 100) -> List[str]:
     """
     Mock Image search using 'intitle:image' or 'filetype:jpg' as google-search-python doesn't support images directly.
     A better way is to use specialized dorks.
@@ -36,7 +36,7 @@ async def search_images(query: str, num: int = 10) -> List[str]:
     results = await GoogleSearchClient.search(dork_query, num_results=num, advanced=False)
     return [str(r) for r in results]
 
-async def search_videos(query: str, num: int = 10) -> List[Any]:
+async def search_videos(query: str, num: int = 100) -> List[Any]:
     """
     Search specifically for video content (e.g. YouTube, Vimeo).
     """

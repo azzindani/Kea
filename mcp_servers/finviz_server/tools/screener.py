@@ -6,25 +6,26 @@ except ImportError:
     
 
 from shared.logging import get_logger
+from shared.mcp.protocol import ToolResult, JSONContent, TextContent
 import pandas as pd
 import json
 
 logger = get_logger(__name__)
 
 
-async def get_screener_signal(limit: int = 100000, signal: str = None) -> str:
+async def get_screener_signal(limit: int = 100000, signal: str = None) -> ToolResult:
     """
     Get generic screener signal.
     Args:
         signal (str): The specific signal key (e.g. "ta_topgainers")
-        limit (int): Number of results (default 30)
+        limit (int): Number of results (default 100000)
     """
     # signal = arguments.get("signal")
     # limit = arguments.get("limit", 30)
     
     try:
         if Overview is None:
-            return "finvizfinance not installed"
+            return ToolResult(content=[TextContent(text="finvizfinance not installed")])
 
         foverview = Overview()
         
@@ -42,7 +43,7 @@ async def get_screener_signal(limit: int = 100000, signal: str = None) -> str:
         df = foverview.screener_view()
         
         if df is None or df.empty:
-            return "No results found."
+            return ToolResult(content=[TextContent(text="No results found.")])
             
         # Simplify columns for LLM
         # Keep: Ticker, Company, Sector, Price, Change, Volume
@@ -52,11 +53,15 @@ async def get_screener_signal(limit: int = 100000, signal: str = None) -> str:
         
         df_lite = df[cols].head(limit)
         
-        return f"### Signal: {real_signal}\n\n{df_lite.to_markdown(index=False)}"
+        # Return Structured + Text
+        return ToolResult(content=[
+            TextContent(text=f"### Signal: {real_signal}\n\n{df_lite.to_markdown(index=False)}"),
+            JSONContent(data=df_lite.to_dict(orient="records"))
+        ])
         
     except Exception as e:
         logger.error(f"Screener error {signal}: {e}")
-        return f"Error: {str(e)}"
+        return ToolResult(isError=True, content=[TextContent(text=f"Error: {str(e)}")])
 
 
 # Map "Nice Name" to Finviz Signal Key

@@ -23,46 +23,46 @@ mcp = FastMCP("google_search_server", dependencies=["googlesearch-python", "beau
 # 0. Core Search
 # ==========================================
 @mcp.tool()
-async def search_google(query: str, num: int = 10, lang: str = "en", region: str = "us") -> List[Any]: 
+async def search_google(query: str, num: int = 100, lang: str = "en", region: str = "us") -> List[Any]: 
     return await core_ops.search_google(query, num, lang, region)
 
 @mcp.tool()
-async def search_basic(query: str, num: int = 10) -> List[str]: 
+async def search_basic(query: str, num: int = 100) -> List[str]: 
     return await core_ops.search_basic(query, num)
 
 @mcp.tool()
-async def search_safe(query: str, num: int = 10) -> List[Any]: 
+async def search_safe(query: str, num: int = 100) -> List[Any]: 
     return await core_ops.search_safe(query, num)
 
 @mcp.tool()
-async def search_images(query: str, num: int = 10) -> List[str]: 
+async def search_images(query: str, num: int = 100) -> List[str]: 
     return await core_ops.search_images(query, num)
 
 @mcp.tool()
-async def search_videos(query: str, num: int = 10) -> List[Any]: 
+async def search_videos(query: str, num: int = 100) -> List[Any]: 
     return await core_ops.search_videos(query, num)
 
 # ==========================================
 # 1. Params (Time/Region)
 # ==========================================
 @mcp.tool()
-async def search_past_hour(query: str, num: int = 10) -> List[Any]: return await param_ops.search_past_hour(query, num)
+async def search_past_hour(query: str, num: int = 100) -> List[Any]: return await param_ops.search_past_hour(query, num)
 @mcp.tool()
-async def search_past_day(query: str, num: int = 10) -> List[Any]: return await param_ops.search_past_day(query, num)
+async def search_past_day(query: str, num: int = 100) -> List[Any]: return await param_ops.search_past_day(query, num)
 @mcp.tool()
-async def search_past_week(query: str, num: int = 10) -> List[Any]: return await param_ops.search_past_week(query, num)
+async def search_past_week(query: str, num: int = 100) -> List[Any]: return await param_ops.search_past_week(query, num)
 @mcp.tool()
-async def search_past_month(query: str, num: int = 10) -> List[Any]: return await param_ops.search_past_month(query, num)
+async def search_past_month(query: str, num: int = 100) -> List[Any]: return await param_ops.search_past_month(query, num)
 @mcp.tool()
-async def search_past_year(query: str, num: int = 10) -> List[Any]: return await param_ops.search_past_year(query, num)
+async def search_past_year(query: str, num: int = 100) -> List[Any]: return await param_ops.search_past_year(query, num)
 @mcp.tool()
-async def search_region(query: str, region: str, num: int = 10) -> List[Any]: return await param_ops.search_region(query, region, num)
+async def search_region(query: str, region: str, num: int = 100) -> List[Any]: return await param_ops.search_region(query, region, num)
 @mcp.tool()
-async def search_us(query: str, num: int = 10) -> List[Any]: return await param_ops.search_us(query, num)
+async def search_us(query: str, num: int = 100) -> List[Any]: return await param_ops.search_us(query, num)
 @mcp.tool()
-async def search_uk(query: str, num: int = 10) -> List[Any]: return await param_ops.search_uk(query, num)
+async def search_uk(query: str, num: int = 100) -> List[Any]: return await param_ops.search_uk(query, num)
 @mcp.tool()
-async def search_language(query: str, lang: str, num: int = 10) -> List[Any]: return await param_ops.search_language(query, lang, num)
+async def search_language(query: str, lang: str, num: int = 100) -> List[Any]: return await param_ops.search_language(query, lang, num)
 
 # ==========================================
 # 2. Dorks: Filetypes

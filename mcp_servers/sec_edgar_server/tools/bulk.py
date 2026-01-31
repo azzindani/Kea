@@ -16,7 +16,7 @@ async def download_bulk_filings(arguments: dict) -> ToolResult:
     try:
         tickers = arguments.get("tickers", [])
         f_type = arguments.get("filing_type", "10-K")
-        amount = arguments.get("amount", 1)
+        amount = arguments.get("amount", 100)
         after = arguments.get("after_date")
         before = arguments.get("before_date")
         
@@ -49,7 +49,7 @@ async def download_filing_suite(arguments: dict) -> ToolResult:
     """
     try:
         ticker = arguments['ticker']
-        amount = arguments.get('amount', 1)
+        amount = arguments.get('amount', 100)
         
         dl = SecCore.get_downloader()
         

@@ -120,9 +120,15 @@ class BinaryContent(BaseModel):
     size_bytes: int = 0
 
 
+class JSONContent(BaseModel):
+    """Structured JSON content in tool result - for machine chaining."""
+    type: str = "json"
+    data: dict[str, Any] | list[Any]
+
+
 class ToolResult(BaseModel):
     """Result from tool execution."""
-    content: list[TextContent | ImageContent | FileContent | BinaryContent]
+    content: list[TextContent | ImageContent | FileContent | BinaryContent | JSONContent]
     isError: bool = False
 
 
