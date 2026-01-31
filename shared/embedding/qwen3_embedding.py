@@ -177,37 +177,30 @@ class LocalEmbedding(EmbeddingProvider):
                 if self.device == "cuda":
                     self.device = "cuda:0"
                 
+                # Load tokenizer (matches working test code)
                 self._tokenizer = AutoTokenizer.from_pretrained(
                     self.model_name,
                     padding_side='left',  # Required for Qwen3 embedding
-                    trust_remote_code=True,
                 )
                 
-                model_kwargs = {}
+                # Load model - keep it SIMPLE like the user's working test code
+                # Don't add extra parameters that cause meta tensor issues
                 if self.use_flash_attention:
-                    model_kwargs["attn_implementation"] = "flash_attention_2"
-                    model_kwargs["torch_dtype"] = torch.float16
-                
-                # Force CPU load first to avoid meta tensor issues
-                self._model = AutoModel.from_pretrained(
-                    self.model_name,
-                    trust_remote_code=True,
-                    device_map=None,  # Disable auto device mapping
-                    low_cpu_mem_usage=False,  # Disable meta tensor loading
-                    **model_kwargs,
-                )
-                
-                # Materialize fully on CPU before moving to GPU
-                self._model = self._model.to("cpu")
-                
-                # Move to target device
-                if self.device.startswith("cuda"):
-                    self._model = self._model.to(self.device)
-                    if not self.use_flash_attention:
-                        self._model = self._model.half()  # Convert to fp16 on GPU
+                    self._model = AutoModel.from_pretrained(
+                        self.model_name,
+                        attn_implementation="flash_attention_2",
+                        torch_dtype=torch.float16,
+                    ).cuda()
+                else:
+                    # Simple load - exactly like user's working code
+                    self._model = AutoModel.from_pretrained(self.model_name)
+                    
+                    # Move to GPU if requested
+                    if self.device.startswith("cuda"):
+                        self._model = self._model.to(self.device)
                 
                 self._model.eval()  # Set to eval mode
-                logger.info(f"Loaded {self.model_name} on {self.device}")
+                logger.info(f"Loaded {self.model_name} on {self._model.device}")
         
         return self._model, self._tokenizer
     
