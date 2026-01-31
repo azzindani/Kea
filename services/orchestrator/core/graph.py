@@ -33,6 +33,9 @@ from services.orchestrator.agents.code_generator import generate_fallback_code, 
 # Data pool for bucket pattern (massive data collection)
 from shared.data_pool import get_data_pool
 
+# Node Assembly Engine for n8n-style node wiring
+from services.orchestrator.core.assembler import ArtifactStore, NodeAssembler, create_assembler
+
 
 
 logger = get_logger(__name__)
@@ -215,6 +218,10 @@ async def researcher_node(state: GraphState) -> GraphState:
     if iteration == 1:
         reset_context_pool()
     
+    # Initialize Node Assembly Engine for artifact-based data flow
+    ctx = get_context_pool()
+    assembler = create_assembler(ctx)
+    
     # If no execution plan, fall back to sub-queries with web_search
     if not micro_tasks:
         logger.info("No execution plan, falling back to sub-query based web search")
@@ -337,6 +344,18 @@ async def researcher_node(state: GraphState) -> GraphState:
             for i, phase_tasks in enumerate(phases, 1):
                 logger.info(f"\n🌊 STARTING PHASE {i}/{len(phases)} ({len(phase_tasks)} tasks) 🌊")
                 
+                # Resolve inputs for this phase using artifacts from previous phases
+                for t in phase_tasks:
+                    input_mapping = t.get("input_mapping", {})
+                    if input_mapping:
+                        resolved = assembler.resolve_task_inputs(type('Task', (), t)())  # Quick wrapper
+                        # Merge resolved inputs into task inputs
+                        if resolved:
+                            current_inputs = t.get("inputs", {})
+                            current_inputs.update(resolved)
+                            t["inputs"] = current_inputs
+                            logger.info(f"🔗 Resolved inputs for {t.get('task_id')}: {list(resolved.keys())}")
+                
                 subtasks = []
                 for t in phase_tasks:
                     subtasks.append(SubTask(
@@ -410,6 +429,14 @@ async def researcher_node(state: GraphState) -> GraphState:
                                 source=f"task_{res.subtask_id}",
                                 task_id=res.subtask_id
                             )
+                            
+                            # 3. Store artifact via Node Assembly Engine
+                            # Find the original task to get output_artifact
+                            original_task = next((t for t in phase_tasks if t.get("task_id") == res.subtask_id), None)
+                            if original_task:
+                                output_artifact = original_task.get("output_artifact")
+                                if output_artifact:
+                                    assembler.store.store(res.subtask_id, output_artifact, str(res.result))
                             
                         except Exception as e:
                             logger.warning(f"Failed to update context pool: {e}")

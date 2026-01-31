@@ -32,6 +32,10 @@ class MicroTask(BaseModel):
     persist: bool = True  # Always persist by default (high threshold policy)
     phase: str = "research"  # Execution phase for parallel batching
     
+    # Node Assembly Engine fields
+    input_mapping: dict[str, str] = Field(default_factory=dict)  # {"csv_path": "{{step_id.artifacts.key}}"}
+    output_artifact: str | None = None  # Artifact key this task produces
+    
     
 class ExecutionPlan(BaseModel):
     """Full execution plan for a research query."""
@@ -54,6 +58,86 @@ def route_to_tool(task_description: str) -> tuple[str, list[str]]:
     Delegates to dynamic loader.
     """
     return route_to_tool_dynamic(task_description)
+
+
+def _extract_template_variables(query: str, expected_vars: list[str]) -> dict[str, str]:
+    """
+    Extract variable values from query for template expansion.
+    
+    Uses pattern matching to find common variable types:
+    - ticker: Stock symbols like BBCA.JK, NVDA, AAPL
+    - company: Company names
+    - period: Time periods like 1y, 6mo, 3mo
+    
+    Args:
+        query: User's research query
+        expected_vars: List of variable names the template expects
+        
+    Returns:
+        Dict of variable name -> extracted value
+    """
+    import re
+    
+    variables = {}
+    query_upper = query.upper()
+    
+    for var in expected_vars:
+        if var.lower() == "ticker":
+            # Look for stock ticker patterns (e.g., BBCA.JK, NVDA, AAPL)
+            ticker_match = re.search(r'\b([A-Z]{1,5}(?:\.[A-Z]{1,3})?)\b', query_upper)
+            if ticker_match:
+                variables[var] = ticker_match.group(1)
+            else:
+                # Default to first word as ticker
+                words = query.split()
+                variables[var] = words[0].upper() if words else "AAPL"
+                
+        elif var.lower() == "company":
+            # Use first few words as company name
+            words = query.split()[:3]
+            variables[var] = " ".join(words)
+            
+        elif var.lower() == "period":
+            # Look for period patterns (1y, 6mo, 3mo, 1d, etc.)
+            period_match = re.search(r'\b(\d+(?:y|mo|d|w))\b', query.lower())
+            if period_match:
+                variables[var] = period_match.group(1)
+            else:
+                variables[var] = "1y"  # Default
+                
+        elif var.lower() in ("source_url", "url"):
+            # Look for URL patterns
+            url_match = re.search(r'https?://[^\s]+', query)
+            if url_match:
+                variables[var] = url_match.group(0)
+            else:
+                variables[var] = query  # Use query as source
+                
+        elif var.lower() in ("output_format", "format"):
+            # Look for format mentions
+            if "json" in query.lower():
+                variables[var] = "json"
+            elif "csv" in query.lower():
+                variables[var] = "csv"
+            elif "markdown" in query.lower() or "md" in query.lower():
+                variables[var] = "markdown"
+            else:
+                variables[var] = "json"  # Default
+                
+        elif var.lower() == "document_type":
+            # Legal document types
+            for doc_type in ["10-K", "10-Q", "8-K", "contract", "agreement", "filing"]:
+                if doc_type.lower() in query.lower():
+                    variables[var] = doc_type
+                    break
+            else:
+                variables[var] = "filing"
+                
+        else:
+            # Generic: use query as the variable value
+            variables[var] = query
+            
+    return variables
 
 
 # ============================================================================
@@ -123,6 +207,53 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
                 max_tokens=32768,  # Maximum for task generation
             )
             
+            # ============================================================
+            # TEMPLATE-FIRST PLANNING (Node Assembly Engine)
+            # ============================================================
+            # Check for matching templates before calling LLM
+            # This reduces hallucination for common workflows
+            template_used = False
+            try:
+                from services.orchestrator.templates.loader import get_template_loader
+                loader = get_template_loader()
+                
+                matched_template = loader.match(query)
+                if matched_template:
+                    template = loader.load(matched_template)
+                    if template:
+                        logger.info(f"🎯 Using template: {matched_template}")
+                        
+                        # Extract variables from query
+                        variables = _extract_template_variables(query, template.get("variables", []))
+                        
+                        # Expand template into tasks
+                        expanded_tasks = loader.expand(template, variables)
+                        
+                        # Generate execution plan from expanded template
+                        execution_plan = generate_execution_plan_from_blueprint(
+                            query, 
+                            {"blueprint": expanded_tasks}
+                        )
+                        
+                        state["sub_queries"] = [query]
+                        state["hypotheses"] = []
+                        state["execution_plan"] = execution_plan.model_dump()
+                        state["status"] = "planning_complete"
+                        state["template_used"] = matched_template
+                        
+                        logger.info(
+                            f"Planner: Generated {len(execution_plan.micro_tasks)} tasks "
+                            f"from template: {matched_template}"
+                        )
+                        template_used = True
+                        
+            except Exception as e:
+                logger.warning(f"Template matching failed: {e}. Falling back to LLM.")
+            
+            # If template was used, skip LLM planning
+            if template_used:
+                return state
+            
             # Discover relevant tools (INTELLIGENCE INJECTION - RAG)
             try:
                 from services.mcp_host.core.session_registry import get_session_registry
@@ -190,7 +321,7 @@ CRITICAL RULES:
 1. OUTPUT ONLY JSON. No prose, no explanations, no "I will now..."
 2. Use exact tool names from the list above. If no tool fits, use "execute_code".
 3. Tasks with same "phase" run in parallel. Higher phase waits for lower phases.
-4. Use artifact keys to pass data between steps: "{{{{step_id.artifact_key}}}}"
+4. Use "artifact" to declare output keys, "input_mapping" to consume outputs from other steps.
 
 OUTPUT SCHEMA:
 {{{{
@@ -199,15 +330,17 @@ OUTPUT SCHEMA:
     {{{{
       "id": "step_1",
       "phase": 1,
-      "tool": "web_search",
-      "args": {{{{"query": "..."}}}},
-      "artifact": "search_results"
+      "tool": "yfinance_server.get_bulk_historical_data",
+      "args": {{{{"tickers": "BBCA.JK", "period": "1y"}}}},
+      "artifact": "prices_csv"
     }}}},
     {{{{
       "id": "step_2", 
       "phase": 2,
-      "tool": "execute_code",
-      "args": {{{{"code": "import pandas as pd\\n..."}}}}
+      "tool": "pandas_ta_server.calculate_indicators",
+      "args": {{{{"indicators": ["rsi", "macd"]}}}},
+      "input_mapping": {{{{"csv_path": "{{{{step_1.artifacts.prices_csv}}}}\"}}}},
+      "artifact": "indicators"
     }}}}
   ]
 }}}}
@@ -216,9 +349,9 @@ EXAMPLE for "Compare NVDA vs AMD financials":
 {{{{
   "intent": "Compare NVDA AMD financial metrics",
   "blueprint": [
-    {{{{"id": "s1", "phase": 1, "tool": "execute_code", "args": {{{{"code": "import yfinance as yf; nvda = yf.Ticker('NVDA').quarterly_financials; print(nvda.to_json())"}}}},"artifact": "nvda_data"}}}},
-    {{{{"id": "s2", "phase": 1, "tool": "execute_code", "args": {{{{"code": "import yfinance as yf; amd = yf.Ticker('AMD').quarterly_financials; print(amd.to_json())"}}}},"artifact": "amd_data"}}}},
-    {{{{"id": "s3", "phase": 2, "tool": "execute_code", "args": {{{{"code": "# Calculate margins from {{{{s1.nvda_data}}}} and {{{{s2.amd_data}}}}"}}}},"artifact": "comparison"}}}}
+    {{{{"id": "s1", "phase": 1, "tool": "yfinance_server.get_income_statement_quarterly", "args": {{{{"ticker": "NVDA"}}}}, "artifact": "nvda_income"}}}},
+    {{{{"id": "s2", "phase": 1, "tool": "yfinance_server.get_income_statement_quarterly", "args": {{{{"ticker": "AMD"}}}}, "artifact": "amd_income"}}}},
+    {{{{"id": "s3", "phase": 2, "tool": "execute_code", "args": {{{{"code": "# Compare margins"}}}}, "input_mapping": {{{{"nvda": "{{{{s1.artifacts.nvda_income}}}}\", "amd": "{{{{s2.artifacts.amd_income}}}}\"}}}}, "artifact": "comparison"}}}}
   ]
 }}}}"""
                 ),
@@ -455,9 +588,8 @@ def generate_execution_plan_from_blueprint(query: str, blueprint: dict) -> Execu
         for key, value in args.items():
             inputs[key] = value
         
-        # Add artifact reference if present
-        if artifact_key:
-            inputs["_artifact_key"] = artifact_key
+        # Parse input_mapping from blueprint (Node Assembly Engine)
+        input_mapping = step.get("input_mapping", {})
         
         micro_task = MicroTask(
             task_id=step_id,
@@ -468,6 +600,8 @@ def generate_execution_plan_from_blueprint(query: str, blueprint: dict) -> Execu
             fallback_tools=["execute_code"] if tool_name != "execute_code" else [],
             persist=True,
             phase=str(phase_num),
+            input_mapping=input_mapping,
+            output_artifact=artifact_key,
         )
         
         micro_tasks.append(micro_task)

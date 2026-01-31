@@ -126,6 +126,16 @@ class ToolResult(BaseModel):
     isError: bool = False
 
 
+class NodeOutput(BaseModel):
+    """Standardized output from any pipeline node.
+    
+    Used by NodeAssembler for artifact-based data flow between nodes.
+    """
+    artifacts: dict[str, Any] = Field(default_factory=dict)  # {"prices_csv": "/vault/data.csv"}
+    metadata: dict[str, Any] = Field(default_factory=dict)   # {"rows": 1000, "columns": [...]}
+    status: str = "success"  # success | partial | failed
+    error: str | None = None
+
 
 # ============================================================================
 # MCP Initialization
