@@ -291,8 +291,9 @@ class SessionRegistry:
                     # "uv run python server.py"
                     cmd = [uv_path, "run", "python", config.script_path.name]
                 else:
-                    # Legacy/Global Mode
-                    cmd = [uv_path, "run", "python", str(config.script_path)]
+                    # Legacy/Global Mode -> Script Mode (PEP 723)
+                    # Use "uv run script.py" so uv parses the metadata dependencies
+                    cmd = [uv_path, "run", str(config.script_path)]
             else:
                 # Fallback to current interpreter
                 cmd = [sys.executable, str(config.script_path)]
