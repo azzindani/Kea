@@ -16,6 +16,16 @@ from typing import Any
 
 from shared.logging import get_logger
 
+# Pre-import transformers to avoid threading issues in Colab/Kaggle
+# These imports happen at module load time, before any threads spawn
+try:
+    from transformers import AutoTokenizer, AutoModel
+    _TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    _TRANSFORMERS_AVAILABLE = False
+    AutoTokenizer = None
+    AutoModel = None
+
 
 logger = get_logger(__name__)
 
@@ -150,7 +160,9 @@ class LocalEmbedding(EmbeddingProvider):
         if self._model is None:
             import threading
             import torch
-            from transformers import AutoTokenizer, AutoModel
+            
+            if not _TRANSFORMERS_AVAILABLE:
+                raise ImportError("transformers library is required for local embedding")
             
             # Thread-safe model loading
             if not hasattr(self, '_load_lock'):
@@ -171,9 +183,7 @@ class LocalEmbedding(EmbeddingProvider):
                     trust_remote_code=True,
                 )
                 
-                model_kwargs = {
-                    "torch_dtype": torch.float32,  # Load in float32 first, then convert
-                }
+                model_kwargs = {}
                 if self.use_flash_attention:
                     model_kwargs["attn_implementation"] = "flash_attention_2"
                     model_kwargs["torch_dtype"] = torch.float16
