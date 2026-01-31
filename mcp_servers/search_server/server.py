@@ -1,3 +1,10 @@
+# /// script
+# dependencies = [
+#   "mcp",
+#   "structlog",
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.search_server.tools import web_search, news_search
 import structlog

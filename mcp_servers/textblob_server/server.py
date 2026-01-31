@@ -1,3 +1,13 @@
+# /// script
+# dependencies = [
+#   "mcp",
+#   "nltk",
+#   "pandas",
+#   "structlog",
+#   "textblob",
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.textblob_server.tools import (
     core_ops, blob_ops, lang_ops, word_ops, 

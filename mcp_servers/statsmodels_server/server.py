@@ -1,3 +1,14 @@
+# /// script
+# dependencies = [
+#   "mcp",
+#   "numpy",
+#   "pandas",
+#   "scipy",
+#   "statsmodels",
+#   "structlog",
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.statsmodels_server.tools import (
     regression_ops, tsa_ops, discrete_ops, multivar_ops, 

@@ -1,3 +1,12 @@
+# /// script
+# dependencies = [
+#   "mcp",
+#   "pandas",
+#   "pandas_ta",
+#   "structlog",
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.pandas_ta_server.tools import (
     bulk, universal, signals, performance, cycles, backtest, alpha, ml, spectral,

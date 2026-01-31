@@ -1,3 +1,13 @@
+# /// script
+# dependencies = [
+#   "mcp",
+#   "numpy",
+#   "pandas",
+#   "rapidfuzz",
+#   "structlog",
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.rapidfuzz_server.tools import core_ops, ratio_ops, distance_ops, process_ops, matrix_ops, super_ops
 import structlog

@@ -1,3 +1,15 @@
+# /// script
+# dependencies = [
+#   "mcp",
+#   "yfinance",
+#   "pandas",
+#   "numpy",
+#   "matplotlib",
+#   "scipy",
+#   "structlog"
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP, Image
 from mcp_servers.yfinance_server.tools import (
     charts, market, financials, holders, analysis, options, discovery, aggregators

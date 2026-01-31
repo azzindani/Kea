@@ -1,3 +1,12 @@
+# /// script
+# dependencies = [
+#   "mcp",
+#   "pandas",
+#   "structlog",
+#   "wbgapi",
+# ]
+# ///
+
 
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.wbgapi_server.tools import (

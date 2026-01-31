@@ -1,3 +1,16 @@
+# /// script
+# dependencies = [
+#   "joblib",
+#   "mcp",
+#   "numpy",
+#   "pandas",
+#   "scikit-learn",
+#   "scipy",
+#   "structlog",
+#   "xgboost",
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.xgboost_server.tools import (
     sklearn_ops, native_ops, booster_ops, analysis_ops, super_ops

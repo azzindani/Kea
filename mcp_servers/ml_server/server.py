@@ -1,3 +1,13 @@
+# /// script
+# dependencies = [
+#   "mcp",
+#   "numpy",
+#   "pandas",
+#   "scikit-learn",
+#   "structlog",
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.ml_server.tools import (
     automl, importance, clustering, anomaly, forecast

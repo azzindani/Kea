@@ -1,3 +1,11 @@
+# /// script
+# dependencies = [
+#   "mcp",
+#   "pandas",
+#   "structlog",
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.shutil_server.tools import (
     core_ops, file_ops, dir_ops, archive_ops, bulk_ops, super_ops

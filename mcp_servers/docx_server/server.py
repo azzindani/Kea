@@ -1,3 +1,13 @@
+# /// script
+# dependencies = [
+#   "mcp",
+#   "pandas",
+#   "pillow",
+#   "python-docx",
+#   "structlog",
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.docx_server.tools import (
     core_ops, text_ops, structure_ops, table_ops, 

@@ -1,3 +1,11 @@
+# /// script
+# dependencies = [
+#   "httpx",
+#   "mcp",
+#   "structlog",
+# ]
+# ///
+
 
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.security_server.tools import security_ops

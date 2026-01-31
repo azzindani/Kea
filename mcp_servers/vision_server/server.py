@@ -1,3 +1,11 @@
+# /// script
+# dependencies = [
+#   "httpx",
+#   "mcp",
+#   "structlog",
+# ]
+# ///
+
 
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.vision_server.tools import ocr

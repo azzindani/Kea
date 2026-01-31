@@ -1,3 +1,13 @@
+# /// script
+# dependencies = [
+#   "matplotlib",
+#   "mcp",
+#   "pandas",
+#   "spacy",
+#   "structlog",
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.spacy_server.tools import (
     core_ops, text_ops, structure_ops, entity_ops, 

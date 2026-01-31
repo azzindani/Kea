@@ -1,3 +1,13 @@
+# /// script
+# dependencies = [
+#   "mcp",
+#   "pandas",
+#   "pdfplumber",
+#   "pillow",
+#   "structlog",
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.pdfplumber_server.tools import (
     core_ops, text_ops, metadata_ops, table_ops, visual_ops, 

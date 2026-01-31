@@ -1,3 +1,13 @@
+# /// script
+# dependencies = [
+#   "duckdb",
+#   "mcp",
+#   "pandas",
+#   "pyarrow",
+#   "structlog",
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.duckdb_server.tools import (
     core_ops, query_ops, schema_ops, io_ops, analysis_ops, super_ops,

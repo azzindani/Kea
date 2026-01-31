@@ -1,3 +1,12 @@
+# /// script
+# dependencies = [
+#   "mcp",
+#   "numpy",
+#   "pandas",
+#   "structlog",
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.numpy_server.tools import (
     creation_ops, manip_ops, math_ops, logic_ops, 

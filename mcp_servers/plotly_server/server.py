@@ -1,3 +1,15 @@
+# /// script
+# dependencies = [
+#   "kaleido",
+#   "mcp",
+#   "numpy",
+#   "pandas",
+#   "plotly",
+#   "scipy",
+#   "structlog",
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.plotly_server.tools import (
     basic_ops, distribution_ops, finance_ops, 

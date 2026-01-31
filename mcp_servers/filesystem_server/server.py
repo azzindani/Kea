@@ -1,3 +1,11 @@
+# /// script
+# dependencies = [
+#   "asyncpg",
+#   "mcp",
+#   "structlog",
+# ]
+# ///
+
 
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.filesystem_server.tools import fs_ops

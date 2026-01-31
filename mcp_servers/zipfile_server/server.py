@@ -1,3 +1,11 @@
+# /// script
+# dependencies = [
+#   "mcp",
+#   "pandas",
+#   "structlog",
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.zipfile_server.tools import (
     core_ops, read_ops, extract_ops, write_ops, bulk_ops, super_ops

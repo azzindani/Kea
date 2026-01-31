@@ -1,3 +1,11 @@
+# /// script
+# dependencies = [
+#   "mcp",
+#   "duckduckgo-search",
+#   "structlog"
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.ddg_search_server.tools import (
     text_ops, media_ops, news_ops, map_ops, ai_ops, bulk_ops

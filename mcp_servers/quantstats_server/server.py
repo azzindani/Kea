@@ -1,3 +1,15 @@
+# /// script
+# dependencies = [
+#   "matplotlib",
+#   "mcp",
+#   "pandas",
+#   "quantstats",
+#   "seaborn",
+#   "structlog",
+#   "yfinance",
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.quantstats_server.tools import (
     core_ops, stats_ops, risk_ops, compare_ops, 

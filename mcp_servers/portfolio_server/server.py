@@ -1,3 +1,15 @@
+# /// script
+# dependencies = [
+#   "matplotlib",
+#   "mcp",
+#   "numpy",
+#   "pandas",
+#   "pyportfolioopt",
+#   "scipy",
+#   "structlog",
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.portfolio_server.tools import (
     core_ops, returns_ops, risk_ops, frontier_ops, 

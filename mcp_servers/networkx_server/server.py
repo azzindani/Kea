@@ -1,3 +1,14 @@
+# /// script
+# dependencies = [
+#   "mcp",
+#   "networkx",
+#   "numpy",
+#   "pandas",
+#   "scipy",
+#   "structlog",
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.networkx_server.tools import (
     basic_ops, gen_ops, path_ops, centrality_ops, 

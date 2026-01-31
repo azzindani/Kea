@@ -1,3 +1,10 @@
+# /// script
+# dependencies = [
+#   "mcp",
+#   "structlog",
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.academic_server.tools import pubmed_ops, arxiv_ops, scholar_ops
 import structlog

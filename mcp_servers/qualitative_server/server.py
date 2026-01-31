@@ -1,3 +1,10 @@
+# /// script
+# dependencies = [
+#   "mcp",
+#   "structlog",
+# ]
+# ///
+
 
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.qualitative_server.tools import coding, entities, graph

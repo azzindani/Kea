@@ -1,3 +1,15 @@
+# /// script
+# dependencies = [
+#   "bs4",
+#   "httpx",
+#   "mcp",
+#   "pandas",
+#   "pymupdf",
+#   "python-docx",
+#   "structlog",
+# ]
+# ///
+
 
 from __future__ import annotations
 from mcp.server.fastmcp import FastMCP

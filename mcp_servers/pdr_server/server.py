@@ -1,3 +1,11 @@
+# /// script
+# dependencies = [
+#   "mcp",
+#   "pandas",
+#   "pandas_datareader",
+# ]
+# ///
+
 
 from __future__ import annotations
 import asyncio

@@ -1,3 +1,11 @@
+# /// script
+# dependencies = [
+#   "mcp",
+#   "newspaper3k",
+#   "structlog",
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.newspaper_server.tools import (
     article_single, source_discovery, bulk_processor, nlp_trends

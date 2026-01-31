@@ -1,3 +1,14 @@
+# /// script
+# dependencies = [
+#   "mcp",
+#   "opencv-python",
+#   "pandas",
+#   "pillow",
+#   "pytesseract",
+#   "structlog",
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.tesseract_server.tools import (
     core_ops, text_ops, config_ops, box_ops, data_ops, format_ops,

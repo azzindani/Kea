@@ -1,3 +1,10 @@
+# /// script
+# dependencies = [
+#   "mcp",
+#   "structlog",
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.html5lib_server.tools import (
     core_ops, parse_ops, walk_ops, serialize_ops, filter_ops, bulk_ops, super_ops

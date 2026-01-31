@@ -1,3 +1,12 @@
+# /// script
+# dependencies = [
+#   "finta",
+#   "mcp",
+#   "pandas",
+#   "structlog",
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.finta_server.tools import (
     bulk, universal, momentum, trend, volatility, volume, 

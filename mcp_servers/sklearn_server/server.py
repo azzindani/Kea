@@ -1,3 +1,16 @@
+# /// script
+# dependencies = [
+#   "joblib",
+#   "mcp",
+#   "numpy",
+#   "pandas",
+#   "scikit-learn",
+#   "scipy",
+#   "structlog",
+#   "threadpoolctl",
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.sklearn_server.tools import (
     preprocess_ops, model_selection_ops, classification_ops, 

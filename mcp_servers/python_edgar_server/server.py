@@ -1,3 +1,12 @@
+# /// script
+# dependencies = [
+#   "edgartools",
+#   "mcp",
+#   "pandas",
+#   "structlog",
+# ]
+# ///
+
 
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.python_edgar_server.tools import (

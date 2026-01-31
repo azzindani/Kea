@@ -1,3 +1,10 @@
+# /// script
+# dependencies = [
+#   "mcp",
+#   "structlog",
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.pandas_server.tools import (
     io_ops, inspection_ops, core_ops, transform_ops, chain_ops, 

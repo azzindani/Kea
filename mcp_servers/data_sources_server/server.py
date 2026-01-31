@@ -1,3 +1,14 @@
+# /// script
+# dependencies = [
+#   "fredapi",
+#   "mcp",
+#   "pandas",
+#   "structlog",
+#   "wbgapi",
+#   "yfinance",
+# ]
+# ///
+
 
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.data_sources_server.tools import fetchers

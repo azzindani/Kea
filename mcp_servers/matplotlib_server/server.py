@@ -1,3 +1,16 @@
+# /// script
+# dependencies = [
+#   "matplotlib",
+#   "mcp",
+#   "numpy",
+#   "pandas",
+#   "pillow",
+#   "scipy",
+#   "seaborn",
+#   "structlog",
+# ]
+# ///
+
 from mcp.server.fastmcp import FastMCP
 from mcp_servers.matplotlib_server.tools import (
     basic_ops, stats_ops, scientific_ops, three_d_ops, 
