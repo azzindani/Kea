@@ -6,7 +6,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.browser_agent_server.tools import browser_ops, validation_ops, memory_ops
+from tools import browser_ops, validation_ops, memory_ops
 import structlog
 from typing import List, Optional
 

@@ -9,7 +9,7 @@
 
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.python_edgar_server.tools import (
+from tools import (
     discovery, content, financials, ownership, 
     sections_deep, bulk_analysis, xbrl_deep, funds
 )

@@ -8,7 +8,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.yahooquery_server.tools import (
+from tools import (
     ticker, screener, analysis, market_intelligence, funds_and_discovery
 )
 import structlog

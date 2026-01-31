@@ -9,7 +9,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.pdfplumber_server.tools import (
+from tools import (
     core_ops, text_ops, metadata_ops, table_ops, visual_ops, 
     page_ops, bulk_ops, filter_ops, super_ops
 )

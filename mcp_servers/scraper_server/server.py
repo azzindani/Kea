@@ -6,7 +6,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.scraper_server.tools import fetch_url, browser_scrape
+from tools import fetch_url, browser_scrape
 import structlog
 from typing import Optional, Dict
 

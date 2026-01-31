@@ -12,7 +12,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.sklearn_server.tools import (
+from tools import (
     preprocess_ops, model_selection_ops, classification_ops, 
     regression_ops, clustering_ops, decomposition_ops, 
     ensemble_ops, super_ops, feature_selection_ops,

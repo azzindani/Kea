@@ -9,7 +9,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.docx_server.tools import (
+from tools import (
     core_ops, text_ops, structure_ops, table_ops, 
     media_ops, style_ops, bulk_ops, super_ops
 )

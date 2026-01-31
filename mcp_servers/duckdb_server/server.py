@@ -9,7 +9,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.duckdb_server.tools import (
+from tools import (
     core_ops, query_ops, schema_ops, io_ops, analysis_ops, super_ops,
     spatial_ops, text_ops, time_ops, infra_ops
 )

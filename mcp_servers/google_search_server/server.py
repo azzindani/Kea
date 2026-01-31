@@ -8,7 +8,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.google_search_server.tools import (
+from tools import (
     core_ops, param_ops, dork_ops, intel_ops, news_ops
 )
 import structlog

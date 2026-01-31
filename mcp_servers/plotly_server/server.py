@@ -11,7 +11,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.plotly_server.tools import (
+from tools import (
     basic_ops, distribution_ops, finance_ops, 
     map_ops, hierarchical_ops, three_d_ops, super_ops,
     animation_ops, parallel_ops, network_ops, polar_ops

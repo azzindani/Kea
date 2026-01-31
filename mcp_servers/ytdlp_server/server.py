@@ -8,7 +8,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.ytdlp_server.tools import (
+from tools import (
     core_ops, info_ops, format_ops, download_ops, bulk_ops, super_ops
 )
 import structlog

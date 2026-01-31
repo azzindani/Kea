@@ -7,7 +7,7 @@
 
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.python_server.tools import execute_code, dataframe_ops, sql_query
+from tools import execute_code, dataframe_ops, sql_query
 import structlog
 import asyncio
 from typing import Dict, Any, List, Optional

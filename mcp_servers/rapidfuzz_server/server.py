@@ -9,7 +9,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.rapidfuzz_server.tools import core_ops, ratio_ops, distance_ops, process_ops, matrix_ops, super_ops
+from tools import core_ops, ratio_ops, distance_ops, process_ops, matrix_ops, super_ops
 import structlog
 from typing import List, Dict, Any, Optional, Tuple, Union
 

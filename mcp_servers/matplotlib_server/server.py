@@ -12,7 +12,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.matplotlib_server.tools import (
+from tools import (
     basic_ops, stats_ops, scientific_ops, three_d_ops, 
     specialty_ops, layout_ops, animation_ops, patch_ops, 
     advanced_ops, super_ops

@@ -8,7 +8,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.finta_server.tools import (
+from tools import (
     bulk, universal, momentum, trend, volatility, volume, 
     exotics, levels, pressure, clouds, advanced_oscillators, 
     volume_flow, weighted, zones, exits_math

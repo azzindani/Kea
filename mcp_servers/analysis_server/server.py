@@ -6,7 +6,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.analysis_server.tools import stats_ops
+from tools import stats_ops
 import structlog
 from typing import List, Dict, Any, Union
 

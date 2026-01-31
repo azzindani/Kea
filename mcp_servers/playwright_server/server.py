@@ -7,8 +7,8 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.playwright_server.session_manager import BrowserSession
-from mcp_servers.playwright_server.tools import (
+from session_manager import BrowserSession
+from tools import (
     nav_ops, input_ops, dom_ops, network_ops, state_ops, chain_ops, scraper_ops,
     frame_ops, dialog_ops, device_ops, extract_ops,
     audit_ops, perf_ops, mock_ops, context_ops, clipboard_ops,

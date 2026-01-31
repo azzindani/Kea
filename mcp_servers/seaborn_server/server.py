@@ -11,7 +11,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.seaborn_server.tools import (
+from tools import (
     relational_ops, distribution_ops, categorical_ops, 
     regression_ops, matrix_ops, multiples_ops, 
     style_ops, super_ops

@@ -10,7 +10,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.visualization_server.tools import (
+from tools import (
     plotly_chart, heatmap, distribution, pairplot
 )
 import structlog

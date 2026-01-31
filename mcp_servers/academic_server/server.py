@@ -6,7 +6,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.academic_server.tools import pubmed_ops, arxiv_ops, scholar_ops
+from tools import pubmed_ops, arxiv_ops, scholar_ops
 import structlog
 from typing import List, Optional
 

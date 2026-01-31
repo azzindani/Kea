@@ -8,7 +8,7 @@
 
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.security_server.tools import security_ops
+from tools import security_ops
 import structlog
 
 logger = structlog.get_logger()

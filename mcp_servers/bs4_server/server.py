@@ -9,8 +9,8 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.bs4_server.soup_manager import SoupManager
-from mcp_servers.bs4_server.tools import (
+from soup_manager import SoupManager
+from tools import (
     core_ops, nav_ops, search_ops, extract_ops, mod_ops, super_ops,
     convert_ops, sanitize_ops, analyze_ops, fix_ops, logic_ops,
     semantic_ops, feed_ops, diff_ops, visual_ops, export_ops

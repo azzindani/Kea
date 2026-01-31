@@ -8,7 +8,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.tradingview_server.tools import ta, screener
+from tools import ta, screener
 import structlog
 import json
 
@@ -113,7 +113,7 @@ def register_fundamentals():
         tdesc = f"Get {fname.replace('_', ' ').title()} via TradingView."
         
         async def fund_handler(ticker: str, market: str = "america", _k=fkey) -> str:
-            from mcp_servers.tradingview_server.tools.screener import TvScreener
+            from tools.screener import TvScreener
             scr = TvScreener()
             # Use bulk mode for single ticker
             res = scr.fetch(market=market, query={"symbol_list": [ticker]}, columns=[_k], range_limit=1)
@@ -152,7 +152,7 @@ def register_performance():
         tdesc = f"Get {pname.replace('_', ' ').title()}."
         
         async def perf_handler(ticker: str, market: str = "america", _k=pkey) -> str:
-            from mcp_servers.tradingview_server.tools.screener import TvScreener
+            from tools.screener import TvScreener
             scr = TvScreener()
             res = scr.fetch(market=market, query={"symbol_list": [ticker]}, columns=[_k], range_limit=1)
             if res and isinstance(res, list) and not "error" in res[0]:

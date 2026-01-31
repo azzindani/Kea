@@ -5,31 +5,31 @@ from shared.mcp.server_base import MCPServer
 from shared.logging import get_logger
 
 # Tools
-from mcp_servers.sec_edgar_server.tools.bulk import download_bulk_filings, download_filing_suite
-from mcp_servers.sec_edgar_server.tools.filings_equity import (
+from tools.bulk import download_bulk_filings, download_filing_suite
+from tools.filings_equity import (
     download_10k, download_10q, download_8k, download_20f, download_6k
 )
-from mcp_servers.sec_edgar_server.tools.filings_holdings import (
+from tools.filings_holdings import (
     download_13f_hr, download_13f_nt, download_form_4, download_form_3, download_form_5, download_13g, download_13d
 )
-from mcp_servers.sec_edgar_server.tools.management import list_downloaded_filings, read_filing_content
+from tools.management import list_downloaded_filings, read_filing_content
 # Phase 2
-from mcp_servers.sec_edgar_server.tools.filings_registration import (
+from tools.filings_registration import (
     download_s1, download_s3, download_s4, download_424b4, download_form_d
 )
-from mcp_servers.sec_edgar_server.tools.parsing import extract_filing_metadata
+from tools.parsing import extract_filing_metadata
 # Phase 3
-from mcp_servers.sec_edgar_server.tools.structuring import parse_13f_holdings, parse_form4_transactions
-from mcp_servers.sec_edgar_server.tools.filings_funds import download_nport, download_ncen
+from tools.structuring import parse_13f_holdings, parse_form4_transactions
+from tools.filings_funds import download_nport, download_ncen
 # Phase 4
-from mcp_servers.sec_edgar_server.tools.analysis import extract_filing_section, calculate_filing_sentiment
-from mcp_servers.sec_edgar_server.tools.advanced import download_filing_details
+from tools.analysis import extract_filing_section, calculate_filing_sentiment
+from tools.advanced import download_filing_details
 # Phase 5
-from mcp_servers.sec_edgar_server.tools.xbrl import extract_xbrl_financials
-from mcp_servers.sec_edgar_server.tools.discovery import scan_local_library
+from tools.xbrl import extract_xbrl_financials
+from tools.discovery import scan_local_library
 # Phase 6
-from mcp_servers.sec_edgar_server.tools.search import search_filing_content, search_local_library, calculate_readability_metrics
-from mcp_servers.sec_edgar_server.tools.timeline import get_filing_timeline
+from tools.search import search_filing_content, search_local_library, calculate_readability_metrics
+from tools.timeline import get_filing_timeline
 
 logger = get_logger(__name__)
 

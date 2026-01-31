@@ -8,7 +8,7 @@
 
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.web3_server.tools import (
+from tools import (
     rpc, erc20, erc721, multicall, ens, utils, network,
     staking, stableswap, security, contract_interaction, identity, weth,
     lending, oracle, defi, events, action, wallet, gas

@@ -9,7 +9,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.ml_server.tools import (
+from tools import (
     automl, importance, clustering, anomaly, forecast
 )
 import structlog

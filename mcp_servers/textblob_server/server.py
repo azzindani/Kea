@@ -9,7 +9,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.textblob_server.tools import (
+from tools import (
     core_ops, blob_ops, lang_ops, word_ops, 
     classifier_ops, bulk_ops, super_ops
 )

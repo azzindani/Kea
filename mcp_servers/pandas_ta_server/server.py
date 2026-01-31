@@ -8,7 +8,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.pandas_ta_server.tools import (
+from tools import (
     bulk, universal, signals, performance, cycles, backtest, alpha, ml, spectral,
     momentum, trend, volatility_volume, candles
 )

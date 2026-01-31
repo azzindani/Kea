@@ -13,7 +13,7 @@
 
 from __future__ import annotations
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.document_server.tools import pdf, word, excel, html, json_tool
+from tools import pdf, word, excel, html, json_tool
 import structlog
 
 logger = structlog.get_logger()

@@ -8,7 +8,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.finviz_server.tools import (
+from tools import (
     screener, quote, groups, insider, global_markets, calendar_news,
     strategy, charts, financials, bulk_ta
 )

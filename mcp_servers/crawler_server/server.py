@@ -6,7 +6,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.crawler_server.tools import crawl_ops, extract_ops, inspect_ops
+from tools import crawl_ops, extract_ops, inspect_ops
 import structlog
 from typing import Optional
 

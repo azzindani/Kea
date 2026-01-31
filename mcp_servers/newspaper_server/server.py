@@ -7,7 +7,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.newspaper_server.tools import (
+from tools import (
     article_single, source_discovery, bulk_processor, nlp_trends
 )
 import structlog

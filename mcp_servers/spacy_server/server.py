@@ -9,7 +9,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.spacy_server.tools import (
+from tools import (
     core_ops, text_ops, structure_ops, entity_ops, 
     vector_ops, matcher_ops, visual_ops, bulk_ops, super_ops, deep_ops
 )

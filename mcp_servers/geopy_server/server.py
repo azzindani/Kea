@@ -8,7 +8,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.geopy_server.tools import (
+from tools import (
     core_ops, geocode_ops, distance_ops, bulk_ops, super_ops
 )
 import structlog

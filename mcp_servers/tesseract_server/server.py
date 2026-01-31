@@ -10,7 +10,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.tesseract_server.tools import (
+from tools import (
     core_ops, text_ops, config_ops, box_ops, data_ops, format_ops,
     preprocess_ops, bulk_ops, super_ops
 )

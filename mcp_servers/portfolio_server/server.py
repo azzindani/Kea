@@ -11,7 +11,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.portfolio_server.tools import (
+from tools import (
     core_ops, returns_ops, risk_ops, frontier_ops, 
     bl_ops, hrp_ops, allocation_ops, plotting_ops, super_ops
 )

@@ -6,7 +6,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.lxml_server.tools import (
+from tools import (
     core_ops, xpath_ops, transform_ops, validate_ops, objectify_ops, bulk_ops, super_ops
 )
 import structlog

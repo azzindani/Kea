@@ -10,7 +10,7 @@
 
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.openpyxl_server.tools import (
+from tools import (
     workbook_ops, sheet_ops, read_ops, write_ops, manage_rows_cols,
     style_ops, chart_ops, object_ops, formatting_ops, advanced_features,
     structure_ops, analytics_ops, formula_ops, metadata_ops, clean_ops,

@@ -11,7 +11,7 @@
 
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.data_sources_server.tools import fetchers
+from tools import fetchers
 import structlog
 
 logger = structlog.get_logger()

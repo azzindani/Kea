@@ -6,7 +6,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.search_server.tools import web_search, news_search
+from tools import web_search, news_search
 import structlog
 
 logger = structlog.get_logger()

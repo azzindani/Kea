@@ -8,7 +8,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.ffmpeg_server.tools import (
+from tools import (
     core_ops, info_ops, convert_ops, filter_ops, bulk_ops, super_ops
 )
 import structlog

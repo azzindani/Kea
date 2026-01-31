@@ -10,7 +10,7 @@
 
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.analytics_server.tools import eda, cleaning, stats
+from tools import eda, cleaning, stats
 import structlog
 import asyncio
 from typing import Dict, Any, List, Optional

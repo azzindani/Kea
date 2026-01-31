@@ -7,7 +7,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.shutil_server.tools import (
+from tools import (
     core_ops, file_ops, dir_ops, archive_ops, bulk_ops, super_ops
 )
 import structlog

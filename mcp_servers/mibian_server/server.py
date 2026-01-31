@@ -10,33 +10,33 @@ import asyncio
 from mcp.server.fastmcp import FastMCP
 
 # Phase 1: Core & Bulk
-from mcp_servers.mibian_server.tools.bulk import price_option_chain, calculate_iv_surface
+from tools.bulk import price_option_chain, calculate_iv_surface
 
 # Phase 2: Pricing
-from mcp_servers.mibian_server.tools.pricing import calculate_bs_price, calculate_gk_price, calculate_me_price
+from tools.pricing import calculate_bs_price, calculate_gk_price, calculate_me_price
 
 # Phase 3: Greeks
-from mcp_servers.mibian_server.tools.greeks import (
+from tools.greeks import (
     calculate_bs_delta, calculate_bs_gamma, calculate_bs_theta, calculate_bs_vega, calculate_bs_rho,
     calculate_gk_delta, calculate_gk_theta
 )
 
 # Phase 4: Volatility
-from mcp_servers.mibian_server.tools.volatility import calculate_implied_volatility
+from tools.volatility import calculate_implied_volatility
 # Phase 2 (Expansion)
-from mcp_servers.mibian_server.tools.utilities import (
+from tools.utilities import (
     calculate_put_call_parity, calculate_moneyness, calculate_probability_itm, calculate_dual_delta
 )
-from mcp_servers.mibian_server.tools.simulation import simulate_greek_scenario
+from tools.simulation import simulate_greek_scenario
 # Phase 3
-from mcp_servers.mibian_server.tools.strategies import calculate_strategy_price
-from mcp_servers.mibian_server.tools.advanced_greeks import (
+from tools.strategies import calculate_strategy_price
+from tools.advanced_greeks import (
     calculate_advanced_greeks, calculate_vanna, calculate_vomma, calculate_charm, calculate_speed
 )
-from mcp_servers.mibian_server.tools.exotics import calculate_binary_price
+from tools.exotics import calculate_binary_price
 # Phase 4
-from mcp_servers.mibian_server.tools.american import calculate_american_price
-from mcp_servers.mibian_server.tools.barriers import calculate_barrier_price
+from tools.american import calculate_american_price
+from tools.barriers import calculate_barrier_price
 
 mcp = FastMCP("mibian_server")
 

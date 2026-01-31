@@ -8,7 +8,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.ccxt_server.tools import (
+from tools import (
     public, metadata, aggregator, derivatives, historical, account, private, trading, exchange_manager
 )
 import ccxt.async_support as ccxt

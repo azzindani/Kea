@@ -9,7 +9,7 @@
 
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.wbgapi_server.tools import (
+from tools import (
     indicators, economy, discovery, dashboards, specialized, aggregates,
     sdg, granular_dashboards, debt, governance, metadata_deep
 )

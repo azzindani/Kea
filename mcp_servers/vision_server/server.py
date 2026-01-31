@@ -8,7 +8,7 @@
 
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.vision_server.tools import ocr
+from tools import ocr
 import structlog
 import asyncio
 

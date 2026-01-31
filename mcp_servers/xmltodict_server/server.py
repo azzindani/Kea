@@ -6,7 +6,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.xmltodict_server.tools import (
+from tools import (
     core_ops, parse_ops, unparse_ops, file_ops, bulk_ops, super_ops
 )
 import structlog

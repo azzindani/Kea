@@ -10,7 +10,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.statsmodels_server.tools import (
+from tools import (
     regression_ops, tsa_ops, discrete_ops, multivar_ops, 
     nonparam_ops, stat_tools_ops, super_ops
 )

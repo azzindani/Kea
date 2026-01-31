@@ -12,14 +12,14 @@ import asyncio
 from mcp.server.fastmcp import FastMCP
 
 # Tools
-from mcp_servers.pdr_server.tools.famafrench import get_fama_french_data, get_ff_map
-from mcp_servers.pdr_server.tools.market_global import get_stooq_data, get_tsp_fund_data, get_moex_data
-from mcp_servers.pdr_server.tools.dashboards import (
+from tools.famafrench import get_fama_french_data, get_ff_map
+from tools.market_global import get_stooq_data, get_tsp_fund_data, get_moex_data
+from tools.dashboards import (
     get_factor_dashboard, get_global_factors_dashboard, get_industry_health_dashboard, get_liquidity_dashboard
 )
-from mcp_servers.pdr_server.tools.market_symbols import get_nasdaq_symbol_list
-from mcp_servers.pdr_server.tools.central_bank import get_bank_of_canada_data
-from mcp_servers.pdr_server.tools.commercial import get_tiingo_data, get_alphavantage_data
+from tools.market_symbols import get_nasdaq_symbol_list
+from tools.central_bank import get_bank_of_canada_data
+from tools.commercial import get_tiingo_data, get_alphavantage_data
 
 mcp = FastMCP("pdr_server", dependencies=["pandas_datareader", "pandas"])
 

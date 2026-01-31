@@ -6,7 +6,7 @@
 # ///
 
 from mcp.server.fastmcp import FastMCP
-from mcp_servers.hashlib_server.tools import (
+from tools import (
     core_ops, string_ops, shake_ops, file_ops, bulk_ops, security_ops, super_ops
 )
 import structlog
