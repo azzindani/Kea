@@ -238,6 +238,12 @@ class StressTestRunner:
         # Create job via API
         logger.info("Creating research job via API...")
         
+        # DEBUG: Show exactly what we're sending
+        print(f"\n{'='*70}")
+        print(f"DEBUG: API REQUEST - query.prompt =")
+        print(f"{query.prompt[:200]}..." if len(query.prompt) > 200 else query.prompt)
+        print(f"{'='*70}\n")
+        
         response = await self.api_client.post(
             "/api/v1/jobs/",
             json={
