@@ -44,7 +44,7 @@ def _discover_servers() -> Dict[str, str]:
                             obj = getattr(module, name, None)
                             if isinstance(obj, type) or callable(obj):
                                 exports[name] = module_path
-                except ImportError as e:
+                except Exception as e:
                     logger.debug(f"Could not import {module_path}: {e}")
                     continue
     
@@ -59,7 +59,7 @@ def _discover_servers() -> Dict[str, str]:
                         obj = getattr(module, name, None)
                         if isinstance(obj, type) or callable(obj):
                             exports[name] = module_path
-            except ImportError:
+            except Exception:
                 continue
     
     _discovered_exports = exports
@@ -85,4 +85,6 @@ def __dir__():
     return list(_discover_servers().keys())
 
 
-__all__ = list(_discover_servers())
+# Lazy discovery to prevent import loops
+# __all__ = list(_discover_servers()) 
+__all__ = []
