@@ -511,7 +511,17 @@ class AgentSpawner:
                 # PRIORITY 1: Explicit Tool from Planner
                 if subtask.preferred_tool:
                     tool_name = subtask.preferred_tool
-                    server_name = registry.get_server_for_tool(tool_name)
+                    server_name = None
+                    
+                    # Handle "server.tool" format (e.g., "yfinance_server.get_income_statement_quarterly")
+                    if "." in tool_name and "_server." in tool_name:
+                        parts = tool_name.split(".", 1)
+                        server_name = parts[0]
+                        tool_name = parts[1]
+                        logger.debug(f"   📌 Parsed server.tool format: server={server_name}, tool={tool_name}")
+                    else:
+                        # Lookup server from static registry
+                        server_name = registry.get_server_for_tool(tool_name)
                     
                     if not server_name:
                          # Try mapping legacy names if needed
