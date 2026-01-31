@@ -62,6 +62,8 @@ dependencies = [
     "python-docx>=1.0.0",
     "openpyxl>=3.1.0",
     "pgvector>=0.4.2",
+    # MCP Framework
+    "mcp",
 ]
 
 [project.optional-dependencies]
