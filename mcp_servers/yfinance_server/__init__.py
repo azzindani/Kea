@@ -16,9 +16,9 @@ def _discover() -> dict:
     exports = {}
     for item in _DIR.iterdir():
         if item.is_file() and item.suffix == ".py" and item.name != "__init__.py":
-            module_path = f"mcp_servers.yfinance_server.{item.stem}"
+            module_path = f".{item.stem}"
             try:
-                module = importlib.import_module(module_path)
+                module = importlib.import_module(module_path, package=__name__)
                 for name in dir(module):
                     if not name.startswith("_"):
                         obj = getattr(module, name, None)

@@ -1,14 +1,5 @@
-# /// script
-# dependencies = [
-#   "mcp",
-#   "yfinance",
-#   "pandas",
-#   "numpy",
-#   "matplotlib",
-#   "scipy",
-#   "structlog"
-# ]
-# ///
+# Yfinance Server
+# Managed by pyproject.toml
 
 from mcp.server.fastmcp import FastMCP, Image
 from tools import (
