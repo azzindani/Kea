@@ -2,61 +2,102 @@
 """
 Model Context Protocol (MCP) servers for tool execution.
 
-Each server provides a set of specialized tools:
-- scraper_server: Web scraping tools
-- search_server: Search engine tools  
-- python_server: Python execution tools
-- analysis_server: Data analysis tools (legacy)
-- vision_server: Vision/OCR tools
-- data_sources_server: Financial and data fetching
-- analytics_server: EDA, cleaning, statistics
-- crawler_server: Web crawling and discovery
-- ml_server: Machine learning tools
-- visualization_server: Chart generation
-- document_server: Document parsing
-- academic_server: PubMed, arXiv, Semantic Scholar
-- regulatory_server: EDGAR, eCFR, Federal Register
-- browser_agent_server: Human-like browsing
-- qualitative_server: Investigation, text coding, themes
-- security_server: URL scanning, sanitization, safety
-- tool_discovery_server: PyPI/npm search, MCP stub generation
+AUTO-DETECTION: Servers are discovered automatically by scanning this directory.
+Any subdirectory with a server.py file is treated as an MCP server.
+This enables adding new servers without modifying this file.
+
+Discovery Rules:
+1. Subdirectories containing server.py are detected as servers
+2. Top-level .py files (excluding __init__.py) are also servers
+3. Imports are LAZY to prevent cascading failures
 """
 
-from mcp_servers.scraper_server import ScraperServer
-from mcp_servers.search_server import SearchServer
-from mcp_servers.python_server import PythonServer
-from mcp_servers.vision_server import VisionServer
-from mcp_servers.data_sources_server import DataSourcesServer
-from mcp_servers.analytics_server import AnalyticsServer
-from mcp_servers.crawler_server import CrawlerServer
-from mcp_servers.ml_server import MLServer
-from mcp_servers.visualization_server import VisualizationServer
-from mcp_servers.document_server import DocumentServer
-from mcp_servers.academic_server import AcademicServer
-from mcp_servers.regulatory_server import RegulatoryServer
-from mcp_servers.browser_agent_server import BrowserAgentServer
-from mcp_servers.qualitative_server import QualitativeServer
-from mcp_servers.security_server import SecurityServer
-from mcp_servers.tool_discovery_server import ToolDiscoveryServer
+from pathlib import Path
+from typing import Dict, Any
+import importlib
+import logging
 
-__all__ = [
-    "ScraperServer",
-    "SearchServer", 
-    "PythonServer",
-    "VisionServer",
-    "DataSourcesServer",
-    "AnalyticsServer",
-    "CrawlerServer",
-    "MLServer",
-    "VisualizationServer",
-    "DocumentServer",
-    "AcademicServer",
-    "RegulatoryServer",
-    "BrowserAgentServer",
-    "QualitativeServer",
-    "SecurityServer",
-    "ToolDiscoveryServer",
-]
+logger = logging.getLogger(__name__)
+
+# Auto-detect servers from directory structure
+_SERVERS_DIR = Path(__file__).parent
+_discovered_servers: Dict[str, str] = {}  # name -> module path
 
 
+def _discover_servers() -> Dict[str, str]:
+    """
+    Auto-discover MCP servers by scanning the mcp_servers directory.
+    
+    Discovery rules:
+    1. Subdirectory with server.py -> server name is directory name
+    2. Top-level .py file -> server name is file stem
+    
+    Returns:
+        Dict mapping server class name to module path
+    """
+    global _discovered_servers
+    
+    if _discovered_servers:
+        return _discovered_servers
+    
+    servers = {}
+    
+    # Strategy 1: Subdirectories with server.py
+    for item in _SERVERS_DIR.iterdir():
+        if item.is_dir() and not item.name.startswith("_"):
+            server_script = item / "server.py"
+            if server_script.exists():
+                # Convention: directory name is server name
+                # e.g., yfinance_server -> YfinanceServer class expected
+                server_name = item.name
+                module_path = f"mcp_servers.{server_name}.server"
+                
+                # Try to infer class name (PascalCase of directory name)
+                # yfinance_server -> YfinanceServer
+                class_name = "".join(
+                    word.capitalize() for word in server_name.split("_")
+                )
+                
+                servers[class_name] = module_path
+    
+    # Strategy 2: Top-level .py files (legacy servers)
+    for item in _SERVERS_DIR.iterdir():
+        if item.is_file() and item.suffix == ".py" and item.name != "__init__.py":
+            server_name = item.stem
+            module_path = f"mcp_servers.{server_name}"
+            
+            class_name = "".join(
+                word.capitalize() for word in server_name.split("_")
+            )
+            
+            servers[class_name] = module_path
+    
+    _discovered_servers = servers
+    return servers
 
+
+def __getattr__(name: str) -> Any:
+    """
+    Lazy import servers only when accessed.
+    Enables auto-discovery without eager loading.
+    """
+    servers = _discover_servers()
+    
+    if name in servers:
+        try:
+            module = importlib.import_module(servers[name])
+            return getattr(module, name, module)
+        except ImportError as e:
+            logger.warning(f"Failed to import {name}: {e}")
+            raise AttributeError(f"Server {name} failed to import: {e}")
+    
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__():
+    """Return list of available servers for auto-complete."""
+    return list(_discover_servers().keys())
+
+
+# Export all discovered servers
+__all__ = list(_discover_servers())

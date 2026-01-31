@@ -1,67 +1,52 @@
 # Embedding Package
 """
 Embedding and reranking providers for RAG.
-
-Models:
-- Qwen3-Embedding-8B (OpenRouter API)
-- Qwen3-Embedding-0.6B (Local)
-- Qwen3-Reranker-0.6B (Local)
-- Qwen3-VL-Embedding-2B (Local, Vision-Language)
-- Qwen3-VL-Reranker-2B (Local, Vision-Language)
+Auto-discovered embedding and reranker modules.
 """
 
-from shared.embedding.qwen3_embedding import (
-    EmbeddingProvider,
-    OpenRouterEmbedding,
-    LocalEmbedding,
-    create_embedding_provider,
-)
-from shared.embedding.qwen3_reranker import (
-    RerankerProvider,
-    LocalReranker,
-    RerankResult,
-    create_reranker_provider,
-)
-from shared.embedding.qwen3_vl_embedding import (
-    VLEmbeddingProvider,
-    LocalVLEmbedding,
-    VLInput,
-    create_vl_embedding_provider,
-)
-from shared.embedding.qwen3_vl_reranker import (
-    VLRerankerProvider,
-    VLRerankResult,
-    create_vl_reranker_provider,
-)
-from shared.embedding.model_manager import (
-    get_embedding_provider,
-    get_reranker_provider,
-    reset_providers,
-)
+from pathlib import Path
+from typing import Any
+import importlib
+import logging
 
-__all__ = [
-    # Text Embedding
-    "EmbeddingProvider",
-    "OpenRouterEmbedding",
-    "LocalEmbedding",
-    "create_embedding_provider",
-    # Text Reranking
-    "RerankerProvider",
-    "LocalReranker",
-    "RerankResult",
-    "create_reranker_provider",
-    # Vision-Language Embedding
-    "VLEmbeddingProvider",
-    "LocalVLEmbedding",
-    "VLInput",
-    "create_vl_embedding_provider",
-    # Vision-Language Reranking
-    "VLRerankerProvider",
-    "VLRerankResult",
-    "create_vl_reranker_provider",
-    # Model Manager (Singletons)
-    "get_embedding_provider",
-    "get_reranker_provider",
-    "reset_providers",
-]
+logger = logging.getLogger(__name__)
 
+_EMB_DIR = Path(__file__).parent
+_discovered: dict = {}
+
+
+def _discover() -> dict:
+    global _discovered
+    if _discovered:
+        return _discovered
+    
+    modules = {}
+    for item in _EMB_DIR.iterdir():
+        if item.is_file() and item.suffix == ".py" and item.name != "__init__.py":
+            module_name = item.stem
+            module_path = f"shared.embedding.{module_name}"
+            modules[module_name] = module_path
+    
+    _discovered = modules
+    return modules
+
+
+def __getattr__(name: str) -> Any:
+    modules = _discover()
+    
+    for mod_name, mod_path in modules.items():
+        try:
+            module = importlib.import_module(mod_path)
+            if hasattr(module, name):
+                return getattr(module, name)
+        except ImportError:
+            continue
+    
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__():
+    return list(_discover().keys())
+
+
+__all__ = list(_discover())

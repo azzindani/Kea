@@ -1,18 +1,52 @@
 # Security MCP Server
 """
 Security tools for safe research operations.
+Auto-discovered from server.py.
 """
 
-from mcp_servers.security_server.server import (
-    SecurityServer,
-    url_scanner_tool,
-    content_sanitizer_tool,
-    code_safety_tool,
-)
+from pathlib import Path
+from typing import Any
+import importlib
+import logging
 
-__all__ = [
-    "SecurityServer",
-    "url_scanner_tool",
-    "content_sanitizer_tool",
-    "code_safety_tool",
-]
+logger = logging.getLogger(__name__)
+
+_SEC_DIR = Path(__file__).parent
+_discovered: dict = {}
+
+
+def _discover() -> dict:
+    global _discovered
+    if _discovered:
+        return _discovered
+    
+    modules = {}
+    for item in _SEC_DIR.iterdir():
+        if item.is_file() and item.suffix == ".py" and item.name != "__init__.py":
+            module_name = item.stem
+            module_path = f"mcp_servers.security_server.{module_name}"
+            modules[module_name] = module_path
+    
+    _discovered = modules
+    return modules
+
+
+def __getattr__(name: str) -> Any:
+    modules = _discover()
+    
+    for mod_name, mod_path in modules.items():
+        try:
+            module = importlib.import_module(mod_path)
+            if hasattr(module, name):
+                return getattr(module, name)
+        except ImportError:
+            continue
+    
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__():
+    return list(_discover().keys())
+
+
+__all__ = list(_discover())

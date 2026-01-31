@@ -1,20 +1,39 @@
 # Data Sources MCP Server
-"""
-Data sources tools for fetching financial, economic, and general data.
-"""
+"""Data sources tools for fetching financial, economic, and general data. Auto-discovered."""
 
-from mcp_servers.data_sources_server.server import (
-    DataSourcesServer,
-    yfinance_fetch_tool,
-    fred_fetch_tool,
-    world_bank_fetch_tool,
-    csv_fetch_tool,
-)
+from pathlib import Path
+from typing import Any
+import importlib
 
-__all__ = [
-    "DataSourcesServer",
-    "yfinance_fetch_tool",
-    "fred_fetch_tool",
-    "world_bank_fetch_tool",
-    "csv_fetch_tool",
-]
+_DIR = Path(__file__).parent
+_discovered: dict = {}
+
+
+def _discover() -> dict:
+    global _discovered
+    if _discovered:
+        return _discovered
+    modules = {}
+    for item in _DIR.iterdir():
+        if item.is_file() and item.suffix == ".py" and item.name != "__init__.py":
+            modules[item.stem] = f"mcp_servers.data_sources_server.{item.stem}"
+    _discovered = modules
+    return modules
+
+
+def __getattr__(name: str) -> Any:
+    for mod_path in _discover().values():
+        try:
+            module = importlib.import_module(mod_path)
+            if hasattr(module, name):
+                return getattr(module, name)
+        except ImportError:
+            continue
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__():
+    return list(_discover().keys())
+
+
+__all__ = list(_discover())

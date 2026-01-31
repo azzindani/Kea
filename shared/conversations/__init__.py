@@ -1,14 +1,51 @@
 """
 Conversation Management Package.
+Auto-discovered conversation modules.
 """
 
-from shared.conversations.models import Conversation, Message, MessageRole
-from shared.conversations.manager import ConversationManager, get_conversation_manager
+from pathlib import Path
+from typing import Any
+import importlib
+import logging
 
-__all__ = [
-    "Conversation",
-    "Message",
-    "MessageRole",
-    "ConversationManager",
-    "get_conversation_manager",
-]
+logger = logging.getLogger(__name__)
+
+_CONV_DIR = Path(__file__).parent
+_discovered: dict = {}
+
+
+def _discover() -> dict:
+    global _discovered
+    if _discovered:
+        return _discovered
+    
+    modules = {}
+    for item in _CONV_DIR.iterdir():
+        if item.is_file() and item.suffix == ".py" and item.name != "__init__.py":
+            module_name = item.stem
+            module_path = f"shared.conversations.{module_name}"
+            modules[module_name] = module_path
+    
+    _discovered = modules
+    return modules
+
+
+def __getattr__(name: str) -> Any:
+    modules = _discover()
+    
+    for mod_name, mod_path in modules.items():
+        try:
+            module = importlib.import_module(mod_path)
+            if hasattr(module, name):
+                return getattr(module, name)
+        except ImportError:
+            continue
+    
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__():
+    return list(_discover().keys())
+
+
+__all__ = list(_discover())

@@ -1,6 +1,39 @@
 # Search Tools Package
-from mcp_servers.search_server.tools.web_search import web_search_tool
-from mcp_servers.search_server.tools.news_search import news_search_tool
-from mcp_servers.search_server.tools.academic_search import academic_search_tool
+"""Auto-discovered search tools."""
 
-__all__ = ["web_search_tool", "news_search_tool", "academic_search_tool"]
+from pathlib import Path
+from typing import Any
+import importlib
+
+_DIR = Path(__file__).parent
+_discovered: dict = {}
+
+
+def _discover() -> dict:
+    global _discovered
+    if _discovered:
+        return _discovered
+    modules = {}
+    for item in _DIR.iterdir():
+        if item.is_file() and item.suffix == ".py" and item.name != "__init__.py":
+            modules[item.stem] = f"mcp_servers.search_server.tools.{item.stem}"
+    _discovered = modules
+    return modules
+
+
+def __getattr__(name: str) -> Any:
+    for mod_path in _discover().values():
+        try:
+            module = importlib.import_module(mod_path)
+            if hasattr(module, name):
+                return getattr(module, name)
+        except ImportError:
+            continue
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__():
+    return list(_discover().keys())
+
+
+__all__ = list(_discover())
