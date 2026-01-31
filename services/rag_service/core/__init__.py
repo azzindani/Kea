@@ -1,7 +1,6 @@
-# RAG Service Core Package
 """
-Core components for the RAG service.
-Auto-discovered modules for vector storage, fact storage, and graph RAG.
+RAG Service Core Package.
+Auto-discovered with actual export detection.
 """
 
 from pathlib import Path
@@ -11,64 +10,43 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-_CORE_DIR = Path(__file__).parent
-_discovered_modules: dict = {}
+_DIR = Path(__file__).parent
+_discovered: dict = {}
 
 
-def _discover_modules() -> dict:
-    """Auto-discover core modules by scanning this directory."""
-    global _discovered_modules
+def _discover() -> dict:
+    global _discovered
+    if _discovered:
+        return _discovered
     
-    if _discovered_modules:
-        return _discovered_modules
-    
-    modules = {}
-    
-    for item in _CORE_DIR.iterdir():
+    exports = {}
+    for item in _DIR.iterdir():
         if item.is_file() and item.suffix == ".py" and item.name != "__init__.py":
-            module_name = item.stem
-            module_path = f"services.rag_service.core.{module_name}"
-            modules[module_name] = module_path
+            module_path = f"services.rag_service.core.{item.stem}"
+            try:
+                module = importlib.import_module(module_path)
+                for name in dir(module):
+                    if not name.startswith("_"):
+                        obj = getattr(module, name, None)
+                        if isinstance(obj, type) or callable(obj):
+                            exports[name] = module_path
+            except ImportError:
+                continue
     
-    _discovered_modules = modules
-    return modules
+    _discovered = exports
+    return exports
 
 
 def __getattr__(name: str) -> Any:
-    """Lazy import modules and their exports only when accessed."""
-    modules = _discover_modules()
-    
-    # Check if it's a module name
-    for mod_name, mod_path in modules.items():
-        if name == mod_name:
-            try:
-                return importlib.import_module(mod_path)
-            except ImportError as e:
-                logger.warning(f"Failed to import {name}: {e}")
-                raise AttributeError(f"Module {name} failed to import: {e}")
-        
-        # Check if it's an attribute from a module
-        try:
-            module = importlib.import_module(mod_path)
-            if hasattr(module, name):
-                return getattr(module, name)
-        except ImportError:
-            continue
-    
-    # Also check vault for vector_store compatibility
-    try:
-        from services.vault.core import vector_store
-        if hasattr(vector_store, name):
-            return getattr(vector_store, name)
-    except ImportError:
-        pass
-    
+    exports = _discover()
+    if name in exports:
+        module = importlib.import_module(exports[name])
+        return getattr(module, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def __dir__():
-    """Return list of available modules for auto-complete."""
-    return list(_discover_modules().keys())
+    return list(_discover().keys())
 
 
-__all__ = list(_discover_modules())
+__all__ = list(_discover())

@@ -1,6 +1,6 @@
 """
 User Management Package.
-Auto-discovered user modules.
+Auto-discovered with actual export detection.
 """
 
 from pathlib import Path
@@ -10,7 +10,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-_USERS_DIR = Path(__file__).parent
+_DIR = Path(__file__).parent
 _discovered: dict = {}
 
 
@@ -19,28 +19,29 @@ def _discover() -> dict:
     if _discovered:
         return _discovered
     
-    modules = {}
-    for item in _USERS_DIR.iterdir():
+    exports = {}
+    for item in _DIR.iterdir():
         if item.is_file() and item.suffix == ".py" and item.name != "__init__.py":
-            module_name = item.stem
-            module_path = f"shared.users.{module_name}"
-            modules[module_name] = module_path
+            module_path = f"shared.users.{item.stem}"
+            try:
+                module = importlib.import_module(module_path)
+                for name in dir(module):
+                    if not name.startswith("_"):
+                        obj = getattr(module, name, None)
+                        if isinstance(obj, type) or callable(obj):
+                            exports[name] = module_path
+            except ImportError:
+                continue
     
-    _discovered = modules
-    return modules
+    _discovered = exports
+    return exports
 
 
 def __getattr__(name: str) -> Any:
-    modules = _discover()
-    
-    for mod_name, mod_path in modules.items():
-        try:
-            module = importlib.import_module(mod_path)
-            if hasattr(module, name):
-                return getattr(module, name)
-        except ImportError:
-            continue
-    
+    exports = _discover()
+    if name in exports:
+        module = importlib.import_module(exports[name])
+        return getattr(module, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 

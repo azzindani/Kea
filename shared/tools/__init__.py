@@ -1,7 +1,6 @@
 """
-Tool Loading Utilities.
-
-Auto-discovered tool loading modules.
+Shared Tools Package.
+Auto-discovered with actual export detection.
 """
 
 from pathlib import Path
@@ -11,56 +10,43 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-_TOOLS_DIR = Path(__file__).parent
-_discovered_tools: dict = {}
+_DIR = Path(__file__).parent
+_discovered: dict = {}
 
 
-def _discover_tools() -> dict:
-    """Auto-discover tool modules by scanning this directory."""
-    global _discovered_tools
+def _discover() -> dict:
+    global _discovered
+    if _discovered:
+        return _discovered
     
-    if _discovered_tools:
-        return _discovered_tools
-    
-    tools = {}
-    
-    for item in _TOOLS_DIR.iterdir():
+    exports = {}
+    for item in _DIR.iterdir():
         if item.is_file() and item.suffix == ".py" and item.name != "__init__.py":
-            module_name = item.stem
-            module_path = f"shared.tools.{module_name}"
-            tools[module_name] = module_path
+            module_path = f"shared.tools.{item.stem}"
+            try:
+                module = importlib.import_module(module_path)
+                for name in dir(module):
+                    if not name.startswith("_"):
+                        obj = getattr(module, name, None)
+                        if isinstance(obj, type) or callable(obj):
+                            exports[name] = module_path
+            except ImportError:
+                continue
     
-    _discovered_tools = tools
-    return tools
+    _discovered = exports
+    return exports
 
 
 def __getattr__(name: str) -> Any:
-    """Lazy import tool modules only when accessed."""
-    tools = _discover_tools()
-    
-    # First check if it's a module name
-    for mod_name, mod_path in tools.items():
-        if name == mod_name:
-            try:
-                return importlib.import_module(mod_path)
-            except ImportError as e:
-                logger.warning(f"Failed to import tool module {name}: {e}")
-                raise AttributeError(f"Tool module {name} failed to import: {e}")
-        
-        # Check if it's an attribute from a module
-        try:
-            module = importlib.import_module(mod_path)
-            if hasattr(module, name):
-                return getattr(module, name)
-        except ImportError:
-            continue
-    
+    exports = _discover()
+    if name in exports:
+        module = importlib.import_module(exports[name])
+        return getattr(module, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def __dir__():
-    """Return list of available tool modules for auto-complete."""
-    return list(_discover_tools().keys())
+    return list(_discover().keys())
 
 
-__all__ = list(_discover_tools())
+__all__ = list(_discover())

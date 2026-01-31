@@ -1,11 +1,48 @@
 # Orchestrator Service Package
 """
 The Brain - Main orchestrator with LangGraph state machine and MCP client.
-
-Components:
-- core/: LangGraph state machine and routing logic
-- mcp/: MCP client for tool invocation
-- nodes/: LangGraph node implementations
-- agents/: Specialized worker agents (Generator, Critic, Judge)
-- state/: Pydantic state schemas
+Auto-discovered with actual export detection.
 """
+
+from pathlib import Path
+from typing import Any
+import importlib
+
+_DIR = Path(__file__).parent
+_discovered: dict = {}
+
+
+def _discover() -> dict:
+    global _discovered
+    if _discovered:
+        return _discovered
+    exports = {}
+    for item in _DIR.iterdir():
+        if item.is_file() and item.suffix == ".py" and item.name != "__init__.py":
+            module_path = f"services.orchestrator.{item.stem}"
+            try:
+                module = importlib.import_module(module_path)
+                for name in dir(module):
+                    if not name.startswith("_"):
+                        obj = getattr(module, name, None)
+                        if isinstance(obj, type) or callable(obj):
+                            exports[name] = module_path
+            except ImportError:
+                continue
+    _discovered = exports
+    return exports
+
+
+def __getattr__(name: str) -> Any:
+    exports = _discover()
+    if name in exports:
+        module = importlib.import_module(exports[name])
+        return getattr(module, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__():
+    return list(_discover().keys())
+
+
+__all__ = list(_discover())

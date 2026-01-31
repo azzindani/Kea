@@ -1,11 +1,6 @@
 """
 Orchestrator Nodes Package.
-
-LangGraph nodes for the research pipeline.
-
-AUTO-DETECTION: Nodes are discovered automatically by scanning this directory.
-Any .py file (excluding __init__.py) is treated as a node module.
-Convention: File exports a function named `<filename>_node` or `<classname>Node`.
+Auto-discovered with actual export detection.
 """
 
 from pathlib import Path
@@ -15,56 +10,43 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-_NODES_DIR = Path(__file__).parent
-_discovered_nodes: dict = {}
+_DIR = Path(__file__).parent
+_discovered: dict = {}
 
 
-def _discover_nodes() -> dict:
-    """
-    Auto-discover nodes by scanning this directory.
+def _discover() -> dict:
+    global _discovered
+    if _discovered:
+        return _discovered
     
-    Convention:
-    - planner.py -> exports planner_node
-    - keeper.py -> exports keeper_node
-    """
-    global _discovered_nodes
-    
-    if _discovered_nodes:
-        return _discovered_nodes
-    
-    nodes = {}
-    
-    for item in _NODES_DIR.iterdir():
+    exports = {}
+    for item in _DIR.iterdir():
         if item.is_file() and item.suffix == ".py" and item.name != "__init__.py":
-            module_name = item.stem
-            module_path = f"services.orchestrator.nodes.{module_name}"
-            
-            # Convention: file exports {module_name}_node
-            export_name = f"{module_name}_node"
-            nodes[export_name] = module_path
+            module_path = f"services.orchestrator.nodes.{item.stem}"
+            try:
+                module = importlib.import_module(module_path)
+                for name in dir(module):
+                    if not name.startswith("_"):
+                        obj = getattr(module, name, None)
+                        if isinstance(obj, type) or callable(obj):
+                            exports[name] = module_path
+            except ImportError:
+                continue
     
-    _discovered_nodes = nodes
-    return nodes
+    _discovered = exports
+    return exports
 
 
 def __getattr__(name: str) -> Any:
-    """Lazy import nodes only when accessed."""
-    nodes = _discover_nodes()
-    
-    if name in nodes:
-        try:
-            module = importlib.import_module(nodes[name])
-            return getattr(module, name)
-        except (ImportError, AttributeError) as e:
-            logger.warning(f"Failed to import node {name}: {e}")
-            raise AttributeError(f"Node {name} failed to import: {e}")
-    
+    exports = _discover()
+    if name in exports:
+        module = importlib.import_module(exports[name])
+        return getattr(module, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def __dir__():
-    """Return list of available nodes for auto-complete."""
-    return list(_discover_nodes().keys())
+    return list(_discover().keys())
 
 
-__all__ = list(_discover_nodes())
+__all__ = list(_discover())

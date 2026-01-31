@@ -1,8 +1,7 @@
 """
 LLM Provider Package.
 
-Auto-discovered LLM providers.
-Any .py file (except __init__.py and provider.py base class) is a provider.
+Auto-discovered LLM providers with proper name detection.
 """
 
 from pathlib import Path
@@ -13,54 +12,63 @@ import logging
 logger = logging.getLogger(__name__)
 
 _LLM_DIR = Path(__file__).parent
-_discovered_providers: dict = {}
+_discovered_exports: dict = {}
 
 
-def _discover_providers() -> dict:
-    """Auto-discover LLM providers by scanning this directory."""
-    global _discovered_providers
+def _discover() -> dict:
+    """
+    Auto-discover LLM modules and their actual exports.
+    Scans each module for classes ending in 'Provider' and other common exports.
+    """
+    global _discovered_exports
     
-    if _discovered_providers:
-        return _discovered_providers
+    if _discovered_exports:
+        return _discovered_exports
     
-    providers = {}
-    
-    # Always include base classes first
-    providers["LLMProvider"] = "shared.llm.provider"
-    providers["LLMConfig"] = "shared.llm.provider"
-    providers["LLMResponse"] = "shared.llm.provider"
+    exports = {}
     
     for item in _LLM_DIR.iterdir():
-        if item.is_file() and item.suffix == ".py" and item.name not in ("__init__.py", "provider.py"):
+        if item.is_file() and item.suffix == ".py" and item.name != "__init__.py":
             module_name = item.stem
             module_path = f"shared.llm.{module_name}"
             
-            # Convention: openrouter.py -> OpenrouterProvider
-            class_name = module_name.capitalize() + "Provider"
-            providers[class_name] = module_path
+            try:
+                # Import the module to discover actual exports
+                module = importlib.import_module(module_path)
+                
+                # Get all public names from the module
+                for name in dir(module):
+                    if name.startswith("_"):
+                        continue
+                    obj = getattr(module, name, None)
+                    # Include classes, functions, and common exports
+                    if isinstance(obj, type) or callable(obj) or name in ("LLMConfig", "LLMResponse", "LLMMessage", "LLMUsage"):
+                        exports[name] = module_path
+            except ImportError as e:
+                logger.debug(f"Could not import {module_path} for discovery: {e}")
+                continue
     
-    _discovered_providers = providers
-    return providers
+    _discovered_exports = exports
+    return exports
 
 
 def __getattr__(name: str) -> Any:
-    """Lazy import LLM providers only when accessed."""
-    providers = _discover_providers()
+    """Lazy import - discovers actual module exports."""
+    exports = _discover()
     
-    if name in providers:
+    if name in exports:
         try:
-            module = importlib.import_module(providers[name])
+            module = importlib.import_module(exports[name])
             return getattr(module, name)
         except (ImportError, AttributeError) as e:
-            logger.warning(f"Failed to import LLM provider {name}: {e}")
-            raise AttributeError(f"LLM provider {name} failed to import: {e}")
+            raise AttributeError(f"Cannot import {name}: {e}")
     
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def __dir__():
-    """Return list of available providers for auto-complete."""
-    return list(_discover_providers().keys())
+    """Return list of available exports."""
+    return list(_discover().keys())
 
 
-__all__ = list(_discover_providers())
+__all__ = list(_discover())

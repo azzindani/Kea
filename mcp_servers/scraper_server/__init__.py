@@ -1,8 +1,5 @@
 # Scraper MCP Server Package
-"""
-Web scraping MCP server with Playwright and stealth capabilities.
-Auto-discovered from server.py.
-"""
+"""Web scraping tools. Auto-discovered with actual export detection."""
 
 from pathlib import Path
 from typing import Any
@@ -16,22 +13,28 @@ def _discover() -> dict:
     global _discovered
     if _discovered:
         return _discovered
-    modules = {}
+    exports = {}
     for item in _DIR.iterdir():
         if item.is_file() and item.suffix == ".py" and item.name != "__init__.py":
-            modules[item.stem] = f"mcp_servers.scraper_server.{item.stem}"
-    _discovered = modules
-    return modules
+            module_path = f"mcp_servers.scraper_server.{item.stem}"
+            try:
+                module = importlib.import_module(module_path)
+                for name in dir(module):
+                    if not name.startswith("_"):
+                        obj = getattr(module, name, None)
+                        if isinstance(obj, type) or callable(obj):
+                            exports[name] = module_path
+            except ImportError:
+                continue
+    _discovered = exports
+    return exports
 
 
 def __getattr__(name: str) -> Any:
-    for mod_path in _discover().values():
-        try:
-            module = importlib.import_module(mod_path)
-            if hasattr(module, name):
-                return getattr(module, name)
-        except ImportError:
-            continue
+    exports = _discover()
+    if name in exports:
+        module = importlib.import_module(exports[name])
+        return getattr(module, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 

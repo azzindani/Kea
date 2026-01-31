@@ -1,11 +1,6 @@
 """
 Orchestrator Agents Package.
-
-Adversarial collaboration agents for consensus building.
-
-AUTO-DETECTION: Agents are discovered automatically by scanning this directory.
-Any .py file (excluding __init__.py) is treated as an agent module.
-Convention: File exports a class named `<PascalCase>Agent`.
+Auto-discovered with actual export detection.
 """
 
 from pathlib import Path
@@ -15,56 +10,43 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-_AGENTS_DIR = Path(__file__).parent
-_discovered_agents: dict = {}
+_DIR = Path(__file__).parent
+_discovered: dict = {}
 
 
-def _discover_agents() -> dict:
-    """
-    Auto-discover agents by scanning this directory.
+def _discover() -> dict:
+    global _discovered
+    if _discovered:
+        return _discovered
     
-    Convention:
-    - generator.py -> exports GeneratorAgent
-    - critic.py -> exports CriticAgent
-    """
-    global _discovered_agents
-    
-    if _discovered_agents:
-        return _discovered_agents
-    
-    agents = {}
-    
-    for item in _AGENTS_DIR.iterdir():
+    exports = {}
+    for item in _DIR.iterdir():
         if item.is_file() and item.suffix == ".py" and item.name != "__init__.py":
-            module_name = item.stem
-            module_path = f"services.orchestrator.agents.{module_name}"
-            
-            # Convention: file exports {PascalCase}Agent
-            class_name = module_name.capitalize() + "Agent"
-            agents[class_name] = module_path
+            module_path = f"services.orchestrator.agents.{item.stem}"
+            try:
+                module = importlib.import_module(module_path)
+                for name in dir(module):
+                    if not name.startswith("_"):
+                        obj = getattr(module, name, None)
+                        if isinstance(obj, type) or callable(obj):
+                            exports[name] = module_path
+            except ImportError:
+                continue
     
-    _discovered_agents = agents
-    return agents
+    _discovered = exports
+    return exports
 
 
 def __getattr__(name: str) -> Any:
-    """Lazy import agents only when accessed."""
-    agents = _discover_agents()
-    
-    if name in agents:
-        try:
-            module = importlib.import_module(agents[name])
-            return getattr(module, name)
-        except (ImportError, AttributeError) as e:
-            logger.warning(f"Failed to import agent {name}: {e}")
-            raise AttributeError(f"Agent {name} failed to import: {e}")
-    
+    exports = _discover()
+    if name in exports:
+        module = importlib.import_module(exports[name])
+        return getattr(module, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def __dir__():
-    """Return list of available agents for auto-complete."""
-    return list(_discover_agents().keys())
+    return list(_discover().keys())
 
 
-__all__ = list(_discover_agents())
+__all__ = list(_discover())

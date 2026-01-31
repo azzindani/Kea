@@ -1,7 +1,6 @@
-# API Gateway Routes package
 """
-Auto-discovered route modules.
-Any .py file (except __init__.py) in this directory is registered as a route module.
+API Gateway Routes Package.
+Auto-discovered with actual export detection.
 """
 
 from pathlib import Path
@@ -11,46 +10,43 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-_ROUTES_DIR = Path(__file__).parent
-_discovered_routes: dict = {}
+_DIR = Path(__file__).parent
+_discovered: dict = {}
 
 
-def _discover_routes() -> dict:
-    """Auto-discover route modules by scanning this directory."""
-    global _discovered_routes
+def _discover() -> dict:
+    global _discovered
+    if _discovered:
+        return _discovered
     
-    if _discovered_routes:
-        return _discovered_routes
-    
-    routes = {}
-    
-    for item in _ROUTES_DIR.iterdir():
+    exports = {}
+    for item in _DIR.iterdir():
         if item.is_file() and item.suffix == ".py" and item.name != "__init__.py":
-            module_name = item.stem
-            module_path = f"services.api_gateway.routes.{module_name}"
-            routes[module_name] = module_path
+            module_path = f"services.api_gateway.routes.{item.stem}"
+            try:
+                module = importlib.import_module(module_path)
+                for name in dir(module):
+                    if not name.startswith("_"):
+                        obj = getattr(module, name, None)
+                        if isinstance(obj, type) or callable(obj):
+                            exports[name] = module_path
+            except ImportError:
+                continue
     
-    _discovered_routes = routes
-    return routes
+    _discovered = exports
+    return exports
 
 
 def __getattr__(name: str) -> Any:
-    """Lazy import route modules only when accessed."""
-    routes = _discover_routes()
-    
-    if name in routes:
-        try:
-            return importlib.import_module(routes[name])
-        except ImportError as e:
-            logger.warning(f"Failed to import route {name}: {e}")
-            raise AttributeError(f"Route {name} failed to import: {e}")
-    
+    exports = _discover()
+    if name in exports:
+        module = importlib.import_module(exports[name])
+        return getattr(module, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def __dir__():
-    """Return list of available routes for auto-complete."""
-    return list(_discover_routes().keys())
+    return list(_discover().keys())
 
 
-__all__ = list(_discover_routes())
+__all__ = list(_discover())
