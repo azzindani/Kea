@@ -65,7 +65,7 @@ def pytest_addoption(parser):
             "--query",
             action="store",
             default=None,
-            help="Query ID(s) to run, comma-separated (e.g., '1' or '1,2,3')",
+            help="Query ID(s) comma-separated (e.g., '1' or '1,2,3') OR a custom query string (e.g., 'Analyze AAPL stock')",
         )
     except ValueError:
         pass
@@ -453,11 +453,21 @@ def all_queries():
 
 @pytest.fixture
 def query_ids(request):
-    """Get query IDs from command line."""
+    """Get query IDs or custom query from command line.
+    
+    Returns list of either:
+    - int: predefined query ID
+    - str: custom query string
+    """
     query_arg = request.config.getoption("--query", default=None)
     if query_arg:
-        return [int(q.strip()) for q in query_arg.split(",")]
-    return [1]  # Default to query 1
+        # Check if it looks like numeric ID(s)
+        if query_arg.replace(",", "").replace(" ", "").isdigit():
+            return [int(q.strip()) for q in query_arg.split(",")]
+        else:
+            # It's a custom query string
+            return [query_arg]  # Return as single-item list of string
+    return [1]  # Default to Query 1 (Indonesian Alpha Hunt)
 
 
 # =============================================================================
