@@ -369,7 +369,6 @@ async def researcher_node(state: GraphState) -> GraphState:
                 # Generate prompts for this phase
                 # FETCH GLOBAL CONTEXT for Prompt Engineering
                 try:
-                    from shared.context_pool import get_context_pool
                     ctx = get_context_pool()
                     global_facts = [f.get("text", "") for f in ctx.fact_pool]
                 except Exception as e:
@@ -413,7 +412,6 @@ async def researcher_node(state: GraphState) -> GraphState:
                         
                         # Store in Context Pool for next phase!
                         try:
-                            from shared.context_pool import get_context_pool
                             ctx = get_context_pool()
                             
                             # 1. Store as structured data (for code agents)
