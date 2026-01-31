@@ -470,6 +470,9 @@ class TestStressQueries:
             pytest tests/stress/stress_test.py --query=1 -v -s --log-cli-level=DEBUG
         """
         for query_item in query_ids:
+            # DEBUG: Print what we received from fixture
+            print(f"DEBUG: query_item = {query_item!r}, type = {type(query_item).__name__}")
+            
             # Handle both numeric IDs and custom query strings
             if isinstance(query_item, int):
                 query = get_query(query_item)
