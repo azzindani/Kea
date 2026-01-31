@@ -310,8 +310,15 @@ class SessionRegistry:
             transport = SubprocessTransport(process)
             client = MCPClient(timeout=300.0)
             
-            # Connect
-            await client.connect(transport)
+            # Connect with timeout to prevent indefinite hangs
+            # FastMCP servers with dependencies may take time to start (UV install)
+            connect_timeout = getattr(jit_config, 'connect_timeout', 120)  # 120s default for dep install
+            try:
+                await asyncio.wait_for(client.connect(transport), timeout=connect_timeout)
+            except asyncio.TimeoutError:
+                logger.error(f"❌ Timeout ({connect_timeout}s) connecting to {server_name}")
+                process.terminate()
+                raise TimeoutError(f"Server {server_name} did not respond in {connect_timeout}s")
             
             self.active_sessions[server_name] = client
             self.active_processes[server_name] = process
