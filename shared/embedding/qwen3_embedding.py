@@ -132,6 +132,12 @@ class LocalEmbedding(EmbeddingProvider):
         embeddings = await provider.embed(["Hello world"])
     """
     
+    # Class-level cache for model singleton (shared across all instances)
+    _shared_model = None
+    _shared_tokenizer = None
+    _shared_lock = None  # Will be created on first use
+    _shared_device = None
+    
     def __init__(
         self,
         model_name: str = "Qwen/Qwen3-Embedding-0.6B",
@@ -145,8 +151,6 @@ class LocalEmbedding(EmbeddingProvider):
         self.device = device or ("cuda" if self._has_cuda() else "cpu")
         self.use_flash_attention = use_flash_attention
         self.max_length = max_length
-        self._model = None
-        self._tokenizer = None
     
     def _has_cuda(self) -> bool:
         try:
@@ -156,53 +160,58 @@ class LocalEmbedding(EmbeddingProvider):
             return False
     
     def _load_model(self):
-        """Lazy load model and tokenizer with thread safety."""
-        if self._model is None:
-            import threading
-            import torch
-            
-            if not _TRANSFORMERS_AVAILABLE:
-                raise ImportError("transformers library is required for local embedding")
-            
-            # Thread-safe model loading
-            if not hasattr(self, '_load_lock'):
-                self._load_lock = threading.Lock()
-            
-            with self._load_lock:
-                # Double-check pattern
-                if self._model is not None:
-                    return self._model, self._tokenizer
-                
-                # Pin to specific device
-                if self.device == "cuda":
-                    self.device = "cuda:0"
-                
-                # Load tokenizer (matches working test code)
-                self._tokenizer = AutoTokenizer.from_pretrained(
-                    self.model_name,
-                    padding_side='left',  # Required for Qwen3 embedding
-                )
-                
-                # Load model - keep it SIMPLE like the user's working test code
-                # Don't add extra parameters that cause meta tensor issues
-                if self.use_flash_attention:
-                    self._model = AutoModel.from_pretrained(
-                        self.model_name,
-                        attn_implementation="flash_attention_2",
-                        torch_dtype=torch.float16,
-                    ).cuda()
-                else:
-                    # Simple load - exactly like user's working code
-                    self._model = AutoModel.from_pretrained(self.model_name)
-                    
-                    # Move to GPU if requested
-                    if self.device.startswith("cuda"):
-                        self._model = self._model.to(self.device)
-                
-                self._model.eval()  # Set to eval mode
-                logger.info(f"Loaded {self.model_name} on {self._model.device}")
+        """Lazy load model and tokenizer with thread safety (class-level singleton)."""
+        import threading
+        import torch
         
-        return self._model, self._tokenizer
+        # Fast path: model already loaded
+        if LocalEmbedding._shared_model is not None:
+            return LocalEmbedding._shared_model, LocalEmbedding._shared_tokenizer
+        
+        if not _TRANSFORMERS_AVAILABLE:
+            raise ImportError("transformers library is required for local embedding")
+        
+        # Create class-level lock if not exists
+        if LocalEmbedding._shared_lock is None:
+            LocalEmbedding._shared_lock = threading.Lock()
+        
+        with LocalEmbedding._shared_lock:
+            # Double-check pattern
+            if LocalEmbedding._shared_model is not None:
+                return LocalEmbedding._shared_model, LocalEmbedding._shared_tokenizer
+            
+            # Pin to specific device
+            device = self.device
+            if device == "cuda":
+                device = "cuda:0"
+            
+            # Load tokenizer (matches working test code)
+            LocalEmbedding._shared_tokenizer = AutoTokenizer.from_pretrained(
+                self.model_name,
+                padding_side='left',  # Required for Qwen3 embedding
+            )
+            
+            # Load model - keep it SIMPLE like the user's working test code
+            # Don't add extra parameters that cause meta tensor issues
+            if self.use_flash_attention:
+                LocalEmbedding._shared_model = AutoModel.from_pretrained(
+                    self.model_name,
+                    attn_implementation="flash_attention_2",
+                    torch_dtype=torch.float16,
+                ).cuda()
+            else:
+                # Simple load - exactly like user's working code
+                LocalEmbedding._shared_model = AutoModel.from_pretrained(self.model_name)
+                
+                # Move to GPU if requested
+                if device.startswith("cuda"):
+                    LocalEmbedding._shared_model = LocalEmbedding._shared_model.to(device)
+            
+            LocalEmbedding._shared_model.eval()  # Set to eval mode
+            LocalEmbedding._shared_device = device
+            logger.info(f"Loaded {self.model_name} on {LocalEmbedding._shared_model.device}")
+        
+        return LocalEmbedding._shared_model, LocalEmbedding._shared_tokenizer
     
     def _last_token_pool(self, last_hidden_states, attention_mask):
         """
