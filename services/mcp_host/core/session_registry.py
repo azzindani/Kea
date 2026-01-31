@@ -316,9 +316,20 @@ class SessionRegistry:
             try:
                 await asyncio.wait_for(client.connect(transport), timeout=connect_timeout)
             except asyncio.TimeoutError:
+                # Capture stderr to diagnose WHY the server didn't start
+                stderr_output = ""
+                try:
+                    if process.stderr:
+                        stderr_data = await asyncio.wait_for(process.stderr.read(4096), timeout=1.0)
+                        stderr_output = stderr_data.decode('utf-8', errors='replace')
+                except:
+                    pass
+                
                 logger.error(f"❌ Timeout ({connect_timeout}s) connecting to {server_name}")
+                if stderr_output:
+                    logger.error(f"   Server stderr: {stderr_output[:500]}")
                 process.terminate()
-                raise TimeoutError(f"Server {server_name} did not respond in {connect_timeout}s")
+                raise TimeoutError(f"Server {server_name} did not respond in {connect_timeout}s. Stderr: {stderr_output[:200]}")
             
             self.active_sessions[server_name] = client
             self.active_processes[server_name] = process
@@ -327,6 +338,15 @@ class SessionRegistry:
             return client
             
         except Exception as e:
+            # On any failure, try to capture stderr for debugging
+            if 'process' in locals() and process.stderr:
+                try:
+                    stderr_data = await asyncio.wait_for(process.stderr.read(4096), timeout=1.0)
+                    stderr_output = stderr_data.decode('utf-8', errors='replace')
+                    if stderr_output:
+                        logger.error(f"   Server stderr: {stderr_output[:500]}")
+                except:
+                    pass
             logger.error(f"❌ Failed to spawn {server_name}: {e}")
             raise
 
