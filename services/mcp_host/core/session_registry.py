@@ -292,8 +292,9 @@ class SessionRegistry:
                     cmd = [uv_path, "run", "python", config.script_path.name]
                 else:
                     # Legacy/Global Mode -> Script Mode (PEP 723)
-                    # Use "uv run script.py" so uv parses the metadata dependencies
-                    cmd = [uv_path, "run", str(config.script_path)]
+                    # Use "uv run --no-project script.py" so uv ignores root pyproject.toml
+                    # and uses the metadata in the script.
+                    cmd = [uv_path, "run", "--no-project", str(config.script_path)]
             else:
                 # Fallback to current interpreter
                 cmd = [sys.executable, str(config.script_path)]

@@ -9,7 +9,7 @@ import yfinance as yf
 import uuid
 import os
 import base64
-from mcp.types import Image
+from mcp.server.fastmcp import Image
 from shared.logging import get_logger
 
 logger = get_logger(__name__)
