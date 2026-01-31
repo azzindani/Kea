@@ -1,6 +1,13 @@
 # Yfinance Server
 # Managed by pyproject.toml
 
+import sys
+from pathlib import Path
+
+# Ensure current directory is in python path for local imports
+# This fixes "ModuleNotFoundError: No module named 'tools'" in some uv environments
+sys.path.append(str(Path(__file__).parent))
+
 from mcp.server.fastmcp import FastMCP, Image
 from tools import (
     charts, market, financials, holders, analysis, options, discovery, aggregators
