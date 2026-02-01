@@ -10,6 +10,7 @@ dependencies = [
     "pandas-datareader",
     "pydantic",
     "python-dotenv",
+    "setuptools",
     "structlog",
     "wrapt",
 ]

@@ -53,22 +53,28 @@ def register_indicators():
         name = f"get_indicator_{ind.lower().replace('.', '_')}"
         desc = f"Get only {ind} value."
         
-        # Closure for specific indicator
-        async def handler(symbol: str, market: str = "america", exchange: str = "NASDAQ", interval: str = "1d", _key=ind) -> str:
+    def make_handler(ind_name):
+        async def handler(symbol: str, market: str = "america", exchange: str = "NASDAQ", interval: str = "1d") -> str:
             # Reuse get_indicators logic
             res_str = await ta.get_indicators(symbol, market, exchange, interval)
             try:
                 if res_str.startswith("Error"): return res_str
                 data = json.loads(res_str)
-                val = data.get(_key, "N/A")
+                # Use captured variable
+                val = data.get(ind_name, "N/A")
                 return str(val)
             except: 
                 return "N/A"
+        return handler
+
+    for ind in INDICATORS:
+        name = f"get_indicator_{ind.lower().replace('.', '_')}"
+        desc = f"Get only {ind} value."
         
         mcp.add_tool(
             name=name,
             description=desc,
-            fn=handler
+            fn=make_handler(ind)
         )
 
 register_indicators()
@@ -115,17 +121,23 @@ def register_fundamentals():
         tname = f"get_tv_{fname}"
         tdesc = f"Get {fname.replace('_', ' ').title()} via TradingView."
         
-        async def fund_handler(ticker: str, market: str = "america", _k=fkey) -> str:
+    def make_fund_handler(fkey):
+        async def fund_handler(ticker: str, market: str = "america") -> str:
             scr = screener_module.TvScreener()
             # Use bulk mode for single ticker
-            res = scr.fetch(market=market, query={"symbol_list": [ticker]}, columns=[_k], range_limit=1)
+            res = scr.fetch(market=market, query={"symbol_list": [ticker]}, columns=[fkey], range_limit=1)
             
             if res and isinstance(res, list) and not "error" in res[0]:
-                val = res[0].get(_k, "N/A")
+                val = res[0].get(fkey, "N/A")
                 return str(val)
             return "N/A"
+        return fund_handler
 
-        mcp.add_tool(name=tname, description=tdesc, fn=fund_handler)
+    for fname, fkey in FUNDAMENTALS.items():
+        tname = f"get_tv_{fname}"
+        tdesc = f"Get {fname.replace('_', ' ').title()} via TradingView."
+        
+        mcp.add_tool(name=tname, description=tdesc, fn=make_fund_handler(fkey))
 
 register_fundamentals()
 
@@ -153,15 +165,21 @@ def register_performance():
         tname = f"get_{pname}"
         tdesc = f"Get {pname.replace('_', ' ').title()}."
         
-        async def perf_handler(ticker: str, market: str = "america", _k=pkey) -> str:
+    def make_perf_handler(pkey):
+        async def perf_handler(ticker: str, market: str = "america") -> str:
             scr = screener_module.TvScreener()
-            res = scr.fetch(market=market, query={"symbol_list": [ticker]}, columns=[_k], range_limit=1)
+            res = scr.fetch(market=market, query={"symbol_list": [ticker]}, columns=[pkey], range_limit=1)
             if res and isinstance(res, list) and not "error" in res[0]:
-                val = res[0].get(_k, "N/A")
+                val = res[0].get(pkey, "N/A")
                 return str(val)
             return "N/A"
+        return perf_handler
 
-        mcp.add_tool(name=tname, description=tdesc, fn=perf_handler)
+    for pname, pkey in PERFORMANCE.items():
+        tname = f"get_{pname}"
+        tdesc = f"Get {pname.replace('_', ' ').title()}."
+        
+        mcp.add_tool(name=tname, description=tdesc, fn=make_perf_handler(pkey))
 
 register_performance()
 
@@ -187,10 +205,17 @@ def register_presets():
             t_name = f"scan_{m}_{p}"
             t_desc = f"Quick Scan: {p.replace('_', ' ').title()} in {m.title()}"
             
-            async def p_handler(limit: int = 100000, _m=m, _p=p) -> str:
-                return await screener_module.scan_market(_m, limit, _p)
-            
-            mcp.add_tool(name=t_name, description=t_desc, fn=p_handler)
+    def make_preset_handler(m_val, p_val):
+        async def p_handler(limit: int = 100000) -> str:
+            return await screener_module.scan_market(m_val, limit, p_val)
+        return p_handler
+
+    for m in MARKETS:
+        for p in PRESETS:
+            t_name = f"scan_{m}_{p}"
+            t_desc = f"Quick Scan: {p.replace('_', ' ').title()} in {m.title()}"
+             
+            mcp.add_tool(name=t_name, description=t_desc, fn=make_preset_handler(m, p))
 
 register_presets()
 

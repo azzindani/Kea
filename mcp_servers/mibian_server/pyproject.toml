@@ -8,6 +8,7 @@ dependencies = [
     "mcp",
     "mibian",
     "numpy",
+    "pandas",
     "pydantic",
     "python-dotenv",
     "scipy",

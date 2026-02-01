@@ -24,7 +24,7 @@ logger = structlog.get_logger()
 
 # Create the FastMCP server
 mcp = FastMCP("numpy_server", dependencies=["numpy", "pandas"])
-NumericData = Union[List[float], List[int], str] 
+NumericData = Any 
 
 # ==========================================
 # 1. Creation
