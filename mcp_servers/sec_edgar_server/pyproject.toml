@@ -11,7 +11,7 @@ dependencies = [
     "mcp",
     "pandas",
     "pydantic",
-    "pyrate-limiter<3.0",
+    "pyrate-limiter>=3.6",
     "python-dotenv",
     "sec-edgar-downloader>=5.0.3",
     "structlog",

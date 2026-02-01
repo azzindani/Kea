@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "mcp",
-    "pandas",
+    "pandas<2.0.0",
     "pandas-datareader",
     "pydantic",
     "python-dotenv",

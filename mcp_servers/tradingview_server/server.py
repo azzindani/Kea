@@ -41,7 +41,7 @@ async def get_ma_all(symbol: str, market: str = "america", exchange: str = "NASD
 # We explicitly register specific indicators for ease of use
 INDICATORS = [
     "RSI", "MACD", "Stoch.K", "Stoch.D", "CCI", "ADX", "AO", "Mom", "Rec.Stoch.RSI",
-    "W%R", "UO", "BBP", "EMA10", "EMA20", "EMA50", "EMA100", "EMA200",
+    "W_R", "UO", "BBP", "EMA10", "EMA20", "EMA50", "EMA100", "EMA200",
     "SMA10", "SMA20", "SMA50", "SMA100", "SMA200", "Ichimoku.BLine", "VWMA",
     "open", "high", "low", "close", "volume", "change",
     "Pivot.M.Classic.S3", "Pivot.M.Classic.S2", "Pivot.M.Classic.S1", "Pivot.M.Classic.Middle", "Pivot.M.Classic.R1", "Pivot.M.Classic.R2", "Pivot.M.Classic.R3",
