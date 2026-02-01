@@ -17,4 +17,8 @@ def dict_to_result(data: dict, title: str = "Result") -> ToolResult:
 class EdgarCore:
     @staticmethod
     def get_company(ticker: str) -> Company:
-        return Company(ticker)
+        c = Company(ticker)
+        # Check for dummy CIK returned by library for invalid tickers
+        if hasattr(c, 'cik') and (str(c.cik) == "-999999999" or c.cik == -999999999):
+            raise ValueError(f"Company {ticker} not found in EDGAR database.")
+        return c

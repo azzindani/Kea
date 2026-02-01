@@ -22,7 +22,11 @@ def _format_financials(df: pd.DataFrame) -> pd.DataFrame:
             elif abs(x) >= 1e6:
                 return f"{x/1e6:.2f}M"
         return x
-    return df.applymap(fmt)
+    # Compatibility for pandas >= 2.1.0
+    if hasattr(df, "map"):
+        return df.map(fmt)
+    else:
+        return df.applymap(fmt)
 
 # Helper to avoid repetition
 async def _get_stmt(ticker: str, type_: str, freq: str) -> str:
