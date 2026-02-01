@@ -1,0 +1,15 @@
+[project]
+name = "finviz_server"
+version = "0.1.0"
+description = "MCP Server for Finviz Finance"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp>=0.1.0",
+    "finvizfinance",
+    "pandas",
+    "structlog"
+]
+
+[tool.uv]
+dev-dependencies = []

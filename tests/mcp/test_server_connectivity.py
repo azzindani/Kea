@@ -48,7 +48,7 @@ class TestMCPServerConnectivity:
         passed_servers = []
         
         # Increase timeout for JIT installations (some servers imply heavy deps)
-        TIMEOUT_PER_SERVER = 180  
+        TIMEOUT_PER_SERVER = 60  
         
         print(f"\n🚀 Starting Connectivity Tets for {len(discovered_servers)} Servers...")
         

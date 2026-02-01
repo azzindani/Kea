@@ -1,3 +1,4 @@
+from __future__ import annotations
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
@@ -6,9 +7,6 @@ sys.path.append(str(Path(__file__).parent))
 #   "mcp",
 # ]
 # ///
-
-
-from __future__ import annotations
 import asyncio
 from mcp.server.fastmcp import FastMCP
 
