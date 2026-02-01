@@ -9,6 +9,7 @@ dependencies = [
     "pandas",
     "pydantic",
     "python-dotenv",
+    "requests",
     "structlog",
     "tradingview-ta",
     "wrapt",

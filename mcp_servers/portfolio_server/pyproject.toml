@@ -4,7 +4,16 @@ version = "0.1.0"
 description = "MCP Server for portfolio_server"
 requires-python = ">=3.10"
 dependencies = [
+    "matplotlib",
     "mcp",
+    "numpy",
+    "pandas",
+    "pydantic",
+    "pyportfolioopt",
+    "python-dotenv",
+    "scipy",
+    "structlog",
+    "wrapt",
 ]
 
 [tool.uv]

@@ -284,33 +284,39 @@ async def get_chainlink_usdc_usd() -> str:
 # Register dynamic shortcuts
 for sym, addr in tokens.items():
     # Balance
-    async def make_bal_handler(a=addr):
+    def make_bal_handler(a=addr):
         async def handler(wallet_address: str):
             return await run_op(erc20.get_token_balance, token_address=a, wallet_address=wallet_address)
         return handler
     
-    mcp.tool(name=f"get_{sym}_balance", description=f"SHORTCUT: Get {sym.upper()} Balance.")(
-        make_bal_handler()
+    mcp.add_tool(
+        name=f"get_{sym}_balance",
+        description=f"SHORTCUT: Get {sym.upper()} Balance.",
+        fn=make_bal_handler()
     )
 
     # Price
-    async def make_price_handler(a=addr):
+    def make_price_handler(a=addr):
         async def handler():
             return await run_op(defi.get_uniswap_price, token_in=a, token_out="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", amount_in=1.0, fee=3000)
         return handler
 
-    mcp.tool(name=f"get_{sym}_price", description=f"SHORTCUT: Get {sym.upper()} Price (in USDC).")(
-        make_price_handler()
+    mcp.add_tool(
+        name=f"get_{sym}_price",
+        description=f"SHORTCUT: Get {sym.upper()} Price (in USDC).",
+        fn=make_price_handler()
     )
 
     # Aave
-    async def make_aave_handler(a=addr):
+    def make_aave_handler(a=addr):
         async def handler():
             return await run_op(lending.get_aave_reserve_data, asset=a)
         return handler
 
-    mcp.tool(name=f"get_{sym}_aave_data", description=f"SHORTCUT: Get {sym.upper()} Aave Rates.")(
-        make_aave_handler()
+    mcp.add_tool(
+        name=f"get_{sym}_aave_data",
+        description=f"SHORTCUT: Get {sym.upper()} Aave Rates.",
+        fn=make_aave_handler()
     )
 
 if __name__ == "__main__":

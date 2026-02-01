@@ -13,6 +13,17 @@ def create_document() -> str:
     # For now, we'll assume the user provides output paths for save.
     return "Ready to create. Use save_document to finalize."
 
+def create_document_file(path: str) -> str:
+    """Create a new blank document at the specified path."""
+    try:
+        doc = docx.Document()
+        doc.save(path)
+        return f"Created new document at {path}"
+    except Exception as e:
+        logger.error("failed_to_create_docx", path=path, error=str(e))
+        raise
+
+
 def open_document(path: str) -> docx.document.Document:
     """Helper to open a document."""
     try:

@@ -10,6 +10,7 @@ dependencies = [
     "mcp",
     "pydantic",
     "python-dotenv",
+    "requests",
     "structlog",
     "wrapt",
 ]

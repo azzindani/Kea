@@ -1,6 +1,8 @@
 from lxml import etree, html
 import requests
 import json
+import glob
+import os
 from typing import Dict, Any, List, Union
 from mcp_servers.lxml_server.tools import core_ops
 

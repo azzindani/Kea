@@ -5,7 +5,7 @@ description = "MCP Server for Finviz Finance"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "finviz",
+    "finvizfinance",
     "mcp",
     "pandas",
     "pydantic",

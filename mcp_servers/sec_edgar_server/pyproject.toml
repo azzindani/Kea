@@ -7,11 +7,14 @@ requires-python = ">=3.10"
 dependencies = [
     "beautifulsoup4",
     "httpx",
+    "lxml",
     "mcp",
+    "pandas",
     "pydantic",
     "python-dotenv",
     "sec-edgar-downloader",
     "structlog",
+    "textblob",
     "wrapt",
 ]
 

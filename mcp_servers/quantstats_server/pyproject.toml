@@ -11,8 +11,10 @@ dependencies = [
     "pydantic",
     "python-dotenv",
     "quantstats",
+    "seaborn",
     "structlog",
     "wrapt",
+    "yfinance",
 ]
 
 [tool.uv]

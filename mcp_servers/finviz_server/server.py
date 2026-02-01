@@ -17,6 +17,7 @@ from tools import (
     strategy, charts, financials, bulk_ta
 )
 from typing import List, Dict, Any, Optional
+import structlog
 
 logger = structlog.get_logger()
 

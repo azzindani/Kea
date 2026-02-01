@@ -190,12 +190,12 @@ for name, code in INDICATORS.items():
     desc = f"INDICATOR: Get '{name}' ({code}) for economies."
     
     # We must bind 'c=code' to capture the value in the loop
-    async def make_ind_handler(c=code):
+    def make_handler(c=code):
         async def handler(economies: list[str] = None, mrv: int = 5):
             return await run_op(indicators.get_indicator_data, indicator_code=c, economies=economies, mrv=mrv)
         return handler
     
-    mcp.tool(name=tool_name, description=desc)(make_ind_handler())
+    mcp.add_tool(name=tool_name, description=desc, fn=make_handler())
 
 if __name__ == "__main__":
     mcp.run()

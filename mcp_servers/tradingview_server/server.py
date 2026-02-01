@@ -11,7 +11,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import ta, screener
+from tools import ta, screener as screener_module
 import structlog
 import json
 
@@ -23,19 +23,19 @@ mcp = FastMCP("tradingview_server", dependencies=["tradingview_ta", "requests"])
 # --- 1. CORE TA TOOLS ---
 
 @mcp.tool()
-async def get_ta_summary(symbol: str, screener: str = "america", exchange: str = "NASDAQ", interval: str = "1d") -> str:
+async def get_ta_summary(symbol: str, market: str = "america", exchange: str = "NASDAQ", interval: str = "1d") -> str:
     """Get high-level Technical Analysis Summary (Buy/Sell/Hold)."""
-    return await ta.get_ta_summary(symbol, screener, exchange, interval)
+    return await ta.get_ta_summary(symbol, market, exchange, interval)
 
 @mcp.tool()
-async def get_oscillators_all(symbol: str, screener: str = "america", exchange: str = "NASDAQ", interval: str = "1d") -> str:
+async def get_oscillators_all(symbol: str, market: str = "america", exchange: str = "NASDAQ", interval: str = "1d") -> str:
     """Get ALL Oscillator values (RSI, MACD, etc)."""
-    return await ta.get_oscillators(symbol, screener, exchange, interval)
+    return await ta.get_oscillators(symbol, market, exchange, interval)
 
 @mcp.tool()
-async def get_ma_all(symbol: str, screener: str = "america", exchange: str = "NASDAQ", interval: str = "1d") -> str:
+async def get_ma_all(symbol: str, market: str = "america", exchange: str = "NASDAQ", interval: str = "1d") -> str:
     """Get ALL Moving Averages (SMA/EMA)."""
-    return await ta.get_moving_averages(symbol, screener, exchange, interval)
+    return await ta.get_moving_averages(symbol, market, exchange, interval)
 
 # --- 2. GRANULAR TA (Unrolling for High Definition) ---
 # We explicitly register specific indicators for ease of use
@@ -54,9 +54,9 @@ def register_indicators():
         desc = f"Get only {ind} value."
         
         # Closure for specific indicator
-        async def handler(symbol: str, screener: str = "america", exchange: str = "NASDAQ", interval: str = "1d", _key=ind) -> str:
+        async def handler(symbol: str, market: str = "america", exchange: str = "NASDAQ", interval: str = "1d", _key=ind) -> str:
             # Reuse get_indicators logic
-            res_str = await ta.get_indicators(symbol, screener, exchange, interval)
+            res_str = await ta.get_indicators(symbol, market, exchange, interval)
             try:
                 if res_str.startswith("Error"): return res_str
                 data = json.loads(res_str)
@@ -116,8 +116,7 @@ def register_fundamentals():
         tdesc = f"Get {fname.replace('_', ' ').title()} via TradingView."
         
         async def fund_handler(ticker: str, market: str = "america", _k=fkey) -> str:
-            from tools.screener import TvScreener
-            scr = TvScreener()
+            scr = screener_module.TvScreener()
             # Use bulk mode for single ticker
             res = scr.fetch(market=market, query={"symbol_list": [ticker]}, columns=[_k], range_limit=1)
             
@@ -155,8 +154,7 @@ def register_performance():
         tdesc = f"Get {pname.replace('_', ' ').title()}."
         
         async def perf_handler(ticker: str, market: str = "america", _k=pkey) -> str:
-            from tools.screener import TvScreener
-            scr = TvScreener()
+            scr = screener_module.TvScreener()
             res = scr.fetch(market=market, query={"symbol_list": [ticker]}, columns=[_k], range_limit=1)
             if res and isinstance(res, list) and not "error" in res[0]:
                 val = res[0].get(_k, "N/A")
@@ -172,12 +170,12 @@ register_performance()
 @mcp.tool()
 async def scan_market(market: str = "america", limit: int = 100000, preset: str = "market_cap") -> str:
     """BULK: Scan market (Top Gainers, Losers, Oversold)."""
-    return await screener.scan_market(market, limit, preset)
+    return await screener_module.scan_market(market, limit, preset)
 
 @mcp.tool()
 async def get_bulk_data(tickers: list[str], columns: list[str] = None, market: str = "america") -> str:
     """MULTI-TALENT: Get custom data columns for list of tickers."""
-    return await screener.get_bulk_data(tickers, columns, market)
+    return await screener_module.get_bulk_data(tickers, columns, market)
 
 # --- 4. PRESET SCANNERS (Convenience) ---
 PRESETS = ["top_gainers", "top_losers", "most_active", "oversold", "overbought"]
@@ -190,7 +188,7 @@ def register_presets():
             t_desc = f"Quick Scan: {p.replace('_', ' ').title()} in {m.title()}"
             
             async def p_handler(limit: int = 100000, _m=m, _p=p) -> str:
-                return await scan_market(_m, limit, _p)
+                return await screener_module.scan_market(_m, limit, _p)
             
             mcp.add_tool(name=t_name, description=t_desc, fn=p_handler)
 

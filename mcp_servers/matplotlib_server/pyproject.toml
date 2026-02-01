@@ -8,6 +8,7 @@ dependencies = [
     "mcp",
     "numpy",
     "pandas",
+    "pillow",
     "pydantic",
     "python-dotenv",
     "scipy",
