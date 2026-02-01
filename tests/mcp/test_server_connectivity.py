@@ -68,7 +68,7 @@ class VerboseServerTester:
         self.registry = registry
         self.results: Dict[str, SpawnResult] = {}
     
-    async def test_server(self, server_name: str, timeout: int = 180)> SpawnResult:
+    async def test_server(self, server_name: str, timeout: int = 180) -> SpawnResult:
         """Test a single server with maximum verbosity."""
         result = SpawnResult()
         
