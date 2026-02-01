@@ -37,7 +37,8 @@ from tools.timeline import get_filing_timeline
 
 logger = structlog.get_logger()
 
-# Create the FastMCP server
+mcp = FastMCP(
+    "sec_edgar_server",
     dependencies=["sec-edgar-downloader", "pandas", "beautifulsoup4", "lxml", "textblob"]
 )
 

@@ -13,6 +13,20 @@ sys.path.append(str(Path(__file__).parent))
 import asyncio
 from mcp.server.fastmcp import FastMCP
 
+# --- PATCH: Fix pandas-datareader compatibility ---
+# pandas-datareader uses an old signature for deprecate_kwarg.
+# We patch it to prevent TypeError on import.
+try:
+    import pandas.util._decorators
+    def mock_deprecate_kwarg(old_arg_name, new_arg_name, mapping=None, stacklevel=2):
+        def decorator(func):
+            return func
+        return decorator
+    pandas.util._decorators.deprecate_kwarg = mock_deprecate_kwarg
+except ImportError:
+    pass
+# --------------------------------------------------
+
 # Tools - use aliased imports to avoid naming collisions
 from tools import famafrench, market_global, dashboards, market_symbols, central_bank, commercial
 
