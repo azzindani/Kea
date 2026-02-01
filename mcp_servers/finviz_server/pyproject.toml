@@ -12,6 +12,7 @@ dependencies = [
     "python-dotenv",
     "structlog",
     "wrapt",
+    "yfinance",
 ]
 
 [tool.uv]

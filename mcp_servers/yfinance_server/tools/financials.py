@@ -7,6 +7,24 @@ from shared.logging import get_logger
 logger = get_logger(__name__)
 
 # Helper to avoid repetition
+
+import pandas as pd
+
+# Helper: Format huge numbers
+def _format_financials(df: pd.DataFrame) -> pd.DataFrame:
+    """Format large numbers in DataFrame to readable strings."""
+    def fmt(x):
+        if isinstance(x, (int, float)):
+            if abs(x) >= 1e12:
+                return f"{x/1e12:.2f}T"
+            elif abs(x) >= 1e9:
+                return f"{x/1e9:.2f}B"
+            elif abs(x) >= 1e6:
+                return f"{x/1e6:.2f}M"
+        return x
+    return df.applymap(fmt)
+
+# Helper to avoid repetition
 async def _get_stmt(ticker: str, type_: str, freq: str) -> str:
     try:
         stock = yf.Ticker(ticker)
@@ -19,8 +37,16 @@ async def _get_stmt(ticker: str, type_: str, freq: str) -> str:
         else:
             return "Error: Unknown Type"
             
+        if df.empty:
+            return f"No {type_} data found for {ticker}"
+            
+        # Format numbers
+        df_formatted = _format_financials(df)
+        
         title = f"{freq.capitalize()} {type_.replace('_', ' ').title()}"
-        return f"### {title} ({ticker})\n\n{df.to_markdown()}"
+        source = f"https://finance.yahoo.com/quote/{ticker}/{type_}"
+        
+        return f"### {title} ({ticker})\n\n{df_formatted.to_markdown()}\n\nSource: {source}"
     except Exception as e:
         logger.error(f"Financials error for {ticker}: {e}")
         return f"Error: {str(e)}"

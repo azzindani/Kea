@@ -39,7 +39,22 @@ async def get_stock_depth(ticker: str, mode: str) -> str:
             data = stock.ticker_fundament()
             return json.dumps(data, indent=2)
             
+            
     except Exception as e:
         logger.error(f"Quote error {ticker} {mode}: {e}")
+        
+        # Fallback for Fundamentals using yfinance
+        if mode == "fundament" and "404" in str(e):
+            try:
+                import yfinance as yf
+                logger.info(f"Falling back to yfinance for {ticker} fundamentals")
+                stock = yf.Ticker(ticker)
+                info = stock.info
+                # Basic normalization to match expected dict structure if needed, 
+                # but returning the raw info dict is usually fine for LLM interpretation.
+                return json.dumps(info, indent=2)
+            except Exception as yf_e:
+                logger.error(f"yfinance fallback failed: {yf_e}")
+                
         return f"Error: {str(e)}"
 
