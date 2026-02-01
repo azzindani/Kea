@@ -289,7 +289,7 @@ class SessionRegistry:
                     cwd = server_dir
                     # Run relative to the server dir to ensure UV uses that project
                     # "uv run python server.py"
-                    cmd = [uv_path, "run", "python", config.script_path.name]
+                    cmd = [uv_path, "run", "-q", "python", config.script_path.name]
                 else:
                     # Legacy/Global Mode -> Script Mode (PEP 723)
                     # Use "uv run --no-project --with mcp --with structlog script.py" 
