@@ -1,13 +1,17 @@
 [project]
 name = "scraper_server"
 version = "0.1.0"
-description = "MCP Server for scraper_server"
+description = "MCP Server for Scraper"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "#   mcp",
-    "#   structlog",
-    "mcp"
+    "mcp>=0.1.0",
+    "playwright",
+    "beautifulsoup4",
+    "wrapt",
+    "pydantic",
+    "structlog",
+    "python-dotenv"
 ]
 
 [tool.uv]
