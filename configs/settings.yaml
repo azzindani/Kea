@@ -112,7 +112,6 @@ mcp:
     - name: "yfinance_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with yfinance --with pandas --with matplotlib --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.yfinance_server.server"
     - name: "yahooquery_server"
       enabled: true
       transport: "stdio"
@@ -120,11 +119,9 @@ mcp:
     - name: "ccxt_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with ccxt --with pandas --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.ccxt_server.server"
     - name: "tradingview_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with tradingview-ta --with pandas --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.tradingview_server.server"
     
     # === Technical Analysis Servers ===
     - name: "pandas_ta_server"
@@ -144,21 +141,17 @@ mcp:
     - name: "finviz_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with finviz --with pandas --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.finviz_server.server"
     - name: "pdr_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with pandas-datareader --with pandas --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.pdr_server.server"
     - name: "wbgapi_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with wbgapi --with pandas --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.wbgapi_server.server"
     
     # === SEC/EDGAR Servers ===
     - name: "sec_edgar_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with sec-edgar-downloader --with httpx --with beautifulsoup4 --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.sec_edgar_server.server"
     - name: "python_edgar_server"
       enabled: true
       transport: "stdio"
@@ -170,17 +163,14 @@ mcp:
     - name: "docx_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with python-docx --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.docx_server.server"
     
     # === Specialized Servers ===
     - name: "newspaper_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with newspaper3k --with lxml --with nltk --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.newspaper_server.server"
     - name: "web3_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with web3 --with eth-abi --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.web3_server.server"
     - name: "analysis_server"
       enabled: true
       transport: "stdio"
@@ -192,7 +182,6 @@ mcp:
     - name: "pandas_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with pandas --with numpy --with pyarrow --with openpyxl --with wrapt --with pydantic --with structlog --with python-dotenv python -m mcp_servers.pandas_server.server"
     - name: "playwright_server"
       enabled: true
       transport: "stdio"
@@ -200,7 +189,6 @@ mcp:
     - name: "bs4_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with beautifulsoup4 --with lxml --with html5lib --with structlog --with python-dotenv python -m mcp_servers.bs4_server.server"
     - name: "google_search_server"
       enabled: true
       transport: "stdio"
@@ -216,7 +204,6 @@ mcp:
     - name: "numpy_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with numpy --with pandas --with structlog --with python-dotenv python -m mcp_servers.numpy_server.server"
     - name: "statsmodels_server"
       enabled: true
       transport: "stdio"
@@ -236,11 +223,9 @@ mcp:
     - name: "matplotlib_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with matplotlib --with seaborn --with scipy --with numpy --with pandas --with structlog --with python-dotenv python -m mcp_servers.matplotlib_server.server"
     - name: "seaborn_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with seaborn --with matplotlib --with scipy --with numpy --with pandas --with structlog --with python-dotenv python -m mcp_servers.seaborn_server.server"
     - name: "plotly_server"
       enabled: true
       transport: "stdio"
@@ -252,11 +237,9 @@ mcp:
     - name: "portfolio_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with quantstats --with pandas --with numpy --with matplotlib --with structlog --with python-dotenv python -m mcp_servers.portfolio_server.server"
     - name: "quantstats_server"
       enabled: true
       transport: "stdio"
-      command: "uv run --with quantstats --with pandas --with numpy --with matplotlib --with structlog --with python-dotenv python -m mcp_servers.quantstats_server.server"
     - name: "spacy_server"
       enabled: true
       transport: "stdio"
