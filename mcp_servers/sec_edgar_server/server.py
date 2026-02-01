@@ -9,6 +9,23 @@ if root_path not in sys.path:
 # Ensure current directory is in python path for local imports
 sys.path.append(str(Path(__file__).parent))
 
+# --- PATCH FOR PYRATE-LIMITER v3+ ---
+# sec-edgar-downloader uses 'raise_when_fail' kwarg which was removed in pyrate-limiter v3.
+# We monkey-patch Limiter to accept and ignore it.
+try:
+    from pyrate_limiter import Limiter
+    original_init = Limiter.__init__
+
+    def patched_init(self, *args, **kwargs):
+        if 'raise_when_fail' in kwargs:
+            kwargs.pop('raise_when_fail')
+        original_init(self, *args, **kwargs)
+
+    Limiter.__init__ = patched_init
+except ImportError:
+    pass
+# ------------------------------------
+
 from mcp.server.fastmcp import FastMCP
 from typing import List, Optional
 import structlog
@@ -42,22 +59,7 @@ mcp = FastMCP(
     dependencies=["sec-edgar-downloader", "pandas", "beautifulsoup4", "lxml", "textblob"]
 )
 
-# --- PATCH FOR PYRATE-LIMITER v3+ ---
-# sec-edgar-downloader uses 'raise_when_fail' kwarg which was removed in pyrate-limiter v3.
-# We monkey-patch Limiter to accept and ignore it.
-try:
-    from pyrate_limiter import Limiter
-    original_init = Limiter.__init__
 
-    def patched_init(self, *args, **kwargs):
-        if 'raise_when_fail' in kwargs:
-            kwargs.pop('raise_when_fail')
-        original_init(self, *args, **kwargs)
-
-    Limiter.__init__ = patched_init
-except ImportError:
-    pass
-# ------------------------------------
 
 
 # =============================================================================
