@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 
 from services.mcp_host.core.session_registry import SessionRegistry
 from shared.mcp.client import MCPClient
+from shared.mcp.transport import SubprocessTransport
 
 # Configure logging to capture ALL output
 logging.basicConfig(
@@ -90,25 +91,6 @@ class VerboseServerTester:
         
         stderr_lines = []
         stdout_lines = []
-        
-        async def stream_stderr(proc):
-            """Stream stderr in real-time."""
-            try:
-                while True:
-                    line = await proc.stderr.readline()
-                    if not line:
-                        break
-                    text = line.decode('utf-8', errors='replace').rstrip()
-                    stderr_lines.append(text)
-                    print(f"   [STDERR] {text}")
-            except Exception as e:
-                print(f"   [STDERR-ERR] {e}")
-        
-        async def stream_stdout(proc):
-            """Stream stdout in real-time (for debug only, normally MCP uses this)."""
-            # Note: We can't actually stream stdout because MCP uses it for protocol
-            # But we can capture it on error
-            pass
         
         try:
             print(f"\n🚀 Spawning server...")
@@ -274,7 +256,6 @@ class VerboseServerTester:
         
         try:
             # Create transport and connect
-            from services.mcp_host.core.subprocess_transport import SubprocessTransport
             transport = SubprocessTransport(process)
             client = MCPClient(timeout=300.0)
             
