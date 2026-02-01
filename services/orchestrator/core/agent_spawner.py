@@ -564,7 +564,8 @@ class AgentSpawner:
                             # =========================================================
                             if tool_name in ["execute_code", "run_python"]:
                                 from services.orchestrator.agents.code_generator import generate_python_code
-                                from services.orchestrator.core.utils import build_tool_inputs
+                                from services.orchestrator.agents.code_generator import generate_python_code
+
                                 
                                 attempt = 0
                                 max_attempts = 3
