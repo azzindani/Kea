@@ -19,6 +19,8 @@ try:
     def patched_init(self, *args, **kwargs):
         if 'raise_when_fail' in kwargs:
             kwargs.pop('raise_when_fail')
+        if 'max_delay' in kwargs:
+            kwargs.pop('max_delay')
         original_init(self, *args, **kwargs)
 
     Limiter.__init__ = patched_init
