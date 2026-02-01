@@ -137,8 +137,7 @@ def inspect_treebuilder_options() -> List[str]: return super_ops.inspect_treebui
 def memory_usage_estimate(html_input: str) -> str: return super_ops.memory_usage_estimate(html_input)
 @mcp.tool()
 def profile_page_structure(html_input: str) -> str: return super_ops.profile_page_structure(html_input)
-@mcp.tool()
-def find_broken_links_dummy(html_input: str) -> str: return super_ops.find_broken_links_dummy(html_input)
+
 @mcp.tool()
 def generate_toc_from_html(html_input: str) -> str: return super_ops.generate_toc_from_html(html_input)
 @mcp.tool()

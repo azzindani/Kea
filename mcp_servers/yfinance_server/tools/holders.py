@@ -33,11 +33,11 @@ async def get_mutual_fund_holders(ticker: str) -> str:
         logger.error(f"Holders tool error: {e}")
         return f"Error: {str(e)}"
 
-async def get_insider_transactions(ticker: str) -> str:
+async def get_insider_transactions(ticker: str, limit: int = 1000) -> str:
     """Get recent insider transactions."""
     try:
         df = yf.Ticker(ticker).insider_transactions
-        return df.head(20).to_markdown() if df is not None else "N/A"
+        return df.head(limit).to_markdown() if df is not None else "N/A"
     except Exception as e: 
         logger.error(f"Holders tool error: {e}")
         return f"Error: {str(e)}"

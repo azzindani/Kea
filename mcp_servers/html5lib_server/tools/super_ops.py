@@ -126,10 +126,7 @@ def profile_page_structure(html_input: str) -> str:
     except Exception as e:
         return f"Error: {e}"
 
-def find_broken_links_dummy(html_input: str) -> str:
-    """Find hrefs."""
-    links = extract_links_stream(html_input)
-    return f"Found {len(links)} links. (Validation requires network)."
+
 
 def generate_toc_from_html(html_input: str) -> str:
     """Headers -> TOC."""

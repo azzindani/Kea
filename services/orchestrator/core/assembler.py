@@ -301,7 +301,43 @@ class NodeAssembler:
                 # Extract text content as raw_output
                 for content in result.content:
                     if isinstance(content, TextContent):
-                        output.artifacts["raw_output"] = content.text
+                        text_data = content.text
+                        output.artifacts["raw_output"] = text_data
+                        
+                        # STANDARD I/O: Try to parse ToolOutput JSON
+                        # This enables tools to return complex objects (files, data) via text pipe
+                        if text_data.strip().startswith("{") and "tool_name" in text_data:
+                            try:
+                                import json
+                                from shared.schemas import ToolOutput
+                                
+                                # Fast check if it looks like ToolOutput before heavy pydantic parse
+                                data = json.loads(text_data)
+                                if "tool_name" in data and ("data" in data or "files" in data):
+                                    tool_output = ToolOutput(**data)
+                                    
+                                    # 1. Store structured data
+                                    if tool_output.data:
+                                        output.artifacts["data"] = tool_output.data.data
+                                        
+                                    # 2. Store file paths
+                                    for file_ref in tool_output.files:
+                                        if file_ref.path:
+                                            output.artifacts[file_ref.file_id] = file_ref.path
+                                            # Also map strictly by file_id for direct access
+                                            # e.g. {{step.artifacts.screenshot.png}}
+                                            
+                                    # 3. Store raw text if different matches
+                                    if tool_output.text:
+                                        output.artifacts["text"] = tool_output.text
+                                        # Update raw_output to be the human readable text, not JSON
+                                        output.artifacts["raw_output"] = tool_output.text
+                                    
+                                    logger.info(f"🧩 Parsed Standard I/O ToolOutput from {tool_output.tool_name}")
+                            except Exception as e:
+                                # Not a ToolOutput or parse failed - treat as raw text
+                                pass
+                        
                         break
         elif isinstance(result, str):
             output.artifacts["raw_output"] = result

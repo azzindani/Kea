@@ -273,7 +273,7 @@ class AgentSpawner:
         result = await spawner.execute_swarm(plan)
         
         # Get aggregated result
-        print(result.aggregated_result)
+        logger.debug(result.aggregated_result)
     """
     
     def __init__(
