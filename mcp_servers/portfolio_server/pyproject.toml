@@ -2,17 +2,9 @@
 name = "portfolio_server"
 version = "0.1.0"
 description = "MCP Server for portfolio_server"
-readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "#   matplotlib",
-    "#   mcp",
-    "#   numpy",
-    "#   pandas",
-    "#   pyportfolioopt",
-    "#   scipy",
-    "#   structlog",
-    "mcp"
+    "mcp",
 ]
 
 [tool.uv]

@@ -1,3 +1,4 @@
+from typing import Any
 from mcp_servers.docx_server.tools.core_ops import open_document, save_document, get_document_properties, set_document_properties
 
 # We can expose more specific property tools if needed, but core_ops covers the basics.

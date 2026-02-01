@@ -5,10 +5,13 @@ description = "MCP Server for pdr_server"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "#   mcp",
-    "#   pandas",
-    "#   pandas_datareader",
-    "mcp"
+    "mcp",
+    "pandas",
+    "pandas-datareader",
+    "pydantic",
+    "python-dotenv",
+    "structlog",
+    "wrapt",
 ]
 
 [tool.uv]

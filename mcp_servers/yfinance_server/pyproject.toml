@@ -4,11 +4,12 @@ version = "0.1.0"
 description = "MCP Server for Yahoo Finance"
 requires-python = ">=3.10"
 dependencies = [
-    "mcp",
-    "yfinance",
-    "pandas",
-    "numpy",
     "matplotlib",
-    "scipy",
-    "structlog"
+    "mcp",
+    "pandas",
+    "pydantic",
+    "python-dotenv",
+    "structlog",
+    "wrapt",
+    "yfinance",
 ]

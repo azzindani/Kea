@@ -1,0 +1,18 @@
+[project]
+name = "lxml_server"
+version = "0.1.0"
+description = "MCP Server for lxml_server"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "cssselect",
+    "lxml",
+    "mcp",
+    "pydantic",
+    "python-dotenv",
+    "structlog",
+    "wrapt",
+]
+
+[tool.uv]
+dev-dependencies = []

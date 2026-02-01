@@ -1,0 +1,19 @@
+[project]
+name = "openpyxl_server"
+version = "0.1.0"
+description = "MCP Server for openpyxl_server"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp",
+    "openpyxl",
+    "pandas",
+    "pillow",
+    "pydantic",
+    "python-dotenv",
+    "structlog",
+    "wrapt",
+]
+
+[tool.uv]
+dev-dependencies = []

@@ -2,18 +2,18 @@
 name = "matplotlib_server"
 version = "0.1.0"
 description = "MCP Server for matplotlib_server"
-readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "#   matplotlib",
-    "#   mcp",
-    "#   numpy",
-    "#   pandas",
-    "#   pillow",
-    "#   scipy",
-    "#   seaborn",
-    "#   structlog",
-    "mcp"
+    "matplotlib",
+    "mcp",
+    "numpy",
+    "pandas",
+    "pydantic",
+    "python-dotenv",
+    "scipy",
+    "seaborn",
+    "structlog",
+    "wrapt",
 ]
 
 [tool.uv]

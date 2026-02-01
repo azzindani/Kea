@@ -2,12 +2,17 @@
 name = "pandas_server"
 version = "0.1.0"
 description = "MCP Server for pandas_server"
-readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "#   mcp",
-    "#   structlog",
-    "mcp"
+    "mcp",
+    "numpy",
+    "openpyxl",
+    "pandas",
+    "pyarrow",
+    "pydantic",
+    "python-dotenv",
+    "structlog",
+    "wrapt",
 ]
 
 [tool.uv]

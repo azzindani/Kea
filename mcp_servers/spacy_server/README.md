@@ -1,0 +1,2 @@
+# spacy_server
+MCP Server auto-generated.

@@ -3,6 +3,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
+sys.path.append(str(Path(__file__).parents[2]))
 from tools import (
     public, metadata, aggregator, derivatives, historical, account, private, trading, exchange_manager
 )
@@ -134,8 +135,8 @@ def register_shortcuts():
     for ex in TOP_EXCHANGES:
         
         # Ticker Shortcut
-        async def ticker_handler(symbol: str, _ex=ex) -> str:
-            return await public.get_ticker(_ex, symbol)
+        async def ticker_handler(symbol: str, exchange_name=ex) -> str:
+            return await public.get_ticker(exchange_name, symbol)
         
         mcp.add_tool(
             name=f"get_{ex}_ticker",
@@ -144,8 +145,8 @@ def register_shortcuts():
         )
 
         # Order Book Shortcut
-        async def book_handler(symbol: str, _ex=ex) -> str:
-            return await public.get_order_book(_ex, symbol)
+        async def book_handler(symbol: str, exchange_name=ex) -> str:
+            return await public.get_order_book(exchange_name, symbol)
         
         mcp.add_tool(
             name=f"get_{ex}_book",
@@ -154,8 +155,8 @@ def register_shortcuts():
         )
         
         # OHLCV Shortcut
-        async def ohlcv_handler(symbol: str, _ex=ex) -> str:
-            return await public.get_ohlcv(_ex, symbol)
+        async def ohlcv_handler(symbol: str, exchange_name=ex) -> str:
+            return await public.get_ohlcv(exchange_name, symbol)
             
         mcp.add_tool(
             name=f"get_{ex}_ohlcv",

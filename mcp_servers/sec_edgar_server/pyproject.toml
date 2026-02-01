@@ -5,14 +5,14 @@ description = "MCP Server for SEC Edgar"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "mcp>=0.1.0",
-    "sec-edgar-downloader",
-    "httpx",
     "beautifulsoup4",
-    "wrapt",
+    "httpx",
+    "mcp",
     "pydantic",
+    "python-dotenv",
+    "sec-edgar-downloader",
     "structlog",
-    "python-dotenv"
+    "wrapt",
 ]
 
 [tool.uv]

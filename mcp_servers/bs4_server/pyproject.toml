@@ -5,12 +5,14 @@ description = "MCP Server for bs4_server"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "#   mcp",
-    "#   beautifulsoup4",
-    "#   lxml",
-    "#   html5lib",
-    "#   structlog",
-    "mcp"
+    "beautifulsoup4",
+    "html5lib",
+    "lxml",
+    "mcp",
+    "pydantic",
+    "python-dotenv",
+    "structlog",
+    "wrapt",
 ]
 
 [tool.uv]

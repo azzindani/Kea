@@ -2,15 +2,14 @@
 name = "docx_server"
 version = "0.1.0"
 description = "MCP Server for docx_server"
-readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "#   mcp",
-    "#   pandas",
-    "#   pillow",
-    "#   python-docx",
-    "#   structlog",
-    "mcp"
+    "mcp",
+    "pydantic",
+    "python-docx",
+    "python-dotenv",
+    "structlog",
+    "wrapt",
 ]
 
 [tool.uv]

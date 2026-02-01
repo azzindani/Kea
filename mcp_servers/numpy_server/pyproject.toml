@@ -2,13 +2,15 @@
 name = "numpy_server"
 version = "0.1.0"
 description = "MCP Server for Numpy"
-readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "mcp>=0.1.0",
+    "mcp",
     "numpy",
     "pandas",
-    "structlog"
+    "pydantic",
+    "python-dotenv",
+    "structlog",
+    "wrapt",
 ]
 
 [tool.uv]

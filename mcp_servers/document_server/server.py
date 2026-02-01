@@ -1,3 +1,12 @@
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+# Fix for importing 'shared' module from root when running in JIT mode
+root_path = str(Path(__file__).parents[2])
+if root_path not in sys.path:
+    sys.path.append(root_path)
+
 # /// script
 # dependencies = [
 #   "bs4",
@@ -9,9 +18,6 @@
 #   "structlog",
 # ]
 # ///
-
-
-from __future__ import annotations
 from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path

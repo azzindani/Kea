@@ -5,11 +5,13 @@ description = "MCP Server for wbgapi_server"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "#   mcp",
-    "#   pandas",
-    "#   structlog",
-    "#   wbgapi",
-    "mcp"
+    "mcp",
+    "pandas",
+    "pydantic",
+    "python-dotenv",
+    "structlog",
+    "wbgapi",
+    "wrapt",
 ]
 
 [tool.uv]
