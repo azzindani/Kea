@@ -86,9 +86,15 @@ async def execute_tool(request: ToolRequest):
         
     except Exception as e:
         logger.error(f"Tool execution failed: {e}")
+        from shared.schemas import ToolOutput
         return ToolResponse(
             tool_name=request.tool_name,
-            content=str(e),
+            output=ToolOutput(
+                tool_name=request.tool_name,
+                text=str(e),
+                error=str(e),
+                success=False
+            ),
             is_error=True
         )
 
@@ -99,6 +105,7 @@ async def execute_batch(request: BatchToolRequest):
     Execute multiple tools in parallel (Fan-Out).
     """
     from services.mcp_host.core.session_registry import get_session_registry
+    from shared.schemas import ToolOutput
     registry = get_session_registry()
     
     # We can't use registry directly for parallel calls efficiently unless we implement `call_tools_parallel`
@@ -122,7 +129,16 @@ async def execute_batch(request: BatchToolRequest):
             res = await session.call_tool(task.tool_name, task.arguments)
             return ToolResponse.from_mcp_result(task.tool_name, res)
         except Exception as e:
-            return ToolResponse(tool_name=task.tool_name, content=str(e), is_error=True)
+            return ToolResponse(
+                tool_name=task.tool_name,
+                output=ToolOutput(
+                    tool_name=task.tool_name,
+                    text=str(e),
+                    error=str(e),
+                    success=False
+                ),
+                is_error=True
+            )
 
     tasks = [_exec_one(t) for t in request.tasks]
     return await asyncio.gather(*tasks)

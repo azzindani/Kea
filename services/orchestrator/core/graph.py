@@ -363,7 +363,8 @@ async def researcher_node(state: GraphState) -> GraphState:
                         query=t.get("description"),
                         domain=Domain.RESEARCH, 
                         task_type=TaskType.RESEARCH,
-                        preferred_tool=t.get("tool")
+                        preferred_tool=t.get("tool"),
+                        arguments=t.get("inputs", {})
                     ))
                 
                 # Generate prompts for this phase

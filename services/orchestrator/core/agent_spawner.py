@@ -23,6 +23,7 @@ from services.orchestrator.core.prompt_factory import (
     TaskType,
 )
 from services.orchestrator.core.utils import build_tool_inputs, extract_url_from_text
+from services.mcp_host.core.models import ToolResponse
 
 
 logger = get_logger(__name__)
@@ -48,6 +49,7 @@ class SubTask:
     dependencies: list[str] = field(default_factory=list)
     estimated_complexity: int = 1  # 1-5 scale
     preferred_tool: str | None = None  # Explicit tool override from Planner
+    arguments: dict[str, Any] = field(default_factory=dict)  # Standard I/O arguments
 
 
 @dataclass
@@ -601,21 +603,18 @@ class AgentSpawner:
                                     tool_res = await session.call_tool("execute_code", args)
                                     
                                     # 4. EVALUATE
-                                    if not tool_res.isError:
+                                    # Normalize Result using Standard I/O
+                                    norm_res = ToolResponse.from_mcp_result("execute_code", tool_res)
+                                    
+                                    if not norm_res.is_error:
                                         # Success!
-                                        response = f"Swarm Tool Result (execute_code):\n {str(tool_res.content)[:2000]}"
+                                        response = f"Swarm Tool Result (execute_code):\n {norm_res.output.get_for_llm()[:2000]}"
                                         
-                                        # Verbose Output Log
-                                        content_text = ""
-                                        if hasattr(tool_res.content, 'text'): content_text = tool_res.content.text
-                                        elif isinstance(tool_res.content, list):
-                                            content_text = "\n".join([c.text for c in tool_res.content if hasattr(c, 'text')])
-                                            
-                                        logger.info(f"   ✅ EXECUTION SUCCESS:\n{content_text.strip()[:1000]}...")
+                                        logger.info(f"   ✅ EXECUTION SUCCESS:\n{norm_res.output.text[:1000]}...")
                                         break
                                     else:
                                         # Failure - Capture error for retry
-                                        error_msg = str(tool_res.content)
+                                        error_msg = norm_res.output.error or str(norm_res.output.text)
                                         logger.warning(f"   ❌ Execution Failed (Attempt {attempt}): {error_msg[:200]}")
                                         
                                         previous_code = code
@@ -628,13 +627,18 @@ class AgentSpawner:
                             else:
 
                                 # STANDARD TOOL EXECUTION (Non-Code)
-                                # 1. Try heuristic mapping first
-                                args = build_tool_inputs(
-                                    tool_name=tool_name, 
-                                    description=subtask.query, 
-                                    original_inputs={}, 
-                                    collected_facts=collected_facts
-                                )
+                                # 0. Use Explicit Arguments if available (Standard I/O)
+                                if subtask.arguments:
+                                    args = subtask.arguments
+                                    logger.info(f"   🎯 Used Explicit Arguments from Planner: {args}")
+                                else:
+                                    # 1. Try heuristic mapping first
+                                    args = build_tool_inputs(
+                                        tool_name=tool_name, 
+                                        description=subtask.query, 
+                                        original_inputs={}, 
+                                        collected_facts=collected_facts
+                                    )
                                 
                                 # 2. DYNAMIC ARGUMENT GENERATION (The "Smart Hands" fix)
                                 # If heuristics failed (returned None or generic 'query') and it's complex tool
@@ -686,10 +690,13 @@ CRITICAL: Return ONLY valid JSON for the tool arguments. No markdown, no explana
 
                                 tool_res = await session.call_tool(tool_name, args)
                                 
-                                if not tool_res.isError:
-                                    response = f"Swarm Tool Result ({tool_name}):\n {str(tool_res.content)[:1000]}"
+                                # Normalize Output
+                                norm_res = ToolResponse.from_mcp_result(tool_name, tool_res)
+                                
+                                if not norm_res.is_error:
+                                    response = f"Swarm Tool Result ({tool_name}):\n {norm_res.output.get_for_llm()[:2000]}"
                                 else:
-                                    response = f"Swarm Tool Failed ({tool_name}): {tool_res.content}"
+                                    response = f"Swarm Tool Failed ({tool_name}): {norm_res.output.error or norm_res.output.text}"
                             # =========================================================
                         except Exception as e:
                             response = f"Swarm Tool Exception ({tool_name}): {e}"
