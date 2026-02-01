@@ -9,21 +9,41 @@ from pathlib import Path
 from typing import List, Dict, Optional
 from dataclasses import dataclass, field
 
+# Configure logging BEFORE any imports to capture ALL output
+# Create a handler that writes to stdout
+handler = logging.StreamHandler(sys.stdout)
+handler.setLevel(logging.DEBUG)
+handler.setFormatter(logging.Formatter(
+    '%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    datefmt='%H:%M:%S'
+))
+
+# Configure root logger
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.DEBUG)
+root_logger.addHandler(handler)
+
+# Enable DEBUG for all relevant modules
+for logger_name in [
+    'services',
+    'services.mcp_host',
+    'services.mcp_host.core',
+    'services.mcp_host.core.session_registry',
+    'shared',
+    'shared.mcp',
+    'shared.mcp.client',
+    'shared.mcp.transport',
+    'shared.config',
+    'mcp',
+    '__main__',
+]:
+    logging.getLogger(logger_name).setLevel(logging.DEBUG)
+
+logger = logging.getLogger(__name__)
+
 from services.mcp_host.core.session_registry import SessionRegistry
 from shared.mcp.client import MCPClient
 from shared.mcp.transport import SubprocessTransport
-
-# Configure logging to capture ALL output
-logging.basicConfig(
-    level=logging.DEBUG, 
-    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
-    datefmt='%H:%M:%S',
-    stream=sys.stdout
-)
-logger = logging.getLogger(__name__)
-
-# Also enable debug for session_registry
-logging.getLogger('services.mcp_host.core.session_registry').setLevel(logging.DEBUG)
 
 
 @dataclass
