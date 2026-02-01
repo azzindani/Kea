@@ -1,12 +1,14 @@
 
 import sys
+import os
 from pathlib import Path
 # Fix for importing 'shared' module from root when running in JIT mode
 root_path = str(Path(__file__).parents[2])
 if root_path not in sys.path:
     sys.path.append(root_path)
 
-
+# Clear MPLBACKEND before importing matplotlib (Kaggle sets invalid value)
+os.environ.pop('MPLBACKEND', None)
 import matplotlib
 matplotlib.use("Agg")
 from mcp.server.fastmcp import FastMCP

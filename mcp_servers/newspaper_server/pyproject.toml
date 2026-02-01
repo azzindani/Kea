@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "lxml",
+    "lxml_html_clean",
     "mcp",
     "newspaper3k",
     "nltk",

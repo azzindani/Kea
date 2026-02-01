@@ -1,3 +1,4 @@
+from __future__ import annotations
 
 import sys
 from pathlib import Path
@@ -9,9 +10,6 @@ if root_path not in sys.path:
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-
-
-from __future__ import annotations
 import asyncio
 from mcp.server.fastmcp import FastMCP
 

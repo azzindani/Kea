@@ -1,4 +1,7 @@
 
+import os
+# Clear MPLBACKEND before importing matplotlib (Kaggle sets invalid value)
+os.environ.pop('MPLBACKEND', None)
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt

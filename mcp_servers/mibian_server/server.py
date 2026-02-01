@@ -1,3 +1,4 @@
+from __future__ import annotations
 
 import sys
 from pathlib import Path
@@ -5,8 +6,6 @@ from pathlib import Path
 root_path = str(Path(__file__).parents[2])
 if root_path not in sys.path:
     sys.path.append(root_path)
-
-from __future__ import annotations
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))

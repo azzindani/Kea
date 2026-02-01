@@ -1,16 +1,17 @@
 
 import sys
+import os
 from pathlib import Path
 # Fix for importing 'shared' module from root when running in JIT mode
 root_path = str(Path(__file__).parents[2])
 if root_path not in sys.path:
     sys.path.append(root_path)
 
+# Clear MPLBACKEND before importing matplotlib (Kaggle sets invalid value)
+os.environ.pop('MPLBACKEND', None)
+
 # Yfinance Server
 # Managed by pyproject.toml
-
-import sys
-from pathlib import Path
 
 # Ensure current directory is in python path for local imports
 # This fixes "ModuleNotFoundError: No module named 'tools'" in some uv environments

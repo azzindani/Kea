@@ -1,3 +1,7 @@
+import os
+# Clear MPLBACKEND before importing matplotlib (Kaggle sets invalid value)
+os.environ.pop('MPLBACKEND', None)
+
 from mcp_servers.portfolio_server.tools.core_ops import _parse_prices
 from pypfopt import plotting
 import pandas as pd
