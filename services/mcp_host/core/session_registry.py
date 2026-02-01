@@ -322,16 +322,16 @@ class SessionRegistry:
                 stderr_output = ""
                 try:
                     if process.stderr:
-                        stderr_data = await asyncio.wait_for(process.stderr.read(4096), timeout=1.0)
+                        stderr_data = await asyncio.wait_for(process.stderr.read(65536), timeout=5.0)
                         stderr_output = stderr_data.decode('utf-8', errors='replace')
                 except:
                     pass
                 
                 logger.error(f"❌ Timeout ({connect_timeout}s) connecting to {server_name}")
                 if stderr_output:
-                    logger.error(f"   Server stderr: {stderr_output[:500]}")
+                    logger.error(f"   Server stderr:\n{stderr_output}")
                 process.terminate()
-                raise TimeoutError(f"Server {server_name} did not respond in {connect_timeout}s. Stderr: {stderr_output[:200]}")
+                raise TimeoutError(f"Server {server_name} did not respond in {connect_timeout}s.\n\n=== STDERR ===\n{stderr_output}\n=== END STDERR ===")
             
             self.active_sessions[server_name] = client
             self.active_processes[server_name] = process
@@ -343,10 +343,13 @@ class SessionRegistry:
             # On any failure, try to capture stderr for debugging
             if 'process' in locals() and process.stderr:
                 try:
-                    stderr_data = await asyncio.wait_for(process.stderr.read(4096), timeout=1.0)
+                    stderr_data = await asyncio.wait_for(process.stderr.read(65536), timeout=5.0)
                     stderr_output = stderr_data.decode('utf-8', errors='replace')
                     if stderr_output:
-                        logger.error(f"   Server stderr: {stderr_output[:500]}")
+                        logger.error(f"   Server stderr:\n{stderr_output}")
+                        # Attach stderr to exception for tests to access
+                        if not hasattr(e, 'stderr'):
+                            e.stderr = stderr_output
                 except:
                     pass
             logger.error(f"❌ Failed to spawn {server_name}: {e}")
