@@ -93,14 +93,14 @@ async def get_balance_sheet_quarterly(ticker: str) -> str:
     return await financials.get_balance_sheet_quarterly(ticker)
 
 @mcp.tool()
-async def get_cash_flow_annual(ticker: str) -> str:
-    """Annual Cash Flow."""
-    return await financials.get_cash_flow_annual(ticker)
+async def get_cash_flow_statement_annual(ticker: str) -> str:
+    """Annual Cash Flow Statement."""
+    return await financials.get_cash_flow_statement_annual(ticker)
 
 @mcp.tool()
-async def get_cash_flow_quarterly(ticker: str) -> str:
-    """Quarterly Cash Flow."""
-    return await financials.get_cash_flow_quarterly(ticker)
+async def get_cash_flow_statement_quarterly(ticker: str) -> str:
+    """Quarterly Cash Flow Statement."""
+    return await financials.get_cash_flow_statement_quarterly(ticker)
 
 # --- Holders ---
 @mcp.tool()

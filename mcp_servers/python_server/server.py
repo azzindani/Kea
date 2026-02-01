@@ -18,7 +18,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import execute_code, dataframe_ops, sql_query
+from tools import execute_code as execute_code_module, dataframe_ops as dataframe_ops_module, sql_query as sql_query_module
 import structlog
 import asyncio
 from typing import Dict, Any, List, Optional
@@ -62,7 +62,7 @@ async def execute_code(
     Execute Python code in a sandboxed environment.
     Returns stdout, variables, and any errors.
     """
-    return await run_op(execute_code.execute_code_tool, code=code, timeout=timeout, dependencies=dependencies)
+    return await run_op(execute_code_module.execute_code_tool, code=code, timeout=timeout, dependencies=dependencies)
 
 @mcp.tool()
 async def dataframe_ops(
@@ -74,7 +74,7 @@ async def dataframe_ops(
     Perform Pandas DataFrame operations.
     operation: load_csv, load_json, describe, filter, aggregate, join
     """
-    return await run_op(dataframe_ops.dataframe_ops_tool, operation=operation, data=data, params=params)
+    return await run_op(dataframe_ops_module.dataframe_ops_tool, operation=operation, data=data, params=params)
 
 @mcp.tool()
 async def sql_query(
@@ -85,7 +85,7 @@ async def sql_query(
     Execute SQL query on in-memory data using DuckDB.
     Supports CSV/Parquet/JSON data sources.
     """
-    return await run_op(sql_query.sql_query_tool, query=query, data_sources=data_sources)
+    return await run_op(sql_query_module.sql_query_tool, query=query, data_sources=data_sources)
 
 if __name__ == "__main__":
     mcp.run()

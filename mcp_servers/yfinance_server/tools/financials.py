@@ -38,9 +38,9 @@ async def get_balance_sheet_annual(ticker: str) -> str:
 async def get_balance_sheet_quarterly(ticker: str) -> str:
     return await _get_stmt(ticker, "balance", "quarterly")
 
-async def get_cash_flow_annual(ticker: str) -> str:
+async def get_cash_flow_statement_annual(ticker: str) -> str:
     return await _get_stmt(ticker, "cashflow", "annual")
 
-async def get_cash_flow_quarterly(ticker: str) -> str:
+async def get_cash_flow_statement_quarterly(ticker: str) -> str:
     return await _get_stmt(ticker, "cashflow", "quarterly")
 

@@ -134,6 +134,7 @@ class SessionRegistry:
         for dir_path in base_path.iterdir():
             if dir_path.is_dir():
                 server_script = dir_path / "server.py"
+                logger.info(f"Checking {dir_path.name} -> {server_script} (Exists: {server_script.exists()})")
                 if server_script.exists():
                     self._register_script(dir_path.name, server_script)
 
@@ -178,8 +179,8 @@ class SessionRegistry:
                             SessionRegistry._shared_tool_to_server[tool_name] = server_name
                             logger.debug(f"   🔍 Discovered tool '{tool_name}' in {server_name}")
 
-                # 2. FastMCP: @mcp.tool() decorators on functions
-                elif isinstance(node, ast.FunctionDef):
+                # 2. FastMCP: @mcp.tool() decorators on functions (Sync & Async)
+                elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     is_tool = False
                     for decorator in node.decorator_list:
                         # Case A: @mcp.tool() - Call
