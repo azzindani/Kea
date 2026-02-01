@@ -11,6 +11,8 @@
 # ]
 # ///
 
+import matplotlib
+matplotlib.use("Agg")
 from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
