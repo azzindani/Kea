@@ -1,11 +1,3 @@
-# /// script
-# dependencies = [
-#   "mcp",
-#   "requests",
-#   "structlog",
-#   "tradingview_ta",
-# ]
-# ///
 
 from mcp.server.fastmcp import FastMCP
 import sys

@@ -1,10 +1,3 @@
-# /// script
-# dependencies = [
-#   "mcp",
-#   "structlog",
-#   "web3",
-# ]
-# ///
 
 
 from mcp.server.fastmcp import FastMCP

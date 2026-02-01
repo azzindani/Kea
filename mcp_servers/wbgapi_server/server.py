@@ -1,11 +1,3 @@
-# /// script
-# dependencies = [
-#   "mcp",
-#   "pandas",
-#   "structlog",
-#   "wbgapi",
-# ]
-# ///
 
 
 from mcp.server.fastmcp import FastMCP

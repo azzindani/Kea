@@ -1,12 +1,3 @@
-# /// script
-# dependencies = [
-#   "mcp",
-#   "beautifulsoup4",
-#   "lxml",
-#   "html5lib",
-#   "structlog"
-# ]
-# ///
 
 from mcp.server.fastmcp import FastMCP
 from soup_manager import SoupManager

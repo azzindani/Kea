@@ -1,14 +1,3 @@
-# /// script
-# dependencies = [
-#   "matplotlib",
-#   "mcp",
-#   "numpy",
-#   "pandas",
-#   "pyportfolioopt",
-#   "scipy",
-#   "structlog",
-# ]
-# ///
 
 from mcp.server.fastmcp import FastMCP
 import sys

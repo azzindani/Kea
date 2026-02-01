@@ -1,0 +1,13 @@
+[project]
+name = "sec_edgar_server"
+version = "0.1.0"
+description = "MCP Server for sec_edgar_server"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp",
+    "structlog"
+]
+
+[tool.uv]
+dev-dependencies = []

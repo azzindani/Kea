@@ -1,14 +1,3 @@
-# /// script
-# dependencies = [
-#   "matplotlib",
-#   "mcp",
-#   "numpy",
-#   "pandas",
-#   "scipy",
-#   "seaborn",
-#   "structlog",
-# ]
-# ///
 
 import matplotlib
 matplotlib.use("Agg")

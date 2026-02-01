@@ -1,13 +1,13 @@
 [project]
-name = "newspaper_server"
+name = "web3_server"
 version = "0.1.0"
-description = "MCP Server for newspaper_server"
+description = "MCP Server for web3_server"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "#   mcp",
-    "#   newspaper3k",
     "#   structlog",
+    "#   web3",
     "mcp"
 ]
 

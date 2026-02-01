@@ -1,12 +1,16 @@
 [project]
-name = "newspaper_server"
+name = "seaborn_server"
 version = "0.1.0"
-description = "MCP Server for newspaper_server"
+description = "MCP Server for seaborn_server"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "#   matplotlib",
     "#   mcp",
-    "#   newspaper3k",
+    "#   numpy",
+    "#   pandas",
+    "#   scipy",
+    "#   seaborn",
     "#   structlog",
     "mcp"
 ]
