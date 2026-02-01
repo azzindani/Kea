@@ -73,14 +73,14 @@ def smart_search(query: str, choices: List[str]) -> List[Dict[str, Any]]:
         return [{"match": query, "score": 100, "method": "exact"}]
         
     # 2. Token Sort (good for word order)
-    matches = process.extract(query, choices, scorer=fuzz.token_sort_ratio, limit=5)
+    matches = process.extract(query, choices, scorer=fuzz.token_sort_ratio, limit=100000)
     high_score = matches[0][1] if matches else 0
     
     if high_score > 85:
         return [{"match": m[0], "score": m[1], "method": "token_sort"} for m in matches]
         
     # 3. Partial (substrings)
-    matches_partial = process.extract(query, choices, scorer=fuzz.partial_ratio, limit=5)
+    matches_partial = process.extract(query, choices, scorer=fuzz.partial_ratio, limit=100000)
     return [{"match": m[0], "score": m[1], "method": "partial"} for m in matches_partial]
 
 def rank_candidates(query: str, candidates: List[str]) -> List[str]:

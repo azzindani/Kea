@@ -9,7 +9,7 @@ The **Vault Service** is the immutable persistence and audit layer of the Kea sy
 - **Cryptographic Integrity**: Each audit entry is hashed with its predecessor's metadata, creating a verifiable chain of custody for research findings.
 - **High-Fidelity "OODA" Logging**: Specifically captures Observe, Orient, Decide, and Act phases for every agent decision.
 - **Automatic Auditing Decorator**: Easy-to-use `@audited` utility for developers to wrap sensitive functions with persistence logic.
-- **Polymorphic Backends**: Primary support for PostgreSQL with high-performance In-Memory and SQLite fallbacks.
+- **PostgreSQL Backend**: Primary storage using PostgreSQL with pgvector extension for semantic search and JSONB for flexible state storage.
 
 ---
 

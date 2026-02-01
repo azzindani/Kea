@@ -4,9 +4,9 @@
 from pathlib import Path
 from typing import Any
 import importlib
-import logging
+from shared.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 _DIR = Path(__file__).parent
 _discovered: dict = {}

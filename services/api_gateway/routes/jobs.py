@@ -4,7 +4,7 @@ Jobs API Routes.
 Endpoints for research job management with persistent storage.
 
 Changes:
-- Uses database for persistent job storage (PostgreSQL/SQLite)
+- Uses PostgreSQL for persistent job storage
 - Implements background task execution via Orchestrator API
 - Requires authentication for job operations
 """
@@ -80,7 +80,7 @@ class JobStore:
     """
     Database-backed job storage.
     
-    Supports both PostgreSQL and SQLite.
+    Uses PostgreSQL for job persistence.
     """
     
     def __init__(self):
