@@ -1,17 +1,15 @@
 # 🏦 The Vault ("The Black Box")
 
-The **Vault Service** is the immutable persistence and audit layer of the Kea system. It acts as the system's "Black Box" recorder, ensuring that every cognitive step, tool execution, and compliance decision is logged with cryptographic integrity. It also manages state checkpointing for the Orchestrator's LangGraph.
+The **Vault Service** is the immutable persistence, audit, and data transport layer of the Kea v4.0 system. It acts as the **Artifact Bus** (or "Conveyor Belt"), ensuring that every cognitive step, tool execution, and compliance decision is logged with cryptographic integrity. It is responsible for moving "Physical Artifacts" (Parquet files, SQL Tables, PDFs) securely between the specialized Departments (Nodes) of the enterprise.
 
 ## ✨ Features
 
 - **Immutable Audit Trail**: Logs all system events with SHA-256 checksums to prevent record tampering.
+- **The Artifact Bus**: Serves as the central "Conveyor Belt" for moving data artifacts between independent agents and nodes.
 - **LangGraph Checkpointing**: Persists the state of research graphs to PostgreSQL, enabling seamless recovery after system restarts or crashes.
 - **Cryptographic Integrity**: Each audit entry is hashed with its predecessor's metadata, creating a verifiable chain of custody for research findings.
 - **High-Fidelity "OODA" Logging**: Specifically captures Observe, Orient, Decide, and Act phases for every agent decision.
 - **Automatic Auditing Decorator**: Easy-to-use `@audited` utility for developers to wrap sensitive functions with persistence logic.
-- **PostgreSQL Backend**: Primary storage using PostgreSQL with pgvector extension for semantic search and JSONB for flexible state storage.
-
----
 
 ## 📐 Architecture
 
@@ -29,11 +27,13 @@ graph TD
     Orch -->|State Snapshot| Checkpoint[Checkpoint Store]
     Checkpoint -->|JSONB| Postgres
     
+    Nodes[Generative Agents] -->|Artifacts| Bus[Artifact Bus]
+    Bus -->|Store| S3[Blob Storage / MinIO]
+    Bus -->|Index| Postgres
+    
     Admin[Admin Console] -->|Query| API
     API -->|Read| Postgres
 ```
-
----
 
 ## 📁 Codebase Structure
 
@@ -43,9 +43,7 @@ graph TD
     - `checkpointing.py`: Implementation of the PostgreSQL-backed state store for LangGraph.
     - `postgres_audit.py`: Direct database interactions for the audit trail.
     - `postgres_store.py`: General-purpose relational storage management.
-    - `vector_store.py`: Base implementation for high-dimensional fact storage used by the RAG service.
-
----
+    - `vector_store.py`: Interface for high-dimensional storage (used by other services for raw embeddings).
 
 ## 🧠 Deep Dive
 
@@ -55,10 +53,8 @@ The `AuditEntry` is the unit of accountability in Kea. Beyond standard fields (A
 ### 2. LangGraph State Checkpointing
 The `CheckpointStore` allows Kea to handle long-running research jobs (minutes to hours). Every time the Orchestrator moves between nodes (e.g., from Planner to Researcher), a state snapshot is saved as a `JSONB` blob in the `graph_checkpoints` table. If the system fails, the Orchestrator can reload the `latest` checkpoint and resume exactly where it left off.
 
-### 3. Automatic "Chain of Thought" Capture
-By using the `@audited` decorator, the system captures not just the *inputs* and *outputs* of functions, but the entire "Chain of Thought" (CoT). This data is critical for fine-tuning future models and performing forensic analysis on agent hallucinations.
-
----
+### 3. The Artifact Bus
+In the Kea v4.0 architecture, data is not passed as text in chat windows. Instead, "Physical Artifacts" (e.g., a 10MB CSV file or a scraped PDF) are placed onto the **Artifact Bus**. The Vault manages the storage (S3/Local) and indexing (Postgres) of these artifacts, allowing downstream nodes to pick them up by reference (e.g., `s3://vault/financials_2024.parquet`) rather than by value.
 
 ## 📚 Reference
 

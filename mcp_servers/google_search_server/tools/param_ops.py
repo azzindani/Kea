@@ -13,7 +13,7 @@ def _get_date_dork(days_ago: int) -> str:
     date = datetime.date.today() - datetime.timedelta(days=days_ago)
     return f"after:{date.isoformat()}"
 
-async def search_past_hour(query: str, num: int = 100) -> List[Any]:
+async def search_past_hour(query: str, num: int = 100000) -> List[Any]:
     """
     Search results from the past hour. 
     (Note: Hard to dork 'hour', usually needs 'tbs=qdr:h'. 
@@ -23,38 +23,38 @@ async def search_past_hour(query: str, num: int = 100) -> List[Any]:
     # Best effort without native 'tbs' support in simple wrapper:
     return await GoogleSearchClient.search(query + " after:2024 (simulating fresh)", num_results=num)
 
-async def search_past_day(query: str, num: int = 100) -> List[Any]:
+async def search_past_day(query: str, num: int = 100000) -> List[Any]:
     """Search results from the past 24 hours."""
     dork = _get_date_dork(1)
     return await GoogleSearchClient.search(f"{query} {dork}", num_results=num)
 
-async def search_past_week(query: str, num: int = 100) -> List[Any]:
+async def search_past_week(query: str, num: int = 100000) -> List[Any]:
     """Search results from the past week."""
     dork = _get_date_dork(7)
     return await GoogleSearchClient.search(f"{query} {dork}", num_results=num)
 
-async def search_past_month(query: str, num: int = 100) -> List[Any]:
+async def search_past_month(query: str, num: int = 100000) -> List[Any]:
     """Search results from the past month."""
     dork = _get_date_dork(30)
     return await GoogleSearchClient.search(f"{query} {dork}", num_results=num)
 
-async def search_past_year(query: str, num: int = 100) -> List[Any]:
+async def search_past_year(query: str, num: int = 100000) -> List[Any]:
     """Search results from the past year."""
     dork = _get_date_dork(365)
     return await GoogleSearchClient.search(f"{query} {dork}", num_results=num)
 
-async def search_region(query: str, region: str, num: int = 100) -> List[Any]:
+async def search_region(query: str, region: str, num: int = 100000) -> List[Any]:
     """Search within a specific region (gl parameter)."""
     return await GoogleSearchClient.search(query, region=region, num_results=num)
 
-async def search_us(query: str, num: int = 100) -> List[Any]:
+async def search_us(query: str, num: int = 100000) -> List[Any]:
     """Search USA region."""
     return await GoogleSearchClient.search(query, region="us", num_results=num)
 
-async def search_uk(query: str, num: int = 100) -> List[Any]:
+async def search_uk(query: str, num: int = 100000) -> List[Any]:
     """Search UK region."""
     return await GoogleSearchClient.search(query, region="uk", num_results=num)
 
-async def search_language(query: str, lang: str, num: int = 100) -> List[Any]:
+async def search_language(query: str, lang: str, num: int = 100000) -> List[Any]:
     """Search in specific language (lr parameter)."""
     return await GoogleSearchClient.search(query, lang=lang, num_results=num)

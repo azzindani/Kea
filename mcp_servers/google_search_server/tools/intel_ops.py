@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 # ==========================================
 # Intelligence Tools
 # ==========================================
-async def check_ranking(query: str, target_domain: str, num_check: int = 50) -> Dict[str, Any]:
+async def check_ranking(query: str, target_domain: str, num_check: int = 100000) -> Dict[str, Any]:
     """
     Check the ranking position of a domain for a specific query.
     Return {"rank": int, "found": bool, "url": str}.
@@ -25,7 +25,7 @@ async def check_ranking(query: str, target_domain: str, num_check: int = 50) -> 
             
     return {"rank": -1, "found": False, "msg": f"Not found in top {num_check}"}
 
-async def get_domains(query: str, num: int = 20) -> List[str]:
+async def get_domains(query: str, num: int = 100000) -> List[str]:
     """
     Extract just the unique domain names from search results.
     """
@@ -40,7 +40,7 @@ async def get_domains(query: str, num: int = 20) -> List[str]:
             pass
     return list(domains)
 
-async def competitor_discovery(domain: str, num: int = 10) -> List[str]:
+async def competitor_discovery(domain: str, num: int = 100000) -> List[str]:
     """
     Find competitors using 'related:' operator and extracting domains.
     """
@@ -56,7 +56,7 @@ async def competitor_discovery(domain: str, num: int = 10) -> List[str]:
             pass
     return list(domains)
 
-async def monitor_brand(brand_name: str, num: int = 20) -> Dict[str, List[Any]]:
+async def monitor_brand(brand_name: str, num: int = 100000) -> Dict[str, List[Any]]:
     """
     Search for brand mentions, separating Sentiment (Positive/Negative/Neutral requires NLP, so here we categoriz source).
     This simplest version just returns results, but categorized by News/Social/Web.
@@ -72,7 +72,7 @@ async def monitor_brand(brand_name: str, num: int = 20) -> Dict[str, List[Any]]:
 # ==========================================
 # Bulk Tools
 # ==========================================
-async def bulk_search(queries: List[str], num_per_query: int = 5, delay: float = 2.0) -> Dict[str, List[Any]]:
+async def bulk_search(queries: List[str], num_per_query: int = 100000, delay: float = 2.0) -> Dict[str, List[Any]]:
     """
     Execute multiple queries sequentially with delay to avoid Rate Limits.
     Returns Dictionary {query: [results]}.
@@ -85,7 +85,7 @@ async def bulk_search(queries: List[str], num_per_query: int = 5, delay: float =
         await asyncio.sleep(delay) 
     return output
 
-async def bulk_dork(dork_template: str, targets: List[str], num: int = 5) -> Dict[str, List[Any]]:
+async def bulk_dork(dork_template: str, targets: List[str], num: int = 100000) -> Dict[str, List[Any]]:
     """
     Apply a dork template to a list of targets. 
     Template example: "site:TARGET filetype:pdf"

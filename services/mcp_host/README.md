@@ -1,6 +1,6 @@
 # 🔌 MCP Host Service ("The Hands")
 
-The **MCP Host Service** is the multi-process execution engine of Kea. It is responsible for managing the lifecycle of ephemeral tool processes, handling JSON-RPC communication, and providing a governed high-throughput interface for tool execution. It implements the "Pure MCP" architecture, ensuring the core system remains decoupled from tool-specific dependencies.
+The **MCP Host Service** is the multi-process execution engine of Kea v4.0. It acts as the **Department Head** responsible for staffing and tooling. It manages the lifecycle of ephemeral tool processes, handles JSON-RPC communication, and provides a governed high-throughput interface for tool execution. It implements the "Pure MCP" architecture, ensuring the core system remains decoupled from tool-specific dependencies.
 
 ## ✨ Features
 
@@ -10,8 +10,6 @@ The **MCP Host Service** is the multi-process execution engine of Kea. It is res
 - **Parallel Dispatch Engine**: Handles concurrent tool execution with fan-out support and fire-and-forget background tasks.
 - **Persistent Tool Registry**: Automatically indexes discovered tools into a PostgreSQL (pgvector) database for semantic search at scale.
 - **Sandboxed Execution**: Leverages `uv` for isolated, high-performance environment management with automatic dependency resolution.
-
----
 
 ## 📐 Architecture
 
@@ -42,8 +40,6 @@ graph TD
     end
 ```
 
----
-
 ## 📁 Codebase Structure
 
 The service is divided into a lightweight API layer and a robust core orchestration engine.
@@ -53,18 +49,17 @@ The service is divided into a lightweight API layer and a robust core orchestrat
     - `session_registry.py`: Manages JIT spawning, process termination, and AST-based tool discovery.
     - `supervisor_engine.py`: Implements the governance loop, hardware health checks, and priority-based dispatching.
     - `parallel_executor.py`: Provides utilities for concurrent execution of multiple tools.
-    - `postgres_registry.py`: persistence layer for tool metadata and semantic search indexing.
-    - `background.py`: background workers for processing dispatched batch tasks.
+    - `postgres_registry.py`: Persistence layer for tool metadata and semantic search indexing.
+    - `background.py`: Background workers for processing dispatched batch tasks.
     - `models.py`: Pydantic data models for the internal and external API.
-
----
+    - `tool_registry.py`: Interface for tool registration and access.
 
 ## 🧠 Deep Dive
 
 ### 1. JIT Discovery & Spawning Logic
 The `SessionRegistry` performs a two-stage discovery process:
 1.  **Static Analysis (AST)**: On startup, it scans the `mcp_servers/` directory and parses the Python source code of each server to extract tool names and docstrings using the `ast` module. This allows the system to know about 1,000+ tools without starting a single process.
-2.  **JIT Spawning**: When a tool is called, the registry checks for an active session. If none exists, it uses `uv run` to spawn the server in a pristine environment, waiting until the JSON-RPC handshake is complete before routing the call.
+2.  **JIT Spawning**: When a tool is called (e.g., "yfinance.fetch"), the registry checks for an active session. If none exists, it uses `uv run` to spawn the server in a pristine environment, waiting until the JSON-RPC handshake is complete before routing the call.
 
 ### 2. Hardware-Aware Governance
 The `SupervisorEngine` implements a "Corporate Budget" for system resources:
@@ -74,8 +69,6 @@ The `SupervisorEngine` implements a "Corporate Budget" for system resources:
 
 ### 3. Isolation & Dependency Management
 Kea utilizes `uv` to manage the complexity of tool dependencies. If an MCP server directory contains a `pyproject.toml`, the host runs it in "Project Mode", ensuring it has its own isolated environment. Otherwise, it runs in "Global Mode" using the Kea environment.
-
----
 
 ## 📚 Reference
 

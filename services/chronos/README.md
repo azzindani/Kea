@@ -1,6 +1,6 @@
 # ⏳ Chronos Service ("The Timekeeper")
 
-**Chronos** is the planned temporal orchestration layer of Kea. It is designed to manage scheduled research jobs, recurring tasks, and maintain a historical audit trail of system activities over time.
+**Chronos** is the planned temporal orchestration layer of Kea v4.0. It is designed to manage scheduled research jobs, recurring tasks, and maintain a historical audit trail of system activities over time. In the Fractal Corporation, it acts as the **Chief Operating Officer (COO)**, managing shifts, schedules, and deadlines.
 
 > [!NOTE]
 > **Current Status**: Chronos is currently a **placeholder service**. It provides a base FastAPI structure and a health check endpoint, but the scheduler and historian logic are pending implementation.
@@ -13,8 +13,6 @@
 - **Time-Limited Execution**: Implements hard timeouts on research operations to prevent "Zombie Agents" from consuming system resources indefinitely.
 - **Progress Tracking**: Provides a incremental progress scalar (0.0 - 1.0) for real-time monitoring of long-running tasks.
 - **Artifact Binding**: Automatically maps generated artifacts (Parquet, PDF, etc.) to their parent `job_id`.
-
----
 
 ## 📐 Architecture
 
@@ -31,8 +29,6 @@ graph LR
 ### Future Design
 Chronos will transition to a distributed task scheduler (potentially using `apscheduler` or similar) that can survive service restarts and manage complex retry logic for failed research nodes.
 
----
-
 ## 📁 Codebase Structure
 
 The directory structure is designed for modular expansion as the scheduling logic is implemented.
@@ -41,8 +37,6 @@ The directory structure is designed for modular expansion as the scheduling logi
 - **`core/`**: Intended for the core scheduling engine, recurrence logic, and state transition management.
 - **`README.md`**: Documentation of the service's purpose and future roadmap.
 
----
-
 ## 🧠 Deep Dive: Temporal Governance
 
 ### State Consistency
@@ -50,8 +44,6 @@ The primary responsibility of Chronos is to ensure that no research job remains 
 
 ### Concurrency & Backpressure
 Chronos will act as a traffic controller, monitoring the load on the `MCP Host` and `Orchestrator`. It will implement backpressure mechanisms to queue new research requests when the system is operating at peak capacity.
-
----
 
 ## 📚 Reference
 

@@ -1,6 +1,6 @@
 # 🛡️ Swarm Manager ("The Governor")
 
-The **Swarm Manager** is the governance and compliance layer of the Kea system. It acts as the "legal and safety department" for the autonomous agents, ensuring that every operation adheres to enterprise policies, international standards (ISO, SOC2, GDPR), and hardware constraints.
+The **Swarm Manager** is the governance and compliance layer of the Kea v4.0 system. It acts as the **Chief Risk Officer (CRO)** and **Legal Department** for the autonomous agents, ensuring that every operation adheres to enterprise policies, international standards (ISO, SOC2, GDPR), and hardware constraints.
 
 ## ✨ Features
 
@@ -10,8 +10,6 @@ The **Swarm Manager** is the governance and compliance layer of the Kea system. 
 - **System Resource Guard**: Prevents "System Collapse" by monitoring memory pressure, agent spawn rates, and tool call quotas.
 - **Human-in-the-Loop (HITL) Escalation**: Provides a structured mechanism for agents to "pause and escalate" decisions to human administrators.
 - **Global Kill-Switch**: A centralized emergency stop protocol to terminate all active agent swarms instantly.
-
----
 
 ## 📐 Architecture
 
@@ -36,8 +34,6 @@ graph TD
     Supervisor -->|Approved| Final[Verified Result]
 ```
 
----
-
 ## 📁 Codebase Structure
 
 - **`main.py`**: FastAPI entrypoint hosting the compliance and governance API.
@@ -45,11 +41,8 @@ graph TD
     - `compliance.py`: Implementation of the `ComplianceEngine` and ISO/SOC2 rulesets.
     - `supervisor.py`: Manages `QualityGates`, health monitoring, and human escalation.
     - `guards.py`: Logic for rate limiting, memory protection, and tool quotas.
-    - `procedural_agent.py`: Implementation of the SOP enforcement engine.
     - `kill_switch.py`: Emergency termination protocols for the entire swarm.
     - `resource_governor.py`: Cost and token usage management.
-
----
 
 ## 🧠 Deep Dive
 
@@ -61,8 +54,6 @@ For complex tasks like "Data Access" or "Standard Research," the manager enforce
 
 ### 3. Automated Supervision
 The `Supervisor` monitors "Team Health." If a swarm's error rate spikes or if agents are becoming "blocked" in a specific tool loop, the Supervisor can trigger a **Load Redistribution** or escalate the entire session to a human, preventing wasted compute and potential hallucinations.
-
----
 
 ## 📚 Reference
 

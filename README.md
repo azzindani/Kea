@@ -1,18 +1,28 @@
-# 🦜 Kea: Distributed Autonomous Research Engine (DARE)
+# 🦜 Project Kea v4.0: Autonomous Enterprise Operating System
 
 > **"Not just a Chatbot. A Research Factory."**
 
-Kea is a high-fidelity, microservice-based autonomous research engine designed to handle complex, open-ended investigations. It breaks the "Linear RAG" mold by implementing a **Recursive Cognitive Pipeline** (LangGraph) that mimics human research behavior: formulating hypotheses, gathering data, verifying evidence, and pivoting when results are suboptimal.
+Kea v4.0 represents the evolution from a "Distributed Autonomous Research Engine" (DARE) to a **Generative ERP (Enterprise Resource Planning)** system. It simulates a **100,000+ Employee Corporation** where the "Employees" are silicon, the "Departments" are microservices, and the "Workflows" are generated Just-In-Time.
 
-Built on the **Fractal Corp** architecture, Kea treats agents as specialized corporate personas—Planner, Researcher, Critic, Judge—orchestrated by a unified state machine and powered by 68+ specialized MCP tool servers.
+Instead of writing linear "To-Do Lists," Kea architects and executes **Directed Acyclic Graphs (DAGs)**, enabling complex, non-linear problem solving at an enterprise scale.
 
 ---
 
-## 📐 Architecture (Fractal Corp)
+## 🏗️ The Paradigm Shift
 
-Kea divides cognition into 7 specialized microservices, ensuring fault isolation, scalability, and "Split-Brain" governance (Reasoning vs. Execution).
+| Feature | Legacy Agents (v3) | Kea v4.0 (Enterprise OS) |
+|:--------|:-------------------|:--------------------------|
+| **Structure** | Single Loop ("Thought -> Act") | **Fractal DAGs** (Main Graph spawns Sub-Graphs) |
+| **Tools** | Static list of Python functions | **"Departments"** (Isolated Microservices) |
+| **Data Flow** | Text in a chat window | **Artifact Bus** (Parquet/SQL moving via Vault) |
+| **Planning** | Linear Steps (1, 2, 3...) | **Topological Sort** (Parallel execution paths) |
+| **Role** | Research Assistant | **Autonomous CIO** (Architects the solution) |
 
-### 🗼 The Core Substrate
+---
+
+## 📐 Architecture ("The Fractal Corp")
+
+Kea divides cognition into 7 specialized microservices, ensuring fault isolation and "Split-Brain" governance (Reasoning vs. Execution).
 
 ```mermaid
 graph TD
@@ -37,20 +47,10 @@ graph TD
     Host -->|JSON-RPC| Tools[68+ MCP Servers]
 ```
 
-### 🧠 The Research Path
-When a query enters Kea, it doesn't just "Search." It selects a cognitive path:
-- **Path A: Memory Fork**: Utilizes the Vault to skip research for facts already known.
-- **Path B: Shadow Lab**: Autonomously writes Python code to test hypotheses in a sandbox.
-- **Path C: Grand Synthesis**: Merges multiple research trajectories into a consensus report.
-- **Path D: Deep Research**: The full "OODA Loop" for exploring unknown territory.
-
----
-
-## 📁 Codebase Structure & Documentation
-
-The Kea ecosystem is modular and self-documenting. Use the links below for deep dives into specific components.
-
 ### 🏙️ Services ("The Fractal Nodes")
+
+Each service acts as a distinct corporate persona with a specific mandate.
+
 | Service | Persona | Role | Documentation |
 |:--------|:--------|:-----|:--------------|
 | **Gateway** | The Mouth | Security, Auth, & Routing | [📖 View Doc](services/api_gateway/README.md) |
@@ -58,26 +58,35 @@ The Kea ecosystem is modular and self-documenting. Use the links below for deep 
 | **MCP Host** | The Hands | Tool Execution & JIT Spawning | [📖 View Doc](services/mcp_host/README.md) |
 | **RAG Service** | The Library| Knowledge & Dataset Ingestion | [📖 View Doc](services/rag_service/README.md) |
 | **Vault** | The Memory | Immutability & Persistence | [📖 View Doc](services/vault/README.md) |
-| **Swarm/Manager**| The Conscience| Governance & Compliance | [📖 View Doc](services/swarm_manager/README.md) |
+| **Swarm Manager**| The Conscience| Governance & Compliance | [📖 View Doc](services/swarm_manager/README.md) |
 | **Chronos** | The Clock | Scheduling & Future Tasks | [📖 View Doc](services/chronos/README.md) |
-
-### 🛠️ Tooling & Utilities
-- **[🔌 MCP Servers](mcp_servers/README.md)**: Catalog of 68+ specialized tools (Finance, Web3, Academic).
-- **[⚙️ Workers](workers/README.md)**: Background processors for high-throughput research swarms.
-- **[📚 Shared Libs](shared/README.md)**: Foundation for hardware-awareness, schemas, and logging.
 
 ---
 
-## 🧠 Deep Dive: The Kea Advantage
+## 🧠 The "Kea Advantage"
 
-### 1. Pure MCP & JIT Spawning
-Kea implements a "Zero-Dependency" tool architecture. Using the **Model Context Protocol (MCP)** and `uv`, the system spawns tool servers in isolated, ephemeral environments *Just-In-Time*. The "Brain" has zero knowledge of the "Hands" until runtime, allowing for infinite tool scalability.
+### 1. The Departmental Model (MCP Servers)
+Instead of a mess of Python functions, specialized "Departments" handle domain logic.
+-   **Finance Dept:** `yfinance_server`, `finta_server`
+-   **IT Dept:** `duckdb_server`, `web3_server`
+-   **Legal Dept:** `pdfplumber_server`, `regulatory_server`
+-   **Operations:** `filesystem_server`, `browser_server`
 
-### 2. Genetic Prompting
-Agent personalities are decoupled from code. The `configs/prompts.yaml` library defines the expertise of the Analyst, Judge, and Critic, which can be hot-reloaded to adapt the system's "IQ" and tone without restarting services.
+### 2. Zero-Trust Hardware Adaptation
+Whether running on a $2/mo VPS or a $30k H100 cluster, the `shared/hardware` layer profiles the host machine. It automatically adjusts swarm concurrency, batch sizes, and memory limits to maximize throughput without crashing the host.
 
-### 3. Hardware-Aware Adaptation
-Whether running on a $2/mo VPS or a $30k H100 cluster, Kea adapts. The `shared/hardware` layer profiles the host machine and automatically adjusts batch sizes and concurrency to maximize throughput without triggering OOM errors.
+### 3. The Artifact Bus
+Data does not live in the conversation context. It lives in the **Vault**. When the "Researcher" finds a CSV, it doesn't summarize it; it saves it to the Vault (`s3://vault/data.csv`) and passes the *pointer* to the "Data Scientist" (Pandas Server), who loads it directly. This allows Kea to handle GB-scale datasets without polluting the LLM context.
+
+---
+
+## 🛣️ Roadmap: The Journey to "Node Assembly"
+
+We are currently transitioning from **Level 2 (Linear DAGs)** to **Level 3 (Recursive Sub-Graphing)**.
+
+1.  **The "Blueprint" Schema**: Moving the Planner from outputting text listicles to strict JSON Topology definitions.
+2.  **The Assembler Engine**: A core service that performs Just-In-Time compilation of these Blueprints into executable LangGraph code.
+3.  **The Sub-Orchestrator**: Enabling any node to recursively spawn its own Orchestrator instance to handle sub-problems (Scale = ∞).
 
 ---
 
@@ -96,17 +105,8 @@ The easiest way to see the architecture in action is to run the **Stress Test**,
 export OPENROUTER_API_KEY="your-api-key"
 
 # Run the system validator
-python -m pytest tests/stress/stress_test.py --query="Analyze Tesla's 2024 VPP strategy" -v -s
+uv run pytest tests/stress/stress_test.py --query="Analyze Tesla's 2024 VPP strategy" -v -s
 ```
 
-### 🧪 3. Developer Onboarding
-Check the **[Playbook](examples/README.md)** for a guided walkthrough of building your first custom research workflow using the Kea SDK.
-
----
-
-## 🧪 Quality & Verification
-Kea implements a **Pyramid Testing Strategy** to ensure reliability in non-deterministic AI environments:
-- **Unit**: Fast, mocked validation of core logic.
-- **Integration**: Verifying the service mesh (8000 -> 8006).
-- **Stress**: 50+ agent simulations designed to break the JIT loader and hardware governor.
-- **[📖 View Test Documentation](tests/README.md)**
+### 🧪 3. Quality Assurance
+Kea implements a **Pyramid Testing Strategy** (Unit, Integration, Stress) to ensure reliability in non-deterministic environments. See **[tests/README.md](tests/README.md)** for details.
