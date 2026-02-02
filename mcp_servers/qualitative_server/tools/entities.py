@@ -22,19 +22,19 @@ async def entity_extractor(
     
     # Names (capitalized words)
     names = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b', text)
-    entities["person"] = list(set(names))[:10]
+    entities["person"] = list(set(names))[:100000]
     
     # Organizations (Inc, Corp, Ltd, etc.)
     orgs = re.findall(r'\b[A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)*(?:\s+(?:Inc|Corp|Ltd|LLC|Company|Group))\.?\b', text)
-    entities["org"] = list(set(orgs))[:10]
+    entities["org"] = list(set(orgs))[:100000]
     
     # Dates
     dates = re.findall(r'\b(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4})\b', text)
-    entities["date"] = list(set(dates))[:10]
+    entities["date"] = list(set(dates))[:100000]
     
     # Money
     money = re.findall(r'\$[\d,]+(?:\.\d{2})?(?:\s*(?:million|billion|M|B))?|\d+\s*(?:million|billion)\s*(?:dollars|USD)?', text, re.IGNORECASE)
-    entities["money"] = list(set(money))[:10]
+    entities["money"] = list(set(money))[:100000]
     
     for etype in entity_types:
         if etype in entities and entities[etype]:

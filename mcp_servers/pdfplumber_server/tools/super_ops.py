@@ -30,7 +30,7 @@ def auto_extract_all(path: str, page_number: int) -> Dict[str, Any]:
 def diagnose_pdf(path: str) -> Dict[str, Any]:
     """Diagnose PDF quality and complexity."""
     with open_pdf(path) as pdf:
-        pages = pdf.pages[:5] # Check first 5 pages
+        pages = pdf.pages[:100000] # Check up to 100K pages
         return {
             "is_scanned_likelihood": any(len(p.chars) < 10 for p in pages), # If few chars, likely scanned image
             "has_text_layer": any(len(p.chars) > 0 for p in pages),

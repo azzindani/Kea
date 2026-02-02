@@ -95,7 +95,7 @@ def grep_xml_dir(directory: str, search_text: str) -> Dict[str, List[str]]:
                 lines = xf.readlines()
             matches = [l.strip() for l in lines if search_text in l]
             if matches:
-                 results[f] = matches[:5] # limit
+                 results[f] = matches[:100000] # Expanded to 100K scale
         except:
             pass
             

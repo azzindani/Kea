@@ -31,6 +31,6 @@ async def get_contract_events(arguments: dict) -> ToolResult:
         })
         
         # Summary
-        return ToolResult(content=[TextContent(text=f"### Contract Events\n**Count**: {len(logs)}\n**Topics**: {topics}\n**Range**: {from_block}-{to_block}\n\nFirst 5 Logs:\n{logs[:5]}")])
+        return ToolResult(content=[TextContent(text=f"### Contract Events\n**Count**: {len(logs)}\n**Topics**: {topics}\n**Range**: {from_block}-{to_block}\n\nLogs (capped at 100K):\n{logs[:100000]}")])
     except Exception as e:
         return ToolResult(isError=True, content=[TextContent(text=str(e))])
