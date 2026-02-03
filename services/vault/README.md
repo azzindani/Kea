@@ -1,6 +1,6 @@
 # 🏦 The Vault ("The Black Box")
 
-The **Vault Service** is the immutable persistence, audit, and data transport layer of the Kea v4.0 system. It acts as the **Artifact Bus** (or "Conveyor Belt"), ensuring that every cognitive step, tool execution, and compliance decision is logged with cryptographic integrity. It is responsible for moving "Physical Artifacts" (Parquet files, SQL Tables, PDFs) securely between the specialized Departments (Nodes) of the enterprise.
+The **Vault Service** is the research persistence, context, and data transport layer of the Kea v4.0 system. It serves as the **Active Memory** for on-progress research, multi-user conversational data, and cryptographic audit trails. It functions as the **Artifact Bus**, ensuring that every cognitive step and tool execution is logged and that large artifacts (webscrapes, PDFs, CSVs) are vectorized and indexed for JIT context injection.
 
 ## ✨ Features
 
@@ -53,8 +53,8 @@ The `AuditEntry` is the unit of accountability in Kea. Beyond standard fields (A
 ### 2. LangGraph State Checkpointing
 The `CheckpointStore` allows Kea to handle long-running research jobs (minutes to hours). Every time the Orchestrator moves between nodes (e.g., from Planner to Researcher), a state snapshot is saved as a `JSONB` blob in the `graph_checkpoints` table. If the system fails, the Orchestrator can reload the `latest` checkpoint and resume exactly where it left off.
 
-### 3. The Artifact Bus
-In the Kea v4.0 architecture, data is not passed as text in chat windows. Instead, "Physical Artifacts" (e.g., a 10MB CSV file or a scraped PDF) are placed onto the **Artifact Bus**. The Vault manages the storage (S3/Local) and indexing (Postgres) of these artifacts, allowing downstream nodes to pick them up by reference (e.g., `s3://vault/financials_2024.parquet`) rather than by value.
+### 3. The Artifact Bus & Active Context
+In the Kea v4.0 architecture, research data is not shared via local filesystems. Instead, collected "Active Artifacts" (e.g., a 10MB webscrape or a downloaded PDF) are placed onto the **Artifact Bus**. The Vault manages the storage and **vector indexing** of these artifacts. This allows the Orchestrator and downstream tools to perform semantic searches over the *currently collected data* for a specific job, rather than relying only on global knowledge or polluting the LLM context.
 
 ## 📚 Reference
 

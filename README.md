@@ -14,8 +14,9 @@ Instead of writing linear "To-Do Lists," Kea architects and executes **Directed 
 |:--------|:-------------------|:--------------------------|
 | **Structure** | Single Loop ("Thought -> Act") | **Fractal DAGs** (Main Graph spawns Sub-Graphs) |
 | **Tools** | Static list of Python functions | **"Departments"** (Isolated Microservices) |
-| **Data Flow** | Text in a chat window | **Artifact Bus** (Parquet/SQL moving via Vault) |
+| **Data Flow** | Text in a chat window | **Artifact Bus** (Postgres/S3 via Vault API) |
 | **Planning** | Linear Steps (1, 2, 3...) | **Topological Sort** (Parallel execution paths) |
+| **Storage** | Local Directories / Temp Files | **The Vault** (Research Persistence & Context Engine) |
 | **Role** | Research Assistant | **Autonomous CIO** (Architects the solution) |
 
 ---
@@ -36,13 +37,18 @@ graph TD
     subgraph "The Body (Execution & Memory)"
         Orchestrator -->|Execute| Host[MCP Host]
         Orchestrator -->|Learn| RAG[RAG Service]
-        Orchestrator -->|Audit| Vault[Vault]
+        Orchestrator -->|Persistence| Vault[(The Vault)]
     end
     
     subgraph "The Conscience (Oversight)"
         Host -->|Check| Manager[Swarm Manager]
         Orchestrator -->|Policy| Manager
     end
+    
+    %% The Vault as Central Database
+    Vault -.->|Audit/States| Orchestrator
+    Vault -.->|Artifacts| Host
+    Vault -.->|Knowledge| RAG
     
     Host -->|JSON-RPC| Tools[68+ MCP Servers]
 ```
@@ -56,8 +62,8 @@ Each service acts as a distinct corporate persona with a specific mandate.
 | **Gateway** | The Mouth | Security, Auth, & Routing | [📖 View Doc](services/api_gateway/README.md) |
 | **Orchestrator** | The Brain | LangGraph State & Reasoning | [📖 View Doc](services/orchestrator/README.md) |
 | **MCP Host** | The Hands | Tool Execution & JIT Spawning | [📖 View Doc](services/mcp_host/README.md) |
-| **RAG Service** | The Library| Knowledge & Dataset Ingestion | [📖 View Doc](services/rag_service/README.md) |
-| **Vault** | The Memory | Immutability & Persistence | [📖 View Doc](services/vault/README.md) |
+| **RAG Service** | The Librarian| Multi-Source Knowledge Controller | [📖 View Doc](services/rag_service/README.md) |
+| **Vault** | The Vault | Research Persistence & Context Engine | [📖 View Doc](services/vault/README.md) |
 | **Swarm Manager**| The Conscience| Governance & Compliance | [📖 View Doc](services/swarm_manager/README.md) |
 | **Chronos** | The Clock | Scheduling & Future Tasks | [📖 View Doc](services/chronos/README.md) |
 
@@ -75,8 +81,16 @@ Instead of a mess of Python functions, specialized "Departments" handle domain l
 ### 2. Zero-Trust Hardware Adaptation
 Whether running on a $2/mo VPS or a $30k H100 cluster, the `shared/hardware` layer profiles the host machine. It automatically adjusts swarm concurrency, batch sizes, and memory limits to maximize throughput without crashing the host.
 
-### 3. The Artifact Bus
-Data does not live in the conversation context. It lives in the **Vault**. When the "Researcher" finds a CSV, it doesn't summarize it; it saves it to the Vault (`s3://vault/data.csv`) and passes the *pointer* to the "Data Scientist" (Pandas Server), who loads it directly. This allows Kea to handle GB-scale datasets without polluting the LLM context.
+### 3. The Artifact Bus (Vault-Centric Execution)
+In a true microservices architecture, services do not share a common filesystem. Kea solves this via the **Vault & Artifact Bus**.
+- **Research Persistence Engine**: The Vault stores everything related to the *active work*: multi-user conversational data, job checkpoints, tasks (audit logs), and performance-critical research artifacts.
+- **Embedded Artifacts**: When data is collected (webscrapes, PDFs, etc.), it flows through the Artifact Bus into the Vault, where it is vectorized and indexed for JIT context retrieval during the research project.
+- **Zero Disk Dependency**: Services are stateless; they pull what they need from the Vault over the network (API), enabling Kea to scale across clusters.
+
+### 4. Multi-Source RAG Controller (Reference Intelligence)
+The **RAG Service** acts as the system's global "Reference Library," separate from the Vault's active research storage.
+- **Federated Knowledge**: It orchestrates access to massive, external, or multiple distinct RAG servers via API requests.
+- **Context Synthesis**: It filters and synthesizes the most relevant knowledge from these global sources before passing it to the Orchestrator, ensuring high-density, low-noise prompts.
 
 ---
 

@@ -1,6 +1,6 @@
 # 🗄️ RAG Service ("The Memory")
 
-The **RAG (Retrieval-Augmented Generation) Service** provides the long-term memory and knowledge base for the Kea v4.0 system. It functions as the **Corporate Library**, managing the storage, indexing, and semantic retrieval of "Atomic Facts" extracted during research. It also handles the ingestion of external knowledge (datasets, documents) to fuel the research process.
+The **RAG (Retrieval-Augmented Generation) Service** provides the reference intelligence and global knowledge orchestration layer for the Kea v4.0 system. It functions as the **Corporate Library & Controller**, managing access to massive, external, or multiple distinct RAG servers via API. It handles the ingestion of global datasets and feeds synthesized reference context into the research process.
 
 ## ✨ Features
 
@@ -23,21 +23,17 @@ The RAG Service operates as a **Triple-Store Abstraction Layer**, managing three
 
 ```mermaid
 graph TD
-    API[FastAPI Router] -->|Ingest| HF[Hugging Face Loader]
-    API -->|Write| FactStore[Fact Store]
+    API[FastAPI Router] -->|Orchestrate| External[External RAG Servers]
+    API -->|Ingest| HF[Hugging Face Loader]
+    API -->|Synthesize| Synth[Context Synthesizer]
     
-    HF -->|Stream| FactStore
+    HF -->|Batch| VectorDB[(Global Vector DB)]
+    External -->|Query| API
     
-    subgraph "Storage Layer"
-        FactStore -->|Embeddings| VectorDB[(Vector DB)]
-        FactStore -->|Metadata| PG[(PostgreSQL)]
-        FactStore -->|Relations| Graph[GraphRAG]
-    end
-    
-    Orchestrator[Orchestrator] -->|Query| API
+    Orchestrator[Orchestrator] -->|Context Request| API
+    API -->|Federated Search| External
     API -->|Semantic Search| VectorDB
-    API -->|Filter| PG
-    API -->|Traverse| Graph
+    API -->|Inject| OrchOut[Synthesized Context]
 ```
 
 ## 📁 Codebase Structure
