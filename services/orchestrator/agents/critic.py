@@ -41,6 +41,12 @@ CRITICAL - CHECK FOR HALLUCINATION:
 4. Verify that acknowledged "data gaps" match what's actually missing
 5. Be especially suspicious of precise numbers, dates, or names without citations
 
+IMPORTANT - ALLOW DERIVED CALCULATIONS:
+Distinguish between HALLUCINATION (inventing numbers) and DERIVATION (calculating from existing data).
+If the Generator calculates metrics like Free Cash Flow (Operating Cash - CapEx) or 
+ratios like ROE (Net Income / Equity) from raw facts, DO NOT mark as hallucination.
+If the math is valid and inputs are in the source data, ACCEPT the derived value.
+
 Be constructive - don't just criticize, suggest improvements."""
     
     async def critique(self, answer: str, facts: list, sources: list) -> str:

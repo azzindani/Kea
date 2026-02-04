@@ -157,10 +157,10 @@ TASK: {task_description}
 COLLECTED FACTS (from prior research):
 {facts_summary}
 
-AVAILABLE FILES (Artifacts in current path):
+AVAILABLE FILES (Use these file paths to load data):
 {file_artifacts}
 
-DATA VARIABLES (Already resolved - use directly):
+RESOLVED FILE PATHS (Use these exact paths):
 {resolved_data}
 
 AVAILABLE IN SANDBOX:
@@ -169,15 +169,24 @@ AVAILABLE IN SANDBOX:
 - duckdb
 - Standard builtins (print, len, sum, etc.)
 
-RULES:
-1. DO NOT use import statements (pd, np, duckdb already loaded), EXCEPT `import yfinance as yf` (allowed if you need missing data).
-2. Generate ONLY executable Python code
-3. Use the ACTUAL data from the facts above or FILES listed
-4. If DATA VARIABLES show resolved values, use them directly (they are Python strings)
+CRITICAL RULES:
+1. The sandbox starts EMPTY - NO variables are pre-loaded
+2. You MUST load data from files using pd.read_csv() or pd.read_json()
+3. DO NOT assume variables like 'income', 'balance', 'cashflow' exist - LOAD THEM
+4. Use the EXACT file paths from RESOLVED FILE PATHS above
 5. Print results in markdown table format
-6. Keep code under 30 lines
 
-Generate Python code:
+EXAMPLE (How to load data):
+```python
+# CORRECT - Load data from files
+income_df = pd.read_csv('/path/to/income.csv')
+balance_df = pd.read_csv('/path/to/balance.csv')
+
+# WRONG - Don't assume variables exist
+# revenue = income['totalRevenue']  # ERROR: 'income' not defined!
+```
+
+Generate Python code that explicitly loads all required data:
 ```python
 """
 
