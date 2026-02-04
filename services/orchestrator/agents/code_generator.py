@@ -184,6 +184,19 @@ To access financial metrics, you MUST either:
 1. TRANSPOSE the dataframe: `df = df.set_index(df.columns[0]).T`
 2. FILTER by row value: `row = df[df.iloc[:, 0].str.contains('Net Income', na=False)]`
 
+⚠️ MARKDOWN TABLE PARSING:
+Data may be formatted as Markdown tables (pipe-separated). 
+DO NOT use `sep='\n'` - this will cause a ValueError!
+
+CORRECT pattern for Markdown tables:
+```python
+from io import StringIO
+# Parse pipe-separated markdown table
+df = pd.read_csv(StringIO(data), sep="|", skipinitialspace=True)
+df = df.dropna(axis=1, how='all')  # Remove empty columns from leading/trailing pipes
+df.columns = df.columns.str.strip()
+```
+
 EXAMPLE (Correct approach for financial data):
 ```python
 # Load the data
