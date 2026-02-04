@@ -41,6 +41,12 @@ CRITICAL - CHECK FOR HALLUCINATION:
 4. Verify that acknowledged "data gaps" match what's actually missing
 5. Be especially suspicious of precise numbers, dates, or names without citations
 
+IMPORTANT - TOOL OUTPUTS ARE VALID FACTS:
+The research system uses tools (yfinance, database queries, APIs) to retrieve data.
+If the Generator cites a number (e.g., "Revenue: 75.06T") and that number appears 
+in a TOOL OUTPUT (CSV, JSON, or table string from the Researcher phase), IT IS VALID.
+Tool outputs count as source facts, not hallucinations.
+
 IMPORTANT - ALLOW DERIVED CALCULATIONS:
 Distinguish between HALLUCINATION (inventing numbers) and DERIVATION (calculating from existing data).
 If the Generator calculates metrics like Free Cash Flow (Operating Cash - CapEx) or 

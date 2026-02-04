@@ -189,13 +189,22 @@ EXAMPLE (Correct approach for financial data):
 # Load the data
 income_df = pd.read_csv('/path/to/income.csv')
 
+# ALWAYS clean headers first (remove whitespace, handle encoding)
+income_df.columns = income_df.columns.str.strip()
+
 # TRANSPOSE to make metrics into columns and dates into rows
 income_df = income_df.set_index(income_df.columns[0]).T
-income_df.index = pd.to_datetime(income_df.index)
+income_df.columns = income_df.columns.str.strip()  # Clean again after transpose
 
-# NOW you can access metrics as columns
-net_income = income_df['Net Income From Continuing Operations'].iloc[-1]
-revenue = income_df['Total Revenue'].iloc[-1]
+# Use FLEXIBLE column matching (partial match) to handle variations
+def get_column(df, partial_name):
+    matches = [c for c in df.columns if partial_name.lower() in str(c).lower()]
+    return matches[0] if matches else None
+
+# Access metrics safely
+net_income_col = get_column(income_df, 'Net Income')
+if net_income_col:
+    net_income = income_df[net_income_col].iloc[-1]
 ```
 
 Generate Python code that explicitly loads and transforms financial data:
