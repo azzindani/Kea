@@ -100,11 +100,109 @@ class ArtifactStore:
 
 
 # ============================================================================
-# Placeholder Resolution
+# Placeholder Resolution (Enhanced with JSONPath-like expressions)
 # ============================================================================
 
-# Pattern for {{step_id.artifacts.key}} placeholders
+# Pattern for {{step_id.artifacts.key.subfield[0]}} placeholders
 PLACEHOLDER_PATTERN = re.compile(r"\{\{([^}]+)\}\}")
+
+# Pattern for array access like items[0] or items[*]
+ARRAY_ACCESS_PATTERN = re.compile(r'^([^\[]+)\[(\d+|\*)\]$')
+
+
+def _resolve_jsonpath(path: str, store: ArtifactStore) -> Any:
+    """
+    Resolve JSONPath-like expressions to actual values.
+    
+    Supports:
+        - step_1.artifacts.data -> raw artifact
+        - step_1.artifacts.data.items -> nested field
+        - step_1.artifacts.data.items[0] -> array index
+        - step_1.artifacts.data.items[*].price -> map over array
+        - step_1.artifacts.data.items[-1] -> last element
+    
+    Args:
+        path: JSONPath-like reference string
+        store: ArtifactStore to resolve from
+        
+    Returns:
+        Resolved value or None if not found
+    """
+    parts = path.split(".")
+    if len(parts) < 2:
+        return None
+    
+    step_id = parts[0]
+    
+    # Handle artifacts prefix
+    if len(parts) >= 3 and parts[1] == "artifacts":
+        artifact_key = parts[2]
+        value = store.get(f"{step_id}.artifacts.{artifact_key}")
+        remaining_parts = parts[3:]
+    elif len(parts) >= 2:
+        # Direct reference: step_id.key
+        value = store.get(f"{step_id}.{parts[1]}")
+        remaining_parts = parts[2:]
+    else:
+        return None
+    
+    if value is None:
+        return None
+    
+    # Navigate deeper if more parts
+    for part in remaining_parts:
+        if value is None:
+            return None
+        
+        # Check for array access
+        array_match = ARRAY_ACCESS_PATTERN.match(part)
+        if array_match:
+            field_name = array_match.group(1)
+            index_str = array_match.group(2)
+            
+            # Get the field first if it exists
+            if field_name:
+                if isinstance(value, dict):
+                    value = value.get(field_name)
+                elif hasattr(value, field_name):
+                    value = getattr(value, field_name)
+                else:
+                    return None
+            
+            # Apply array access
+            if isinstance(value, (list, tuple)):
+                if index_str == "*":
+                    # Keep as list for map operations
+                    pass
+                else:
+                    idx = int(index_str)
+                    if idx < 0:
+                        idx = len(value) + idx
+                    if 0 <= idx < len(value):
+                        value = value[idx]
+                    else:
+                        return None
+            else:
+                return None
+        else:
+            # Regular field access
+            if isinstance(value, dict):
+                value = value.get(part)
+            elif isinstance(value, list) and part.isdigit():
+                idx = int(part)
+                value = value[idx] if 0 <= idx < len(value) else None
+            elif hasattr(value, part):
+                value = getattr(value, part)
+            elif isinstance(value, list):
+                # Map operation: extract 'part' from each item
+                value = [
+                    item.get(part) if isinstance(item, dict) else getattr(item, part, None)
+                    for item in value
+                ]
+            else:
+                return None
+    
+    return value
 
 
 def resolve_inputs(
@@ -113,6 +211,12 @@ def resolve_inputs(
 ) -> dict[str, Any]:
     """
     Resolve input_mapping placeholders to actual artifact values.
+    
+    Enhanced with JSONPath-like expressions:
+        - {{step.artifacts.data}} -> raw artifact
+        - {{step.artifacts.data.items}} -> nested field
+        - {{step.artifacts.data.items[0]}} -> first array element
+        - {{step.artifacts.data.items[*].price}} -> extract all prices
     
     Args:
         input_mapping: Dict like {"csv_path": "{{fetch_data.artifacts.prices_csv}}"}
@@ -125,6 +229,10 @@ def resolve_inputs(
         >>> store.store("fetch_data", "prices_csv", "/vault/bbca.csv")
         >>> resolve_inputs({"csv_path": "{{fetch_data.artifacts.prices_csv}}"}, store)
         {"csv_path": "/vault/bbca.csv"}
+        
+        >>> store.store("api", "response", {"items": [{"price": 100}, {"price": 200}]})
+        >>> resolve_inputs({"prices": "{{api.artifacts.response.items[*].price}}"}, store)
+        {"prices": [100, 200]}
     """
     resolved = {}
     
@@ -134,17 +242,36 @@ def resolve_inputs(
             matches = PLACEHOLDER_PATTERN.findall(value)
             
             if matches:
-                resolved_value = value
-                for match in matches:
-                    artifact = store.get(match)
+                # If the entire value is a single placeholder, preserve the type
+                if len(matches) == 1 and value == f"{{{{{matches[0]}}}}}":
+                    artifact = _resolve_jsonpath(matches[0], store)
                     if artifact is not None:
-                        # Replace placeholder with actual value
-                        placeholder = f"{{{{{match}}}}}"
-                        resolved_value = resolved_value.replace(placeholder, str(artifact))
+                        resolved[key] = artifact  # Preserve original type
                         logger.info(f"🔗 Resolved: {key} = {str(artifact)[:100]}")
                     else:
-                        logger.warning(f"⚠️ Missing artifact: {match}")
-                resolved[key] = resolved_value
+                        # Try legacy store.get for backward compatibility
+                        artifact = store.get(matches[0])
+                        if artifact is not None:
+                            resolved[key] = artifact
+                            logger.info(f"🔗 Resolved (legacy): {key} = {str(artifact)[:100]}")
+                        else:
+                            logger.warning(f"⚠️ Missing artifact: {matches[0]}")
+                            resolved[key] = value  # Keep placeholder as-is
+                else:
+                    # Multiple placeholders or mixed content - string interpolation
+                    resolved_value = value
+                    for match in matches:
+                        artifact = _resolve_jsonpath(match, store)
+                        if artifact is None:
+                            artifact = store.get(match)  # Legacy fallback
+                        
+                        if artifact is not None:
+                            placeholder = f"{{{{{match}}}}}"
+                            resolved_value = resolved_value.replace(placeholder, str(artifact))
+                            logger.info(f"🔗 Resolved: {key} part = {str(artifact)[:50]}")
+                        else:
+                            logger.warning(f"⚠️ Missing artifact: {match}")
+                    resolved[key] = resolved_value
             else:
                 resolved[key] = value
         else:

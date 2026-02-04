@@ -1244,3 +1244,120 @@ except Exception as e:
         "code": code, 
         "dependencies": ["yfinance", "pandas", "requests", "html5lib", "lxml", "tabulate"]
     })
+
+
+# ============================================================================
+# Agentic Workflow Runner (Autonomous Human-Like Execution)
+# ============================================================================
+
+async def run_agentic_research(
+    query: str,
+    job_id: str | None = None,
+    max_steps: int = 15
+) -> dict[str, Any]:
+    """
+    Run autonomous research using the agentic workflow.
+    
+    This is an alternative to the standard LangGraph flow that uses
+    a ReAct-style loop where the LLM reasons about each step,
+    similar to how a human analyst would work.
+    
+    The agent will:
+    1. Analyze the query
+    2. Call appropriate tools to gather data
+    3. Inspect results and decide next steps
+    4. Synthesize findings when complete
+    
+    Args:
+        query: User's research query
+        job_id: Optional job ID for tracking
+        max_steps: Maximum reasoning steps (default 15)
+        
+    Returns:
+        Dict with final_answer, reasoning_steps, tool_executions, artifacts
+        
+    Example:
+        result = await run_agentic_research("Analyze TSLA financials")
+        print(result["final_answer"])
+        print(f"Completed in {len(result['reasoning_steps'])} steps")
+    """
+    from services.orchestrator.core.agentic_workflow import AgenticWorkflow
+    from services.mcp_host.core.session_registry import get_session_registry
+    
+    logger.info("=" * 70)
+    logger.info("🤖 AGENTIC WORKFLOW MODE - Human-Like Autonomous Research")
+    logger.info("=" * 70)
+    logger.info(f"Query: {query[:200]}")
+    logger.info("-" * 70)
+    
+    registry = get_session_registry()
+    
+    async def tool_executor(name: str, args: dict) -> Any:
+        """Execute tools via MCP session registry."""
+        # Handle full names like "yfinance_server.get_income_statement_quarterly"
+        if "." in name:
+            server_name, tool_name = name.rsplit(".", 1)
+        else:
+            tool_name = name
+            server_name = registry.get_server_for_tool(name)
+            if not server_name:
+                raise ValueError(f"Tool {name} not found in registry")
+        
+        session = await registry.get_session(server_name)
+        result = await session.call_tool(tool_name, args)
+        
+        # Extract text content from result
+        if hasattr(result, "content"):
+            text_parts = []
+            for c in result.content:
+                if hasattr(c, "text"):
+                    text_parts.append(c.text)
+            return "\n".join(text_parts)
+        
+        return str(result)
+    
+    # Discover available tools
+    await registry.list_all_tools()
+    all_tools = registry.get_all_tools_list()
+    
+    # Filter to relevant tools for financial analysis
+    relevant_prefixes = ["yfinance", "python", "execute", "web_search", "news"]
+    available_tools = [
+        {"name": t.get("name", ""), "description": t.get("description", "")}
+        for t in all_tools
+        if any(p in t.get("name", "").lower() for p in relevant_prefixes)
+    ][:50]  # Limit to 50 tools for context
+    
+    logger.info(f"📚 Discovered {len(available_tools)} relevant tools")
+    
+    # Run the agentic workflow
+    workflow = AgenticWorkflow(
+        tool_executor=tool_executor,
+        max_steps=max_steps
+    )
+    
+    state = await workflow.run(
+        query=query,
+        available_tools=available_tools
+    )
+    
+    # Log summary
+    logger.info("=" * 70)
+    logger.info("✅ AGENTIC WORKFLOW COMPLETE")
+    logger.info("=" * 70)
+    logger.info(f"Status: {state.status}")
+    logger.info(f"Steps: {state.current_step}")
+    logger.info(f"Tools Called: {len(state.tool_executions)}")
+    logger.info(f"Schemas Learned: {len(state.learned_schemas)}")
+    
+    return {
+        "final_answer": state.final_answer,
+        "status": state.status,
+        "reasoning_steps": state.reasoning_steps,
+        "tool_executions": state.tool_executions,
+        "artifacts": state.artifacts,
+        "learned_schemas": state.learned_schemas,
+        "query": query,
+        "job_id": job_id
+    }
+
