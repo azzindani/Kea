@@ -43,7 +43,7 @@ def resolve_placeholders(text: str, context_data: dict[str, Any] | None = None) 
     Resolve {{placeholder}} syntax with actual values from context.
     
     Handles formats like:
-        - {{s1.artifact}} -> Looks up 's1' key in context_data
+        - {{s1.artifact}} -> Looks up task 's1' file in context_pool
         - {{step_1.artifacts.prices_csv}} -> Looks up nested path
         - {{fetch_data.artifact}} -> Converts to actual file path
     
@@ -54,42 +54,97 @@ def resolve_placeholders(text: str, context_data: dict[str, Any] | None = None) 
     Returns:
         String with placeholders replaced by actual values
     """
+    # Build comprehensive context from context_pool
+    try:
+        from shared.context_pool import get_context_pool
+        ctx = get_context_pool()
+        
+        # Build lookup dict from context_pool
+        context_data = context_data or {}
+        
+        # Add all stored files (task_id -> path)
+        for key in ctx.list_data_keys():
+            data = ctx.get_data(key)
+            context_data[key] = data
+        
+        # Add file artifacts
+        for path in ctx.list_files():
+            # Extract task_id from path if possible (e.g., "/vault/s1_income.csv" -> "s1")
+            import os
+            basename = os.path.basename(path)
+            # Try patterns like "s1_...", "task_1_..."
+            if "_" in basename:
+                prefix = basename.split("_")[0]
+                if prefix not in context_data:
+                    context_data[prefix] = path
+        
+        # Add explicit file lookups
+        if hasattr(ctx, '_file_store'):
+            for task_id, info in ctx._file_store.items():
+                if isinstance(info, dict):
+                    context_data[task_id] = info.get("path", str(info))
+                else:
+                    context_data[task_id] = str(info)
+        
+        # Add code results
+        if hasattr(ctx, '_code_results'):
+            for task_id, result in ctx._code_results.items():
+                context_data[f"{task_id}_result"] = result
+                
+    except Exception as e:
+        logger.debug(f"Could not load context_pool: {e}")
+        context_data = context_data or {}
+    
     if not context_data:
         return text
     
     def replace_placeholder(match: re.Match) -> str:
         path = match.group(1)
         parts = path.split(".")
+        task_id = parts[0]  # e.g., "s1" from "s1.artifact"
         
-        # Try various lookup strategies
-        # Strategy 1: Direct key lookup (e.g., "s1" -> context["s1"])
-        if parts[0] in context_data:
-            value = context_data[parts[0]]
-            # Navigate nested path if present
+        # Strategy 1: Direct task_id lookup in context
+        if task_id in context_data:
+            value = context_data[task_id]
+            # Navigate nested path if present (skip artifact/artifacts keywords)
             for part in parts[1:]:
-                if part == "artifact" or part == "artifacts":
+                if part in ("artifact", "artifacts"):
                     continue  # Skip these markers
                 if isinstance(value, dict) and part in value:
                     value = value[part]
                 elif hasattr(value, part):
                     value = getattr(value, part)
-            if value and value != context_data[parts[0]]:
-                return repr(str(value))  # Quoted string for Python
-            return repr(str(value))
+            return repr(str(value))  # Quoted string for Python
         
-        # Strategy 2: Full path lookup (e.g., "step_1.artifacts.prices_csv")
+        # Strategy 2: Try context_pool.get_file() directly
+        try:
+            from shared.context_pool import get_context_pool
+            ctx = get_context_pool()
+            file_path = ctx.get_file(task_id)
+            if file_path:
+                logger.info(f"   ✅ Resolved {{{{task_id}}}} -> {file_path}")
+                return repr(str(file_path))
+                
+            # Try get_data for non-file artifacts
+            data = ctx.get_data(task_id)
+            if data is not None:
+                return repr(str(data))
+        except Exception:
+            pass
+        
+        # Strategy 3: Full path lookup (e.g., "step_1.artifacts.prices_csv")
         full_key = path.replace(".artifacts.", ".").replace(".artifact", "")
         if full_key in context_data:
             return repr(str(context_data[full_key]))
         
-        # Strategy 3: Look for task_output_* keys
-        task_output_key = f"task_output_{parts[0]}"
+        # Strategy 4: Look for task_output_* keys
+        task_output_key = f"task_output_{task_id}"
         if task_output_key in context_data:
             return repr(str(context_data[task_output_key]))
         
-        # Return original placeholder if not found (let it fail explicitly)
+        # Return empty string for unresolved (safer than crashing)
         logger.warning(f"⚠️ Could not resolve placeholder: {path}")
-        return match.group(0)
+        return "''"  # Empty string to prevent syntax errors
     
     return PLACEHOLDER_PATTERN.sub(replace_placeholder, text)
 
@@ -247,6 +302,13 @@ INSTRUCTION: Fix the code above to resolve the error. Ensure you handle the edge
         lines = code.strip().split('\n')
         lines = [l for l in lines if not l.strip().startswith('import ')]
         code = '\n'.join(lines)
+        
+        # CRITICAL: Resolve any {{placeholder}} syntax in the generated code
+        # The LLM may generate code like: pd.read_csv('{{s1.artifact}}')
+        # We need to replace these with actual file paths from context_data
+        if context_data and PLACEHOLDER_PATTERN.search(code):
+            logger.info("   🔧 Resolving placeholders in generated code...")
+            code = resolve_placeholders(code, context_data)
         
         logger.info(f"   📝 GENERATED PYTHON CODE (Self-Correction={bool(previous_error)}):\n{'-'*60}\n{code}\n{'-'*60}")
         return code.strip()
