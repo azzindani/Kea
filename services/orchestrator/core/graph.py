@@ -94,6 +94,10 @@ class GraphState(TypedDict, total=False):
     max_iterations: int
     should_continue: bool
     error: str | None
+    
+    # Revision loop control (for Judge -> Generator retry)
+    revision_count: int
+    max_revisions: int
 
 
 # ============================================================================
@@ -983,10 +987,17 @@ async def judge_node(state: GraphState) -> GraphState:
     logger.info("-"*70)
     logger.info("="*70 + "\n")
     
+    # Increment revision count if verdict is Revise
+    revision_count = state.get("revision_count", 0)
+    if verdict == "Revise":
+        revision_count += 1
+        logger.info(f"🔄 Revision requested. Count: {revision_count}")
+    
     return {
         **state,
         "judge_verdict": verdict,
         "confidence": confidence,
+        "revision_count": revision_count,
     }
 
 
@@ -1057,6 +1068,24 @@ def should_continue_research(state: GraphState) -> Literal["researcher", "genera
     return "generator"
 
 
+def should_revise_or_finalize(state: GraphState) -> Literal["generator", "synthesizer"]:
+    """
+    Decide whether to revise the answer or finalize.
+    
+    If Judge verdict is 'Revise' and we haven't exceeded max_revisions,
+    loop back to Generator for another attempt.
+    """
+    verdict = state.get("judge_verdict", "Accept")
+    revision_count = state.get("revision_count", 0)
+    max_revisions = state.get("max_revisions", 2)  # Default: allow 2 retries
+    
+    if verdict == "Revise" and revision_count < max_revisions:
+        logger.info(f"🔄 Judge requested revision. Attempt {revision_count + 1}/{max_revisions}")
+        return "generator"
+    
+    return "synthesizer"
+
+
 # ============================================================================
 # Build Graph
 # ============================================================================
@@ -1105,7 +1134,17 @@ def build_research_graph() -> StateGraph:
     # Consensus flow
     graph.add_edge(NodeName.GENERATOR.value, NodeName.CRITIC.value)
     graph.add_edge(NodeName.CRITIC.value, NodeName.JUDGE.value)
-    graph.add_edge(NodeName.JUDGE.value, NodeName.SYNTHESIZER.value)
+    
+    # Conditional edge: Judge can request revision or finalize
+    graph.add_conditional_edges(
+        NodeName.JUDGE.value,
+        should_revise_or_finalize,
+        {
+            "generator": NodeName.GENERATOR.value,  # Loop back for revision
+            "synthesizer": NodeName.SYNTHESIZER.value,  # Proceed to final
+        }
+    )
+    
     graph.add_edge(NodeName.SYNTHESIZER.value, END)
     
     return graph

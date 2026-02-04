@@ -14,9 +14,14 @@ from __future__ import annotations
 import os
 import re
 import unicodedata
+from typing import Any
 from shared.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+# Pattern for {{step_id.artifact}} or {{step_id.artifacts.key}} placeholders
+PLACEHOLDER_PATTERN = re.compile(r"\{\{([^}]+)\}\}")
 
 
 def sanitize_for_code(text: str) -> str:
@@ -33,6 +38,62 @@ def sanitize_for_code(text: str) -> str:
     return text.strip()
 
 
+def resolve_placeholders(text: str, context_data: dict[str, Any] | None = None) -> str:
+    """
+    Resolve {{placeholder}} syntax with actual values from context.
+    
+    Handles formats like:
+        - {{s1.artifact}} -> Looks up 's1' key in context_data
+        - {{step_1.artifacts.prices_csv}} -> Looks up nested path
+        - {{fetch_data.artifact}} -> Converts to actual file path
+    
+    Args:
+        text: String potentially containing placeholders
+        context_data: Dict mapping step_id/keys to actual values
+        
+    Returns:
+        String with placeholders replaced by actual values
+    """
+    if not context_data:
+        return text
+    
+    def replace_placeholder(match: re.Match) -> str:
+        path = match.group(1)
+        parts = path.split(".")
+        
+        # Try various lookup strategies
+        # Strategy 1: Direct key lookup (e.g., "s1" -> context["s1"])
+        if parts[0] in context_data:
+            value = context_data[parts[0]]
+            # Navigate nested path if present
+            for part in parts[1:]:
+                if part == "artifact" or part == "artifacts":
+                    continue  # Skip these markers
+                if isinstance(value, dict) and part in value:
+                    value = value[part]
+                elif hasattr(value, part):
+                    value = getattr(value, part)
+            if value and value != context_data[parts[0]]:
+                return repr(str(value))  # Quoted string for Python
+            return repr(str(value))
+        
+        # Strategy 2: Full path lookup (e.g., "step_1.artifacts.prices_csv")
+        full_key = path.replace(".artifacts.", ".").replace(".artifact", "")
+        if full_key in context_data:
+            return repr(str(context_data[full_key]))
+        
+        # Strategy 3: Look for task_output_* keys
+        task_output_key = f"task_output_{parts[0]}"
+        if task_output_key in context_data:
+            return repr(str(context_data[task_output_key]))
+        
+        # Return original placeholder if not found (let it fail explicitly)
+        logger.warning(f"⚠️ Could not resolve placeholder: {path}")
+        return match.group(0)
+    
+    return PLACEHOLDER_PATTERN.sub(replace_placeholder, text)
+
+
 # Code generation prompt - instructs LLM to write executable Python
 CODE_PROMPT = """You are a Python code generator for financial analysis.
 
@@ -44,6 +105,9 @@ COLLECTED FACTS (from prior research):
 AVAILABLE FILES (Artifacts in current path):
 {file_artifacts}
 
+DATA VARIABLES (Already resolved - use directly):
+{resolved_data}
+
 AVAILABLE IN SANDBOX:
 - pd (pandas)
 - np (numpy)  
@@ -54,8 +118,9 @@ RULES:
 1. DO NOT use import statements (pd, np, duckdb already loaded), EXCEPT `import yfinance as yf` (allowed if you need missing data).
 2. Generate ONLY executable Python code
 3. Use the ACTUAL data from the facts above or FILES listed
-4. Print results in markdown table format
-5. Keep code under 30 lines
+4. If DATA VARIABLES show resolved values, use them directly (they are Python strings)
+5. Print results in markdown table format
+6. Keep code under 30 lines
 
 Generate Python code:
 ```python
@@ -68,6 +133,7 @@ async def generate_python_code(
     file_artifacts: list[str] | None = None,
     previous_code: str | None = None,
     previous_error: str | None = None,
+    context_data: dict[str, Any] | None = None,
 ) -> str:
     """
     Use LLM to generate Python code based on task and collected facts.
@@ -79,10 +145,24 @@ async def generate_python_code(
         file_artifacts: List of available file paths
         previous_code: The code that failed (for retry)
         previous_error: The error message (for retry)
+        context_data: Dict mapping step_ids to their output values (for resolving {{placeholders}})
         
     Returns:
         Executable Python code string (no imports)
     """
+    # Build context_data from context pool if not provided
+    if context_data is None:
+        try:
+            from shared.context_pool import get_context_pool
+            ctx = get_context_pool()
+            context_data = ctx.get_all_data() if hasattr(ctx, 'get_all_data') else {}
+            
+            # Also add stored artifacts
+            if hasattr(ctx, '_data_store'):
+                context_data.update(ctx._data_store)
+        except Exception:
+            context_data = {}
+    
     # Check if we have API key
     api_key = os.getenv("OPENROUTER_API_KEY", "")
     if not api_key:
@@ -107,11 +187,26 @@ async def generate_python_code(
         # Summarize files
         files_str = "\n".join(f"- {f}" for f in (file_artifacts or [])) if file_artifacts else "(No files available)"
         
+        # Build resolved data summary (showing what placeholders would resolve to)
+        resolved_data_str = ""
+        if context_data:
+            for key, value in list(context_data.items())[:10]:  # Limit to 10 entries
+                if isinstance(value, str) and len(value) > 200:
+                    resolved_data_str += f"- {key}: (data with {len(value)} chars)\n"
+                else:
+                    resolved_data_str += f"- {key}: {repr(str(value)[:100])}\n"
+        if not resolved_data_str:
+            resolved_data_str = "(No pre-resolved data available)"
+        
+        # Resolve any placeholders in the task description
+        resolved_task = resolve_placeholders(task_description, context_data)
+        
         # Build prompt
         prompt = CODE_PROMPT.format(
-            task_description=task_description,
+            task_description=resolved_task,
             facts_summary=facts_summary,
-            file_artifacts=files_str
+            file_artifacts=files_str,
+            resolved_data=resolved_data_str
         )
         
         # Add Error Context (Self-Correction)
