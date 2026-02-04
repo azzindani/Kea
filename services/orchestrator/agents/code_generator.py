@@ -176,17 +176,29 @@ CRITICAL RULES:
 4. Use the EXACT file paths from RESOLVED FILE PATHS above
 5. Print results in markdown table format
 
-EXAMPLE (How to load data):
-```python
-# CORRECT - Load data from files
-income_df = pd.read_csv('/path/to/income.csv')
-balance_df = pd.read_csv('/path/to/balance.csv')
+⚠️ FINANCIAL DATA STRUCTURE WARNING:
+Financial CSVs have METRICS in ROWS and DATES in COLUMNS (transposed from typical format).
+You cannot access metrics like `df['Net Income']` - that's a ROW VALUE, not a column!
 
-# WRONG - Don't assume variables exist
-# revenue = income['totalRevenue']  # ERROR: 'income' not defined!
+To access financial metrics, you MUST either:
+1. TRANSPOSE the dataframe: `df = df.set_index(df.columns[0]).T`
+2. FILTER by row value: `row = df[df.iloc[:, 0].str.contains('Net Income', na=False)]`
+
+EXAMPLE (Correct approach for financial data):
+```python
+# Load the data
+income_df = pd.read_csv('/path/to/income.csv')
+
+# TRANSPOSE to make metrics into columns and dates into rows
+income_df = income_df.set_index(income_df.columns[0]).T
+income_df.index = pd.to_datetime(income_df.index)
+
+# NOW you can access metrics as columns
+net_income = income_df['Net Income From Continuing Operations'].iloc[-1]
+revenue = income_df['Total Revenue'].iloc[-1]
 ```
 
-Generate Python code that explicitly loads all required data:
+Generate Python code that explicitly loads and transforms financial data:
 ```python
 """
 
