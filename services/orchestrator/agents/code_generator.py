@@ -191,36 +191,50 @@ DO NOT use `sep='\n'` - this will cause a ValueError!
 CORRECT pattern for Markdown tables:
 ```python
 from io import StringIO
-# Parse pipe-separated markdown table
 df = pd.read_csv(StringIO(data), sep="|", skipinitialspace=True)
-df = df.dropna(axis=1, how='all')  # Remove empty columns from leading/trailing pipes
+df = df.dropna(axis=1, how='all')
 df.columns = df.columns.str.strip()
+```
+
+⚠️ COLUMN ACCESS - USE POSITION, NOT DATE STRINGS:
+The data may have leading commas, whitespace in headers, or timestamp formats.
+DO NOT access columns by exact date strings (e.g., `df['2025-12-31']`) - this causes KeyError!
+
+ALWAYS use POSITION-BASED access:
+```python
+# Get most recent data (last column)
+latest_value = df.iloc[:, -1]
+
+# Get specific year by index position
+year_2025 = df.iloc[:, 1]  # Usually first data column after index
+
+# Or sort columns and get latest
+df = df.sort_index(axis=1)
+latest = df.iloc[:, -1]
 ```
 
 EXAMPLE (Correct approach for financial data):
 ```python
-# Load the data
+# Load and clean
 income_df = pd.read_csv('/path/to/income.csv')
-
-# ALWAYS clean headers first (remove whitespace, handle encoding)
 income_df.columns = income_df.columns.str.strip()
 
-# TRANSPOSE to make metrics into columns and dates into rows
+# TRANSPOSE to make metrics into columns
 income_df = income_df.set_index(income_df.columns[0]).T
-income_df.columns = income_df.columns.str.strip()  # Clean again after transpose
+income_df.columns = income_df.columns.str.strip()
 
-# Use FLEXIBLE column matching (partial match) to handle variations
+# Use FLEXIBLE column matching
 def get_column(df, partial_name):
     matches = [c for c in df.columns if partial_name.lower() in str(c).lower()]
     return matches[0] if matches else None
 
-# Access metrics safely
+# Access LATEST data by position (not by date string!)
 net_income_col = get_column(income_df, 'Net Income')
 if net_income_col:
-    net_income = income_df[net_income_col].iloc[-1]
+    latest_net_income = income_df[net_income_col].iloc[-1]  # Last row = most recent
 ```
 
-Generate Python code that explicitly loads and transforms financial data:
+Generate Python code that uses position-based access:
 ```python
 """
 
