@@ -129,7 +129,7 @@ async def persist_facts(facts: list[dict], job_id: str) -> int:
             import uuid
             atomic_fact = AtomicFact(
                 fact_id=str(uuid.uuid4()),
-                entity=fact.get("source", "unknown"),
+                entity=fact.get("source") or "unknown",
                 attribute="content",
                 value=fact.get("text", ""),
                 source_url=fact.get("url", ""),

@@ -238,15 +238,25 @@ OUTPUT ONLY JSON. No prose."""
             # Parse response
             content = str(response).strip()
             # Extract JSON
+            data = {}
             if content.startswith("{"):
-                data = json.loads(content)
-            else:
+                try:
+                    data = json.loads(content)
+                except json.JSONDecodeError:
+                    pass
+            
+            if not data: # Fallback to regex
                 import re
                 json_match = re.search(r'\{[\s\S]*\}', content)
                 if json_match:
-                    data = json.loads(json_match.group(0))
-                else:
-                    return None
+                    try:
+                        data = json.loads(json_match.group(0))
+                    except json.JSONDecodeError:
+                        pass
+            
+            if not isinstance(data, dict):
+                logger.warning(f"⚠️ Microplanner LLM returned non-dict JSON: {type(data)} -> {data}")
+                return None
 
             action = data.get("action", "continue")
 
