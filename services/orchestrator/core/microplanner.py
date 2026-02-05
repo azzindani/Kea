@@ -222,8 +222,14 @@ Based on the latest result, should we:
 RESPOND WITH EXACTLY ONE OF:
 {{"action": "continue"}}
 {{"action": "complete"}}
-{{"action": "expand", "new_steps": [...]}}
-{{"action": "replan", "new_steps": [...]}}
+{{"action": "expand", "new_steps": [{{"id": "unique_id", "tool": "tool_name", "args": {{...}}, "depends_on": [...]}}]}}
+{{"action": "replan", "new_steps": [{{"id": "unique_id", "tool": "tool_name", "args": {{...}}, "depends_on": [...]}}]}}
+
+IMPORTANT rules for 'new_steps':
+1. It must be a LIST of OBJECTS. Do NOT return a list of strings.
+2. Each object MUST have 'tool' and 'args'.
+3. Use only real tools you have seen in the plan or know exist (e.g. web_search, get_financials). Do NOT invent tool names like 'parse' or 'search' unless they are real.
+4. 'depends_on' is optional but recommended.
 
 OUTPUT ONLY JSON. No prose."""
 
