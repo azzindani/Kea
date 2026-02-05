@@ -115,10 +115,10 @@ class TaskDecomposer:
     def decompose(
         self,
         query: str,
-        max_subtasks: int = 5,
+        max_subtasks: int = 20,
         strategy: str = "auto",
     ) -> list[SubTask]:
-        """Decompose query into subtasks."""
+        """Decompose query into subtasks. Limit is now dynamic via complexity classifier."""
         query_lower = query.lower()
         
         # Detect entities (e.g., "Compare A vs B vs C")
@@ -333,8 +333,8 @@ class AgentSpawner:
                 elif "10k" in query_lower or "10,000" in query_lower: factor = 10
                 elif "50k" in query_lower: factor = 15
                 
-                # Cap at reasonable max parallel
-                factor = min(factor, plan.max_parallel or 10)
+                # Cap at plan's max_parallel (now set dynamically by complexity classifier)
+                factor = min(factor, plan.max_parallel or 15)
                 
                 logger.info(f"💥 Expanding massive task '{task.query[:30]}...' into {factor} parallel shards")
                 
