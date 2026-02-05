@@ -49,6 +49,7 @@ The system is divided into 7 specialized microservices:
 - Create test fixtures or mocks
 - Modify files in the `tests/` directory
 - Execute `uv run` commands
+- Execute `python` commands
 
 When implementing features, focus on the production code only.
 
