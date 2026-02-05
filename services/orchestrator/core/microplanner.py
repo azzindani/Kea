@@ -275,6 +275,10 @@ OUTPUT ONLY JSON. No prose."""
 
                 new_nodes = []
                 for step in new_steps:
+                    if not isinstance(step, dict):
+                         logger.warning(f"⚠️ Microplanner skipped invalid step (not dict): {step}")
+                         continue
+                         
                     # Ensure unique IDs
                     step_id = step.get("id", f"replan_{self._replan_count}_{len(new_nodes)}")
                     step["id"] = step_id
