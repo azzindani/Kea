@@ -31,10 +31,16 @@ class MicroTask(BaseModel):
     fallback_tools: list[str] = Field(default_factory=list)  # If primary fails
     persist: bool = True  # Always persist by default (high threshold policy)
     phase: str = "research"  # Execution phase for parallel batching
-    
+
     # Node Assembly Engine fields
     input_mapping: dict[str, str] = Field(default_factory=dict)  # {"csv_path": "{{step_id.artifacts.key}}"}
     output_artifact: str | None = None  # Artifact key this task produces
+
+    # Workflow node type (tool, code, llm, switch, loop, merge, agentic)
+    node_type: str = "tool"
+
+    # Advanced node fields (stored as raw dict for DAG executor to interpret)
+    node_config: dict[str, Any] = Field(default_factory=dict)
     
     
 class ExecutionPlan(BaseModel):
@@ -193,6 +199,26 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
     except Exception as e:
         logger.debug(f"Related fact lookup skipped: {e}")
     
+    # ============================================================
+    # COMPLEXITY CLASSIFICATION (Dynamic Limit Scaling)
+    # ============================================================
+    try:
+        from services.orchestrator.core.complexity import classify_complexity
+        complexity = classify_complexity(query)
+        state["complexity"] = {
+            "tier": complexity.tier.value,
+            "entity_count": complexity.entity_count,
+            "composite": complexity.composite,
+            "max_subtasks": complexity.max_subtasks,
+            "max_phases": complexity.max_phases,
+            "max_depth": complexity.max_depth,
+            "max_parallel": complexity.max_parallel,
+            "max_research_iterations": complexity.max_research_iterations,
+        }
+    except Exception as e:
+        logger.warning(f"Complexity classification failed: {e}")
+        complexity = None
+
     # Use LLM to decompose query
     try:
         import os
@@ -307,12 +333,25 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
                 logger.warning(f"Planner tool discovery CRITICAL FAILURE: {e}")
                 tools_context = "Tool Discovery Unavailable."
 
+            # Complexity-aware planning guidance
+            complexity_guidance = ""
+            if complexity:
+                complexity_guidance = f"""
+QUERY COMPLEXITY: {complexity.tier.value.upper()}
+- Entities detected: {complexity.entity_count}
+- Recommended steps: {complexity.max_subtasks}
+- Maximum phases: {complexity.max_phases}
+- Scale the blueprint to match this complexity. Simple queries need 2-3 steps.
+  Complex queries with many entities need {complexity.max_subtasks}+ steps.
+  Generate as many steps as the query ACTUALLY requires — do NOT default to 3."""
+
             # JSON Blueprint System Prompt (Level 30 Architect)
             messages = [
                 LLMMessage(
                     role=LLMRole.SYSTEM,
                     content=f"""ACT AS: Execution Architect for Kea (Autonomous Research Engine).
 OBJECTIVE: Convert user intent into an executable JSON Blueprint.
+{complexity_guidance}
 
 AVAILABLE TOOLS:
 {tools_context}
@@ -326,6 +365,11 @@ CRITICAL RULES:
    - The <artifact_name> MUST match the "artifact" field of the referenced step EXACTLY.
    - WRONG: {{{{s1.artifact}}}} or {{{{s1.output}}}} (generic names will NOT resolve)
    - CORRECT: {{{{s1.artifacts.prices_csv}}}} (matches "artifact": "prices_csv" from step s1)
+6. ADVANCED NODE TYPES (use when appropriate):
+   - "type": "loop" with "loop_over": "{{{{step.artifacts.list}}}}" and "body": [...] for iterating
+   - "type": "switch" with "condition", "true_branch", "false_branch" for conditional logic
+   - "type": "merge" with "merge_inputs": ["s1", "s2"] to combine results
+   - "type": "agentic" with "goal": "..." for open-ended subtasks needing reasoning
 
 OUTPUT SCHEMA:
 {{{{
@@ -594,18 +638,39 @@ def generate_execution_plan_from_blueprint(query: str, blueprint: dict) -> Execu
         
         # Parse input_mapping from blueprint (Node Assembly Engine)
         input_mapping = step.get("input_mapping", {})
-        
+
+        # Detect node type from step
+        node_type = step.get("type", "tool")
+        if not node_type or node_type == "tool":
+            if tool_name in ("execute_code", "run_python"):
+                node_type = "code"
+
+        # Collect advanced node config for DAG executor
+        node_config: dict[str, Any] = {}
+        for adv_key in (
+            "condition", "true_branch", "false_branch", "true", "false",
+            "loop_over", "over", "loop_body", "body", "loop_variable",
+            "merge_inputs", "merge_strategy",
+            "goal", "agent_max_steps", "agent_tools", "max_steps", "tools",
+            "llm_prompt", "llm_system", "prompt", "system",
+            "max_parallel",
+        ):
+            if adv_key in step:
+                node_config[adv_key] = step[adv_key]
+
         micro_task = MicroTask(
             task_id=step_id,
-            description=f"{tool_name}: {args.get('query', args.get('code', str(args)[:100]))}",
+            description=step.get("description", f"{tool_name}: {args.get('query', args.get('code', str(args)[:100]))}"),
             tool=tool_name,
             inputs=inputs,
-            depends_on=depends_on,
+            depends_on=step.get("depends_on", depends_on),
             fallback_tools=["execute_code"] if tool_name != "execute_code" else [],
             persist=True,
             phase=str(phase_num),
             input_mapping=input_mapping,
             output_artifact=artifact_key,
+            node_type=node_type,
+            node_config=node_config,
         )
         
         micro_tasks.append(micro_task)

@@ -236,10 +236,11 @@ async def researcher_node(state: GraphState) -> GraphState:
         ]
     
     # =========================================================================
-    # Phase 3: Fractal Spawning (High Complexity)
+    # DAG Executor: Dependency-Driven Parallel Execution with Microplanner
     # =========================================================================
-    # =========================================================================
-    # Phase 3: Phased Fractal Spawning (Sequential Phases, Parallel within Phase)
+    # Replaces the old phase-based loop. Tasks now fire as soon as their
+    # specific dependencies are satisfied, not when their entire phase completes.
+    # The microplanner inspects results after each node and can inject new tasks.
     # =========================================================================
     if len(micro_tasks) >= 1:
         try:
@@ -250,219 +251,155 @@ async def researcher_node(state: GraphState) -> GraphState:
             from services.orchestrator.core.prompt_factory import (
                 PromptFactory, PromptContext
             )
+            from services.orchestrator.core.workflow_nodes import (
+                WorkflowNode, NodeType, NodeStatus, NodeResult,
+                parse_blueprint,
+            )
+            from services.orchestrator.core.dag_executor import DAGExecutor
+            from services.orchestrator.core.microplanner import Microplanner
 
             spawner = get_spawner()
             prompt_factory = PromptFactory()
 
-            # 1. GROUP TASKS BY PHASE
-            # We assume micro_tasks are already sorted by phase/dependency order from Planner
-            # We will chunk them into phases based on dependency logic or simple batching
-            phases = []
-            current_phase = []
-            
-            # Simple heuristic: Group by explicit 'phase' field if present, or chunk by dependencies
-            # Since dependencies are hard to parse perfectly, we'll use a safer approach:
-            # If a task depends on a previous task, it breaks the phase.
-            
-            completed_in_plan = set()
-            
-            # Simple sequential chunking for now (Phase N tasks depend on Phase N-1)
-            # We look at the 'id' to guess phase if not explicit
-            # For this fix, we will assume the input list is TOPOLOGICALLY SORTED.
-            # We will look for explicit "PHASE" markers or breakpoints.
-            
-            # Better approach: Group by first digit of task_id if relevant? No.
-            # Let's rely on the Planner's "Phases" output if available, mapped to tasks.
-            # Fallback: Treat all tasks as ONE phase (OLD BEHAVIOR) unless we see explicit distinct phases.
-            
-            # BUT: We know the bug is that "Discovery" (Task 1) and "Collection" (Task 2) ran together.
-            # We need to force a break between them.
-            
-            # Let's implement a "Break on Dependency" logic
-            # If Task B depends on Task A, and Task A is in the current batch, we must start a new batch.
-            
-            pending_tasks = list(micro_tasks) # Copy
-            
-            while pending_tasks:
-                batch = []
-                batch_ids = set()
-                
-                # Iterate through pending tasks and pick those whose dependencies are MET
-                # (i.e. not in pending_tasks, meaning they are either done or in previous batches)
-                
-                # Note: Swarm tasks are "independent" within a swarm.
-                # If Task B depends on Task A, Task A must be in a PREVIOUS swarm.
-                
-                tasks_to_remove = []
-                
-                for task in pending_tasks:
-                    deps = task.get("depends_on", [])
-                    # Check if all deps are satisfied (i.e. NOT in pending_tasks AND NOT in current batch)
-                    # Actually, for the first pass, "satisfied" means "not waiting for anything currently pending"
-                    
-                    # If we don't have explicit deps, we default to "Tasks 1-N are Phase 1"? 
-                    # No, the Planner often dumps strictly parallel tasks in a block.
-                    
-                    # Heuristic: If we lack explicit dependencies, we group by "Action Verbs" or just respect order?
-                    # The safest fix for the "Ticker" issue is to checking if task refers to "filtered list" or "output of previous".
-                    
-                    # Let's use the explicit 'depends_on' if valid.
-                    # If empty, we might fall back to the old behavior (big bang).
-                    # BUT the planner usually outputted: "Task 2 depends on Task 1".
-                    
-                    can_run_now = True
-                    for d in deps:
-                        if d not in completed_in_plan:
-                            can_run_now = False
-                            break
-                            
-                    if can_run_now:
-                        batch.append(task)
-                        batch_ids.add(task.get("task_id"))
-                        tasks_to_remove.append(task)
-                
-                # If no tasks can run (circular dependency or missing), force the first available one to break deadlock
-                if not batch and pending_tasks:
-                    logger.warning("⚠️ Dependency deadlock or missing dependencies detected. Forcing execution of first pending task.")
-                    forced_task = pending_tasks[0]
-                    batch.append(forced_task)
-                    batch_ids.add(forced_task.get("task_id"))
-                    tasks_to_remove.append(forced_task)
-                
-                # Update pending and completed
-                for t in tasks_to_remove:
-                    pending_tasks.remove(t)
-                
-                phases.append(batch)
-                
-                # Mark these as 'complete' for the NEXT batch's dependency check
-                for tid in batch_ids:
-                    completed_in_plan.add(tid)
+            # Get complexity-aware limits
+            complexity_info = state.get("complexity", {})
+            max_parallel = complexity_info.get("max_parallel", 6)
 
-            logger.info(f"🧩 Execution divided into {len(phases)} sequential phases based on dependencies.")
+            # Convert micro_tasks (dicts) into WorkflowNodes
+            workflow_nodes = parse_blueprint(micro_tasks)
 
-            # 2. EXECUTE PHASES SEQUENTIALLY
-            total_success = 0
-            total_failed = 0
-            
-            for i, phase_tasks in enumerate(phases, 1):
-                logger.info(f"\n🌊 STARTING PHASE {i}/{len(phases)} ({len(phase_tasks)} tasks) 🌊")
-                
-                # Resolve inputs for this phase using artifacts from previous phases
-                for t in phase_tasks:
-                    input_mapping = t.get("input_mapping", {})
-                    if input_mapping:
-                        resolved = assembler.resolve_task_inputs(type('Task', (), t)())  # Quick wrapper
-                        # Merge resolved inputs into task inputs
-                        if resolved:
-                            current_inputs = t.get("inputs", {})
-                            current_inputs.update(resolved)
-                            t["inputs"] = current_inputs
-                            logger.info(f"🔗 Resolved inputs for {t.get('task_id')}: {list(resolved.keys())}")
-                
-                subtasks = []
-                for t in phase_tasks:
-                    subtasks.append(SubTask(
-                        subtask_id=t.get("task_id"),
-                        query=t.get("description"),
-                        domain=Domain.RESEARCH, 
-                        task_type=TaskType.RESEARCH,
-                        preferred_tool=t.get("tool"),
-                        arguments=t.get("inputs", {})
-                    ))
-                
-                # Generate prompts for this phase
-                # FETCH GLOBAL CONTEXT for Prompt Engineering
+            logger.info(
+                f"🧩 DAG Executor: {len(workflow_nodes)} nodes, "
+                f"max_parallel={max_parallel}"
+            )
+
+            # Create node executor that bridges WorkflowNode → AgentSpawner
+            async def execute_workflow_node(
+                node: WorkflowNode,
+                args: dict,
+            ) -> NodeResult:
+                """Execute a single workflow node via the agent spawner."""
+                subtask = SubTask(
+                    subtask_id=node.id,
+                    query=node.description or f"{node.tool}: {str(args)[:100]}",
+                    domain=Domain.RESEARCH,
+                    task_type=TaskType.RESEARCH,
+                    preferred_tool=node.tool,
+                    arguments=args,
+                )
+
+                # Generate prompt with global context
                 try:
-                    ctx = get_context_pool()
-                    global_facts = [f.get("text", "") for f in ctx.fact_pool]
-                except Exception as e:
-                    logger.warning(f"Failed to fetch global context for prompts: {e}")
+                    ctx_pool = get_context_pool()
+                    global_facts = [f.get("text", "") for f in ctx_pool.fact_pool]
+                except Exception:
                     global_facts = []
 
-                prompts = []
-                for subtask in subtasks:
-                    context = PromptContext(
-                        query=subtask.query,
-                        domain=subtask.domain,
-                        task_type=subtask.task_type,
-                        previous_findings=global_facts  # Inject global context here!
-                    )
-                    prompts.append(prompt_factory.generate(context))
-                    
-                phase_plan = SpawnPlan(
-                    task_id=f"{state.get('job_id', 'swarm')}_p{i}",
-                    subtasks=subtasks,
-                    prompts=prompts,
-                    max_parallel=len(phase_tasks)
+                prompt_ctx = PromptContext(
+                    query=subtask.query,
+                    domain=subtask.domain,
+                    task_type=subtask.task_type,
+                    previous_findings=global_facts,
                 )
-                
-                # Execute Swarm for this phase
-                logger.info(f"💥 Executing Phase {i} Swarm...")
-                swarm_result = await spawner.execute_swarm(phase_plan)
-                
-                total_success += swarm_result.successful
-                total_failed += swarm_result.failed
-                
-                # Capture results immediately so they are available for next phase
-                for res in swarm_result.agent_results:
-                    if res.status == "completed":
-                        facts.append({
-                            "text": str(res.result),
-                            "query": f"Swarm Agent {res.agent_id}: {res.prompt_used}",
-                            "source": res.source if res.source else "fractal_swarm",
-                            "task_id": res.subtask_id,
-                            "persist": True
-                        })
-                        
-                        # Store in Context Pool for next phase!
-                        try:
-                            ctx = get_context_pool()
-                            
-                            # 1. Store as structured data (for code agents)
-                            ctx.store_data(
-                                key=f"task_output_{res.subtask_id}",
-                                data=str(res.result),
-                                description=f"Output from task {res.subtask_id} (Phase {i})"
-                            )
-                            
-                            # 2. Store as fact (for semantic search/prompts)
-                            ctx.add_fact(
-                                text=str(res.result),
-                                source=f"task_{res.subtask_id}",
-                                task_id=res.subtask_id
-                            )
-                            
-                            # 3. Store artifact via Node Assembly Engine
-                            # Find the original task to get output_artifact
-                            original_task = next((t for t in phase_tasks if t.get("task_id") == res.subtask_id), None)
-                            if original_task:
-                                output_artifact = original_task.get("output_artifact")
-                                if output_artifact:
-                                    assembler.store.store(res.subtask_id, output_artifact, str(res.result))
-                            
-                        except Exception as e:
-                            logger.warning(f"Failed to update context pool: {e}")
+                prompt = prompt_factory.generate(prompt_ctx)
 
-                if swarm_result.failed > 0:
-                    logger.warning(f"⚠️ Phase {i} had failures. Depending tasks in Phase {i+1} might fail.")
-            
-            # Log total success
-            logger.info(f"✅ All Phases Complete: {total_success} successful, {total_failed} failed")
-            
-            # Add dummy tool invocations for all processed tasks to skip standard loop
-            # (We iterate over what we PLANNED, assuming they ran)
-            for phase in phases:
-                for task in phase:
-                    tool_invocations.append({
-                        "task_id": task.get("task_id"),
-                        "tool": "swarm_agent_phased",
-                        "success": True, # Broad assumption, but we logged errors above
-                        "persist": True
+                plan = SpawnPlan(
+                    task_id=f"{state.get('job_id', 'node')}_{node.id}",
+                    subtasks=[subtask],
+                    prompts=[prompt],
+                    max_parallel=1,
+                )
+
+                swarm_result = await spawner.execute_swarm(plan)
+
+                # Convert SwarmResult → NodeResult
+                if swarm_result.successful > 0:
+                    agent_res = next(
+                        (r for r in swarm_result.agent_results
+                         if r.status == "completed"),
+                        None,
+                    )
+                    output = agent_res.result if agent_res else None
+
+                    # Store in context pool for downstream nodes
+                    try:
+                        ctx_pool = get_context_pool()
+                        ctx_pool.store_data(
+                            key=f"task_output_{node.id}",
+                            data=str(output),
+                            description=f"Output from node {node.id}",
+                        )
+                        ctx_pool.add_fact(
+                            text=str(output),
+                            source=f"task_{node.id}",
+                            task_id=node.id,
+                        )
+                    except Exception as e:
+                        logger.warning(f"Context pool update failed: {e}")
+
+                    return NodeResult(
+                        node_id=node.id,
+                        status=NodeStatus.COMPLETED,
+                        output=output,
+                        artifacts={node.output_artifact: str(output)} if node.output_artifact else {},
+                        metadata={
+                            "source": agent_res.source if agent_res else None,
+                            "prompt": agent_res.prompt_used[:200] if agent_res else "",
+                        },
+                    )
+                else:
+                    error_msg = "; ".join(
+                        r.error or "unknown"
+                        for r in swarm_result.agent_results
+                        if r.status != "completed"
+                    )
+                    return NodeResult(
+                        node_id=node.id,
+                        status=NodeStatus.FAILED,
+                        error=error_msg or "All agents failed",
+                    )
+
+            # Initialize microplanner for reactive replanning
+            microplanner = Microplanner(
+                query=query,
+                llm_callback=spawner.llm_callback,
+                max_replans=complexity_info.get("max_research_iterations", 3),
+            )
+
+            # Create and run DAG executor
+            dag_executor = DAGExecutor(
+                store=assembler.store,
+                node_executor=execute_workflow_node,
+                max_parallel=max_parallel,
+                microplanner=microplanner.checkpoint,
+            )
+
+            dag_result = await dag_executor.execute(workflow_nodes)
+
+            # Harvest results into facts/sources/tool_invocations
+            for node_id, node_result in dag_result.node_results.items():
+                if node_result.status == NodeStatus.COMPLETED and node_result.output:
+                    facts.append({
+                        "text": str(node_result.output),
+                        "query": f"DAG Node {node_id}",
+                        "source": node_result.metadata.get("source", "dag_executor"),
+                        "task_id": node_id,
+                        "persist": True,
                     })
-            
-            logger.info("⚡ Skipping standard execution loop (Swarm handled all phases)")
-            micro_tasks = [] # Clear standard loop queue
+
+                tool_invocations.append({
+                    "task_id": node_id,
+                    "tool": "dag_executor",
+                    "success": node_result.status == NodeStatus.COMPLETED,
+                    "persist": True,
+                })
+
+            logger.info(
+                f"✅ DAG complete: {dag_result.completed} ok, "
+                f"{dag_result.failed} failed, {dag_result.skipped} skipped, "
+                f"{dag_result.replans_triggered} replans"
+            )
+            micro_tasks = []  # Clear standard loop queue
 
         except ImportError:
             pass
