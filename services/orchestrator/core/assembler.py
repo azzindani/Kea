@@ -58,16 +58,16 @@ class ArtifactStore:
     def get(self, reference: str) -> Any | None:
         """
         Get an artifact by reference string.
-        
+
         Args:
             reference: Reference in format "step_id.artifacts.key" or just "step_id.key"
-            
+
         Returns:
             The artifact value, or None if not found
         """
         # Parse reference: "step_id.artifacts.key" or "step_id.key"
         parts = reference.split(".")
-        
+
         if len(parts) >= 3 and parts[1] == "artifacts":
             step_id = parts[0]
             key = ".".join(parts[2:])
@@ -77,15 +77,36 @@ class ArtifactStore:
         else:
             logger.warning(f"Invalid artifact reference: {reference}")
             return None
-            
+
         # Try local store first
         if step_id in self._artifacts and key in self._artifacts[step_id]:
             return self._artifacts[step_id][key]
-            
+
+        # Fallback: If key is a generic term like "artifact", resolve to the
+        # step's stored artifact(s). This handles LLM-generated references like
+        # "s1.artifact" when the actual stored key is "income_annual".
+        if step_id in self._artifacts and key in ("artifact", "output", "result", "data"):
+            step_artifacts = self._artifacts[step_id]
+            if len(step_artifacts) == 1:
+                resolved_key = next(iter(step_artifacts))
+                logger.info(
+                    f"🔗 Auto-resolved generic ref '{reference}' -> "
+                    f"'{step_id}.artifacts.{resolved_key}'"
+                )
+                return step_artifacts[resolved_key]
+            elif len(step_artifacts) > 1:
+                # Multiple artifacts: return the first one and warn
+                resolved_key = next(iter(step_artifacts))
+                logger.warning(
+                    f"⚠️ Ambiguous generic ref '{reference}' resolved to first "
+                    f"artifact '{resolved_key}' (step has {len(step_artifacts)} artifacts)"
+                )
+                return step_artifacts[resolved_key]
+
         # Try TaskContextPool
         if self._pool:
             return self._pool.get_data(reference)
-            
+
         return None
         
     def list_artifacts(self, step_id: str | None = None) -> dict[str, dict[str, Any]]:
@@ -131,9 +152,9 @@ def _resolve_jsonpath(path: str, store: ArtifactStore) -> Any:
     parts = path.split(".")
     if len(parts) < 2:
         return None
-    
+
     step_id = parts[0]
-    
+
     # Handle artifacts prefix
     if len(parts) >= 3 and parts[1] == "artifacts":
         artifact_key = parts[2]
@@ -141,11 +162,12 @@ def _resolve_jsonpath(path: str, store: ArtifactStore) -> Any:
         remaining_parts = parts[3:]
     elif len(parts) >= 2:
         # Direct reference: step_id.key
+        # store.get() handles generic keys like "artifact" via its fallback
         value = store.get(f"{step_id}.{parts[1]}")
         remaining_parts = parts[2:]
     else:
         return None
-    
+
     if value is None:
         return None
     
