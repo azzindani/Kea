@@ -17,7 +17,7 @@ from shared.logging import get_logger
 from shared.llm import OpenRouterProvider, LLMConfig
 from shared.llm.provider import LLMMessage, LLMRole
 from shared.config import get_settings
-from services.orchestrator.core.assembler import ArtifactStore
+from services.orchestrator.core.artifact_store import ArtifactStore
 from services.mcp_host.core.session_registry import SessionRegistry, get_session_registry
 
 logger = get_logger(__name__)
