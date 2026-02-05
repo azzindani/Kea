@@ -566,7 +566,6 @@ class AgentSpawner:
                             # =========================================================
                             if tool_name in ["execute_code", "run_python"]:
                                 from services.orchestrator.agents.code_generator import generate_python_code
-                                from services.orchestrator.agents.code_generator import generate_python_code
 
                                 
                                 attempt = 0
@@ -814,8 +813,15 @@ _spawner: AgentSpawner | None = None
 
 
 def get_spawner(llm_callback: Callable | None = None) -> AgentSpawner:
-    """Get or create global agent spawner."""
+    """Get or create global agent spawner.
+
+    If an llm_callback is provided and the spawner already exists but has no
+    callback, the callback is hot-wired onto the existing instance so that
+    the microplanner and agentic nodes can use LLM replanning.
+    """
     global _spawner
     if _spawner is None:
         _spawner = AgentSpawner(llm_callback=llm_callback)
+    elif llm_callback is not None and _spawner.llm_callback is None:
+        _spawner.llm_callback = llm_callback
     return _spawner

@@ -34,7 +34,7 @@ from services.orchestrator.agents.code_generator import generate_fallback_code, 
 from shared.data_pool import get_data_pool
 
 # Node Assembly Engine for n8n-style node wiring
-from services.orchestrator.core.assembler import ArtifactStore, NodeAssembler, create_assembler
+from services.orchestrator.core.assembler import ArtifactStore, create_assembler
 
 
 
@@ -230,8 +230,9 @@ async def researcher_node(state: GraphState) -> GraphState:
     if not micro_tasks:
         logger.info("No execution plan, falling back to sub-query based web search")
         micro_tasks = [
-            {"task_id": f"task_{i+1}", "description": sq, "tool": "web_search", 
-             "inputs": {"query": sq}, "fallback_tools": ["news_search"], "persist": True}
+            {"task_id": f"task_{i+1}", "description": sq, "tool": "web_search",
+             "inputs": {"query": sq}, "fallback_tools": ["news_search"], "persist": True,
+             "output_artifact": f"search_result_{i+1}"}
             for i, sq in enumerate(sub_queries or [query])
         ]
     
@@ -258,7 +259,34 @@ async def researcher_node(state: GraphState) -> GraphState:
             from services.orchestrator.core.dag_executor import DAGExecutor
             from services.orchestrator.core.microplanner import Microplanner
 
-            spawner = get_spawner()
+            # Build an LLM callback so spawner + microplanner can call the LLM
+            async def _llm_callback(system_prompt: str, user_message: str) -> str:
+                """LLM callback for agent spawner and microplanner."""
+                try:
+                    import os
+                    if not os.getenv("OPENROUTER_API_KEY"):
+                        return ""
+                    from shared.llm import OpenRouterProvider, LLMConfig
+                    from shared.llm.provider import LLMMessage, LLMRole
+                    from shared.config import get_settings
+                    app_cfg = get_settings()
+                    provider = OpenRouterProvider()
+                    cfg = LLMConfig(
+                        model=app_cfg.models.planner_model,
+                        temperature=0.3,
+                        max_tokens=4096,
+                    )
+                    msgs = [
+                        LLMMessage(role=LLMRole.SYSTEM, content=system_prompt),
+                        LLMMessage(role=LLMRole.USER, content=user_message),
+                    ]
+                    resp = await provider.complete(msgs, cfg)
+                    return resp.content
+                except Exception as e:
+                    logger.warning(f"LLM callback failed: {e}")
+                    return ""
+
+            spawner = get_spawner(llm_callback=_llm_callback)
             prompt_factory = PromptFactory()
 
             # Get complexity-aware limits
@@ -399,286 +427,263 @@ async def researcher_node(state: GraphState) -> GraphState:
                 f"{dag_result.failed} failed, {dag_result.skipped} skipped, "
                 f"{dag_result.replans_triggered} replans"
             )
-            micro_tasks = []  # Clear standard loop queue
+            micro_tasks = []  # Clear so legacy loop is skipped
 
-        except ImportError:
-            pass
-            
-    # =========================================================================
-
-    # 1. Hardware-Aware Scaling
-    from shared.hardware.detector import detect_hardware
-    from services.mcp_host.core.parallel_executor import ParallelExecutor, ToolCall
-    from services.mcp_host.core.session_registry import get_session_registry
-    
-    hw_profile = detect_hardware()
-    max_workers = hw_profile.optimal_workers()
-    logger.info(f"🚀 Hardware-Aware Dispatcher: Using {max_workers} parallel workers (RAM: {hw_profile.ram_available_gb:.1f}GB)")
-    
-    executor = ParallelExecutor(max_concurrent=max_workers)
-    registry = get_session_registry()
-    
-    # Tool registry for dynamic routing
-    # NOTE: We have removed direct imports to enforce "Pure MCP" architecture.
-    # All tools are now discovered dynamically via SessionRegistry.
-    
-    from services.orchestrator.core.utils import build_tool_inputs
-
-
-    # 2. Unified Tool Handler (INTELLIGENCE INJECTED)
-    async def unified_tool_handler(name: str, args: dict) -> Any:
-        # Resolve target server dynamically
-        server_name = registry.get_server_for_tool(name)
-        
-        if not server_name:
-            # Fallback Mapping (Legacy Support)
-            legacy_map = {
-                "run_python": "execute_code",
-                "fetch_page": "fetch_url"
-            }
-            mapped = legacy_map.get(name)
-            if mapped:
-                server_name = registry.get_server_for_tool(mapped)
-                if server_name:
-                    logger.info(f"🔄 Mapped {name} -> {mapped} on {server_name}")
-                    name = mapped # Switch to actual tool name
-            
-        if not server_name:
-             # Try JIT Discovery
-             await registry.list_all_tools()
-             server_name = registry.get_server_for_tool(name)
-        
-        if not server_name:
-             raise ValueError(f"Tool {name} not found in SessionRegistry.")
-            
-        # Execute
-        try:
-            session = await registry.get_session(server_name)
-            result = await session.call_tool(name, args)
-        except Exception as e:
-            logger.error(f"Tool execution failed: {e}")
-            raise ValueError(f"Tool {name} failed: {e}")
-
-        # =========================================================================
-        # AUTONOMIC MEMORY INTERCEPTOR (The Wiring Fix)
-        # =========================================================================
-        try:
-            from services.orchestrator.core.interceptor import MemoryInterceptor
-            job_id = state.get("job_id", "unknown_trace")
-            
-            # Fire-and-forget storage to Postgres
-            await MemoryInterceptor.intercept(
-                trace_id=job_id,
-                source_node=name,
-                result=result,
-                inputs=args
+        except ImportError as e:
+            logger.warning(
+                f"⚠️ DAG Executor unavailable ({e}), falling back to legacy "
+                f"phase-based executor"
             )
         except Exception as e:
-            logger.warning(f"Interceptor failed (non-blocking): {e}")
-        # =========================================================================
+            logger.error(
+                f"❌ DAG Executor failed ({e}), falling back to legacy executor"
+            )
 
-        return result
+    # =========================================================================
+    # Legacy Phase-Based Executor (fallback when DAG executor is unavailable)
+    # Only runs if micro_tasks is non-empty (DAG executor clears it on success)
+    # =========================================================================
+    if micro_tasks:
+        # 1. Hardware-Aware Scaling
+        from shared.hardware.detector import detect_hardware
+        from services.mcp_host.core.parallel_executor import ParallelExecutor, ToolCall
+        from services.mcp_host.core.session_registry import get_session_registry
 
-    # 3. Parallel Execution Loop
-    completed = {inv["task_id"] for inv in tool_invocations if inv.get("success")}
-    processed_this_run = set()
-    
-    while True:
-        # Find ready tasks
-        ready_tasks = []
-        for task in micro_tasks:
-            t_id = task.get("task_id")
-            if t_id in completed or t_id in processed_this_run:
-                continue
-                
-            # Check dependencies
-            deps = task.get("depends_on", [])
-            if all(d in completed for d in deps):
-                ready_tasks.append(task)
-        
-        if not ready_tasks:
-            break
-            
-        # Batch execute
-        batch = ready_tasks[:max_workers * 2] # Allow slight over-subscription for IO wait
-        processed_this_run.update(t.get("task_id") for t in batch)
-        
-        logger.info(f"\n⚡ Batching {len(batch)} tasks...")
-        
-        # Prepare calls
-        calls = []
-        task_map = {} # index -> task
-        
-        for idx, task in enumerate(batch):
-            t_name = task.get("tool", "web_search")
-            t_desc = task.get("description", "")
-            t_inputs = task.get("inputs", {})
-            t_id = task.get("task_id")
-            
-            # SMART CODE GENERATION INTERCEPTOR
-            if t_name in ["run_python", "execute_code", "parse_document"] and "code" not in t_inputs:
-                try:
-                    from services.orchestrator.agents.code_generator import generate_python_code
-                    ctx = get_context_pool()
-                    files = ctx.list_files()
-                    
-                    logger.info(f"   🤖 Generating Smart Code for '{t_desc}' (Context: {len(facts)} facts, {len(files)} files)")
-                    generated_code = await generate_python_code(t_desc, facts, file_artifacts=files)
-                    
-                    if generated_code:
-                        t_inputs["code"] = generated_code
-                        # Skip standard build_tool_inputs since we handled it
-                        final_inputs = t_inputs
-                    else:
-                        final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
-                except Exception as e:
-                    logger.warning(f"Smart Code Generation failed: {e}, falling back")
-                    final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
-            else:
-                final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
-            
-            # Handle input build failure (fallback immediately or skip)
-            if final_inputs is None:
-                # Try fallback
-                fallback_tools = task.get("fallback_tools") or ["web_search"]
-                t_name = fallback_tools[0]
-                
-                # Attempt to build inputs for fallback tool
-                final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
-                
-                if final_inputs is None:
-                    # Ultimate fallback to web_search with hardware-aware limit
-                    from shared.hardware.detector import detect_hardware
-                    t_name = "web_search"
-                    final_inputs = {"query": t_desc, "max_results": detect_hardware().optimal_search_limit()}
-            
-            calls.append(ToolCall(tool_name=t_name, arguments=final_inputs))
-            task_map[idx] = task
-            
-        # EXECUTE BATCH
-        results = await executor.execute_batch(calls, unified_tool_handler)
-        
-        # Process results
-        for idx, res in enumerate(results):
-            task = task_map[idx]
-            t_id = task.get("task_id")
-            t_persist = task.get("persist", True)
-            
-            success = res.success
-            error_msg = None
-            content_text = ""
-            
-            if success and res.result and hasattr(res.result, "content"):
-                for c in res.result.content:
-                    if hasattr(c, "text"):
-                        content_text += c.text
-                
-                # Strict Error Filtering (Prevent "Error is a Fact")
-                if "tool not found" in content_text.lower() or "error:" in content_text.lower() or "exception" in content_text.lower():
-                    success = False # Mark as failed logically even if technically successful execution
-                    error_msg = content_text
-                elif len(content_text) < 5:
-                    success = False
-                    error_msg = "Content too short"
+        hw_profile = detect_hardware()
+        max_workers = hw_profile.optimal_workers()
+        logger.info(f"🚀 Legacy Executor: Using {max_workers} parallel workers (RAM: {hw_profile.ram_available_gb:.1f}GB)")
 
-            if success:
-                # Extract Facts
-                fact = {
-                    "text": content_text,  # No truncation - store full content
-                    "query": task.get("description", ""),  # No truncation
-                    "source": calls[idx].tool_name,
-                    "task_id": t_id,
-                    "persist": t_persist
+        executor = ParallelExecutor(max_concurrent=max_workers)
+        registry = get_session_registry()
+
+        from services.orchestrator.core.utils import build_tool_inputs
+
+        # 2. Unified Tool Handler (INTELLIGENCE INJECTED)
+        async def unified_tool_handler(name: str, args: dict) -> Any:
+            # Resolve target server dynamically
+            server_name = registry.get_server_for_tool(name)
+
+            if not server_name:
+                # Fallback Mapping (Legacy Support)
+                legacy_map = {
+                    "run_python": "execute_code",
+                    "fetch_page": "fetch_url"
                 }
-                facts.append(fact)
-                
-                # Extract Sources
-                ctx = get_context_pool()
-                extracted_urls = ctx.extract_urls_from_text(content_text)
-                
-                # FALLBACK: If no URLs found in text, check input arguments!
-                if not extracted_urls and "url" in calls[idx].arguments:
-                    url_arg = calls[idx].arguments["url"]
-                    if isinstance(url_arg, str) and url_arg.startswith("http"):
-                        extracted_urls.append(url_arg)
-                        
-                for url in extracted_urls:  # No limit - extract all URLs
-                    sources.append({
-                        "url": url,
-                        "title": task.get("description", ""),  # No truncation
-                        "tool": calls[idx].tool_name,
-                        "task_id": t_id
-                    })
-                
-                # Store in DataPool for bucket pattern
-                try:
-                    data_pool = get_data_pool()
-                    await data_pool.create_pool_item(
-                        pool_id=state.get("job_id", "default"),
-                        metadata={
-                            "fact_text": content_text[:5000],  # Summary for metadata
-                            "source": calls[idx].tool_name,
-                            "task_id": t_id,
-                            "query": task.get("description", ""),
-                        },
-                        status="raw"
-                    )
-                except Exception as e:
-                    logger.debug(f"DataPool storage skipped: {e}")
+                mapped = legacy_map.get(name)
+                if mapped:
+                    server_name = registry.get_server_for_tool(mapped)
+                    if server_name:
+                        logger.info(f"🔄 Mapped {name} -> {mapped} on {server_name}")
+                        name = mapped  # Switch to actual tool name
 
-                # ARTIFACT HARVESTING (NEW): Scan for file paths
-                import re
-                file_matches = re.findall(r'[\w\-\._\/]+\.(?:csv|parquet|xlsx|json)', content_text)
-                for fpath in file_matches:
-                    fpath = fpath.strip()
-                    if len(fpath) > 4: 
-                         ctx.store_file(t_id, fpath)
-                         logger.info(f"   📂 Harvested artifact: {fpath}")
-                
-                completed.add(t_id)
-                logger.info(f"   ✅ Task {t_id} completed via {calls[idx].tool_name}")
-                
-                # VERBOSE CODE OUTPUT
-                if calls[idx].tool_name in ["execute_code", "run_python"]:
-                     logger.info(f"   🐍 EXECUTION OUTPUT:\n{'-'*60}\n{content_text.strip()}\n{'-'*60}")
-            else:
-                # Handle hard failure - extract clean error message
-                tool_name = calls[idx].tool_name
-                error_text = "Unknown error"
-                
-                # Extract error text from result
-                if res.result and hasattr(res.result, "content"):
+            if not server_name:
+                # Try JIT Discovery
+                await registry.list_all_tools()
+                server_name = registry.get_server_for_tool(name)
+
+            if not server_name:
+                raise ValueError(f"Tool {name} not found in SessionRegistry.")
+
+            # Execute
+            try:
+                session = await registry.get_session(server_name)
+                result = await session.call_tool(name, args)
+            except Exception as e:
+                logger.error(f"Tool execution failed: {e}")
+                raise ValueError(f"Tool {name} failed: {e}")
+
+            # AUTONOMIC MEMORY INTERCEPTOR
+            try:
+                from services.orchestrator.core.interceptor import MemoryInterceptor
+                job_id = state.get("job_id", "unknown_trace")
+                await MemoryInterceptor.intercept(
+                    trace_id=job_id,
+                    source_node=name,
+                    result=result,
+                    inputs=args
+                )
+            except Exception as e:
+                logger.warning(f"Interceptor failed (non-blocking): {e}")
+
+            return result
+
+        # 3. Parallel Execution Loop
+        completed = {inv["task_id"] for inv in tool_invocations if inv.get("success")}
+        processed_this_run = set()
+
+        while True:
+            # Find ready tasks
+            ready_tasks = []
+            for task in micro_tasks:
+                t_id = task.get("task_id")
+                if t_id in completed or t_id in processed_this_run:
+                    continue
+
+                # Check dependencies
+                deps = task.get("depends_on", [])
+                if all(d in completed for d in deps):
+                    ready_tasks.append(task)
+
+            if not ready_tasks:
+                break
+
+            # Batch execute
+            batch = ready_tasks[:max_workers * 2]
+            processed_this_run.update(t.get("task_id") for t in batch)
+
+            logger.info(f"\n⚡ Batching {len(batch)} tasks...")
+
+            # Prepare calls
+            calls = []
+            task_map = {}  # index -> task
+
+            for idx, task in enumerate(batch):
+                t_name = task.get("tool", "web_search")
+                t_desc = task.get("description", "")
+                t_inputs = task.get("inputs", {})
+                t_id = task.get("task_id")
+
+                # SMART CODE GENERATION INTERCEPTOR
+                if t_name in ["run_python", "execute_code", "parse_document"] and "code" not in t_inputs:
+                    try:
+                        from services.orchestrator.agents.code_generator import generate_python_code
+                        ctx = get_context_pool()
+                        files = ctx.list_files()
+
+                        logger.info(f"   🤖 Generating Smart Code for '{t_desc}' (Context: {len(facts)} facts, {len(files)} files)")
+                        generated_code = await generate_python_code(t_desc, facts, file_artifacts=files)
+
+                        if generated_code:
+                            t_inputs["code"] = generated_code
+                            final_inputs = t_inputs
+                        else:
+                            final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
+                    except Exception as e:
+                        logger.warning(f"Smart Code Generation failed: {e}, falling back")
+                        final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
+                else:
+                    final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
+
+                # Handle input build failure (fallback immediately or skip)
+                if final_inputs is None:
+                    fallback_tools = task.get("fallback_tools") or ["web_search"]
+                    t_name = fallback_tools[0]
+                    final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
+
+                    if final_inputs is None:
+                        from shared.hardware.detector import detect_hardware
+                        t_name = "web_search"
+                        final_inputs = {"query": t_desc, "max_results": detect_hardware().optimal_search_limit()}
+
+                calls.append(ToolCall(tool_name=t_name, arguments=final_inputs))
+                task_map[idx] = task
+
+            # EXECUTE BATCH
+            results = await executor.execute_batch(calls, unified_tool_handler)
+
+            # Process results
+            for idx, res in enumerate(results):
+                task = task_map[idx]
+                t_id = task.get("task_id")
+                t_persist = task.get("persist", True)
+
+                success = res.success
+                content_text = ""
+
+                if success and res.result and hasattr(res.result, "content"):
                     for c in res.result.content:
                         if hasattr(c, "text"):
-                            error_text = c.text
-                            break
-                elif res.result:
-                    error_text = str(res.result)
-                
-                # Clean up common error patterns for readability
-                if "Tool execution error:" in error_text:
-                    error_text = error_text.replace("Tool execution error:", "Missing parameter:")
-                
-                logger.warning(f"   ❌ Task {t_id} ({tool_name}) FAILED: {error_text}")
-                
-                # We do NOT add to completed, so it won't satisfy dependencies. 
-                # Ideally we should try fallbacks here, but for now we mark failed to avoid infinite loop
+                            content_text += c.text
+
+                    # Strict Error Filtering (Prevent "Error is a Fact")
+                    if "tool not found" in content_text.lower() or "error:" in content_text.lower() or "exception" in content_text.lower():
+                        success = False
+                    elif len(content_text) < 5:
+                        success = False
+
+                if success:
+                    fact = {
+                        "text": content_text,
+                        "query": task.get("description", ""),
+                        "source": calls[idx].tool_name,
+                        "task_id": t_id,
+                        "persist": t_persist
+                    }
+                    facts.append(fact)
+
+                    ctx = get_context_pool()
+                    extracted_urls = ctx.extract_urls_from_text(content_text)
+
+                    if not extracted_urls and "url" in calls[idx].arguments:
+                        url_arg = calls[idx].arguments["url"]
+                        if isinstance(url_arg, str) and url_arg.startswith("http"):
+                            extracted_urls.append(url_arg)
+
+                    for url in extracted_urls:
+                        sources.append({
+                            "url": url,
+                            "title": task.get("description", ""),
+                            "tool": calls[idx].tool_name,
+                            "task_id": t_id
+                        })
+
+                    # Store in DataPool for bucket pattern
+                    try:
+                        data_pool = get_data_pool()
+                        await data_pool.create_pool_item(
+                            pool_id=state.get("job_id", "default"),
+                            metadata={
+                                "fact_text": content_text[:5000],
+                                "source": calls[idx].tool_name,
+                                "task_id": t_id,
+                                "query": task.get("description", ""),
+                            },
+                            status="raw"
+                        )
+                    except Exception as e:
+                        logger.debug(f"DataPool storage skipped: {e}")
+
+                    # ARTIFACT HARVESTING: Scan for file paths
+                    import re
+                    file_matches = re.findall(r'[\w\-\._\/]+\.(?:csv|parquet|xlsx|json)', content_text)
+                    for fpath in file_matches:
+                        fpath = fpath.strip()
+                        if len(fpath) > 4:
+                            ctx.store_file(t_id, fpath)
+                            logger.info(f"   📂 Harvested artifact: {fpath}")
+
+                    completed.add(t_id)
+                    logger.info(f"   ✅ Task {t_id} completed via {calls[idx].tool_name}")
+
+                    if calls[idx].tool_name in ["execute_code", "run_python"]:
+                        logger.info(f"   🐍 EXECUTION OUTPUT:\n{'-'*60}\n{content_text.strip()}\n{'-'*60}")
+                else:
+                    # Handle hard failure
+                    tool_name = calls[idx].tool_name
+                    error_text = "Unknown error"
+
+                    if res.result and hasattr(res.result, "content"):
+                        for c in res.result.content:
+                            if hasattr(c, "text"):
+                                error_text = c.text
+                                break
+                    elif res.result:
+                        error_text = str(res.result)
+
+                    if "Tool execution error:" in error_text:
+                        error_text = error_text.replace("Tool execution error:", "Missing parameter:")
+
+                    logger.warning(f"   ❌ Task {t_id} ({tool_name}) FAILED: {error_text}")
+                    # Prevent re-execution to avoid infinite loop
+                    completed.add(t_id)
+
+                # Log invocation (single entry per task, no duplicates)
                 tool_invocations.append({
                     "task_id": t_id,
-                    "tool": tool_name,
-                    "success": False,
-                    "error": error_text
+                    "tool": calls[idx].tool_name,
+                    "success": success,
+                    "persist": t_persist
                 })
-                # Prevent re-execution to avoid infinite loop
-                completed.add(t_id) 
-
-            # Log invocation
-            tool_invocations.append({
-                 "task_id": t_id,
-                 "tool": calls[idx].tool_name,
-                 "success": success,
-                 "persist": t_persist
-            })
 
     # Summary Logging
     logger.info(f"\n📊 Parallel Research Summary:")
@@ -1094,23 +1099,33 @@ def compile_research_graph():
 
 
 async def smart_fetch_data(args: dict) -> Any:
-    # JIT-Enabled Data Fetcher
+    """JIT-Enabled Data Fetcher using MCP session registry."""
+    from services.mcp_host.core.session_registry import get_session_registry
+
+    registry = get_session_registry()
     query = args.get("query", "")
-    
+
+    async def _call_tool(tool_name: str, tool_args: dict) -> Any:
+        """Resolve tool via registry and call it."""
+        server_name = registry.get_server_for_tool(tool_name)
+        if not server_name:
+            await registry.list_all_tools()
+            server_name = registry.get_server_for_tool(tool_name)
+        if not server_name:
+            raise ValueError(f"Tool {tool_name} not found in SessionRegistry.")
+        session = await registry.get_session(server_name)
+        return await session.call_tool(tool_name, tool_args)
+
     # 1. AUTONOMOUS SEARCH: Find the data source URL first
-    # We define a search query to find a list of companies
     discovery_query = f"list of companies listed on {query} stock exchange wikipedia"
     logger.info(f"🔍 Web Search for Data Source: '{discovery_query}'")
-    
-    wiki_url = "https://en.wikipedia.org/wiki/LQ45" # Default fallback
+
+    wiki_url = "https://en.wikipedia.org/wiki/LQ45"  # Default fallback
     try:
         from shared.hardware.detector import detect_hardware
         search_args = {"query": discovery_query, "max_results": detect_hardware().optimal_search_limit()}
-        # Use MCP Client for search
-        mcp_client = get_mcp_orchestrator()
-        search_results = await mcp_client.call_tool("web_search", search_args)
-        
-        # Simple heuristic to find a Wikipedia URL
+        search_results = await _call_tool("web_search", search_args)
+
         search_text = str(search_results)
         import re
         match = re.search(r'(https://[a-z]+\.wikipedia\.org/wiki/[^\s\)\"]+)', search_text)
@@ -1118,12 +1133,11 @@ async def smart_fetch_data(args: dict) -> Any:
             wiki_url = match.group(0)
             logger.info(f"✅ Discovered Data Source: {wiki_url}")
         else:
-            logger.warning(f"⚠️ Could not extract Wiki URL from search. Defaulting manually to LQ45 one.")
+            logger.warning("⚠️ Could not extract Wiki URL from search. Using LQ45 default.")
     except Exception as e:
         logger.error(f"❌ Discovery Search Failed: {e}")
 
     # 2. Dynamic Script Generation with DISCOVERED URL
-    # NOTE: We use raw imports because we are running in a JIT 'uv' environment
     code = f"""
 import pandas as pd
 import yfinance as yf
@@ -1133,33 +1147,26 @@ def get_tickers():
     source_url = "{wiki_url}"
     print(f"🔍 Scraping tickers from discovered source: {{source_url}}")
     tickers = []
-    
+
     try:
-        # Robust Scrape
-        import html5lib 
+        import html5lib
         tables = pd.read_html(source_url)
-        
-        # Smart Column Detection
+
         for df in tables:
-            # Normalize cols
-            cols = [str(c).upper() for c in df.columns]
-            
             target_col = None
             for c in df.columns:
                 c_up = str(c).upper()
                 if "CODE" in c_up or "SYMBOL" in c_up or "TICKER" in c_up:
                     target_col = c
                     break
-            
+
             if target_col:
-                # Valid table found
                 raw_tickers = df[target_col].tolist()
                 suffix = ".JK" if "Indonesia" in "{query}" or "IDX" in "{query}" or "LQ45" in source_url else ""
-                
                 tickers = [f"{{str(t).strip()}}{{suffix}}" for t in raw_tickers if isinstance(t, str)]
                 print(f"   ✅ Found {{len(tickers)}} tickers in table columns: {{df.columns.tolist()}}")
                 break
-                
+
         if not tickers:
             print("   ⚠️ No ticker column found in any table.")
             try:
@@ -1170,23 +1177,21 @@ def get_tickers():
                 print(f"   ✅ Discovered {{len(tickers)}} tickers from GitHub Fallback")
             except:
                 pass
-            
+
     except Exception as e:
         print(f"Discovery error: {{e}}")
         tickers = []
-        
+
     return tickers
 
-# Main Execution
 try:
     targets = get_tickers()
     if not targets:
         print("No tickers found from source.")
     else:
         print(f"📊 Fetching data for {{len(targets)}} companies...")
-        
         results = []
-        for t in targets[:20]: 
+        for t in targets[:20]:
             try:
                 stock = yf.Ticker(t)
                 info = stock.info
@@ -1201,23 +1206,18 @@ try:
                 print(f"   ✅ Fetched {{t}}")
             except Exception as e:
                 print(f"   ❌ Failed {{t}}: {{e}}")
-                
+
         df = pd.DataFrame(results)
         print("\\nDATA_START")
         print(df.to_markdown(index=False))
         print("DATA_END")
-        
+
 except Exception as e:
     print(f"Script Error: {{e}}")
 """
 
-    # Call execute_code_tool with JIT dependencies via MCP Client
-    mcp_client = get_mcp_orchestrator()
-    if not mcp_client:
-        raise ValueError("MCP/Orchestrator not initialized")
-        
-    return await mcp_client.call_tool("execute_code", {
-        "code": code, 
+    return await _call_tool("execute_code", {
+        "code": code,
         "dependencies": ["yfinance", "pandas", "requests", "html5lib", "lxml", "tabulate"]
     })
 
