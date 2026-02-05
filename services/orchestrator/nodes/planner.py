@@ -321,7 +321,11 @@ CRITICAL RULES:
 1. OUTPUT ONLY JSON. No prose, no explanations, no "I will now..."
 2. Use exact tool names from the list above. If no tool fits, use "execute_code".
 3. Tasks with same "phase" run in parallel. Higher phase waits for lower phases.
-4. Use "artifact" to declare output keys, "input_mapping" to consume outputs from other steps.
+4. Use "artifact" to declare a UNIQUE output key name for each step.
+5. In "input_mapping", reference previous artifacts using EXACT format: {{{{<id>.artifacts.<artifact_name>}}}}
+   - The <artifact_name> MUST match the "artifact" field of the referenced step EXACTLY.
+   - WRONG: {{{{s1.artifact}}}} or {{{{s1.output}}}} (generic names will NOT resolve)
+   - CORRECT: {{{{s1.artifacts.prices_csv}}}} (matches "artifact": "prices_csv" from step s1)
 
 OUTPUT SCHEMA:
 {{{{
@@ -335,7 +339,7 @@ OUTPUT SCHEMA:
       "artifact": "prices_csv"
     }}}},
     {{{{
-      "id": "step_2", 
+      "id": "step_2",
       "phase": 2,
       "tool": "pandas_ta_server.calculate_indicators",
       "args": {{{{"indicators": ["rsi", "macd"]}}}},
