@@ -48,6 +48,7 @@ The system is divided into 7 specialized microservices:
 - Suggest adding tests or test coverage
 - Create test fixtures or mocks
 - Modify files in the `tests/` directory
+- Execute `uv run` commands
 
 When implementing features, focus on the production code only.
 
@@ -106,30 +107,6 @@ Kea/
 - **Classes**: PascalCase (`ArtifactBus`)
 - **Functions**: snake_case (`process_artifact`)
 - **Constants**: SCREAMING_SNAKE_CASE (`MAX_RETRIES`)
-
----
-
-## 🔧 Common Commands
-
-```bash
-# Install dependencies
-uv sync
-
-# Run a specific service
-uv run python -m services.<service_name>.main
-
-# Run database migrations
-uv run alembic upgrade head
-
-# Start all services with Docker
-docker-compose up -d
-
-# Lint code
-uv run ruff check .
-
-# Type checking
-uv run mypy .
-```
 
 ---
 

@@ -291,17 +291,20 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
                 try:
                     # Search specifically for tools that match the query intention
                     search_results = await asyncio.wait_for(
-                        registry.search_tools(query, limit=100), 
-                        timeout=3.0
+                        registry.search_tools(query, limit=50),  # Reduced limit for schema inclusion
+                        timeout=5.0
                     )
                     
                     if search_results:
                         logger.info(f"Planner: RAG found {len(search_results)} relevant tools")
-                        # Format: "tool_name: description" for better LLM understanding
-                        relevant_tools = [
-                            f"{t.get('name', 'N/A')}: {t.get('description', '')[:100]}" 
-                            for t in search_results
-                        ]
+                        # Format: "tool_name: {input_schema}" for precise mapping
+                        for t in search_results:
+                            name = t.get('name', 'N/A')
+                            desc = t.get('description', '')[:200]
+                            schema = t.get('inputSchema', {})
+                            # Compact schema representation
+                            schema_str = str(schema).replace("{", "{{").replace("}", "}}")
+                            relevant_tools.append(f"TOOL: {name}\nDESCRIPTION: {desc}\nSCHEMA: {schema_str}\n")
                 except Exception as search_err:
                     logger.warning(f"Planner RAG Search failed: {search_err}. Falling back to active list.")
 
@@ -309,23 +312,38 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
                 if not relevant_tools:
                     if registry.tool_to_server:
                         known_tools = list(registry.tool_to_server.keys())
-                        # If list is HUGE, we slice it to avoid context overflow (first 500)
-                        # LLM Context is 32k, so 500 tools is fine.
-                        relevant_tools = known_tools[:500]
-                        logger.info(f"Planner: Using fallback list of {len(relevant_tools)} tools")
+                        # Slice to avoid context overflow
+                        target_tools = known_tools[:100]
+                        logger.info(f"Planner: Using fallback list of {len(target_tools)} tools")
+                        
+                        # We need schemas for these tools. Attempt to fetch if possible, 
+                        # otherwise fall back to name:desc.
+                        # Since we can't easily fetch schemas for 100 tools quickly without RAG,
+                        # we might process them in batches or accept lower fidelity here.
+                        # For now, let's try to get schemas for the first 20 most likely relevant?
+                        # Or just list them.
+                        
+                        # HEURISTIC: Just list names for fallback to avoid latency spike
+                        relevant_tools = [f"TOOL: {t}" for t in target_tools]
                     else:
                         # 3. Last Resort: Try to force discovery once
                         try:
                             logger.info("Planner: Registry empty, forcing tool scan...")
                             all_tools = await asyncio.wait_for(registry.list_all_tools(), timeout=5.0)
-                            relevant_tools = [t['name'] for t in all_tools][:200]
+                            # Here we HAVE schemas
+                            for t in all_tools[:50]:
+                                name = t.get('name', 'N/A')
+                                desc = t.get('description', '')[:100]
+                                schema = t.get('inputSchema', {})
+                                schema_str = str(schema).replace("{", "{{").replace("}", "}}")
+                                relevant_tools.append(f"TOOL: {name}\nDESCRIPTION: {desc}\nSCHEMA: {schema_str}\n")
                         except asyncio.TimeoutError:
                              pass
 
                 # Format for LLM
                 if relevant_tools:
                     tools_context = f"RELEVANT TOOLS ({len(relevant_tools)} found):\n"
-                    tools_context += "\n".join(relevant_tools) if ":" in relevant_tools[0] else ", ".join(relevant_tools)
+                    tools_context += "\n".join(relevant_tools)
                 else:
                     tools_context = "No specific tools found. Rely on 'web_search' and 'execute_code'."
                 
@@ -350,30 +368,38 @@ QUERY COMPLEXITY: {complexity.tier.value.upper()}
                 LLMMessage(
                     role=LLMRole.SYSTEM,
                     content=f"""ACT AS: Execution Architect for Kea (Autonomous Research Engine).
-OBJECTIVE: Convert user intent into an executable JSON Blueprint.
+OBJECTIVE: Convert user intent into an executable JSON Blueprint with PRECISE INPUT MAPPING.
 {complexity_guidance}
 
 AVAILABLE TOOLS:
 {tools_context}
 
 CRITICAL RULES:
-1. OUTPUT ONLY JSON. No prose, no explanations, no "I will now..."
-2. Use exact tool names from the list above. If no tool fits, use "execute_code".
-3. Tasks with same "phase" run in parallel. Higher phase waits for lower phases.
-4. Use "artifact" to declare a UNIQUE output key name for each step.
-5. In "input_mapping", reference previous artifacts using EXACT format: {{{{<id>.artifacts.<artifact_name>}}}}
-   - The <artifact_name> MUST match the "artifact" field of the referenced step EXACTLY.
-   - WRONG: {{{{s1.artifact}}}} or {{{{s1.output}}}} (generic names will NOT resolve)
-   - CORRECT: {{{{s1.artifacts.prices_csv}}}} (matches "artifact": "prices_csv" from step s1)
-6. ADVANCED NODE TYPES (use when appropriate):
-   - "type": "loop" with "loop_over": "{{{{step.artifacts.list}}}}" and "body": [...] for iterating
-   - "type": "switch" with "condition", "true_branch", "false_branch" for conditional logic
-   - "type": "merge" with "merge_inputs": ["s1", "s2"] to combine results
-   - "type": "agentic" with "goal": "..." for open-ended subtasks needing reasoning
+1. OUTPUT ONLY JSON. No prose, no explanations.
+2. SELECTIVITY: Use only the tools necessary to answer the user query.
+3. DEPENDENCIES: Tasks with same "phase" run in parallel. Higher phase waits for lower phases.
+4. ARTIFACTS: Use "artifact" to assign a variable name to each step's output (e.g., "csv_file", "search_results").
+5. INPUT MAPPING (The Core Mechanic):
+   - You MUST map outputs from previous steps to inputs of subsequent steps using `input_mapping`.
+   - Syntax: `{{{{step_id.artifacts.artifact_name}}}}` refers to the output of `step_id`.
+   - Deep Selection: You can access JSON fields or array items:
+     - `{{{{s1.artifacts.data.items[0].id}}}}` (First item's ID)
+     - `{{{{s1.artifacts.data.items[*].price}}}}` (List of all prices)
+   - Schema Compliance: Ensure mapped values match the TOOL SCHEMA provided above.
+   - Example: if `calculate_indicators` needs `csv_path`, map it: `"input_mapping": {{{{"csv_path": "{{{{s1.artifacts.prices_csv}}}}"}}}}`.
+
+6. ADVANCED NODE TYPES:
+   - "type": "loop" -> Iterate over a list.
+     - `loop_over`: `{{{{step.artifacts.list}}}}`
+     - `loop_body`: List of steps to run for each item. Use `{{{{loop_variable}}}}` (default `item`) in args.
+   - "type": "switch" -> Conditional logic.
+     - `condition`: `len({{{{s1.artifacts.data}}}}) > 0`
+   - "type": "merge" -> Combine results.
+     - `merge_inputs`: ["s1", "s2"]
 
 OUTPUT SCHEMA:
 {{{{
-  "intent": "Brief technical summary (max 10 words)",
+  "intent": "Brief technical summary",
   "blueprint": [
     {{{{
       "id": "step_1",
@@ -387,19 +413,9 @@ OUTPUT SCHEMA:
       "phase": 2,
       "tool": "pandas_ta_server.calculate_indicators",
       "args": {{{{"indicators": ["rsi", "macd"]}}}},
-      "input_mapping": {{{{"csv_path": "{{{{step_1.artifacts.prices_csv}}}}\"}}}},
+      "input_mapping": {{{{"csv_path": "{{{{step_1.artifacts.prices_csv}}}}"}}}},
       "artifact": "indicators"
     }}}}
-  ]
-}}}}
-
-EXAMPLE for "Compare NVDA vs AMD financials":
-{{{{
-  "intent": "Compare NVDA AMD financial metrics",
-  "blueprint": [
-    {{{{"id": "s1", "phase": 1, "tool": "yfinance_server.get_income_statement_quarterly", "args": {{{{"ticker": "NVDA"}}}}, "artifact": "nvda_income"}}}},
-    {{{{"id": "s2", "phase": 1, "tool": "yfinance_server.get_income_statement_quarterly", "args": {{{{"ticker": "AMD"}}}}, "artifact": "amd_income"}}}},
-    {{{{"id": "s3", "phase": 2, "tool": "execute_code", "args": {{{{"code": "# Compare margins"}}}}, "input_mapping": {{{{"nvda": "{{{{s1.artifacts.nvda_income}}}}\", "amd": "{{{{s2.artifacts.amd_income}}}}\"}}}}, "artifact": "comparison"}}}}
   ]
 }}}}"""
                 ),

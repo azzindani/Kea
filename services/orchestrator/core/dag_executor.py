@@ -21,7 +21,7 @@ from datetime import datetime
 from typing import Any, Callable, Awaitable
 
 from shared.logging import get_logger
-from services.orchestrator.core.assembler import ArtifactStore, resolve_inputs
+from services.orchestrator.core.assembler import ArtifactStore, resolve_inputs, resolve_and_wire_inputs
 from services.orchestrator.core.workflow_nodes import (
     WorkflowNode, NodeType, NodeStatus, NodeResult,
     parse_blueprint_node,
@@ -262,9 +262,15 @@ class DAGExecutor:
     async def _dispatch_node(self, node: WorkflowNode) -> NodeResult:
         """Dispatch execution based on node type."""
         # Resolve input mappings
-        if node.input_mapping:
-            resolved = resolve_inputs(node.input_mapping, self.store)
-            node.args.update(resolved)
+        # Resolve input mappings AND Auto-Wire
+        # Replaces: if node.input_mapping: resolved = resolve_inputs(...)
+        resolved = await resolve_and_wire_inputs(
+            input_mapping=node.input_mapping,
+            current_args=node.args,
+            tool_name=node.tool,
+            store=self.store
+        )
+        node.args.update(resolved)
 
         if node.node_type == NodeType.LOOP:
             return await self._execute_loop(node)
@@ -340,9 +346,14 @@ class DAGExecutor:
 
         async def run_child(child: WorkflowNode) -> NodeResult:
             async with sem:
-                if child.input_mapping:
-                    resolved = resolve_inputs(child.input_mapping, self.store)
-                    child.args.update(resolved)
+                # Use Auto-Wiring for loop children too
+                resolved = await resolve_and_wire_inputs(
+                    input_mapping=child.input_mapping,
+                    current_args=child.args,
+                    tool_name=child.tool,
+                    store=self.store
+                )
+                child.args.update(resolved)
                 return await self.node_executor(child, child.args)
 
         tasks = [run_child(c) for c in children]

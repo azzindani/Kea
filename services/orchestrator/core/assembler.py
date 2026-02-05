@@ -19,6 +19,7 @@ from typing import Any, Callable, Awaitable
 from shared.logging import get_logger
 from shared.context_pool import TaskContextPool
 from shared.mcp.protocol import NodeOutput, ToolResult, TextContent
+from services.orchestrator.core.auto_wiring import AutoWirer
 
 logger = get_logger(__name__)
 
@@ -336,8 +337,10 @@ class NodeAssembler:
                 assembler.store_task_artifacts(task, result)
     """
     
-    def __init__(self, store: ArtifactStore):
+    
+    def __init__(self, store: ArtifactStore, auto_wirer: AutoWirer | None = None):
         self.store = store
+        self.auto_wirer = auto_wirer or AutoWirer(store)
         
     def topological_sort(self, tasks: list[Any]) -> list[PhaseGroup]:
         """
@@ -374,21 +377,37 @@ class NodeAssembler:
             for phase in sorted_phases
         ]
         
-    def resolve_task_inputs(self, task: Any) -> dict[str, Any]:
+    async def resolve_task_inputs(self, task: Any) -> dict[str, Any]:
         """
-        Resolve a task's input_mapping to actual values.
+        Resolve a task's input_mapping to actual values AND auto-wire missing inputs.
         
         Args:
-            task: MicroTask with input_mapping field
+            task: MicroTask with input_mapping & tool fields
             
         Returns:
             Dict of resolved input values to merge into task.inputs
         """
+        # 1. Explicit Mapping (Sync)
         input_mapping = getattr(task, "input_mapping", {}) or {}
-        if not input_mapping:
-            return {}
+        resolved = resolve_inputs(input_mapping, self.store) if input_mapping else {}
+        
+        # 2. Merge with existing inputs to get full picture
+        current_inputs = getattr(task, "inputs", {}) or {}
+        if isinstance(current_inputs, dict):
+            combined_inputs = {**current_inputs, **resolved}
+        else:
+            combined_inputs = resolved
             
-        return resolve_inputs(input_mapping, self.store)
+        # 3. Auto-Wiring (Async)
+        tool_name = getattr(task, "tool", "")
+        if tool_name and self.auto_wirer:
+            wired_inputs = await self.auto_wirer.wire_inputs(tool_name, combined_inputs)
+            # Only return the *new* or *mapped* inputs, not the original ones
+            # to avoid overwriting if using update()
+            # Actually, returning everything that changed/resolved is safer.
+            return wired_inputs
+            
+        return resolved
         
     def store_task_artifacts(self, task: Any, result: Any) -> None:
         """
@@ -508,6 +527,30 @@ def create_assembler(context_pool: TaskContextPool | None = None) -> NodeAssembl
     return NodeAssembler(store)
 
 
+async def resolve_and_wire_inputs(
+    input_mapping: dict[str, str],
+    current_args: dict[str, Any],
+    tool_name: str,
+    store: ArtifactStore,
+    auto_wirer: AutoWirer | None = None
+) -> dict[str, Any]:
+    """
+    Helper for DAG Executor to resolve and wire inputs in one go.
+    """
+    # 1. Resolve explicit mappings
+    resolved_mapping = resolve_inputs(input_mapping, store) if input_mapping else {}
+    
+    # 2. Combine with current args
+    final_args = {**current_args, **resolved_mapping}
+    
+    # 3. Auto-wire
+    if tool_name:
+        wirer = auto_wirer or AutoWirer(store)
+        final_args = await wirer.wire_inputs(tool_name, final_args)
+        
+    return final_args
+
+
 def resolve_task_inputs_batch(
     tasks: list[Any],
     store: ArtifactStore
@@ -602,8 +645,8 @@ class SelfHealingAssembler(NodeAssembler):
             phase_results = []
             
             for task in phase.tasks:
-                # Resolve inputs before execution
-                resolved = self.resolve_task_inputs(task)
+                # Resolve inputs before execution (Async now)
+                resolved = await self.resolve_task_inputs(task)
                 if resolved:
                     # Merge resolved inputs into task
                     if hasattr(task, "inputs"):
