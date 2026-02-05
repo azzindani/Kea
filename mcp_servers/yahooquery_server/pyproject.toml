@@ -9,6 +9,7 @@ dependencies = [
     "pandas",
     "pydantic",
     "python-dotenv",
+    "tabulate",
     "structlog",
     "wrapt",
     "yahooquery",
