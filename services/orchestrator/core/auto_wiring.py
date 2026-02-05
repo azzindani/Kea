@@ -68,8 +68,16 @@ class AutoWirer:
             logger.warning(f"⚠️ AutoWirer: Schema not found for {tool_name}, skipping auto-wiring")
             return explicit_inputs
             
-        required_args = tool_schema.get("required", [])
-        properties = tool_schema.get("properties", {})
+        # Handle both Pydantic model (ToolInputSchema) and dict
+        if hasattr(tool_schema, "model_dump"):
+            schema_dict = tool_schema.model_dump()
+        elif hasattr(tool_schema, "__dict__"):
+            schema_dict = tool_schema.__dict__
+        else:
+            schema_dict = tool_schema if isinstance(tool_schema, dict) else {}
+            
+        required_args = schema_dict.get("required", [])
+        properties = schema_dict.get("properties", {})
         
         # Start with explicit inputs
         final_inputs = explicit_inputs.copy()
