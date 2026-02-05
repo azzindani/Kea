@@ -34,7 +34,7 @@ from services.orchestrator.agents.code_generator import generate_fallback_code, 
 from shared.data_pool import get_data_pool
 
 # Node Assembly Engine for n8n-style node wiring
-from services.orchestrator.core.assembler import ArtifactStore, NodeAssembler, create_assembler
+from services.orchestrator.core.assembler import ArtifactStore, create_assembler
 
 
 
@@ -259,7 +259,34 @@ async def researcher_node(state: GraphState) -> GraphState:
             from services.orchestrator.core.dag_executor import DAGExecutor
             from services.orchestrator.core.microplanner import Microplanner
 
-            spawner = get_spawner()
+            # Build an LLM callback so spawner + microplanner can call the LLM
+            async def _llm_callback(system_prompt: str, user_message: str) -> str:
+                """LLM callback for agent spawner and microplanner."""
+                try:
+                    import os
+                    if not os.getenv("OPENROUTER_API_KEY"):
+                        return ""
+                    from shared.llm import OpenRouterProvider, LLMConfig
+                    from shared.llm.provider import LLMMessage, LLMRole
+                    from shared.config import get_settings
+                    app_cfg = get_settings()
+                    provider = OpenRouterProvider()
+                    cfg = LLMConfig(
+                        model=app_cfg.models.planner_model,
+                        temperature=0.3,
+                        max_tokens=4096,
+                    )
+                    msgs = [
+                        LLMMessage(role=LLMRole.SYSTEM, content=system_prompt),
+                        LLMMessage(role=LLMRole.USER, content=user_message),
+                    ]
+                    resp = await provider.complete(msgs, cfg)
+                    return resp.content
+                except Exception as e:
+                    logger.warning(f"LLM callback failed: {e}")
+                    return ""
+
+            spawner = get_spawner(llm_callback=_llm_callback)
             prompt_factory = PromptFactory()
 
             # Get complexity-aware limits
@@ -1072,23 +1099,33 @@ def compile_research_graph():
 
 
 async def smart_fetch_data(args: dict) -> Any:
-    # JIT-Enabled Data Fetcher
+    """JIT-Enabled Data Fetcher using MCP session registry."""
+    from services.mcp_host.core.session_registry import get_session_registry
+
+    registry = get_session_registry()
     query = args.get("query", "")
-    
+
+    async def _call_tool(tool_name: str, tool_args: dict) -> Any:
+        """Resolve tool via registry and call it."""
+        server_name = registry.get_server_for_tool(tool_name)
+        if not server_name:
+            await registry.list_all_tools()
+            server_name = registry.get_server_for_tool(tool_name)
+        if not server_name:
+            raise ValueError(f"Tool {tool_name} not found in SessionRegistry.")
+        session = await registry.get_session(server_name)
+        return await session.call_tool(tool_name, tool_args)
+
     # 1. AUTONOMOUS SEARCH: Find the data source URL first
-    # We define a search query to find a list of companies
     discovery_query = f"list of companies listed on {query} stock exchange wikipedia"
     logger.info(f"🔍 Web Search for Data Source: '{discovery_query}'")
-    
-    wiki_url = "https://en.wikipedia.org/wiki/LQ45" # Default fallback
+
+    wiki_url = "https://en.wikipedia.org/wiki/LQ45"  # Default fallback
     try:
         from shared.hardware.detector import detect_hardware
         search_args = {"query": discovery_query, "max_results": detect_hardware().optimal_search_limit()}
-        # Use MCP Client for search
-        mcp_client = get_mcp_orchestrator()
-        search_results = await mcp_client.call_tool("web_search", search_args)
-        
-        # Simple heuristic to find a Wikipedia URL
+        search_results = await _call_tool("web_search", search_args)
+
         search_text = str(search_results)
         import re
         match = re.search(r'(https://[a-z]+\.wikipedia\.org/wiki/[^\s\)\"]+)', search_text)
@@ -1096,12 +1133,11 @@ async def smart_fetch_data(args: dict) -> Any:
             wiki_url = match.group(0)
             logger.info(f"✅ Discovered Data Source: {wiki_url}")
         else:
-            logger.warning(f"⚠️ Could not extract Wiki URL from search. Defaulting manually to LQ45 one.")
+            logger.warning("⚠️ Could not extract Wiki URL from search. Using LQ45 default.")
     except Exception as e:
         logger.error(f"❌ Discovery Search Failed: {e}")
 
     # 2. Dynamic Script Generation with DISCOVERED URL
-    # NOTE: We use raw imports because we are running in a JIT 'uv' environment
     code = f"""
 import pandas as pd
 import yfinance as yf
@@ -1111,33 +1147,26 @@ def get_tickers():
     source_url = "{wiki_url}"
     print(f"🔍 Scraping tickers from discovered source: {{source_url}}")
     tickers = []
-    
+
     try:
-        # Robust Scrape
-        import html5lib 
+        import html5lib
         tables = pd.read_html(source_url)
-        
-        # Smart Column Detection
+
         for df in tables:
-            # Normalize cols
-            cols = [str(c).upper() for c in df.columns]
-            
             target_col = None
             for c in df.columns:
                 c_up = str(c).upper()
                 if "CODE" in c_up or "SYMBOL" in c_up or "TICKER" in c_up:
                     target_col = c
                     break
-            
+
             if target_col:
-                # Valid table found
                 raw_tickers = df[target_col].tolist()
                 suffix = ".JK" if "Indonesia" in "{query}" or "IDX" in "{query}" or "LQ45" in source_url else ""
-                
                 tickers = [f"{{str(t).strip()}}{{suffix}}" for t in raw_tickers if isinstance(t, str)]
                 print(f"   ✅ Found {{len(tickers)}} tickers in table columns: {{df.columns.tolist()}}")
                 break
-                
+
         if not tickers:
             print("   ⚠️ No ticker column found in any table.")
             try:
@@ -1148,23 +1177,21 @@ def get_tickers():
                 print(f"   ✅ Discovered {{len(tickers)}} tickers from GitHub Fallback")
             except:
                 pass
-            
+
     except Exception as e:
         print(f"Discovery error: {{e}}")
         tickers = []
-        
+
     return tickers
 
-# Main Execution
 try:
     targets = get_tickers()
     if not targets:
         print("No tickers found from source.")
     else:
         print(f"📊 Fetching data for {{len(targets)}} companies...")
-        
         results = []
-        for t in targets[:20]: 
+        for t in targets[:20]:
             try:
                 stock = yf.Ticker(t)
                 info = stock.info
@@ -1179,23 +1206,18 @@ try:
                 print(f"   ✅ Fetched {{t}}")
             except Exception as e:
                 print(f"   ❌ Failed {{t}}: {{e}}")
-                
+
         df = pd.DataFrame(results)
         print("\\nDATA_START")
         print(df.to_markdown(index=False))
         print("DATA_END")
-        
+
 except Exception as e:
     print(f"Script Error: {{e}}")
 """
 
-    # Call execute_code_tool with JIT dependencies via MCP Client
-    mcp_client = get_mcp_orchestrator()
-    if not mcp_client:
-        raise ValueError("MCP/Orchestrator not initialized")
-        
-    return await mcp_client.call_tool("execute_code", {
-        "code": code, 
+    return await _call_tool("execute_code", {
+        "code": code,
         "dependencies": ["yfinance", "pandas", "requests", "html5lib", "lxml", "tabulate"]
     })
 
