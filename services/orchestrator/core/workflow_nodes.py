@@ -122,29 +122,39 @@ def parse_blueprint_node(step: dict[str, Any]) -> WorkflowNode:
     """
     Parse a single blueprint step dict into a typed WorkflowNode.
 
+    Accepts both LLM blueprint format and MicroTask.model_dump() format:
+      - LLM format:      id, type, artifact, args
+      - MicroTask format: task_id, node_type, output_artifact, inputs, node_config
+
     Infers node_type from the step's fields if not explicitly set.
 
     Args:
-        step: Raw blueprint step from the planner
+        step: Raw blueprint step from the planner (either format)
 
     Returns:
         WorkflowNode with appropriate type and fields
     """
-    node_type_str = step.get("type", "")
+    # Merge node_config into a lookup dict so advanced fields are accessible
+    # at the top level.  MicroTask stores loop_over, condition, etc. inside
+    # node_config rather than at the step root.
+    merged = {**step.get("node_config", {}), **step}
+
+    # Node type: accept "type" (LLM) or "node_type" (MicroTask)
+    node_type_str = merged.get("type", "") or merged.get("node_type", "")
 
     # Auto-detect node type from fields if not explicit
     if not node_type_str:
-        if "loop_over" in step or "loop_body" in step:
+        if "loop_over" in merged or "loop_body" in merged:
             node_type_str = "loop"
-        elif "condition" in step:
+        elif "condition" in merged:
             node_type_str = "switch"
-        elif "merge_inputs" in step or "merge_strategy" in step:
+        elif "merge_inputs" in merged or "merge_strategy" in merged:
             node_type_str = "merge"
-        elif "goal" in step:
+        elif "goal" in merged:
             node_type_str = "agentic"
-        elif "llm_prompt" in step:
+        elif "llm_prompt" in merged:
             node_type_str = "llm"
-        elif step.get("tool", "") in ("execute_code", "run_python"):
+        elif merged.get("tool", "") in ("execute_code", "run_python"):
             node_type_str = "code"
         else:
             node_type_str = "tool"
@@ -155,35 +165,66 @@ def parse_blueprint_node(step: dict[str, Any]) -> WorkflowNode:
         logger.warning(f"Unknown node type '{node_type_str}', defaulting to tool")
         node_type = NodeType.TOOL
 
+    # ID: accept "id" (LLM) or "task_id" (MicroTask)
+    node_id = merged.get("id") or merged.get("task_id", f"node_{id(step)}")
+
+    # Args: accept "args" (LLM) or "inputs" (MicroTask)
+    # Use explicit None check — an empty {} is a valid args dict and should
+    # NOT fall through to "inputs".
+    args = merged.get("args")
+    if args is None:
+        args = merged.get("inputs")
+    if not isinstance(args, dict):
+        args = {}
+
+    # Output artifact: accept "artifact" (LLM) or "output_artifact" (MicroTask)
+    output_artifact = merged.get("artifact") or merged.get("output_artifact")
+
+    # Phase: accept int or str, normalise to int for WorkflowNode
+    raw_phase = merged.get("phase", 1)
+    try:
+        phase = int(raw_phase)
+    except (ValueError, TypeError):
+        phase = 1
+
+    # For merge_inputs, avoid accidentally using "inputs" (MicroTask dict field)
+    merge_inputs_raw = merged.get("merge_inputs")
+    if merge_inputs_raw is None:
+        # Only fall back to "inputs" if it's a list (merge semantic), not a dict
+        inputs_field = merged.get("inputs")
+        merge_inputs_raw = inputs_field if isinstance(inputs_field, list) else []
+    if not isinstance(merge_inputs_raw, list):
+        merge_inputs_raw = []
+
     node = WorkflowNode(
-        id=step.get("id", f"node_{id(step)}"),
+        id=node_id,
         node_type=node_type,
-        phase=step.get("phase", 1),
-        tool=step.get("tool", ""),
-        args=step.get("args", {}),
-        input_mapping=step.get("input_mapping", {}),
-        output_artifact=step.get("artifact"),
-        depends_on=step.get("depends_on", []),
-        description=step.get("description", ""),
+        phase=phase,
+        tool=merged.get("tool", ""),
+        args=args,
+        input_mapping=merged.get("input_mapping", {}),
+        output_artifact=output_artifact,
+        depends_on=merged.get("depends_on", []),
+        description=merged.get("description", ""),
         # SwitchNode
-        condition=step.get("condition", ""),
-        true_branch=step.get("true_branch", step.get("true", [])),
-        false_branch=step.get("false_branch", step.get("false", [])),
+        condition=merged.get("condition", ""),
+        true_branch=merged.get("true_branch", merged.get("true", [])),
+        false_branch=merged.get("false_branch", merged.get("false", [])),
         # LoopNode
-        loop_over=step.get("loop_over", step.get("over", "")),
-        loop_body=step.get("loop_body", step.get("body", [])),
-        max_parallel=step.get("max_parallel", 10),
-        loop_variable=step.get("loop_variable", "item"),
+        loop_over=merged.get("loop_over", merged.get("over", "")),
+        loop_body=merged.get("loop_body", merged.get("body", [])),
+        max_parallel=merged.get("max_parallel", 10),
+        loop_variable=merged.get("loop_variable", "item"),
         # MergeNode
-        merge_inputs=step.get("merge_inputs", step.get("inputs", [])),
-        merge_strategy=step.get("merge_strategy", "concat"),
+        merge_inputs=merge_inputs_raw,
+        merge_strategy=merged.get("merge_strategy", "concat"),
         # AgenticNode
-        goal=step.get("goal", ""),
-        agent_max_steps=step.get("agent_max_steps", step.get("max_steps", 8)),
-        agent_tools=step.get("agent_tools", step.get("tools", [])),
+        goal=merged.get("goal", ""),
+        agent_max_steps=merged.get("agent_max_steps", merged.get("max_steps", 8)),
+        agent_tools=merged.get("agent_tools", merged.get("tools", [])),
         # LLMNode
-        llm_prompt=step.get("llm_prompt", step.get("prompt", "")),
-        llm_system=step.get("llm_system", step.get("system", "")),
+        llm_prompt=merged.get("llm_prompt", merged.get("prompt", "")),
+        llm_system=merged.get("llm_system", merged.get("system", "")),
     )
 
     return node
