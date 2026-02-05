@@ -155,7 +155,8 @@ def setup_logging(config: LogConfig | None = None) -> None:
     root_logger.handlers.clear()
     
     # Create handler
-    handler = logging.StreamHandler(sys.stdout)
+    # Create handler
+    handler = logging.StreamHandler(sys.stderr)
     
     # Set formatter based on format type
     if config.format == "json":
@@ -171,6 +172,14 @@ def setup_logging(config: LogConfig | None = None) -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     logging.getLogger("asyncio").setLevel(logging.WARNING)
+    logging.getLogger("datasets").setLevel(logging.WARNING)
+    logging.getLogger("tensorflow").setLevel(logging.WARNING)
+    logging.getLogger("jax").setLevel(logging.WARNING)
+    logging.getLogger("pydot").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("filelock").setLevel(logging.WARNING)
+    logging.getLogger("multipart").setLevel(logging.WARNING)
+    logging.getLogger("passlib").setLevel(logging.WARNING)
 
 
 def get_logger(name: str) -> logging.Logger:

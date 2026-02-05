@@ -63,7 +63,7 @@ class ModalityValidator:
         result = validator.validate(modality_input)
         if not result.passed:
             for issue in result.issues:
-                print(f"{issue.severity}: {issue.message}")
+                logger.info(f"{issue.severity}: {issue.message}")
     """
     
     # ========================================================================

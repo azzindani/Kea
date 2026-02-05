@@ -150,20 +150,40 @@ class MCPServer(ABC):
         tool_name = params.get("name")
         arguments = params.get("arguments", {})
         
-        if tool_name not in self._handlers:
-            return ToolResult(
-                content=[TextContent(text=f"Tool not found: {tool_name}")],
-                isError=True
-            )
+        # 1. Try registered handlers (standard pattern)
+        if tool_name in self._handlers:
+            try:
+                handler = self._handlers[tool_name]
+                return await handler(arguments)
+            except Exception as e:
+                return ToolResult(
+                    content=[TextContent(text=f"Tool execution error: {str(e)}")],
+                    isError=True
+                )
         
+        # 2. Try override method (legacy/subclass pattern)
         try:
-            handler = self._handlers[tool_name]
-            return await handler(arguments)
+            # Check if subclass implements handle_tool_call
+            process_result = await self.handle_tool_call(tool_name, arguments)
+            if process_result:
+                return process_result
         except Exception as e:
-            return ToolResult(
+             return ToolResult(
                 content=[TextContent(text=f"Tool execution error: {str(e)}")],
                 isError=True
             )
+
+        return ToolResult(
+            content=[TextContent(text=f"Tool not found: {tool_name}")],
+            isError=True
+        )
+
+    async def handle_tool_call(self, name: str, arguments: dict) -> ToolResult | None:
+        """
+        Override this method in subclasses to handle tool calls dynamically
+        without using register_tool().
+        """
+        return None
     
     async def run(self, transport: Transport | None = None) -> None:
         """

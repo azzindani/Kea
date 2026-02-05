@@ -1,0 +1,19 @@
+[project]
+name = "bs4_server"
+version = "0.1.0"
+description = "MCP Server for bs4_server"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "beautifulsoup4",
+    "html5lib",
+    "lxml",
+    "mcp",
+    "pydantic",
+    "python-dotenv",
+    "structlog",
+    "wrapt",
+]
+
+[tool.uv]
+dev-dependencies = []

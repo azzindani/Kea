@@ -383,9 +383,21 @@ def create_artifact_store(use_local: bool = True) -> ArtifactStore:
     Args:
         use_local: Use local storage instead of S3
     """
+    # 1. Create Blob Layer (Physical Storage)
     if use_local or not os.getenv("S3_BUCKET"):
-        logger.info("Using local artifact store")
-        return LocalArtifactStore()
-    
-    logger.info("Using S3 artifact store")
-    return S3ArtifactStore()
+        logger.info("Using local artifact blob store")
+        blob_store = LocalArtifactStore()
+    else:
+        logger.info("Using S3 artifact blob store")
+        blob_store = S3ArtifactStore()
+
+    # 2. Add Metadata Layer (Postgres Index)
+    if os.getenv("DATABASE_URL"):
+        try:
+            from services.rag_service.core.postgres_artifacts import PostgresArtifactStore
+            logger.info("Using Postgres artifact metadata index")
+            return PostgresArtifactStore(blob_store)
+        except Exception as e:
+            logger.warning(f"Failed to init PostgresArtifactStore: {e}, using blob store only")
+            
+    return blob_store

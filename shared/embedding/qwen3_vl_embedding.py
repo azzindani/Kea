@@ -2,6 +2,8 @@
 Qwen3 VL (Vision-Language) Embedding Provider.
 
 Local inference: Qwen/Qwen3-VL-Embedding-2B
+
+Uses the official Qwen3VLEmbedder pattern from scripts/qwen3_vl_embedding.
 """
 
 from __future__ import annotations
@@ -21,7 +23,7 @@ logger = get_logger(__name__)
 class VLInput:
     """Vision-Language input."""
     text: str | None = None
-    image: str | None = None  # URL or base64
+    image: str | None = None  # URL or file path
 
 
 class VLEmbeddingProvider(ABC):
@@ -58,8 +60,10 @@ class LocalVLEmbedding(VLEmbeddingProvider):
     ) -> None:
         self.model_name = model_name
         self.device = device or ("cuda" if self._has_cuda() else "cpu")
+        if self.device == "cuda":
+            self.device = "cuda:0"
         self.use_flash_attention = use_flash_attention
-        self._model = None
+        self._embedder = None
     
     def _has_cuda(self) -> bool:
         try:
@@ -69,47 +73,121 @@ class LocalVLEmbedding(VLEmbeddingProvider):
             return False
     
     def _load_model(self):
-        """Lazy load model."""
-        if self._model is None:
+        """Lazy load the Qwen3VLEmbedder model."""
+        if self._embedder is None:
             try:
-                # Try to import the Qwen3 VL embedding module
-                # This requires the qwen3-vl-embedding package
                 import torch
-                from transformers import AutoModel, AutoProcessor
                 
-                self._processor = AutoProcessor.from_pretrained(
-                    self.model_name,
-                    trust_remote_code=True,
-                )
+                # Try to import the official Qwen3VLEmbedder
+                try:
+                    from scripts.qwen3_vl_embedding import Qwen3VLEmbedder
+                except ImportError:
+                    # Fall back to transformers-based implementation
+                    logger.warning(
+                        "scripts.qwen3_vl_embedding not found. "
+                        "Using transformers-based fallback."
+                    )
+                    self._embedder = self._create_fallback_embedder()
+                    return self._embedder
                 
-                model_kwargs = {"torch_dtype": torch.float16}
+                # Use official Qwen3VLEmbedder
+                model_kwargs = {}
                 if self.use_flash_attention:
                     model_kwargs["attn_implementation"] = "flash_attention_2"
+                    model_kwargs["torch_dtype"] = torch.float16
                 
-                self._model = AutoModel.from_pretrained(
-                    self.model_name,
+                self._embedder = Qwen3VLEmbedder(
+                    model_name_or_path=self.model_name,
                     **model_kwargs,
-                    trust_remote_code=True,
-                ).eval()
+                )
                 
-                if self.device == "cuda":
-                    self._model = self._model.cuda()
-                
-                logger.info(f"Loaded {self.model_name} on {self.device}")
+                logger.info(f"Loaded {self.model_name} with Qwen3VLEmbedder")
                 
             except Exception as e:
                 logger.error(f"Failed to load VL embedding model: {e}")
                 raise
         
-        return self._model
+        return self._embedder
+    
+    def _create_fallback_embedder(self):
+        """Create a fallback embedder using transformers directly."""
+        import torch
+        from transformers import AutoModel, AutoProcessor
+        
+        class FallbackVLEmbedder:
+            def __init__(self, model_name: str, device: str, use_flash_attention: bool):
+                self.device = device
+                
+                self.processor = AutoProcessor.from_pretrained(
+                    model_name,
+                    trust_remote_code=True,
+                )
+                
+                model_kwargs = {"torch_dtype": torch.float16}
+                if use_flash_attention:
+                    model_kwargs["attn_implementation"] = "flash_attention_2"
+                
+                self.model = AutoModel.from_pretrained(
+                    model_name,
+                    **model_kwargs,
+                    trust_remote_code=True,
+                ).eval()
+                
+                if device.startswith("cuda"):
+                    self.model = self.model.to(device)
+            
+            def process(self, inputs: list[dict]) -> torch.Tensor:
+                """Process inputs and return embeddings."""
+                import torch.nn.functional as F
+                
+                embeddings_list = []
+                
+                with torch.no_grad():
+                    for inp in inputs:
+                        # Build messages for processor
+                        content = []
+                        if "image" in inp:
+                            content.append({"type": "image", "image": inp["image"]})
+                        if "text" in inp:
+                            content.append({"type": "text", "text": inp["text"]})
+                        
+                        if not content:
+                            # Empty input, return zero embedding
+                            embeddings_list.append(torch.zeros(1024))
+                            continue
+                        
+                        messages = [{"role": "user", "content": content}]
+                        
+                        try:
+                            # Process input
+                            processed = self.processor(
+                                text=self.processor.apply_chat_template(messages, tokenize=False),
+                                images=[inp.get("image")] if "image" in inp else None,
+                                return_tensors="pt",
+                            )
+                            processed = {k: v.to(self.model.device) for k, v in processed.items()}
+                            
+                            # Get embedding
+                            outputs = self.model(**processed)
+                            # Use last hidden state mean pooling
+                            emb = outputs.last_hidden_state.mean(dim=1).squeeze()
+                            emb = F.normalize(emb, p=2, dim=0)
+                            embeddings_list.append(emb.cpu())
+                        except Exception as e:
+                            logger.warning(f"VL embedding failed for input: {e}")
+                            embeddings_list.append(torch.zeros(1024))
+                
+                return torch.stack(embeddings_list)
+        
+        return FallbackVLEmbedder(self.model_name, self.device, self.use_flash_attention)
     
     async def embed(self, inputs: list[VLInput]) -> list[list[float]]:
         """Generate embeddings for vision-language inputs."""
         import asyncio
         
-        model = self._load_model()
+        embedder = self._load_model()
         
-        # Format inputs for the model
+        # Format inputs as dicts (official format)
         formatted_inputs = []
         for inp in inputs:
             item = {}
@@ -122,28 +200,19 @@ class LocalVLEmbedding(VLEmbeddingProvider):
         loop = asyncio.get_event_loop()
         
         def compute_embeddings():
-            # Process with the model
-            # Note: Actual implementation depends on qwen3-vl-embedding package
-            import torch
-            
-            embeddings = []
-            with torch.no_grad():
-                for inp in formatted_inputs:
-                    # This is a placeholder - actual API depends on package
-                    # For now, return normalized random vectors
-                    emb = torch.randn(1024)
-                    emb = emb / emb.norm()
-                    embeddings.append(emb.tolist())
-            
-            return embeddings
+            return embedder.process(formatted_inputs).tolist()
         
         embeddings = await loop.run_in_executor(None, compute_embeddings)
-        
-        logger.warning(
-            "VL embedding using placeholder. Install qwen3-vl-embedding for full support."
-        )
-        
         return embeddings
+    
+    async def embed_query(self, query: str, task: str | None = None) -> list[float]:
+        """Generate embedding for a text query."""
+        if task is None:
+            task = "Given a web search query, retrieve relevant passages that answer the query"
+        
+        formatted_query = f"Instruct: {task}\nQuery: {query}"
+        result = await self.embed([VLInput(text=formatted_query)])
+        return result[0]
 
 
 def create_vl_embedding_provider(**kwargs) -> VLEmbeddingProvider:

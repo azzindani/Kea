@@ -103,10 +103,44 @@ class ImageContent(BaseModel):
     mimeType: str = "image/png"
 
 
+class FileContent(BaseModel):
+    """File content in tool result - for artifact file passing."""
+    type: str = "file"
+    path: str  # Path to file artifact
+    mimeType: str = "application/octet-stream"
+    size_bytes: int = 0
+    description: str = ""
+
+
+class BinaryContent(BaseModel):
+    """Binary content in tool result - for in-memory binary data."""
+    type: str = "binary"
+    data: str  # Base64 encoded
+    mimeType: str = "application/octet-stream"
+    size_bytes: int = 0
+
+
+class JSONContent(BaseModel):
+    """Structured JSON content in tool result - for machine chaining."""
+    type: str = "json"
+    data: dict[str, Any] | list[Any]
+
+
 class ToolResult(BaseModel):
     """Result from tool execution."""
-    content: list[TextContent | ImageContent]
+    content: list[TextContent | ImageContent | FileContent | BinaryContent | JSONContent]
     isError: bool = False
+
+
+class NodeOutput(BaseModel):
+    """Standardized output from any pipeline node.
+    
+    Used by NodeAssembler for artifact-based data flow between nodes.
+    """
+    artifacts: dict[str, Any] = Field(default_factory=dict)  # {"prices_csv": "/vault/data.csv"}
+    metadata: dict[str, Any] = Field(default_factory=dict)   # {"rows": 1000, "columns": [...]}
+    status: str = "success"  # success | partial | failed
+    error: str | None = None
 
 
 # ============================================================================

@@ -1,0 +1,20 @@
+[project]
+name = "data_sources_server"
+version = "0.1.0"
+description = "MCP Server for data_sources_server"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fredapi",
+    "mcp",
+    "pandas",
+    "pydantic",
+    "python-dotenv",
+    "structlog",
+    "wbgapi",
+    "wrapt",
+    "yfinance",
+]
+
+[tool.uv]
+dev-dependencies = []

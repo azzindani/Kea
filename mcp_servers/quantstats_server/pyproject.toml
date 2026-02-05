@@ -1,0 +1,22 @@
+[project]
+name = "quantstats_server"
+version = "0.1.0"
+description = "MCP Server for quantstats_server"
+requires-python = ">=3.10"
+dependencies = [
+    "matplotlib",
+    "mcp",
+    "numpy",
+    "pandas",
+    "pydantic",
+    "python-dotenv",
+    "quantstats",
+    "seaborn",
+    "structlog",
+    "tabulate",
+    "wrapt",
+    "yfinance",
+]
+
+[tool.uv]
+dev-dependencies = []

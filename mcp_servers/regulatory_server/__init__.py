@@ -1,16 +1,45 @@
 # Regulatory Data MCP Server
-"""
-Government and regulatory data tools.
-"""
+"""Regulatory data tools. Auto-discovered with actual export detection."""
 
-from mcp_servers.regulatory_server.server import (
-    RegulatoryServer,
-    edgar_search_tool,
-    federal_register_tool,
-)
+from pathlib import Path
+from typing import Any
+import importlib
 
-__all__ = [
-    "RegulatoryServer",
-    "edgar_search_tool",
-    "federal_register_tool",
-]
+_DIR = Path(__file__).parent
+_discovered: dict = {}
+
+
+def _discover() -> dict:
+    global _discovered
+    if _discovered:
+        return _discovered
+    exports = {}
+    for item in _DIR.iterdir():
+        if item.is_file() and item.suffix == ".py" and item.name != "__init__.py":
+            module_path = f"mcp_servers.regulatory_server.{item.stem}"
+            try:
+                module = importlib.import_module(module_path)
+                for name in dir(module):
+                    if not name.startswith("_"):
+                        obj = getattr(module, name, None)
+                        if isinstance(obj, type) or callable(obj):
+                            exports[name] = module_path
+            except ImportError:
+                continue
+    _discovered = exports
+    return exports
+
+
+def __getattr__(name: str) -> Any:
+    exports = _discover()
+    if name in exports:
+        module = importlib.import_module(exports[name])
+        return getattr(module, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__():
+    return list(_discover().keys())
+
+
+__all__ = list(_discover())

@@ -449,16 +449,50 @@ class ModalityProcessor:
             )
     
     async def _process_image(self, modality: ModalityInput) -> ProcessedModality:
-        """Process image - placeholder for vision model."""
-        # TODO: Integrate with vision model (OpenAI, Qwen-VL, etc.)
-        return ProcessedModality(
-            original=modality,
-            text_content="[Image processing - requires vision model integration]",
-            structured_data={
-                "status": "pending_implementation",
-                "modality": "image",
-            },
-        )
+        """Process image using Vision Server."""
+        try:
+            from services.mcp_host.core.session_registry import get_session_registry
+            registry = get_session_registry()
+            
+            # Prefer vision_server
+            server_name = registry.get_server_for_tool("screenshot_extract") or "vision_server"
+            session = await registry.get_session(server_name)
+            
+            # Prepare args - prefer base64 for direct processing
+            import base64
+            if isinstance(modality.content, bytes):
+                b64_data = base64.b64encode(modality.content).decode("utf-8")
+                args = {"image_base64": b64_data, "extraction_type": "all"}
+            else:
+                # specific handling if content is path/url string
+                args = {"image_url": str(modality.content), "extraction_type": "all"}
+                
+            tool_res = await session.call_tool("screenshot_extract", args)
+            
+            if tool_res.isError:
+                raise RuntimeError(f"Vision tool failed: {tool_res.content}")
+                
+            text_content = ""
+            structured_data = {}
+            
+            # Parse result
+            for content in tool_res.content:
+                if content.type == "text":
+                    text_content += content.text + "\n"
+            
+            return ProcessedModality(
+                original=modality,
+                text_content=text_content.strip(),
+                structured_data={"vision_response": text_content, "server": server_name},
+            )
+            
+        except Exception as e:
+            logger.error(f"Image processing failed: {e}")
+            return ProcessedModality(
+                original=modality,
+                text_content=f"[Image processing failed: {e}]",
+                error=str(e)
+            )
     
     async def _process_audio(self, modality: ModalityInput) -> ProcessedModality:
         """Process audio - placeholder for transcription."""
@@ -485,24 +519,77 @@ class ModalityProcessor:
         )
     
     async def _process_document(self, modality: ModalityInput) -> ProcessedModality:
-        """Process document - extract text."""
-        # Use existing document server if available
+        """Process document using Document/Scraper Server."""
         try:
-            from mcp_servers.document_server.server import DocumentServer
+            from services.mcp_host.core.session_registry import get_session_registry
+            registry = get_session_registry()
             
-            # This is a placeholder - actual implementation would use the server
+            # Try document tools
+            # We need a tool that handles file content. 
+            # If we don't have direct file upload tool, we might use 'read_file' if it's a path
+            
+            server_name = "document_server" 
+            # Check if we can get a session
+            try:
+                session = await registry.get_session(server_name)
+            except:
+                # Fallback to scraper if document server missing
+                server_name = "scraper_server"
+                session = await registry.get_session(server_name)
+
+            # NOTE: For now, assuming content is a path string or we save it to temp
+            path_to_read = ""
+            if isinstance(modality.content, str) and os.path.exists(modality.content):
+                path_to_read = modality.content
+            elif modality.filename:
+                # Save temp
+                import tempfile
+                with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(modality.filename)[1]) as tmp:
+                    if isinstance(modality.content, str):
+                        tmp.write(modality.content.encode())
+                    else:
+                        tmp.write(modality.content)
+                    path_to_read = tmp.name
+            
+            if not path_to_read:
+                 return ProcessedModality(
+                    original=modality,
+                    text_content="[Document Content: Memory object (extraction requires file path)]",
+                )
+
+            # Call text extraction
+            # Assuming 'read_file' or 'parse_document' exists in these servers
+            # If strictly following README, scraper has 'pdf_extract'
+            
+            tool_name = "pdf_extract" if path_to_read.endswith(".pdf") else "read_file"
+            
+            # Check if tool exists on linked server (optimization)
+            # For this patch, we'll try 'pdf_extract' then 'read_file'
+            
+            try:
+                tool_res = await session.call_tool(tool_name, {"file_path": path_to_read})
+            except:
+                tool_res = await session.call_tool("read_file", {"path": path_to_read})
+
+            if tool_res.isError:
+                 raise RuntimeError(f"Document tool failed: {tool_res.content}")
+            
+            text = ""
+            for c in tool_res.content:
+                if hasattr(c, 'text'): text += c.text + "\n"
+                
             return ProcessedModality(
                 original=modality,
-                text_content="[Document processing - use document_server tools]",
-                structured_data={
-                    "status": "use_mcp_server",
-                    "server": "document_server",
-                },
+                text_content=text.strip()[:50000], # Cap at 50k chars
+                structured_data={"server": server_name, "source_path": path_to_read}
             )
-        except ImportError:
+
+        except Exception as e:
+            logger.error(f"Document processing failed: {e}")
             return ProcessedModality(
                 original=modality,
-                text_content="[Document processing available via MCP]",
+                text_content=f"[Document processing failed: {e}]",
+                error=str(e)
             )
     
     async def _process_data(self, modality: ModalityInput) -> ProcessedModality:

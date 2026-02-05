@@ -6,11 +6,14 @@ Runs stress tests via API Gateway endpoints, properly exercising
 the full microservices stack with authentication.
 
 Usage:
-    # Via pytest (recommended)
+    # Via pytest with predefined query ID
     python -m pytest tests/stress/stress_test.py --query=1 -v -s --log-cli-level=DEBUG
     
-    # Direct execution
-    python tests/stress/stress_test.py --query=1 -v
+    # Via pytest with CUSTOM QUERY STRING
+    python -m pytest tests/stress/stress_test.py --query="Analyze Apple stock performance" -v -s --log-cli-level=DEBUG
+    
+    # Direct execution with custom query
+    python tests/stress/stress_test.py --query="What are the top 10 AI companies?" -v
     python tests/stress/stress_test.py --list
     
 Prerequisites:
@@ -81,7 +84,7 @@ def pytest_addoption(parser):
         "--query",
         action="store",
         default=None,
-        help="Query ID(s) to run, comma-separated (e.g., '1' or '1,2,3')",
+        help="Query ID(s) comma-separated (e.g., '1' or '1,2,3') OR a custom query string (e.g., 'Analyze AAPL stock')",
     )
     parser.addoption(
         "--output-dir",
@@ -208,6 +211,8 @@ class StressTestRunner:
             logger.info("-"*40)
             logger.info("RESULTS:")
             logger.info(f"  Duration: {metrics.duration_ms / 1000:.1f}s")
+            logger.info(f"  Total Tool Time: {metrics.total_tool_duration_ms / 1000:.1f}s")
+            logger.info(f"  Concurrency Factor: {metrics.concurrency_factor:.2f}x")
             logger.info(f"  LLM Calls: {metrics.llm_calls}")
             logger.info(f"  Tool Iterations: {metrics.tool_iterations}")
             logger.info(f"  Efficiency Ratio: {metrics.efficiency_ratio:.1f}x")
@@ -233,13 +238,19 @@ class StressTestRunner:
         # Create job via API
         logger.info("Creating research job via API...")
         
+        # DEBUG: Show exactly what we're sending
+        print(f"\n{'='*70}")
+        print(f"DEBUG: API REQUEST - query.prompt =")
+        print(f"{query.prompt[:200]}..." if len(query.prompt) > 200 else query.prompt)
+        print(f"{'='*70}\n")
+        
         response = await self.api_client.post(
             "/api/v1/jobs/",
             json={
                 "query": query.prompt,
                 "job_type": "deep_research",
                 "depth": 2,
-                "max_sources": 10,
+                "max_sources": 50,
             },
         )
         
@@ -254,6 +265,8 @@ class StressTestRunner:
         start_time = time.time()
         last_status = None
         
+        print(f"Waiting for job {job_id} to complete (Timeout: {JOB_TIMEOUT}s)...")
+        
         while True:
             elapsed = time.time() - start_time
             if elapsed > JOB_TIMEOUT:
@@ -262,17 +275,20 @@ class StressTestRunner:
             response = await self.api_client.get(f"/api/v1/jobs/{job_id}")
             status_data = response.json()
             current_status = status_data["status"]
+            progress = status_data.get('progress', 0)
             
-            if current_status != last_status:
-                logger.info(f"Job status: {current_status} (progress: {status_data.get('progress', 0):.0%})")
-                last_status = current_status
+            # Print status update every poll
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            print(f"[{timestamp}] Status: {current_status.upper()} | Progress: {progress:.1%} | Elapsed: {elapsed:.1f}s")
             
             if current_status == "completed":
                 break
             elif current_status == "failed":
                 error = status_data.get("error", "Unknown error")
+                print(f"[{timestamp}] ❌ JOB FAILED: {error}")
                 raise Exception(f"Job failed: {error}")
             elif current_status == "cancelled":
+                print(f"[{timestamp}] ⚠️ JOB CANCELLED")
                 raise Exception("Job was cancelled")
             
             await asyncio.sleep(JOB_POLL_INTERVAL)
@@ -288,30 +304,30 @@ class StressTestRunner:
         # ============================================================
         # PRINT FULL RESULTS
         # ============================================================
-        logger.info("")
-        logger.info("="*70)
-        logger.info("FINAL REPORT")
-        logger.info("="*70)
+        print("")
+        print("="*70)
+        print("FINAL REPORT")
+        print("="*70)
         
         # Print the actual report content
         if result.get("report"):
             content = result["report"]
-            logger.info(f"\n{content}\n")
+            print(f"\n{content}\n")
         
         # Print confidence
         confidence = result.get("confidence", 0.0)
-        logger.info(f"CONFIDENCE: {confidence:.0%}")
+        print(f"CONFIDENCE: {confidence:.0%}")
         
         # Print sources count
         sources_count = result.get("sources_count", 0)
-        logger.info(f"SOURCES: {sources_count} total")
+        print(f"SOURCES: {sources_count} total")
         
         # Print facts count
         facts_count = result.get("facts_count", 0)
-        logger.info(f"FACTS EXTRACTED: {facts_count} total")
+        print(f"FACTS EXTRACTED: {facts_count} total")
         
-        logger.info("="*70)
-        logger.info("")
+        print("="*70)
+        print("")
         
         # Track metrics from result
         # Estimate LLM calls based on typical pipeline: router + planner + generator + critic + judge
@@ -430,11 +446,39 @@ def runner(request):
 
 @pytest.fixture
 def query_ids(request):
-    """Get query IDs from command line."""
+    """Get query IDs or custom query from command line or environment.
+    
+    Returns list of either:
+    - int: predefined query ID
+    - str: custom query string
+    
+    Priority:
+    1. STRESS_TEST_QUERY environment variable (for Colab/Kaggle)
+    2. --query command line argument
+    3. Default to Query 1
+    """
+    # Priority 1: Environment variable (most reliable for Colab/Kaggle)
+    env_query = os.getenv("STRESS_TEST_QUERY")
+    if env_query:
+        print(f"DEBUG: Using env var STRESS_TEST_QUERY = {env_query!r}")
+        if env_query.replace(",", "").replace(" ", "").isdigit():
+            return [int(q.strip()) for q in env_query.split(",")]
+        else:
+            return [env_query]
+    
+    # Priority 2: Command line argument  
     query_arg = request.config.getoption("--query")
+    print(f"DEBUG: --query arg = {query_arg!r}")
+    
     if query_arg:
-        return [int(q.strip()) for q in query_arg.split(",")]
-    return [1]  # Default to query 1
+        # Check if it looks like numeric ID(s)
+        if query_arg.replace(",", "").replace(" ", "").isdigit():
+            return [int(q.strip()) for q in query_arg.split(",")]
+        else:
+            # It's a custom query string
+            return [query_arg]  # Return as single-item list of string
+    
+    return [1]  # Default to Query 1 (Indonesian Alpha Hunt)
 
 
 class TestStressQueries:
@@ -449,10 +493,26 @@ class TestStressQueries:
         Usage:
             pytest tests/stress/stress_test.py --query=1 -v -s --log-cli-level=DEBUG
         """
-        for query_id in query_ids:
-            query = get_query(query_id)
-            if query is None:
-                pytest.fail(f"Query {query_id} not found")
+        for query_item in query_ids:
+            # DEBUG: Print what we received from fixture
+            print(f"DEBUG: query_item = {query_item!r}, type = {type(query_item).__name__}")
+            
+            # Handle both numeric IDs and custom query strings
+            if isinstance(query_item, int):
+                query = get_query(query_item)
+                if query is None:
+                    pytest.fail(f"Query {query_item} not found")
+                query_id = query_item
+            else:
+                # Custom query string - create ad-hoc StressQuery
+                query = StressQuery(
+                    id=0,
+                    name="Custom Query",
+                    prompt=query_item,
+                    expected_tool_iterations=100,
+                    expected_llm_calls=10,
+                )
+                query_id = "custom"
             
             logger.info(f"Running query {query_id}: {query.name}")
             
@@ -462,32 +522,60 @@ class TestStressQueries:
             assert metrics is not None, "Metrics should be collected"
             
             if metrics.success:
-                # Adaptive efficiency threshold with retry and degradation
+                # Adaptive efficiency threshold with retry loop
                 if metrics.llm_calls > 0:
-                    threshold = 0.95
+                    target_threshold = 0.95
                     min_threshold = 0.5
-                    degradation_step = 0.05
+                    degradation_step = 0.10
+                    max_retries = 3
                     
-                    passed = False
-                    while threshold >= min_threshold:
-                        if metrics.efficiency_ratio >= threshold:
-                            logger.info(f"✅ Efficiency check PASSED at threshold {threshold:.2f}")
-                            passed = True
-                            break
-                        else:
+                    passed_efficiency = False
+                    current_threshold = target_threshold
+                    
+                    # Check current run efficiency
+                    if metrics.efficiency_ratio >= current_threshold:
+                        logger.info(f"✅ Efficiency check PASSED at threshold {current_threshold:.2f}")
+                        passed_efficiency = True
+                    else:
+                        # Enter retry loop
+                        retries = 0
+                        while retries < max_retries:
                             logger.warning(
-                                f"⚠️ Efficiency {metrics.efficiency_ratio:.2f} < {threshold:.2f}, "
-                                f"degrading threshold by {degradation_step}"
+                                f"⚠️ Efficiency {metrics.efficiency_ratio:.2f} < {current_threshold:.2f}. "
+                                f"Degrading threshold to {current_threshold - degradation_step:.2f} and RETRYING query..."
                             )
-                            threshold -= degradation_step
+                            current_threshold -= degradation_step
+                            retries += 1
+                            
+                            # RERUN QUERY
+                            logger.info(f"🔄 Retry {retries}/{max_retries} for Query {query_id}...")
+                            metrics = await runner.run_query(query)
+                            
+                            if not metrics.success:
+                                logger.error(f"❌ Retry {retries} failed: {metrics.error_message}")
+                                continue
+                                
+                            if metrics.efficiency_ratio >= current_threshold:
+                                logger.info(f"✅ Retry {retries} PASSED at threshold {current_threshold:.2f}")
+                                passed_efficiency = True
+                                break
                     
-                    if not passed:
+                    if not passed_efficiency:
                         pytest.fail(
-                            f"Efficiency ratio {metrics.efficiency_ratio:.2f} below minimum threshold {min_threshold}"
+                            f"Efficiency ratio {metrics.efficiency_ratio:.2f} below minimum threshold {min_threshold} after {max_retries} retries"
                         )
                 
-                logger.info(f"✅ Query {query_id} PASSED")
+                logger.info(f"✅ Query {query_id} PASSED (Final)")
                 logger.info(f"   Efficiency ratio: {metrics.efficiency_ratio:.1f}x")
+                
+                # Verify Concurrency (Generic Check)
+                if metrics.tool_iterations > 50:
+                    logger.info(f"   Concurrency Factor: {metrics.concurrency_factor:.2f}x")
+                    
+                    if metrics.concurrency_factor > 1.2:
+                        logger.info("✅ PARALLEL EXECUTION CONFIRMED")
+                    elif metrics.duration_ms > 5000:
+                         logger.warning(f"⚠️ Low concurrency ({metrics.concurrency_factor:.2f}x). Expected parallel execution for heavy workload.")
             else:
                 logger.error(f"❌ Query {query_id} FAILED: {metrics.error_message}")
                 pytest.fail(f"Query {query_id} failed: {metrics.error_message}")
@@ -550,26 +638,51 @@ Prerequisites:
     
     args = parser.parse_args()
     
+    if args.verbose:
+        os.environ["KEA_LOG_NO_TRUNCATE"] = "1"
+        print("⚡ VERBOSE MODE: KEA_LOG_NO_TRUNCATE=1 (Full Payloads Enabled)")
+        # Ensure third-party noisy loggers stay quiet(er) or become verbose?
+        # User wants "naked", so let's allow DEBUG from httpx if they really want it, 
+        # but usually we just want OUR debugs. 
+        # setup_logging in stress_test.py sets them to WARNING.
+        # Let's keep them quiet unless specifically asked, as they spam byte-level info.
+        pass
+    
     if args.list:
         list_queries()
         return
     
     if not args.query:
-        parser.print_help()
-        print("\n💡 Tip: Use pytest for better logging:")
-        print("   pytest tests/stress/stress_test.py --query=1 -v -s --log-cli-level=DEBUG")
-        sys.exit(1)
-    
-    query_ids = [int(q.strip()) for q in args.query.split(",")]
+        print("Defaulting to Query 1")
+        query_items = [1]
+    else:
+        # Check if it looks like numeric ID(s)
+        if args.query.replace(",", "").replace(" ", "").isdigit():
+            query_items = [int(q.strip()) for q in args.query.split(",")]
+        else:
+            # It's a custom query string
+            query_items = [args.query]
     
     runner = StressTestRunner(output_dir=args.output)
     
     try:
-        for qid in query_ids:
-            query = get_query(qid)
-            if query is None:
-                print(f"Error: Query {qid} not found")
-                sys.exit(1)
+        for query_item in query_items:
+            # Handle both numeric IDs and custom query strings
+            if isinstance(query_item, int):
+                query = get_query(query_item)
+                if query is None:
+                    print(f"Error: Query {query_item} not found")
+                    sys.exit(1)
+            else:
+                # Custom query string - create ad-hoc StressQuery
+                query = StressQuery(
+                    id=0,
+                    name="Custom Query",
+                    prompt=query_item,
+                    expected_tool_iterations=100,
+                    expected_llm_calls=10,
+                )
+                print(f"Running custom query: {query_item[:50]}...")
             
             if args.stream:
                 await runner.run_query_streaming(query)

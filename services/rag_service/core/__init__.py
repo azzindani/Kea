@@ -1,43 +1,52 @@
-# RAG Service Core Package
 """
-Core components for the RAG service.
-
-- vector_store: Vector storage abstraction (Qdrant/In-Memory)
-- fact_store: Atomic fact storage and search
-- artifact_store: Research artifact storage (Local/S3)
-- graph_rag: Knowledge graph for provenance
+RAG Service Core Package.
+Auto-discovered with actual export detection.
 """
 
-from services.rag_service.core.vector_store import (
-    VectorStore,
-    QdrantVectorStore,
-    InMemoryVectorStore,
-    Document,
-    SearchResult,
-    create_vector_store,
-)
-from services.rag_service.core.fact_store import FactStore
-from services.rag_service.core.artifact_store import (
-    ArtifactStore,
-    LocalArtifactStore,
-    S3ArtifactStore,
-    Artifact,
-    create_artifact_store,
-)
-from services.rag_service.core.graph_rag import GraphRAG
+from pathlib import Path
+from typing import Any
+import importlib
+from shared.logging import get_logger
 
-__all__ = [
-    "VectorStore",
-    "QdrantVectorStore",
-    "InMemoryVectorStore",
-    "Document",
-    "SearchResult",
-    "create_vector_store",
-    "FactStore",
-    "ArtifactStore",
-    "LocalArtifactStore",
-    "S3ArtifactStore",
-    "Artifact",
-    "create_artifact_store",
-    "GraphRAG",
-]
+logger = get_logger(__name__)
+
+_DIR = Path(__file__).parent
+_discovered: dict = {}
+
+
+def _discover() -> dict:
+    global _discovered
+    if _discovered:
+        return _discovered
+    
+    exports = {}
+    for item in _DIR.iterdir():
+        if item.is_file() and item.suffix == ".py" and item.name != "__init__.py":
+            module_path = f"services.rag_service.core.{item.stem}"
+            try:
+                module = importlib.import_module(module_path)
+                for name in dir(module):
+                    if not name.startswith("_"):
+                        obj = getattr(module, name, None)
+                        if isinstance(obj, type) or callable(obj):
+                            exports[name] = module_path
+            except ImportError:
+                continue
+    
+    _discovered = exports
+    return exports
+
+
+def __getattr__(name: str) -> Any:
+    exports = _discover()
+    if name in exports:
+        module = importlib.import_module(exports[name])
+        return getattr(module, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__():
+    return list(_discover().keys())
+
+
+__all__ = list(_discover())

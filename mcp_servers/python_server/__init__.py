@@ -1,13 +1,45 @@
 # Python MCP Server Package
-"""
-Sandboxed Python execution MCP server.
+"""Sandboxed Python execution. Auto-discovered with actual export detection."""
 
-Tools:
-- execute_code: Run Python code in sandbox
-- dataframe_ops: Pandas DataFrame operations
-- sql_query: DuckDB SQL queries
-"""
+from pathlib import Path
+from typing import Any
+import importlib
 
-from mcp_servers.python_server.server import PythonServer
+_DIR = Path(__file__).parent
+_discovered: dict = {}
 
-__all__ = ["PythonServer"]
+
+def _discover() -> dict:
+    global _discovered
+    if _discovered:
+        return _discovered
+    exports = {}
+    for item in _DIR.iterdir():
+        if item.is_file() and item.suffix == ".py" and item.name != "__init__.py":
+            module_path = f"mcp_servers.python_server.{item.stem}"
+            try:
+                module = importlib.import_module(module_path)
+                for name in dir(module):
+                    if not name.startswith("_"):
+                        obj = getattr(module, name, None)
+                        if isinstance(obj, type) or callable(obj):
+                            exports[name] = module_path
+            except ImportError:
+                continue
+    _discovered = exports
+    return exports
+
+
+def __getattr__(name: str) -> Any:
+    exports = _discover()
+    if name in exports:
+        module = importlib.import_module(exports[name])
+        return getattr(module, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__():
+    return list(_discover().keys())
+
+
+__all__ = list(_discover())

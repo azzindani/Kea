@@ -61,10 +61,22 @@ class MCPSettings(BaseModel):
     retry_on_timeout: bool = True
     retry_on_connection_error: bool = True
     
-    # Rate limiting
-    rate_limit_per_second: float = 10.0
     max_concurrent_tools: int = 5
     tool_timeout_seconds: float = 60.0
+    
+    # JIT Configuration
+    jit: JITSettings = Field(default_factory=lambda: JITSettings())
+
+
+class JITSettings(BaseModel):
+    """Just-In-Time Server Spawning Configuration."""
+    enabled: bool = True
+    uv_enabled: bool = True
+    uv_path: str | None = None
+    idle_timeout: float = 300.0  # 5 minutes
+    max_servers: int = 20
+    allowed_dirs: list[str] = Field(default_factory=list)  # Security whitelist (optional)
+
 
 
 class ResearchSettings(BaseModel):
@@ -73,6 +85,65 @@ class ResearchSettings(BaseModel):
     max_sources: int = 10
     timeout_seconds: int = 300
     parallel_tools: int = 5
+
+
+class EmbeddingSettings(BaseModel):
+    """Embedding configuration."""
+    use_local: bool = True  # Use local GPU if available, else API
+    model_name: str = "Qwen/Qwen3-Embedding-0.6B"
+    api_model: str = "qwen/qwen3-embedding-8b"  # OpenRouter model
+    dimension: int = 1024
+    batch_size: int = 32
+
+
+class RerankerSettings(BaseModel):
+    """Reranker configuration."""
+    model_name: str = "Qwen/Qwen3-Reranker-0.6B"
+    per_task_top_k: int = 32768  # Top-k after each tool
+    final_batch_top_k: int = 32768  # Top-k before generation
+    max_length: int = 32768
+
+
+class ConfidenceSettings(BaseModel):
+    """Adaptive confidence loop configuration."""
+    initial_threshold: float = 0.95
+    degradation_rate: float = 0.05
+    min_threshold: float = 0.60
+    max_loops: int = 32768
+
+
+class LoopSafetySettings(BaseModel):
+    """Loop safety controls."""
+    max_global_iterations: int = 32768
+    max_facts_threshold: int = 32768
+
+
+class TimeoutSettings(BaseModel):
+    """Standardized timeouts for the entire system."""
+    default: float = 30.0
+    audit_log: float = 2.0
+    llm_completion: float = 60.0
+    llm_streaming: float = 120.0
+    tool_execution: float = 300.0
+    short: float = 5.0
+    long: float = 600.0
+
+
+class ModelDefaults(BaseModel):
+    """Centralized model defaults."""
+    default_model: str = "nvidia/nemotron-3-nano-30b-a3b:free"
+    app_name: str = "research-engine"
+    planner_model: str = "nvidia/nemotron-3-nano-30b-a3b:free"
+    critic_model: str = "nvidia/nemotron-3-nano-30b-a3b:free"
+    generator_model: str = "nvidia/nemotron-3-nano-30b-a3b:free"
+
+
+class GovernanceSettings(BaseModel):
+    """Resource governance settings."""
+    max_concurrent_cost: int = 100
+    max_ram_percent: float = 85.0
+    max_cpu_percent: float = 90.0
+    poll_interval: float = 1.0
 
 
 class Settings(BaseSettings):
@@ -91,10 +162,6 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "postgresql://localhost/research_engine"
     redis_url: str = "redis://localhost:6379"
-    
-    # Vector DB
-    qdrant_url: str = "http://localhost:6333"
-    qdrant_api_key: str = ""
     
     # Storage
     s3_bucket: str = "research-artifacts"
@@ -120,6 +187,15 @@ class Settings(BaseSettings):
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
     mcp: MCPSettings = Field(default_factory=MCPSettings)
     research: ResearchSettings = Field(default_factory=ResearchSettings)
+    embedding: EmbeddingSettings = Field(default_factory=EmbeddingSettings)
+    reranker: RerankerSettings = Field(default_factory=RerankerSettings)
+    confidence: ConfidenceSettings = Field(default_factory=ConfidenceSettings)
+    loop_safety: LoopSafetySettings = Field(default_factory=LoopSafetySettings)
+    
+    # New Configs (Deep Audit Fixes)
+    timeouts: TimeoutSettings = Field(default_factory=TimeoutSettings)
+    models: ModelDefaults = Field(default_factory=ModelDefaults)
+    governance: GovernanceSettings = Field(default_factory=GovernanceSettings)
     
     class Config:
         env_file = ".env"

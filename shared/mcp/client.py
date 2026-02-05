@@ -34,13 +34,14 @@ class MCPClient:
         result = await client.call_tool("fetch_url", {"url": "https://example.com"})
     """
     
-    def __init__(self) -> None:
+    def __init__(self, timeout: float = 60.0) -> None:
         self._transport: Transport | None = None
         self._pending: dict[str | int, asyncio.Future[JSONRPCResponse]] = {}
         self._tools: list[Tool] = []
         self._initialized = False
         self._receive_task: asyncio.Task | None = None
-    
+        self.timeout = timeout
+
     async def connect(self, transport: Transport) -> None:
         """
         Connect to an MCP server via the given transport.
@@ -79,7 +80,8 @@ class MCPClient:
             
             if response.id in self._pending:
                 future = self._pending.pop(response.id)
-                future.set_result(response)
+                if not future.done():
+                    future.set_result(response)
     
     async def _send_request(self, method: str, params: dict[str, Any] | None = None) -> JSONRPCResponse:
         """Send a request and wait for response."""
@@ -98,7 +100,8 @@ class MCPClient:
         
         # Wait for response with timeout
         try:
-            return await asyncio.wait_for(future, timeout=30.0)
+            # Increased timeout for JIT installations
+            return await asyncio.wait_for(future, timeout=self.timeout)
         except asyncio.TimeoutError:
             self._pending.pop(request_id, None)
             raise TimeoutError(f"Request timed out: {method}")

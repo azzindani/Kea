@@ -1,104 +1,78 @@
-# RAG Service ("The Memory")
+# 🗄️ RAG Service ("The Memory")
 
-The **RAG Service** is the persistent memory system of Kea. It implements a "Triple Vault" architecture to store varying granularities of information:
-1.  **Atomic Facts**: Precision-recall for verification.
-2.  **Semantic Vectors**: Fuzzy search for exploration.
-3.  **Raw Artifacts**: Heavy file storage for source documents.
+The **RAG (Retrieval-Augmented Generation) Service** provides the reference intelligence and global knowledge orchestration layer for the Kea v4.0 system. It functions as the **Corporate Library & Controller**, managing access to massive, external, or multiple distinct RAG servers via API. It handles the ingestion of global datasets and feeds synthesized reference context into the research process.
 
----
+## ✨ Features
 
-## 🏗️ Architecture Overview
+- **Atomic Fact Model**: Stores information in a granular, structured format (Entity-Attribute-Value) to enable high-precision retrieval and contradiction resolution.
+- **Hybrid Search Engine**: Combines vector-based semantic search with discrete metadata filtering (e.g., entity, dataset, confidence score).
+- **GraphRAG Engine**: (Experimental) In-memory knowledge graph for tracking relationships between entities, facts, and sources, enabling provenance tracking and contradiction detection.
+- **Plug-and-Play Vector Stores**: Supports multiple backends including Qdrant, PostgreSQL (pgvector), and high-performance in-memory options.
+- **Hugging Face Integration**: Native `DatasetLoader` for streaming and ingesting massive-scale external datasets directly into the research memory.
+- **Provenance Tracking**: Maintains strict association between every fact and its source URL, title, and extraction timestamp.
 
-The system abstracts retrieval complexity behind a unified facade known as the **FactStore**.
+## 📐 Architecture
+
+The RAG Service operates as a **Triple-Store Abstraction Layer**, managing three distinct types of data:
+
+1.  **Vector Store**: High-dimensional embeddings of facts for semantic similarity search.
+2.  **Metadata Store**: Structured properties (Confidence, Entity, Time Period) for deterministic filtering.
+3.  **Knowledge Graph**: Relational connections between entities and sources.
+
+### 🗼 Topology: Information Ingestion 
 
 ```mermaid
 graph TD
-    User[Orchestrator] -->|Search| API[FastAPI Entrypoint]
+    API[FastAPI Router] -->|Orchestrate| External[External RAG Servers]
+    API -->|Ingest| HF[Hugging Face Loader]
+    API -->|Synthesize| Synth[Context Synthesizer]
     
-    API --> FactStore[FactStore Facade]
+    HF -->|Batch| VectorDB[(Global Vector DB)]
+    External -->|Query| API
     
-    FactStore -->|Metadata| Qdrant[Vector DB]
-    FactStore -->|Blobs| Artifacts[ArtifactStore]
-    
-    subgraph Triple Vault
-        Qdrant
-        Artifacts
-        Graph[Provenance Graph]
-    end
-    
-    Qdrant -.->|ID Link| Graph
-    Graph -.->|Source Link| Artifacts
+    Orchestrator[Orchestrator] -->|Context Request| API
+    API -->|Federated Search| External
+    API -->|Semantic Search| VectorDB
+    API -->|Inject| OrchOut[Synthesized Context]
 ```
 
----
+## 📁 Codebase Structure
 
-## 📁 Codebase Structure & Reference
+- **`main.py`**: FastAPI entrypoint hosting the facts and datasets API.
+- **`core/`**: The implementation of the storage and loading logic.
+    - `fact_store.py`: Orchestrates the `AtomicFact` lifecycle across vector and metadata stores.
+    - `artifact_store.py`: Implementation of Local and S3 storage for large research files (Interface to Vault).
+    - `dataset_loader.py`: Integration with Hugging Face `datasets` for streaming ingestion.
+    - `graph_rag.py`: Implements the Knowledge Graph for fact relationships and provenance.
+    - `postgres_artifacts.py`: Database-backed persistence for artifact metadata.
+- **`schemas/`**: Pydantic models for `AtomicFact`, `Dataset`, and API requests.
 
-| File / Directory | Component | Description | Key Classes/Functions |
-|:-----------------|:----------|:------------|:----------------------|
-| **`main.py`** | **Entry Point** | FastAPI service definition and route handlers. | `lifespan()`, `add_fact()` |
-| **`core/`** | **Logic** | Storage abstractions. | |
-| ├── `fact_store.py` | Facade | The high-level API for adding/searching facts. Ties vector + graph together. | `FactStore` |
-| ├── `vector_store.py`| Vector DB | Adapter for Qdrant/Chroma. Handles embedding generation. | `create_vector_store()` |
-| ├── `artifact_store.py`| Object DB | Adapter for S3/LocalFS. Handles large file I/O. | `ArtifactStore` |
-| **`api/`** | **Routes** | (Legacy) Split route modules. | - |
-| **`schemas/`** | **Models** | Pydantic data models for API contracts. | `AtomicFact`, `FactResponse` |
+## 🧠 Deep Dive
 
----
+### 1. The Atomic Fact Pattern
+Every finding in Kea is normalized into an `AtomicFact`:
+- **Entity**: "Nickel Production"
+- **Attribute**: "Global Volume 2023"
+- **Value**: "3.6 Million Metric Tons"
+- **Context**: Unit, Period, Source URL, Confidence Score.
 
-## 🔬 Deep Dive: The Triple Vault
+This normalization allows the Orchestrator's **Consensus Engine** to compare findings from different sources at a granular level, detecting contradictions even when the surrounding text differs.
 
-### 1. Atomic Fact Vault (Qdrant)
-Instead of chunking text blindly, Kea stores **Atomic Facts**.
-*   **Structure**: Entity-Attribute-Value (EAV).
-*   **Example**: `{"entity": "Nvidia", "attribute": "Revenue 2024", "value": "$60B"}`.
-*   **Benefit**: Eliminates "lost in the middle" hallucination issues common in long-context retrieval.
+### 2. High-Throughput Ingestion
+The `DatasetLoader` is designed for scale. When a Hugging Face dataset is ingested (e.g., via `/datasets/ingest`), the service spawns a background task that streams rows, maps them to the atomic schema using a dynamic field map, and batch-inserts them into the vector store. This enables Kea to "read" thousands of rows of structured data in seconds.
 
-### 2. Artifact Vault (Blob Store)
-Stores the "Ground Truth" documents.
-*   **Content**: PDFs, HTML snapshots, CSVs.
-*   **Linkage**: Every Atomic Fact has a `source_id` pointing to a file in the Artifact Vault, enabling "Click-to-Verify" citations.
+### 3. GraphRAG & Provenance
+The `GraphRAG` module constructs a live knowledge graph linking Entities -> Facts -> Sources. This allows Kea to answer questions like "What contradicting facts exist for Entity X?" or "Show the provenance chain for this data point," providing explainable AI features critical for enterprise trust.
 
-### 3. Provenance Graph (NetworkX)
-(In-Memory / Experimental) Tracks the derivation chain.
-*   **Usage**: "How do we know Nvidia revenue is $60B?" -> "Derived from Artifact #123 (Quarterly Report), page 5."
+## 📚 Reference
 
----
-
-## 🔌 API Endpoint Structure
-
-### 1. Fact Management
-Core CRUD for the atomic knowledge base.
+### API Interface
 
 | Endpoint | Method | Description |
 |:---------|:-------|:------------|
-| `/facts` | `POST` | Insert a new atomic fact. |
-| `/facts/search` | `POST` | Semantic search (Vector + Keyword) for facts. |
-| `/facts/{id}` | `GET` | Retrieve a specific fact by UUID. |
-| `/facts/{id}` | `DELETE` | Remove a fact (e.g., if proven false). |
-
-### 2. Entity Exploration
- Browsing the knowledge graph.
-
-| Endpoint | Method | Description |
-|:---------|:-------|:------------|
-| `/entities` | `GET` | List all unique entities (e.g., "Tesla", "Musk"). |
-| `/entities/{id}` | `GET` | Get all facts associated with an entity. |
-
-### 3. System
-Service health and monitoring.
-
-| Endpoint | Method | Description |
-|:---------|:-------|:------------|
-| `/health` | `GET` | Check connection to Vector DB and Artifact Store. |
-
----
-
-## 🚀 Usage
-
-To start the RAG service independently:
-
-```bash
-# Run on port 8001
-uvicorn services.rag_service.main:app --port 8001
-```
+| `/facts` | `POST` | Manually add a verified atomic fact. |
+| `/facts/search` | `POST` | Perform semantic and filtered search across facts. |
+| `/datasets/ingest` | `POST` | Trigger background ingestion from Hugging Face. |
+| `/entities` | `GET` | List all unique entities currently known to the system. |
+| `/artifacts` | `GET` | List available research artifacts by job ID. |
+| `/health` | `GET` | Service status and initialization checks. |

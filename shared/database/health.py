@@ -65,8 +65,6 @@ class HealthChecker:
         """Run all health checks."""
         checks = await asyncio.gather(
             self.check_database(),
-            self.check_redis(),
-            self.check_qdrant(),
             self.check_memory(),
             return_exceptions=True,
         )
@@ -116,91 +114,6 @@ class HealthChecker:
         except Exception as e:
             return HealthStatus(
                 service="database",
-                status="unhealthy",
-                latency_ms=(time.time() - start) * 1000,
-                details={"error": str(e)},
-            )
-    
-    async def check_redis(self) -> HealthStatus:
-        """Check Redis connectivity."""
-        start = time.time()
-        
-        try:
-            import os
-            redis_url = os.getenv("REDIS_URL")
-            
-            if not redis_url:
-                return HealthStatus(
-                    service="redis",
-                    status="degraded",
-                    details={"message": "Redis not configured"},
-                )
-            
-            import redis.asyncio as redis_lib
-            
-            client = redis_lib.from_url(redis_url)
-            await client.ping()
-            info = await client.info("memory")
-            await client.close()
-            
-            latency = (time.time() - start) * 1000
-            
-            return HealthStatus(
-                service="redis",
-                status="healthy",
-                latency_ms=latency,
-                details={
-                    "used_memory_human": info.get("used_memory_human"),
-                    "connected_clients": info.get("connected_clients"),
-                },
-            )
-            
-        except ImportError:
-            return HealthStatus(
-                service="redis",
-                status="degraded",
-                details={"message": "redis package not installed"},
-            )
-        except Exception as e:
-            return HealthStatus(
-                service="redis",
-                status="unhealthy",
-                latency_ms=(time.time() - start) * 1000,
-                details={"error": str(e)},
-            )
-    
-    async def check_qdrant(self) -> HealthStatus:
-        """Check Qdrant vector DB connectivity."""
-        start = time.time()
-        
-        try:
-            import os
-            import httpx
-            
-            qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
-            
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.get(f"{qdrant_url}/healthz")
-                
-                latency = (time.time() - start) * 1000
-                
-                if response.status_code == 200:
-                    return HealthStatus(
-                        service="qdrant",
-                        status="healthy",
-                        latency_ms=latency,
-                    )
-                else:
-                    return HealthStatus(
-                        service="qdrant",
-                        status="unhealthy",
-                        latency_ms=latency,
-                        details={"status_code": response.status_code},
-                    )
-            
-        except Exception as e:
-            return HealthStatus(
-                service="qdrant",
                 status="unhealthy",
                 latency_ms=(time.time() - start) * 1000,
                 details={"error": str(e)},

@@ -33,6 +33,14 @@ Your role:
 - Present findings in a clear, structured manner
 - Be thorough but not verbose
 
+CRITICAL ANTI-HALLUCINATION RULES:
+1. ONLY use information from the provided "Available Facts"
+2. NEVER invent, fabricate, or guess any data (numbers, dates, names, statistics)
+3. If asked about something not in the facts, say "This data was not collected"
+4. If a task failed or wasn't executed, acknowledge it - don't make up results
+5. Always cite which facts support your claims
+6. When in doubt, say "Information not available" rather than guessing
+
 Always cite your sources when making claims."""
     
     async def generate(self, query: str, facts: list, sources: list) -> str:
@@ -55,15 +63,16 @@ Always cite your sources when making claims."""
                 return self._fallback_generate(query, facts, sources)
             
             provider = OpenRouterProvider()
+            from shared.config import get_settings
             config = LLMConfig(
-                model="nvidia/nemotron-3-nano-30b-a3b:free",
+                model=get_settings().models.generator_model,
                 temperature=0.6,
-                max_tokens=800,
+                max_tokens=32768,
             )
             
             facts_text = "\n".join([
                 f"- {f.get('text', str(f)) if isinstance(f, dict) else str(f)}"
-                for f in facts[:15]
+                for f in facts  # No limit - use all facts
             ]) if facts else "No facts available"
             
             messages = [

@@ -1,62 +1,52 @@
 """
 MCP Package - Model Context Protocol Implementation.
-
-Provides:
-- protocol: JSON-RPC 2.0 message types
-- transport: stdio and SSE transport implementations
-- server_base: Base class for MCP tool servers
-- client_base: MCP client for connecting to servers
-- tool_router: Semantic routing for 1000+ tools
+Auto-discovered with actual export detection.
 """
 
-from shared.mcp.protocol import (
-    JSONRPCRequest,
-    JSONRPCResponse,
-    JSONRPCError,
-    JSONRPCNotification,
-    MCPMethod,
-    MCPErrorCode,
-    Tool,
-    ToolCallRequest,
-    ToolResult,
-    TextContent,
-    ImageContent,
-    InitializeRequest,
-    InitializeResult,
-    LogLevel,
-    LogMessage,
-)
-from shared.mcp.tool_router import (
-    ToolIndex,
-    ToolRouter,
-    ToolDescriptor,
-    ToolCategory,
-    get_tool_index,
-    get_tool_router,
-)
+from pathlib import Path
+from typing import Any
+import importlib
+import logging
 
-__all__ = [
-    "JSONRPCRequest",
-    "JSONRPCResponse",
-    "JSONRPCError",
-    "JSONRPCNotification",
-    "MCPMethod",
-    "MCPErrorCode",
-    "Tool",
-    "ToolCallRequest",
-    "ToolResult",
-    "TextContent",
-    "ImageContent",
-    "InitializeRequest",
-    "InitializeResult",
-    "LogLevel",
-    "LogMessage",
-    # Tool Router
-    "ToolIndex",
-    "ToolRouter",
-    "ToolDescriptor",
-    "ToolCategory",
-    "get_tool_index",
-    "get_tool_router",
-]
+logger = logging.getLogger(__name__)
 
+_DIR = Path(__file__).parent
+_discovered: dict = {}
+
+
+def _discover() -> dict:
+    global _discovered
+    if _discovered:
+        return _discovered
+    
+    exports = {}
+    for item in _DIR.iterdir():
+        if item.is_file() and item.suffix == ".py" and item.name != "__init__.py":
+            module_path = f"shared.mcp.{item.stem}"
+            try:
+                module = importlib.import_module(module_path)
+                for name in dir(module):
+                    if not name.startswith("_"):
+                        obj = getattr(module, name, None)
+                        if isinstance(obj, type) or callable(obj):
+                            exports[name] = module_path
+            except ImportError:
+                continue
+    
+    _discovered = exports
+    return exports
+
+
+def __getattr__(name: str) -> Any:
+    exports = _discover()
+    if name in exports:
+        module = importlib.import_module(exports[name])
+        return getattr(module, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__():
+    return list(_discover().keys())
+
+
+__all__ = list(_discover())

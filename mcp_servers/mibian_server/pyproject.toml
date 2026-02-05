@@ -1,0 +1,20 @@
+[project]
+name = "mibian_server"
+version = "0.1.0"
+description = "MCP Server for mibian_server"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp",
+    "mibian",
+    "numpy",
+    "pandas",
+    "pydantic",
+    "python-dotenv",
+    "scipy",
+    "structlog",
+    "wrapt",
+]
+
+[tool.uv]
+dev-dependencies = []

@@ -1,0 +1,18 @@
+[project]
+name = "docx_server"
+version = "0.1.0"
+description = "MCP Server for docx_server"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp",
+    "pandas",
+    "pillow",
+    "pydantic",
+    "python-docx",
+    "python-dotenv",
+    "structlog",
+    "wrapt",
+]
+
+[tool.uv]
+dev-dependencies = []

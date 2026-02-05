@@ -1,72 +1,90 @@
-# Shared Libraries ("The Foundation")
+# 📚 Shared Libraries ("The Foundation")
 
-This directory contains the **Core Infrastructure** and **Type Definitions** used by all microservices. It ensures consistency across the distributed system (e.g., that the Orchestrator speaks the same API language as the Gateway).
+The `shared/` directory is the **Standard Library** of the Kea v4.0 system. It contains the core primitives, data schemas, and infrastructure abstractions that ensure consistency and interoperability across all microservices. It is the common substrate upon which the entire "Fractal Corp" architecture is built.
 
----
+## ✨ Features
 
-## 🏗️ Architecture Role
+- **Unified Configuration**: Strongly-typed settings using Pydantic `BaseSettings` with JIT spawning controls and hardware-aware defaults.
+- **Rich Domain Schemas**: Canonical models for `ResearchState`, `AtomicFact`, and a sophisticated `ToolOutput` container for n8n-style data chaining.
+- **Messaging System**: Async `MessageBus` (`messaging.py`) for inter-agent communication (Request/Response, Broadcast).
+- **Task Dispatcher**: Persistent "Fire and Forget" task queue (`dispatcher.py`) backed by PostgreSQL for managing massive batches of micro-tasks.
+- **Hardware-Aware Adaptive Execution**: Automated system profiling (CPU, RAM, GPU) to optimize worker counts and batch sizes.
+- **Zero-Trust Structured Logging**: OpenTelemetry-ready JSON logging with trace correlation across service boundaries.
+- **LLM & MCP Abstractions**: Standardized interfaces for multi-provider LLM access and Model Context Protocol clients.
 
-The `shared/` library acts as the "Standard Library" of Kea.
-1.  **Configuration**: Centralized `.env` loading via Pydantic Settings.
-2.  **Schemas**: The canonical source of truth for all API contracts.
-3.  **Observability**: Unified JSON logging and Tracing.
-4.  **Hardware**: Abstractions for interacting with LLM providers.
+## 📐 Architecture
 
----
+The Shared Library acts as the "Glue" and "Substrate" for the distributed system.
 
-## 📁 Codebase Structure & Reference
+```mermaid
+graph TD
+    subgraph Services [Kea Microservices]
+        Gateway[API Gateway]
+        Orch[Orchestrator]
+        Host[MCP Host]
+        Vault[Vault]
+        Manager[Swarm Manager]
+    end
 
-| File / Directory | Component | Description | Key Classes/Functions |
-|:-----------------|:----------|:------------|:----------------------|
-| **`schemas.py`** | **Contracts** | **Critical**. Defines the Pydantic models exchanged between services. | `AtomicFact`, `ResearchState`, `JobRequest` |
-| **`config.py`** | **Settings** | Strongly-typed configuration manager. Reads env vars. | `Settings`, `get_settings()` |
-| **`logging/`** | **Observability**| JSON-structured logger with request ID propagation. | `get_logger()`, `RequestLoggingMiddleware` |
-| **`mcp/`** | **Protocol** | The JSON-RPC 2.0 client implementation. | `MCPOrchestrator`, `ToolRegistry` |
-| **`llm/`** | **AI** | Provider abstractions (OpenAI, Anthropic). | `ChatModel`, `get_provider()` |
-| **`users/`** | **Auth** | User and Tenant management logic. | `UserManager`, `ApiKeyManager` |
+    subgraph Shared [shared/ Library]
+        Config[config.py<br/>Global Settings]
+        Schemas[schemas.py<br/>Domain Models]
+        Bus[messaging.py<br/>Event Bus]
+        Dispatch[dispatcher.py<br/>Task Queue]
+        Hardware[hardware/<br/>Resource Monitoring]
+        Logging[logging/<br/>Observability]
+    end
 
----
-
-## 🔬 Deep Dive: The Lingua Franca
-
-### 1. Research State (`schemas.ResearchState`)
-This is the object passed around the Orchestrator's graph.
-*   **Attributes**: `query`, `facts` (List), `hypotheses` (List), `report` (Markdown).
-*   **Usage**: It allows the Planner to write a plan that the Researcher can read, and the Researcher to write facts that the Generator can read.
-
-### 2. Atomic Fact (`schemas.AtomicFact`)
-The unit of knowledge in Kea.
-```python
-class AtomicFact(BaseModel):
-    fact_id: str
-    entity: str        # "Nvidia"
-    attribute: str     # "Revenue 2024"
-    value: str         # "$60 Billion"
-    confidence: float  # 0.95
+    Gateway -.-> Shared
+    Orch -.-> Shared
+    Host -.-> Shared
+    Vault -.-> Shared
+    Manager -.-> Shared
 ```
 
-### 3. Job Polymorphism (`schemas.JobType`)
-Defines the valid modes of operation:
-*   `DEEP_RESEARCH`: Standard crawl.
-*   `SHADOW_LAB`: Recalculation (Sandbox).
-*   `GRAND_SYNTHESIS`: Meta-study.
+## 📁 Codebase Structure
 
----
+- **`config.py`**: Centralized configuration management using environment variables and YAML.
+- **`schemas.py`**: The "Book of Truth" for all inter-service data contracts.
+- **`messaging.py`**: Implementation of the Agent Message Bus.
+- **`dispatcher.py`**: Persistent task tracking and batch management.
+- **`service_registry.py`**: Maps service names to URLs and ports.
+- **`hardware/`**: Hardware detection, resource pressure monitoring, and optimal execution strategy calculation.
+- **`logging/`**: Structured JSON logging, OpenTelemetry tracing, and performance metrics.
+- **`mcp/`**: Shared implementation of the Model Context Protocol (Client, Server, Transport, Router).
+- **`llm/`**: Abstraction layer for LLM providers with built-in retry logic and token tracking.
+- **`database/`**: Shared connection pool management and database lifecycle utilities.
+- **`context_pool.py`**: Management of shared memory segments for agent swarms.
 
-## 🔌 Core Type Reference
+## 🧠 Deep Dive
 
-These are the primary data structures developer interact with.
+### 1. The Message Bus (`messaging.py`)
+To enable the "Fractal Corp" interaction, agents need to talk. The `MessageBus` allows an agent to `request` information from another, `broadcast` an update to its department, or send an `urgent` alert to the Swarm Manager. It supports correlation IDs to track "conversations" across multiple asynchronous turns.
 
-### Research Primitives
-| Class | Description | Fields |
-|:------|:------------|:-------|
-| `ResearchStatus` | Enum for job lifecycle. | `PENDING`, `RUNNING`, `COMPLETED` |
-| `Source` | Provenance metadata. | `url`, `reliability_score`, `accessed_at` |
-| `ToolInvocation` | Audit log for agent actions. | `tool_name`, `arguments`, `result` |
+### 2. The Task Dispatcher (`dispatcher.py`)
+For massive research jobs (e.g., "Analyze 500 stocks"), the Orchestrator doesn't wait. It pushes a batch of 500 `micro_tasks` to the `dispatcher`. The dispatcher persists these to PostgreSQL (`execution_batches` table) and returns a `batch_id`. Worker nodes then pick up these tasks, execute them, and write results back to the DB asynchronously.
 
-### API Contracts
-| Class | Description | Fields |
-|:------|:------------|:-------|
-| `JobRequest` | Input for `POST /jobs`. | `query`, `depth`, `max_sources` |
-| `JobResponse` | Output for `GET /jobs/{id}`. | `job_id`, `progress`, `report` |
-| `FactResponse` | Output for `GET /facts`. | `entity`, `attribute`, `value`, `source_url` |
+### 3. Hardware-Aware Scaling (`hardware/detector.py`)
+Kea is designed to run anywhere. The `HardwareProfile` detected at startup determines the `optimal_workers()` formula. For example, if it detects only 4GB of RAM (common in standard Colab), it limits concurrent agent swarms to prevent OOM (Out-of-Memory) crashes, while on a 128-core VPS, it scales up to 8+ parallel workers automatically.
+
+## 📚 Reference
+
+### Core Primitive Reference
+
+| Class | Description | Key Fields |
+|:------|:------------|:-----------|
+| `ResearchState` | The LangGraph state object. | `job_id`, `facts`, `sub_queries`, `report` |
+| `AtomicFact` | High-fidelity data point. | `entity`, `attribute`, `value`, `confidence` |
+| `Message` | Inter-agent communication. | `from_agent`, `to_agent`, `content`, `type` |
+| `ToolOutput` | Rich n8n-style result. | `text`, `data`, `files`, `next_input` |
+
+### Service Port Registry
+
+| Service | Default Port | Environment Variable Override |
+|:--------|:-------------|:------------------------------|
+| Gateway | 8000 | `SERVICE_URL_GATEWAY` |
+| Orchestrator | 8001 | `SERVICE_URL_ORCHESTRATOR` |
+| MCP Host | 8002 | `SERVICE_URL_MCP_HOST` |
+| RAG Service | 8003 | `SERVICE_URL_RAG_SERVICE` |
+| Vault | 8004 | `SERVICE_URL_VAULT` |
+| Swarm Manager| 8005 | `SERVICE_URL_SWARM_MANAGER` |

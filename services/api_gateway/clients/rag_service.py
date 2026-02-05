@@ -11,6 +11,7 @@ import httpx
 
 from shared.logging import get_logger
 from shared.config import get_settings
+from shared.service_registry import ServiceRegistry, ServiceName
 
 logger = get_logger(__name__)
 
@@ -31,7 +32,7 @@ class RAGServiceClient:
     """
     
     def __init__(self, base_url: str | None = None) -> None:
-        self.base_url = base_url or "http://localhost:8001"
+        self.base_url = base_url or ServiceRegistry.get_url(ServiceName.RAG_SERVICE)
         self.timeout = httpx.Timeout(60.0, connect=10.0)
     
     async def health_check(self) -> dict[str, Any]:
@@ -44,7 +45,7 @@ class RAGServiceClient:
     async def search(
         self,
         query: str,
-        limit: int = 10,
+        limit: int = 100000,
         min_score: float = 0.5,
     ) -> list[dict[str, Any]]:
         """

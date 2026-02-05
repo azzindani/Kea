@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from shared.schemas import ResearchState, ResearchStatus, QueryPath
 from shared.logging import get_logger
+from services.vault.core.audit_trail import audited, AuditEventType
 
 # Import real implementations
 from services.orchestrator.nodes.planner import planner_node as real_planner_node
@@ -26,8 +27,15 @@ from services.orchestrator.agents.judge import JudgeAgent
 from services.orchestrator.core.router import IntentionRouter
 
 # NEW: Context pool and code generator for dynamic data flow
-from services.orchestrator.core.context_pool import get_context_pool, reset_context_pool
+from shared.context_pool import get_context_pool, reset_context_pool
 from services.orchestrator.agents.code_generator import generate_fallback_code, generate_python_code
+
+# Data pool for bucket pattern (massive data collection)
+from shared.data_pool import get_data_pool
+
+# Node Assembly Engine for n8n-style node wiring
+from services.orchestrator.core.assembler import ArtifactStore, NodeAssembler, create_assembler
+
 
 
 logger = get_logger(__name__)
@@ -86,6 +94,10 @@ class GraphState(TypedDict, total=False):
     max_iterations: int
     should_continue: bool
     error: str | None
+    
+    # Revision loop control (for Judge -> Generator retry)
+    revision_count: int
+    max_revisions: int
 
 
 # ============================================================================
@@ -93,18 +105,47 @@ class GraphState(TypedDict, total=False):
 # ============================================================================
 
 async def router_node(state: GraphState) -> GraphState:
-    """Route query to appropriate execution path."""
+    """Route query to appropriate execution path with Memory & Intent."""
     query = state.get("query", "")
+    job_id = state.get("job_id", "unknown_session")
     
     logger.info("\n" + "="*70)
-    logger.info("📍 STEP 1: ROUTER NODE")
+    logger.info("📍 STEP 1: ROUTER NODE (Memory Aware)")
     logger.info("="*70)
     logger.info(f"Query: {query[:200]}...")
     
+    # =========================================================================
+    # Phase 2: Memory & Intent Integration
+    # =========================================================================
+    from services.orchestrator.core.conversation import get_conversation_manager, Intent
+    
+    mem_mgr = get_conversation_manager()
+    
+    # We use job_id as session_id for now for simplicity
+    # In a real app, session_id would be distinct from job_id
+    resp = await mem_mgr.process(session_id=job_id, message=query)
+    
+    logger.info(f"🧠 Intent Detected: {resp.intent.value.upper()}")
+    
+    context_str = ""
+    if resp.intent == Intent.FOLLOW_UP:
+        context_str = resp.context
+        logger.info(f"📚 Retrieved Context ({len(context_str)} chars)")
+        # Inject context into query for the Planner to see
+        # We append it so the Planner knows what "it" refers to
+        state["query"] = f"{query}\n\n[CONTEXT FROM MEMORY]:\n{context_str}"
+        
+    elif resp.intent == Intent.NEW_TOPIC:
+        logger.info("✨ New Topic Detected - Clearing localized context")
+        # No context injection
+        
+    # =========================================================================
+
     router = IntentionRouter()
     context = {
         "prior_research": state.get("prior_research"),
         "data_to_verify": state.get("data_to_verify"),
+        "memory_context": context_str
     }
     
     path = await router.route(query, context)
@@ -113,8 +154,6 @@ async def router_node(state: GraphState) -> GraphState:
     logger.info(f"   A = Memory Fork | B = Shadow Lab | C = Grand Synthesis | D = Deep Research")
     logger.info("="*70 + "\n")
     
-    logger.info(f"Router: Selected path {path}")
-    
     return {
         **state,
         "path": path,
@@ -122,6 +161,7 @@ async def router_node(state: GraphState) -> GraphState:
     }
 
 
+@audited(AuditEventType.QUERY_CLASSIFIED, "Planner Node decomposed query")
 async def planner_node(state: GraphState) -> GraphState:
     """Decompose query into sub-queries, hypotheses, and execution plan using real LLM."""
     logger.info("\n" + "="*70)
@@ -161,12 +201,13 @@ async def planner_node(state: GraphState) -> GraphState:
     
     return {**state, **updated_state}
 
+@audited(AuditEventType.TOOL_CALLED, "Researcher Node executed iteration")
 async def researcher_node(state: GraphState) -> GraphState:
-    """Execute research using execution plan with dynamic tool routing."""
+    """Execute research using execution plan with dynamic tool routing and PARALLEL execution."""
     iteration = state.get("iteration", 1)
     
     logger.info("\n" + "="*70)
-    logger.info(f"📍 STEP 3: RESEARCHER NODE (Iteration {iteration}) - Dynamic Tool Routing")
+    logger.info(f"📍 STEP 3: RESEARCHER NODE (Iteration {iteration}) - Parallel Tool Execution")
     logger.info("="*70)
     
     execution_plan = state.get("execution_plan", {})
@@ -181,6 +222,10 @@ async def researcher_node(state: GraphState) -> GraphState:
     if iteration == 1:
         reset_context_pool()
     
+    # Initialize Node Assembly Engine for artifact-based data flow
+    ctx = get_context_pool()
+    assembler = create_assembler(ctx)
+    
     # If no execution plan, fall back to sub-queries with web_search
     if not micro_tasks:
         logger.info("No execution plan, falling back to sub-query based web search")
@@ -190,299 +235,622 @@ async def researcher_node(state: GraphState) -> GraphState:
             for i, sq in enumerate(sub_queries or [query])
         ]
     
-    logger.info(f"Executing {len(micro_tasks)} micro-tasks from execution plan")
-    
-    # Tool registry for dynamic routing - Wire ALL existing MCP tools
-    from services.orchestrator.mcp.client import get_mcp_orchestrator
-    
-    # Search tools
-    from mcp_servers.search_server.tools.web_search import web_search_tool
-    
-    # Scraper tools
-    from mcp_servers.scraper_server.tools.fetch_url import fetch_url_tool
-    
-    # Python execution tools
-    from mcp_servers.python_server.tools.execute_code import execute_code_tool
-    from mcp_servers.python_server.tools.dataframe_ops import dataframe_ops_tool
-    from mcp_servers.python_server.tools.sql_query import sql_query_tool
-    
-    # Crawler tools
-    from mcp_servers.crawler_server.server import web_crawler_tool, sitemap_parser_tool, link_extractor_tool
-    
-    # Browser agent tools
-    from mcp_servers.browser_agent_server.server import human_like_search_tool, source_validator_tool
-    
-    # Direct tool implementations - ALL available tools wired here
-    direct_tools = {
-        # ===========================================
-        # SEARCH TOOLS (parallel capable)
-        # ===========================================
-        "web_search": web_search_tool,
-        "news_search": web_search_tool,
-        "human_search": human_like_search_tool,  # Human-like with delays
-        
-        # ===========================================
-        # SCRAPING TOOLS (recursive capable)
-        # ===========================================
-        "scrape_url": fetch_url_tool,
-        "fetch_url": fetch_url_tool,
-        "fetch_data": lambda args: web_search_tool({"query": args.get("query", ""), "max_results": 10}),
-        
-        # ===========================================
-        # CRAWLER TOOLS (depth unlimited)
-        # ===========================================
-        "web_crawler": web_crawler_tool,      # Recursive crawl - depth/pages configurable
-        "sitemap_parser": sitemap_parser_tool,  # Parse sitemap for URLs
-        "link_extractor": link_extractor_tool,  # Extract all links from page
-        
-        # ===========================================
-        # BROWSER TOOLS (parallel browse)
-        # ===========================================
-        "multi_browse": lambda args: BrowserAgentServer()._handle_multi_browse(args),  # Browse 10+ URLs parallel
-        "source_validator": source_validator_tool,  # Check credibility
-        
-        # ===========================================
-        # DATA TOOLS (DataFrame/SQL)
-        # ===========================================
-        "dataframe_ops": dataframe_ops_tool,  # Load, filter, aggregate DataFrames
-        "sql_query": sql_query_tool,          # DuckDB SQL queries
-        "run_python": execute_code_tool,
-        "execute_code": execute_code_tool,
-        "analyze_data": dataframe_ops_tool,   # Alias for clarity
-        "parse_document": execute_code_tool,  # Document parsing via Python
-    }
-    
-    # Import for multi_browse
-    from mcp_servers.browser_agent_server.server import BrowserAgentServer
-    
-    def build_tool_inputs(tool_name: str, description: str, original_inputs: dict, collected_facts: list = None) -> dict:
-        """Build proper inputs based on tool requirements."""
-        
-        # Get context pool for data chaining
-        ctx = get_context_pool()
-        
-        # =====================================================
-        # PYTHON TOOLS - Use code generator with collected facts
-        # =====================================================
-        if tool_name in ["run_python", "execute_code", "parse_document"]:
-            if "code" in original_inputs:
-                return original_inputs
-            # Generate code using facts from prior research tasks
-            code = generate_fallback_code(description, collected_facts or [])
-            logger.info(f"   📝 Generated code ({len(code)} chars)")
-            return {"code": code}
-        
-        if tool_name in ["dataframe_ops", "analyze_data"]:
-            if "operation" in original_inputs:
-                return original_inputs
-            # Default to describe operation with web search to find data
-            return None  # Use fallback
-        
-        if tool_name == "sql_query":
-            if "query" in original_inputs:
-                return original_inputs
-            return None  # Use fallback
-        
-        # =====================================================
-        # SCRAPING TOOLS
-        # =====================================================
-        if tool_name in ["scrape_url", "fetch_url"]:
-            if "url" in original_inputs:
-                return original_inputs
-            return None  # Signal to use fallback
-        
-        # =====================================================
-        # CRAWLER TOOLS (support unlimited depth)
-        # =====================================================
-        if tool_name == "web_crawler":
-            if "start_url" in original_inputs:
-                # Allow LLM to specify depth - no hard limit
-                return {
-                    "start_url": original_inputs["start_url"],
-                    "max_depth": original_inputs.get("max_depth", 5),
-                    "max_pages": original_inputs.get("max_pages", 100),
-                    "same_domain": original_inputs.get("same_domain", True),
-                }
-            # Try to use URL from context pool (collected from earlier search results)
-            crawl_url = ctx.get_url()
-            if crawl_url:
-                logger.info(f"   📋 Using URL from pool: {crawl_url[:50]}...")
-                return {
-                    "start_url": crawl_url,
-                    "max_depth": 3,
-                    "max_pages": 50,
-                }
-            return None  # No URL available, use fallback
-        
-        if tool_name in ["sitemap_parser", "link_extractor"]:
-            if "url" in original_inputs:
-                return original_inputs
-            return None  # Need URL
-        
-        # =====================================================
-        # BROWSER TOOLS (parallel capable)
-        # =====================================================
-        if tool_name in ["human_search"]:
-            if "query" in original_inputs:
-                return {
-                    "query": original_inputs["query"],
-                    "max_sites": original_inputs.get("max_sites", 10),  # 10 parallel
-                }
-            return {"query": description, "max_sites": 10}
-        
-        if tool_name == "multi_browse":
-            if "urls" in original_inputs:
-                return {
-                    "urls": original_inputs["urls"],
-                    "max_concurrent": original_inputs.get("max_concurrent", 10),  # 10 parallel
-                    "extract": original_inputs.get("extract", "text"),
-                }
-            return None  # Need URLs
-        
-        if tool_name == "source_validator":
-            if "url" in original_inputs:
-                return original_inputs
-            return None
-        
-        # =====================================================
-        # SEARCH TOOLS (default)
-        # =====================================================
-        if tool_name in ["web_search", "news_search", "fetch_data"]:
-            if "query" in original_inputs:
-                return original_inputs
-            return {"query": description, "max_results": 20}  # Increased from 10
-        
-        # Default: pass as-is
-        return original_inputs
-    
-    client = get_mcp_orchestrator()
-    use_direct = len(client.tool_names) == 0  # No MCP tools registered
-    
-    # Execute each micro-task (increased limit for comprehensive research)
-    for i, task in enumerate(micro_tasks[:100], 1):  # Allow up to 100 tasks
-        task_id = task.get("task_id", f"task_{i}")
-        tool_name = task.get("tool", "web_search")
-        description = task.get("description", "")
-        fallbacks = task.get("fallback_tools", []) or ["web_search"]  # Default fallback
-        persist = task.get("persist", True)
-        original_inputs = task.get("inputs", {})
-        
-        logger.info(f"\n🔧 Micro-Task {task_id}: {tool_name}")
-        logger.info(f"   Description: {description[:80]}...")
-        logger.info(f"   Persist: {persist} | Fallbacks: {fallbacks}")
-        
-        result = None
-        used_tool = tool_name
-        error = None
-        success = False
-        
-        # Build proper inputs for this tool (pass collected facts for code generation)
-        tool_inputs = build_tool_inputs(tool_name, description, original_inputs, facts)
-        
-        # If inputs are None, tool can't run (e.g., scrape_url without URL)
-        if tool_inputs is None:
-            logger.info(f"   ⚠️ Cannot build inputs for {tool_name}, using fallback")
-            tool_name = fallbacks[0] if fallbacks else "web_search"
-            tool_inputs = {"query": description, "max_results": 10}
-            used_tool = tool_name
-        
+    # =========================================================================
+    # Phase 3: Fractal Spawning (High Complexity)
+    # =========================================================================
+    # =========================================================================
+    # Phase 3: Phased Fractal Spawning (Sequential Phases, Parallel within Phase)
+    # =========================================================================
+    if len(micro_tasks) >= 1:
         try:
-            # Try primary tool
-            if use_direct and tool_name in direct_tools:
-                logger.info(f"   🔌 Direct call: {tool_name}")
-                result = await direct_tools[tool_name](tool_inputs)
-            elif not use_direct:
-                logger.info(f"   📡 MCP call: {tool_name}")
-                result = await client.call_tool(tool_name, tool_inputs)
-            else:
-                logger.info(f"   ⚠️ Tool {tool_name} not available, trying fallbacks")
-                raise ValueError(f"Tool {tool_name} not available")
+            from services.orchestrator.core.agent_spawner import get_spawner
+            from services.orchestrator.core.agent_spawner import (
+                SubTask, SpawnPlan, TaskType, Domain
+            )
+            from services.orchestrator.core.prompt_factory import (
+                PromptFactory, PromptContext
+            )
+
+            spawner = get_spawner()
+            prompt_factory = PromptFactory()
+
+            # 1. GROUP TASKS BY PHASE
+            # We assume micro_tasks are already sorted by phase/dependency order from Planner
+            # We will chunk them into phases based on dependency logic or simple batching
+            phases = []
+            current_phase = []
             
-            # Check for error response - trigger fallback
-            if result and hasattr(result, "isError") and result.isError:
-                error_text = ""
-                for c in result.content:
-                    if hasattr(c, "text"):
-                        error_text = c.text
-                        break
-                logger.info(f"   ⚠️ Tool returned error: {error_text[:100]}")
-                raise ValueError(f"Tool error: {error_text[:100]}")
+            # Simple heuristic: Group by explicit 'phase' field if present, or chunk by dependencies
+            # Since dependencies are hard to parse perfectly, we'll use a safer approach:
+            # If a task depends on a previous task, it breaks the phase.
+            
+            completed_in_plan = set()
+            
+            # Simple sequential chunking for now (Phase N tasks depend on Phase N-1)
+            # We look at the 'id' to guess phase if not explicit
+            # For this fix, we will assume the input list is TOPOLOGICALLY SORTED.
+            # We will look for explicit "PHASE" markers or breakpoints.
+            
+            # Better approach: Group by first digit of task_id if relevant? No.
+            # Let's rely on the Planner's "Phases" output if available, mapped to tasks.
+            # Fallback: Treat all tasks as ONE phase (OLD BEHAVIOR) unless we see explicit distinct phases.
+            
+            # BUT: We know the bug is that "Discovery" (Task 1) and "Collection" (Task 2) ran together.
+            # We need to force a break between them.
+            
+            # Let's implement a "Break on Dependency" logic
+            # If Task B depends on Task A, and Task A is in the current batch, we must start a new batch.
+            
+            pending_tasks = list(micro_tasks) # Copy
+            
+            while pending_tasks:
+                batch = []
+                batch_ids = set()
                 
-        except Exception as e:
-            error = str(e)
-            logger.info(f"   ❌ Primary tool failed: {e}")
-            
-            # Try fallbacks
-            for fallback in fallbacks:
-                try:
-                    logger.info(f"   🔄 Fallback: {fallback}")
-                    fallback_inputs = build_tool_inputs(fallback, description, original_inputs)
-                    if fallback_inputs is None:
-                        fallback_inputs = {"query": description, "max_results": 10}
+                # Iterate through pending tasks and pick those whose dependencies are MET
+                # (i.e. not in pending_tasks, meaning they are either done or in previous batches)
+                
+                # Note: Swarm tasks are "independent" within a swarm.
+                # If Task B depends on Task A, Task A must be in a PREVIOUS swarm.
+                
+                tasks_to_remove = []
+                
+                for task in pending_tasks:
+                    deps = task.get("depends_on", [])
+                    # Check if all deps are satisfied (i.e. NOT in pending_tasks AND NOT in current batch)
+                    # Actually, for the first pass, "satisfied" means "not waiting for anything currently pending"
                     
-                    if fallback in direct_tools:
-                        result = await direct_tools[fallback](fallback_inputs)
-                        # Check for fallback error too
-                        if result and hasattr(result, "isError") and result.isError:
-                            continue  # Try next fallback
-                        used_tool = fallback
-                        error = None
-                        success = True
-                        break
-                except Exception as fe:
-                    logger.info(f"   ❌ Fallback {fallback} failed: {fe}")
-        
-        # Process result
-        if result and hasattr(result, "content"):
-            for content in result.content:
-                if hasattr(content, "text"):
-                    if hasattr(result, "isError") and result.isError:
-                        logger.info(f"   ⚠️ Tool returned error: {content.text[:100]}")
-                    else:
-                        fact = {
-                            "text": content.text[:1000],
-                            "query": description[:200],
-                            "source": used_tool,
-                            "task_id": task_id,
-                            "persist": persist,
-                        }
-                        facts.append(fact)
-                        success = True  # Mark as successful when we got valid content
-                        logger.info(f"   ✅ Result extracted ({len(content.text)} chars)")
+                    # If we don't have explicit deps, we default to "Tasks 1-N are Phase 1"? 
+                    # No, the Planner often dumps strictly parallel tasks in a block.
+                    
+                    # Heuristic: If we lack explicit dependencies, we group by "Action Verbs" or just respect order?
+                    # The safest fix for the "Ticker" issue is to checking if task refers to "filtered list" or "output of previous".
+                    
+                    # Let's use the explicit 'depends_on' if valid.
+                    # If empty, we might fall back to the old behavior (big bang).
+                    # BUT the planner usually outputted: "Task 2 depends on Task 1".
+                    
+                    can_run_now = True
+                    for d in deps:
+                        if d not in completed_in_plan:
+                            can_run_now = False
+                            break
+                            
+                    if can_run_now:
+                        batch.append(task)
+                        batch_ids.add(task.get("task_id"))
+                        tasks_to_remove.append(task)
+                
+                # If no tasks can run (circular dependency or missing), force the first available one to break deadlock
+                if not batch and pending_tasks:
+                    logger.warning("⚠️ Dependency deadlock or missing dependencies detected. Forcing execution of first pending task.")
+                    forced_task = pending_tasks[0]
+                    batch.append(forced_task)
+                    batch_ids.add(forced_task.get("task_id"))
+                    tasks_to_remove.append(forced_task)
+                
+                # Update pending and completed
+                for t in tasks_to_remove:
+                    pending_tasks.remove(t)
+                
+                phases.append(batch)
+                
+                # Mark these as 'complete' for the NEXT batch's dependency check
+                for tid in batch_ids:
+                    completed_in_plan.add(tid)
+
+            logger.info(f"🧩 Execution divided into {len(phases)} sequential phases based on dependencies.")
+
+            # 2. EXECUTE PHASES SEQUENTIALLY
+            total_success = 0
+            total_failed = 0
+            
+            for i, phase_tasks in enumerate(phases, 1):
+                logger.info(f"\n🌊 STARTING PHASE {i}/{len(phases)} ({len(phase_tasks)} tasks) 🌊")
+                
+                # Resolve inputs for this phase using artifacts from previous phases
+                for t in phase_tasks:
+                    input_mapping = t.get("input_mapping", {})
+                    if input_mapping:
+                        resolved = assembler.resolve_task_inputs(type('Task', (), t)())  # Quick wrapper
+                        # Merge resolved inputs into task inputs
+                        if resolved:
+                            current_inputs = t.get("inputs", {})
+                            current_inputs.update(resolved)
+                            t["inputs"] = current_inputs
+                            logger.info(f"🔗 Resolved inputs for {t.get('task_id')}: {list(resolved.keys())}")
+                
+                subtasks = []
+                for t in phase_tasks:
+                    subtasks.append(SubTask(
+                        subtask_id=t.get("task_id"),
+                        query=t.get("description"),
+                        domain=Domain.RESEARCH, 
+                        task_type=TaskType.RESEARCH,
+                        preferred_tool=t.get("tool"),
+                        arguments=t.get("inputs", {})
+                    ))
+                
+                # Generate prompts for this phase
+                # FETCH GLOBAL CONTEXT for Prompt Engineering
+                try:
+                    ctx = get_context_pool()
+                    global_facts = [f.get("text", "") for f in ctx.fact_pool]
+                except Exception as e:
+                    logger.warning(f"Failed to fetch global context for prompts: {e}")
+                    global_facts = []
+
+                prompts = []
+                for subtask in subtasks:
+                    context = PromptContext(
+                        query=subtask.query,
+                        domain=subtask.domain,
+                        task_type=subtask.task_type,
+                        previous_findings=global_facts  # Inject global context here!
+                    )
+                    prompts.append(prompt_factory.generate(context))
+                    
+                phase_plan = SpawnPlan(
+                    task_id=f"{state.get('job_id', 'swarm')}_p{i}",
+                    subtasks=subtasks,
+                    prompts=prompts,
+                    max_parallel=len(phase_tasks)
+                )
+                
+                # Execute Swarm for this phase
+                logger.info(f"💥 Executing Phase {i} Swarm...")
+                swarm_result = await spawner.execute_swarm(phase_plan)
+                
+                total_success += swarm_result.successful
+                total_failed += swarm_result.failed
+                
+                # Capture results immediately so they are available for next phase
+                for res in swarm_result.agent_results:
+                    if res.status == "completed":
+                        facts.append({
+                            "text": str(res.result),
+                            "query": f"Swarm Agent {res.agent_id}: {res.prompt_used}",
+                            "source": res.source if res.source else "fractal_swarm",
+                            "task_id": res.subtask_id,
+                            "persist": True
+                        })
                         
-                        # Extract URLs using context pool (centralized extraction)
-                        ctx = get_context_pool()
-                        extracted_urls = ctx.extract_urls_from_text(content.text)
-                        
-                        # Add to sources for reporting
-                        for url in extracted_urls[:10]:
-                            sources.append({
-                                "url": url, 
-                                "title": description[:80], 
-                                "tool": used_tool,
-                                "task_id": task_id,
-                            })
-        
-        # Record tool invocation with proper success tracking
-        tool_invocations.append({
-            "task_id": task_id,
-            "tool": used_tool,
-            "success": success or (error is None and result is not None),
-            "error": error,
-            "persist": persist,
-        })
+                        # Store in Context Pool for next phase!
+                        try:
+                            ctx = get_context_pool()
+                            
+                            # 1. Store as structured data (for code agents)
+                            ctx.store_data(
+                                key=f"task_output_{res.subtask_id}",
+                                data=str(res.result),
+                                description=f"Output from task {res.subtask_id} (Phase {i})"
+                            )
+                            
+                            # 2. Store as fact (for semantic search/prompts)
+                            ctx.add_fact(
+                                text=str(res.result),
+                                source=f"task_{res.subtask_id}",
+                                task_id=res.subtask_id
+                            )
+                            
+                            # 3. Store artifact via Node Assembly Engine
+                            # Find the original task to get output_artifact
+                            original_task = next((t for t in phase_tasks if t.get("task_id") == res.subtask_id), None)
+                            if original_task:
+                                output_artifact = original_task.get("output_artifact")
+                                if output_artifact:
+                                    assembler.store.store(res.subtask_id, output_artifact, str(res.result))
+                            
+                        except Exception as e:
+                            logger.warning(f"Failed to update context pool: {e}")
+
+                if swarm_result.failed > 0:
+                    logger.warning(f"⚠️ Phase {i} had failures. Depending tasks in Phase {i+1} might fail.")
+            
+            # Log total success
+            logger.info(f"✅ All Phases Complete: {total_success} successful, {total_failed} failed")
+            
+            # Add dummy tool invocations for all processed tasks to skip standard loop
+            # (We iterate over what we PLANNED, assuming they ran)
+            for phase in phases:
+                for task in phase:
+                    tool_invocations.append({
+                        "task_id": task.get("task_id"),
+                        "tool": "swarm_agent_phased",
+                        "success": True, # Broad assumption, but we logged errors above
+                        "persist": True
+                    })
+            
+            logger.info("⚡ Skipping standard execution loop (Swarm handled all phases)")
+            micro_tasks = [] # Clear standard loop queue
+
+        except ImportError:
+            pass
+            
+    # =========================================================================
+
+    # 1. Hardware-Aware Scaling
+    from shared.hardware.detector import detect_hardware
+    from services.mcp_host.core.parallel_executor import ParallelExecutor, ToolCall
+    from services.mcp_host.core.session_registry import get_session_registry
     
-    # Count successes for logging
-    successes = sum(1 for inv in tool_invocations if inv.get("success", False))
-    logger.info(f"\n📊 Research Summary:")
-    logger.info(f"   Tasks executed: {len(tool_invocations)}")
-    logger.info(f"   Tasks succeeded: {successes}")
+    hw_profile = detect_hardware()
+    max_workers = hw_profile.optimal_workers()
+    logger.info(f"🚀 Hardware-Aware Dispatcher: Using {max_workers} parallel workers (RAM: {hw_profile.ram_available_gb:.1f}GB)")
+    
+    executor = ParallelExecutor(max_concurrent=max_workers)
+    registry = get_session_registry()
+    
+    # Tool registry for dynamic routing
+    # NOTE: We have removed direct imports to enforce "Pure MCP" architecture.
+    # All tools are now discovered dynamically via SessionRegistry.
+    
+    from services.orchestrator.core.utils import build_tool_inputs
+
+
+    # 2. Unified Tool Handler (INTELLIGENCE INJECTED)
+    async def unified_tool_handler(name: str, args: dict) -> Any:
+        # Resolve target server dynamically
+        server_name = registry.get_server_for_tool(name)
+        
+        if not server_name:
+            # Fallback Mapping (Legacy Support)
+            legacy_map = {
+                "run_python": "execute_code",
+                "fetch_page": "fetch_url"
+            }
+            mapped = legacy_map.get(name)
+            if mapped:
+                server_name = registry.get_server_for_tool(mapped)
+                if server_name:
+                    logger.info(f"🔄 Mapped {name} -> {mapped} on {server_name}")
+                    name = mapped # Switch to actual tool name
+            
+        if not server_name:
+             # Try JIT Discovery
+             await registry.list_all_tools()
+             server_name = registry.get_server_for_tool(name)
+        
+        if not server_name:
+             raise ValueError(f"Tool {name} not found in SessionRegistry.")
+            
+        # Execute
+        try:
+            session = await registry.get_session(server_name)
+            result = await session.call_tool(name, args)
+        except Exception as e:
+            logger.error(f"Tool execution failed: {e}")
+            raise ValueError(f"Tool {name} failed: {e}")
+
+        # =========================================================================
+        # AUTONOMIC MEMORY INTERCEPTOR (The Wiring Fix)
+        # =========================================================================
+        try:
+            from services.orchestrator.core.interceptor import MemoryInterceptor
+            job_id = state.get("job_id", "unknown_trace")
+            
+            # Fire-and-forget storage to Postgres
+            await MemoryInterceptor.intercept(
+                trace_id=job_id,
+                source_node=name,
+                result=result,
+                inputs=args
+            )
+        except Exception as e:
+            logger.warning(f"Interceptor failed (non-blocking): {e}")
+        # =========================================================================
+
+        return result
+
+    # 3. Parallel Execution Loop
+    completed = {inv["task_id"] for inv in tool_invocations if inv.get("success")}
+    processed_this_run = set()
+    
+    while True:
+        # Find ready tasks
+        ready_tasks = []
+        for task in micro_tasks:
+            t_id = task.get("task_id")
+            if t_id in completed or t_id in processed_this_run:
+                continue
+                
+            # Check dependencies
+            deps = task.get("depends_on", [])
+            if all(d in completed for d in deps):
+                ready_tasks.append(task)
+        
+        if not ready_tasks:
+            break
+            
+        # Batch execute
+        batch = ready_tasks[:max_workers * 2] # Allow slight over-subscription for IO wait
+        processed_this_run.update(t.get("task_id") for t in batch)
+        
+        logger.info(f"\n⚡ Batching {len(batch)} tasks...")
+        
+        # Prepare calls
+        calls = []
+        task_map = {} # index -> task
+        
+        for idx, task in enumerate(batch):
+            t_name = task.get("tool", "web_search")
+            t_desc = task.get("description", "")
+            t_inputs = task.get("inputs", {})
+            t_id = task.get("task_id")
+            
+            # SMART CODE GENERATION INTERCEPTOR
+            if t_name in ["run_python", "execute_code", "parse_document"] and "code" not in t_inputs:
+                try:
+                    from services.orchestrator.agents.code_generator import generate_python_code
+                    ctx = get_context_pool()
+                    files = ctx.list_files()
+                    
+                    logger.info(f"   🤖 Generating Smart Code for '{t_desc}' (Context: {len(facts)} facts, {len(files)} files)")
+                    generated_code = await generate_python_code(t_desc, facts, file_artifacts=files)
+                    
+                    if generated_code:
+                        t_inputs["code"] = generated_code
+                        # Skip standard build_tool_inputs since we handled it
+                        final_inputs = t_inputs
+                    else:
+                        final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
+                except Exception as e:
+                    logger.warning(f"Smart Code Generation failed: {e}, falling back")
+                    final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
+            else:
+                final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
+            
+            # Handle input build failure (fallback immediately or skip)
+            if final_inputs is None:
+                # Try fallback
+                fallback_tools = task.get("fallback_tools") or ["web_search"]
+                t_name = fallback_tools[0]
+                
+                # Attempt to build inputs for fallback tool
+                final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
+                
+                if final_inputs is None:
+                    # Ultimate fallback to web_search with hardware-aware limit
+                    from shared.hardware.detector import detect_hardware
+                    t_name = "web_search"
+                    final_inputs = {"query": t_desc, "max_results": detect_hardware().optimal_search_limit()}
+            
+            calls.append(ToolCall(tool_name=t_name, arguments=final_inputs))
+            task_map[idx] = task
+            
+        # EXECUTE BATCH
+        results = await executor.execute_batch(calls, unified_tool_handler)
+        
+        # Process results
+        for idx, res in enumerate(results):
+            task = task_map[idx]
+            t_id = task.get("task_id")
+            t_persist = task.get("persist", True)
+            
+            success = res.success
+            error_msg = None
+            content_text = ""
+            
+            if success and res.result and hasattr(res.result, "content"):
+                for c in res.result.content:
+                    if hasattr(c, "text"):
+                        content_text += c.text
+                
+                # Strict Error Filtering (Prevent "Error is a Fact")
+                if "tool not found" in content_text.lower() or "error:" in content_text.lower() or "exception" in content_text.lower():
+                    success = False # Mark as failed logically even if technically successful execution
+                    error_msg = content_text
+                elif len(content_text) < 5:
+                    success = False
+                    error_msg = "Content too short"
+
+            if success:
+                # Extract Facts
+                fact = {
+                    "text": content_text,  # No truncation - store full content
+                    "query": task.get("description", ""),  # No truncation
+                    "source": calls[idx].tool_name,
+                    "task_id": t_id,
+                    "persist": t_persist
+                }
+                facts.append(fact)
+                
+                # Extract Sources
+                ctx = get_context_pool()
+                extracted_urls = ctx.extract_urls_from_text(content_text)
+                
+                # FALLBACK: If no URLs found in text, check input arguments!
+                if not extracted_urls and "url" in calls[idx].arguments:
+                    url_arg = calls[idx].arguments["url"]
+                    if isinstance(url_arg, str) and url_arg.startswith("http"):
+                        extracted_urls.append(url_arg)
+                        
+                for url in extracted_urls:  # No limit - extract all URLs
+                    sources.append({
+                        "url": url,
+                        "title": task.get("description", ""),  # No truncation
+                        "tool": calls[idx].tool_name,
+                        "task_id": t_id
+                    })
+                
+                # Store in DataPool for bucket pattern
+                try:
+                    data_pool = get_data_pool()
+                    await data_pool.create_pool_item(
+                        pool_id=state.get("job_id", "default"),
+                        metadata={
+                            "fact_text": content_text[:5000],  # Summary for metadata
+                            "source": calls[idx].tool_name,
+                            "task_id": t_id,
+                            "query": task.get("description", ""),
+                        },
+                        status="raw"
+                    )
+                except Exception as e:
+                    logger.debug(f"DataPool storage skipped: {e}")
+
+                # ARTIFACT HARVESTING (NEW): Scan for file paths
+                import re
+                file_matches = re.findall(r'[\w\-\._\/]+\.(?:csv|parquet|xlsx|json)', content_text)
+                for fpath in file_matches:
+                    fpath = fpath.strip()
+                    if len(fpath) > 4: 
+                         ctx.store_file(t_id, fpath)
+                         logger.info(f"   📂 Harvested artifact: {fpath}")
+                
+                completed.add(t_id)
+                logger.info(f"   ✅ Task {t_id} completed via {calls[idx].tool_name}")
+                
+                # VERBOSE CODE OUTPUT
+                if calls[idx].tool_name in ["execute_code", "run_python"]:
+                     logger.info(f"   🐍 EXECUTION OUTPUT:\n{'-'*60}\n{content_text.strip()}\n{'-'*60}")
+            else:
+                # Handle hard failure - extract clean error message
+                tool_name = calls[idx].tool_name
+                error_text = "Unknown error"
+                
+                # Extract error text from result
+                if res.result and hasattr(res.result, "content"):
+                    for c in res.result.content:
+                        if hasattr(c, "text"):
+                            error_text = c.text
+                            break
+                elif res.result:
+                    error_text = str(res.result)
+                
+                # Clean up common error patterns for readability
+                if "Tool execution error:" in error_text:
+                    error_text = error_text.replace("Tool execution error:", "Missing parameter:")
+                
+                logger.warning(f"   ❌ Task {t_id} ({tool_name}) FAILED: {error_text}")
+                
+                # We do NOT add to completed, so it won't satisfy dependencies. 
+                # Ideally we should try fallbacks here, but for now we mark failed to avoid infinite loop
+                tool_invocations.append({
+                    "task_id": t_id,
+                    "tool": tool_name,
+                    "success": False,
+                    "error": error_text
+                })
+                # Prevent re-execution to avoid infinite loop
+                completed.add(t_id) 
+
+            # Log invocation
+            tool_invocations.append({
+                 "task_id": t_id,
+                 "tool": calls[idx].tool_name,
+                 "success": success,
+                 "persist": t_persist
+            })
+
+    # Summary Logging
+    logger.info(f"\n📊 Parallel Research Summary:")
     logger.info(f"   Facts collected: {len(facts)}")
     logger.info(f"   Sources found: {len(sources)}")
-    logger.info("="*70 + "\n")
     
-    logger.info(f"\n✅ Total Facts Collected: {len(facts)}")
-    logger.info(f"✅ Total Sources Found: {len(sources)}")
+    # ============================================================
+    # RERANK FACTS BY RELEVANCE (Neural Reranking)
+    # ============================================================
+    if facts and len(facts) > 1:
+        try:
+            from shared.embedding.model_manager import get_reranker_provider
+            from shared.config import get_settings
+            
+            query = state.get("query", "")
+            reranker = get_reranker_provider()
+            config = get_settings()
+            
+            # GPU MEMORY SAFETY (User Request)
+            try:
+                import torch
+                import gc
+                gc.collect()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            except ImportError:
+                pass
+            
+            # Extract text from facts for reranking
+            fact_texts = [f.get("text", "")[:2000] for f in facts]
+            
+            # Use top_k from config
+            # (Previously was hardware aware, now config driven, which can be hardware aware if we tune defaults)
+            top_k = min(len(facts), config.reranker.per_task_top_k)
+            
+            logger.info(f"   🔄 Reranking {len(facts)} facts by relevance to query...")
+            logger.debug(f"   🔍 Reranker Query: {query[:100]}...")
+            logger.debug(f"   🔍 Reranker Sample Fact: {fact_texts[0][:100]}...")
+            
+            try:
+                results = await reranker.rerank(query, fact_texts, top_k=top_k)
+                if results:
+                    logger.info(f"   ✅ Top Score: {results[0].score:.4f}, Bottom Score: {results[-1].score:.4f}")
+                else:
+                    logger.warning("   ⚠️ Reranker returned no results")
+            except Exception as e:
+                # OOM CHECK & RECOVERY
+                is_oom = "out of memory" in str(e).lower()
+                if is_oom:
+                     import torch
+                     import gc
+                     from shared.embedding.model_manager import switch_reranker_device
+                     
+                     logger.warning(f"⚠️ CUDA OOM detected during reranking. Initiating failover...")
+                     
+                     # Clear cache immediately
+                     gc.collect()
+                     if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                     
+                     # Determine next device
+                     new_device = "cpu"
+                     if torch.cuda.is_available() and torch.cuda.device_count() > 1:
+                         # Try next GPU
+                         current_device = getattr(reranker, "device", "cuda:0")
+                         if isinstance(current_device, str) and ":" in current_device:
+                             try:
+                                 curr_idx = int(current_device.split(":")[-1])
+                                 new_idx = (curr_idx + 1) % torch.cuda.device_count()
+                                 # Prevent cycling back to same OOM device immediately if count > 1
+                                 if new_idx != curr_idx:
+                                     new_device = f"cuda:{new_idx}"
+                             except:
+                                 pass
+                     
+                     logger.warning(f"   🔄 Switching reranker to {new_device} and retrying operation...")
+                     
+                     # Switch device
+                     switch_reranker_device(new_device)
+                     
+                     # Retry execution
+                     results = await reranker.rerank(query, fact_texts, top_k=top_k)
+                     logger.info(f"   ✅ Retry successful on {new_device}")
+                else:
+                    raise e
+            finally:
+                # Cleanup after heavy operation
+                try:
+                    import torch
+                    import gc
+                    gc.collect()
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                except: 
+                    pass
+            
+            # Reorder facts by reranker score
+            reranked_facts = []
+            for r in results:
+                fact = facts[r.index].copy()
+                fact["rerank_score"] = r.score
+                reranked_facts.append(fact)
+            
+            facts = reranked_facts
+            logger.info(f"   ✅ Reranked to top {len(facts)} facts")
+            
+        except Exception as e:
+            logger.warning(f"   ⚠️ Reranking failed, using original order: {e}")
+    
     logger.info("="*70 + "\n")
     
     return {
@@ -493,10 +861,15 @@ async def researcher_node(state: GraphState) -> GraphState:
     }
 
 
+@audited(AuditEventType.SECURITY_CHECK, "Keeper Node verified progress")
 async def keeper_node(state: GraphState) -> GraphState:
     """Check for context drift and verify progress."""
+    from shared.config import get_settings
+    config = get_settings()
+    
     iteration = state.get("iteration", 0)
-    max_iterations = state.get("max_iterations", 3)
+    # Use config for max depth
+    max_iterations = state.get("max_iterations", config.research.max_depth)
     facts = state.get("facts", [])
     
     logger.info("\n" + "="*70)
@@ -614,13 +987,21 @@ async def judge_node(state: GraphState) -> GraphState:
     logger.info("-"*70)
     logger.info("="*70 + "\n")
     
+    # Increment revision count if verdict is Revise
+    revision_count = state.get("revision_count", 0)
+    if verdict == "Revise":
+        revision_count += 1
+        logger.info(f"🔄 Revision requested. Count: {revision_count}")
+    
     return {
         **state,
         "judge_verdict": verdict,
         "confidence": confidence,
+        "revision_count": revision_count,
     }
 
 
+@audited(AuditEventType.QUERY_COMPLETED, "Synthesizer Node generated final report")
 async def synthesizer_node(state: GraphState) -> GraphState:
     """Create final report from all inputs."""
     logger.info("\n" + "="*70)
@@ -687,6 +1068,24 @@ def should_continue_research(state: GraphState) -> Literal["researcher", "genera
     return "generator"
 
 
+def should_revise_or_finalize(state: GraphState) -> Literal["generator", "synthesizer"]:
+    """
+    Decide whether to revise the answer or finalize.
+    
+    If Judge verdict is 'Revise' and we haven't exceeded max_revisions,
+    loop back to Generator for another attempt.
+    """
+    verdict = state.get("judge_verdict", "Accept")
+    revision_count = state.get("revision_count", 0)
+    max_revisions = state.get("max_revisions", 2)  # Default: allow 2 retries
+    
+    if verdict == "Revise" and revision_count < max_revisions:
+        logger.info(f"🔄 Judge requested revision. Attempt {revision_count + 1}/{max_revisions}")
+        return "generator"
+    
+    return "synthesizer"
+
+
 # ============================================================================
 # Build Graph
 # ============================================================================
@@ -735,7 +1134,17 @@ def build_research_graph() -> StateGraph:
     # Consensus flow
     graph.add_edge(NodeName.GENERATOR.value, NodeName.CRITIC.value)
     graph.add_edge(NodeName.CRITIC.value, NodeName.JUDGE.value)
-    graph.add_edge(NodeName.JUDGE.value, NodeName.SYNTHESIZER.value)
+    
+    # Conditional edge: Judge can request revision or finalize
+    graph.add_conditional_edges(
+        NodeName.JUDGE.value,
+        should_revise_or_finalize,
+        {
+            "generator": NodeName.GENERATOR.value,  # Loop back for revision
+            "synthesizer": NodeName.SYNTHESIZER.value,  # Proceed to final
+        }
+    )
+    
     graph.add_edge(NodeName.SYNTHESIZER.value, END)
     
     return graph
@@ -745,3 +1154,249 @@ def compile_research_graph():
     """Compile the research graph for execution."""
     graph = build_research_graph()
     return graph.compile()
+
+
+async def smart_fetch_data(args: dict) -> Any:
+    # JIT-Enabled Data Fetcher
+    query = args.get("query", "")
+    
+    # 1. AUTONOMOUS SEARCH: Find the data source URL first
+    # We define a search query to find a list of companies
+    discovery_query = f"list of companies listed on {query} stock exchange wikipedia"
+    logger.info(f"🔍 Web Search for Data Source: '{discovery_query}'")
+    
+    wiki_url = "https://en.wikipedia.org/wiki/LQ45" # Default fallback
+    try:
+        from shared.hardware.detector import detect_hardware
+        search_args = {"query": discovery_query, "max_results": detect_hardware().optimal_search_limit()}
+        # Use MCP Client for search
+        mcp_client = get_mcp_orchestrator()
+        search_results = await mcp_client.call_tool("web_search", search_args)
+        
+        # Simple heuristic to find a Wikipedia URL
+        search_text = str(search_results)
+        import re
+        match = re.search(r'(https://[a-z]+\.wikipedia\.org/wiki/[^\s\)\"]+)', search_text)
+        if match:
+            wiki_url = match.group(0)
+            logger.info(f"✅ Discovered Data Source: {wiki_url}")
+        else:
+            logger.warning(f"⚠️ Could not extract Wiki URL from search. Defaulting manually to LQ45 one.")
+    except Exception as e:
+        logger.error(f"❌ Discovery Search Failed: {e}")
+
+    # 2. Dynamic Script Generation with DISCOVERED URL
+    # NOTE: We use raw imports because we are running in a JIT 'uv' environment
+    code = f"""
+import pandas as pd
+import yfinance as yf
+import requests
+
+def get_tickers():
+    source_url = "{wiki_url}"
+    print(f"🔍 Scraping tickers from discovered source: {{source_url}}")
+    tickers = []
+    
+    try:
+        # Robust Scrape
+        import html5lib 
+        tables = pd.read_html(source_url)
+        
+        # Smart Column Detection
+        for df in tables:
+            # Normalize cols
+            cols = [str(c).upper() for c in df.columns]
+            
+            target_col = None
+            for c in df.columns:
+                c_up = str(c).upper()
+                if "CODE" in c_up or "SYMBOL" in c_up or "TICKER" in c_up:
+                    target_col = c
+                    break
+            
+            if target_col:
+                # Valid table found
+                raw_tickers = df[target_col].tolist()
+                suffix = ".JK" if "Indonesia" in "{query}" or "IDX" in "{query}" or "LQ45" in source_url else ""
+                
+                tickers = [f"{{str(t).strip()}}{{suffix}}" for t in raw_tickers if isinstance(t, str)]
+                print(f"   ✅ Found {{len(tickers)}} tickers in table columns: {{df.columns.tolist()}}")
+                break
+                
+        if not tickers:
+            print("   ⚠️ No ticker column found in any table.")
+            try:
+                print("   🔄 Falling back to GitHub raw CSV...")
+                url = "https://raw.githubusercontent.com/goapi-io/idx-companies/main/companies.csv"
+                df_gh = pd.read_csv(url)
+                tickers = [f"{{t}}.JK" for t in df_gh.iloc[:, 0].tolist()[:50]]
+                print(f"   ✅ Discovered {{len(tickers)}} tickers from GitHub Fallback")
+            except:
+                pass
+            
+    except Exception as e:
+        print(f"Discovery error: {{e}}")
+        tickers = []
+        
+    return tickers
+
+# Main Execution
+try:
+    targets = get_tickers()
+    if not targets:
+        print("No tickers found from source.")
+    else:
+        print(f"📊 Fetching data for {{len(targets)}} companies...")
+        
+        results = []
+        for t in targets[:20]: 
+            try:
+                stock = yf.Ticker(t)
+                info = stock.info
+                results.append({{
+                    "Ticker": t,
+                    "Market Cap (IDR T)": round((info.get("marketCap", 0) or 0) / 1_000_000_000_000, 2),
+                    "PE Ratio": round(info.get("trailingPE", 999) or 999, 2),
+                    "Revenue Growth (%)": round((info.get("revenueGrowth", 0) or 0) * 100, 2),
+                    "Sector": info.get("sector", "Unknown"),
+                    "Price": info.get("currentPrice", 0)
+                }})
+                print(f"   ✅ Fetched {{t}}")
+            except Exception as e:
+                print(f"   ❌ Failed {{t}}: {{e}}")
+                
+        df = pd.DataFrame(results)
+        print("\\nDATA_START")
+        print(df.to_markdown(index=False))
+        print("DATA_END")
+        
+except Exception as e:
+    print(f"Script Error: {{e}}")
+"""
+
+    # Call execute_code_tool with JIT dependencies via MCP Client
+    mcp_client = get_mcp_orchestrator()
+    if not mcp_client:
+        raise ValueError("MCP/Orchestrator not initialized")
+        
+    return await mcp_client.call_tool("execute_code", {
+        "code": code, 
+        "dependencies": ["yfinance", "pandas", "requests", "html5lib", "lxml", "tabulate"]
+    })
+
+
+# ============================================================================
+# Agentic Workflow Runner (Autonomous Human-Like Execution)
+# ============================================================================
+
+async def run_agentic_research(
+    query: str,
+    job_id: str | None = None,
+    max_steps: int = 15
+) -> dict[str, Any]:
+    """
+    Run autonomous research using the agentic workflow.
+    
+    This is an alternative to the standard LangGraph flow that uses
+    a ReAct-style loop where the LLM reasons about each step,
+    similar to how a human analyst would work.
+    
+    The agent will:
+    1. Analyze the query
+    2. Call appropriate tools to gather data
+    3. Inspect results and decide next steps
+    4. Synthesize findings when complete
+    
+    Args:
+        query: User's research query
+        job_id: Optional job ID for tracking
+        max_steps: Maximum reasoning steps (default 15)
+        
+    Returns:
+        Dict with final_answer, reasoning_steps, tool_executions, artifacts
+        
+    Example:
+        result = await run_agentic_research("Analyze TSLA financials")
+        print(result["final_answer"])
+        print(f"Completed in {len(result['reasoning_steps'])} steps")
+    """
+    from services.orchestrator.core.agentic_workflow import AgenticWorkflow
+    from services.mcp_host.core.session_registry import get_session_registry
+    
+    logger.info("=" * 70)
+    logger.info("🤖 AGENTIC WORKFLOW MODE - Human-Like Autonomous Research")
+    logger.info("=" * 70)
+    logger.info(f"Query: {query[:200]}")
+    logger.info("-" * 70)
+    
+    registry = get_session_registry()
+    
+    async def tool_executor(name: str, args: dict) -> Any:
+        """Execute tools via MCP session registry."""
+        # Handle full names like "yfinance_server.get_income_statement_quarterly"
+        if "." in name:
+            server_name, tool_name = name.rsplit(".", 1)
+        else:
+            tool_name = name
+            server_name = registry.get_server_for_tool(name)
+            if not server_name:
+                raise ValueError(f"Tool {name} not found in registry")
+        
+        session = await registry.get_session(server_name)
+        result = await session.call_tool(tool_name, args)
+        
+        # Extract text content from result
+        if hasattr(result, "content"):
+            text_parts = []
+            for c in result.content:
+                if hasattr(c, "text"):
+                    text_parts.append(c.text)
+            return "\n".join(text_parts)
+        
+        return str(result)
+    
+    # Discover available tools
+    await registry.list_all_tools()
+    all_tools = registry.get_all_tools_list()
+    
+    # Filter to relevant tools for financial analysis
+    relevant_prefixes = ["yfinance", "python", "execute", "web_search", "news"]
+    available_tools = [
+        {"name": t.get("name", ""), "description": t.get("description", "")}
+        for t in all_tools
+        if any(p in t.get("name", "").lower() for p in relevant_prefixes)
+    ][:50]  # Limit to 50 tools for context
+    
+    logger.info(f"📚 Discovered {len(available_tools)} relevant tools")
+    
+    # Run the agentic workflow
+    workflow = AgenticWorkflow(
+        tool_executor=tool_executor,
+        max_steps=max_steps
+    )
+    
+    state = await workflow.run(
+        query=query,
+        available_tools=available_tools
+    )
+    
+    # Log summary
+    logger.info("=" * 70)
+    logger.info("✅ AGENTIC WORKFLOW COMPLETE")
+    logger.info("=" * 70)
+    logger.info(f"Status: {state.status}")
+    logger.info(f"Steps: {state.current_step}")
+    logger.info(f"Tools Called: {len(state.tool_executions)}")
+    logger.info(f"Schemas Learned: {len(state.learned_schemas)}")
+    
+    return {
+        "final_answer": state.final_answer,
+        "status": state.status,
+        "reasoning_steps": state.reasoning_steps,
+        "tool_executions": state.tool_executions,
+        "artifacts": state.artifacts,
+        "learned_schemas": state.learned_schemas,
+        "query": query,
+        "job_id": job_id
+    }
+

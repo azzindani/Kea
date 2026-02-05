@@ -180,11 +180,21 @@ class EnvironmentConfig:
     
     @classmethod
     def for_development(cls) -> "EnvironmentConfig":
-        """Development configuration - full features."""
+        """Development configuration - full features.
+        
+        NOTE: Requires DATABASE_URL environment variable (PostgreSQL).
+        """
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            logger.warning(
+                "DATABASE_URL not set. PostgreSQL is required. "
+                "Set DATABASE_URL=postgresql://user:pass@localhost:5432/kea"
+            )
+        
         return cls(
             mode=EnvironmentMode.DEVELOPMENT,
             features=FeatureFlags.for_development(),
-            database_url=os.getenv("DATABASE_URL", "sqlite:///data/dev.db"),
+            database_url=database_url or "",  # Will fail gracefully if empty
             redis_url=os.getenv("REDIS_URL", ""),
             # Relaxed limits
             max_concurrent_requests=200,

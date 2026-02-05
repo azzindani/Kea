@@ -32,8 +32,8 @@ def get_url() -> str:
     url = os.getenv("DATABASE_URL", "")
     
     if not url:
-        # Fallback for development
-        url = "sqlite:///data/kea.db"
+        # Fallback for development using host 'localhost' and default DB
+        url = "postgresql+asyncpg://postgres:postgres@localhost:5432/research_engine"
     
     # Convert postgres:// to postgresql+asyncpg://
     if url.startswith("postgres://"):

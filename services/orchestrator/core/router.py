@@ -62,8 +62,9 @@ Respond with ONLY the letter: A, B, C, or D"""
             import os
             if os.getenv("OPENROUTER_API_KEY"):
                 provider = OpenRouterProvider()
+                from shared.config import get_settings
                 config = LLMConfig(
-                    model="nvidia/nemotron-3-nano-30b-a3b:free",
+                    model=get_settings().models.planner_model,
                     temperature=0.1,
                     max_tokens=10,
                 )

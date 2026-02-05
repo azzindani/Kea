@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from shared.logging import get_logger
 from shared.llm import OpenRouterProvider, LLMConfig
 from shared.llm.provider import LLMMessage, LLMRole
+import asyncio
 
 logger = get_logger(__name__)
 
@@ -29,6 +30,11 @@ class MicroTask(BaseModel):
     depends_on: list[str] = Field(default_factory=list)  # task_ids this depends on
     fallback_tools: list[str] = Field(default_factory=list)  # If primary fails
     persist: bool = True  # Always persist by default (high threshold policy)
+    phase: str = "research"  # Execution phase for parallel batching
+    
+    # Node Assembly Engine fields
+    input_mapping: dict[str, str] = Field(default_factory=dict)  # {"csv_path": "{{step_id.artifacts.key}}"}
+    output_artifact: str | None = None  # Artifact key this task produces
     
     
 class ExecutionPlan(BaseModel):
@@ -44,134 +50,94 @@ class ExecutionPlan(BaseModel):
 # Tool Routing Logic
 # ============================================================================
 
-TOOL_CAPABILITIES = {
-    # ===========================================
-    # SEARCH TOOLS
-    # ===========================================
-    "web_search": {
-        "keywords": ["search", "find", "look up", "what is", "who is", "list of", "query"],
-        "server": "search_server",
-        "fallbacks": ["news_search", "human_search"],
-    },
-    "news_search": {
-        "keywords": ["news", "recent", "latest", "announcement", "press release"],
-        "server": "search_server",
-        "fallbacks": ["web_search"],
-    },
-    "human_search": {
-        "keywords": ["research", "investigate", "thorough", "comprehensive", "deep search"],
-        "server": "browser_agent_server",
-        "fallbacks": ["web_search"],
-    },
-    
-    # ===========================================
-    # CRAWLER TOOLS (recursive, unlimited depth)
-    # ===========================================
-    "web_crawler": {
-        "keywords": ["crawl", "explore", "recursive", "all pages", "entire site", "sitemap"],
-        "server": "crawler_server",
-        "fallbacks": ["link_extractor", "scrape_url"],
-    },
-    "sitemap_parser": {
-        "keywords": ["sitemap", "site map", "all urls", "url list"],
-        "server": "crawler_server",
-        "fallbacks": ["web_crawler"],
-    },
-    "link_extractor": {
-        "keywords": ["extract links", "get links", "find links", "outbound", "href"],
-        "server": "crawler_server",
-        "fallbacks": ["web_search"],
-    },
-    
-    # ===========================================
-    # SCRAPING TOOLS
-    # ===========================================
-    "scrape_url": {
-        "keywords": ["scrape", "extract", "download", "annual report", "website", "page", "fetch"],
-        "server": "scraper_server",
-        "fallbacks": ["web_crawler", "web_search"],
-    },
-    "fetch_data": {
-        "keywords": ["data", "historical", "OHLCV", "price", "volume", "stock", "ticker", "API"],
-        "server": "data_sources_server",
-        "fallbacks": ["web_search"],
-    },
-    "multi_browse": {
-        "keywords": ["multiple sites", "parallel", "batch", "many urls", "browse all"],
-        "server": "browser_agent_server",
-        "fallbacks": ["web_crawler"],
-    },
-    
-    # ===========================================
-    # DATA ANALYSIS TOOLS
-    # ===========================================
-    "run_python": {
-        "keywords": ["calculate", "compute", "analyze", "algorithm", "ratio", "growth", "formula"],
-        "server": "python_server",
-        "fallbacks": ["dataframe_ops"],
-    },
-    "dataframe_ops": {
-        "keywords": ["dataframe", "pandas", "table", "csv", "json", "filter", "aggregate", "load data"],
-        "server": "python_server",
-        "fallbacks": ["run_python"],
-    },
-    "sql_query": {
-        "keywords": ["sql", "query", "select", "from", "where", "join", "database"],
-        "server": "python_server",
-        "fallbacks": ["dataframe_ops"],
-    },
-    "parse_document": {
-        "keywords": ["parse", "extract text", "pdf", "document", "pdfminer", "beautifulsoup"],
-        "server": "python_server",
-        "fallbacks": ["run_python", "scrape_url"],
-    },
-    
-    # ===========================================
-    # SPECIALIZED TOOLS
-    # ===========================================
-    "build_graph": {
-        "keywords": ["graph", "relationship", "entity", "network", "connection", "ownership"],
-        "server": "analytics_server",
-        "fallbacks": [],
-    },
-    "parse_document": {
-        "keywords": ["parse", "read", "extract from", "PDF", "report", "financial statement"],
-        "server": "document_server",
-        "fallbacks": ["scrape_url"],
-    },
-    "source_validator": {
-        "keywords": ["validate", "credibility", "trustworthy", "verify source", "reliable"],
-        "server": "browser_agent_server",
-        "fallbacks": [],
-    },
-}
-
+from services.orchestrator.core.tool_loader import route_to_tool_dynamic
 
 def route_to_tool(task_description: str) -> tuple[str, list[str]]:
     """
     Route a micro-task to the appropriate tool based on keywords.
-    
-    Returns:
-        (primary_tool, fallback_tools)
+    Delegates to dynamic loader.
     """
-    task_lower = task_description.lower()
+    return route_to_tool_dynamic(task_description)
+
+
+def _extract_template_variables(query: str, expected_vars: list[str]) -> dict[str, str]:
+    """
+    Extract variable values from query for template expansion.
     
-    # Score each tool based on keyword matches
-    scores = {}
-    for tool, config in TOOL_CAPABILITIES.items():
-        score = sum(1 for kw in config["keywords"] if kw in task_lower)
-        if score > 0:
-            scores[tool] = score
+    Uses pattern matching to find common variable types:
+    - ticker: Stock symbols like BBCA.JK, NVDA, AAPL
+    - company: Company names
+    - period: Time periods like 1y, 6mo, 3mo
     
-    if not scores:
-        # Default to web_search
-        return "web_search", ["news_search"]
+    Args:
+        query: User's research query
+        expected_vars: List of variable names the template expects
+        
+    Returns:
+        Dict of variable name -> extracted value
+    """
+    import re
     
-    # Get highest scoring tool
-    best_tool = max(scores, key=scores.get)
-    fallbacks = TOOL_CAPABILITIES[best_tool]["fallbacks"]
+    variables = {}
+    query_upper = query.upper()
     
-    return best_tool, fallbacks
+    for var in expected_vars:
+        if var.lower() == "ticker":
+            # Look for stock ticker patterns (e.g., BBCA.JK, NVDA, AAPL)
+            ticker_match = re.search(r'\b([A-Z]{1,5}(?:\.[A-Z]{1,3})?)\b', query_upper)
+            if ticker_match:
+                variables[var] = ticker_match.group(1)
+            else:
+                # Default to first word as ticker
+                words = query.split()
+                variables[var] = words[0].upper() if words else "AAPL"
+                
+        elif var.lower() == "company":
+            # Use first few words as company name
+            words = query.split()[:3]
+            variables[var] = " ".join(words)
+            
+        elif var.lower() == "period":
+            # Look for period patterns (1y, 6mo, 3mo, 1d, etc.)
+            period_match = re.search(r'\b(\d+(?:y|mo|d|w))\b', query.lower())
+            if period_match:
+                variables[var] = period_match.group(1)
+            else:
+                variables[var] = "1y"  # Default
+                
+        elif var.lower() in ("source_url", "url"):
+            # Look for URL patterns
+            url_match = re.search(r'https?://[^\s]+', query)
+            if url_match:
+                variables[var] = url_match.group(0)
+            else:
+                variables[var] = query  # Use query as source
+                
+        elif var.lower() in ("output_format", "format"):
+            # Look for format mentions
+            if "json" in query.lower():
+                variables[var] = "json"
+            elif "csv" in query.lower():
+                variables[var] = "csv"
+            elif "markdown" in query.lower() or "md" in query.lower():
+                variables[var] = "markdown"
+            else:
+                variables[var] = "json"  # Default
+                
+        elif var.lower() == "document_type":
+            # Legal document types
+            for doc_type in ["10-K", "10-Q", "8-K", "contract", "agreement", "filing"]:
+                if doc_type.lower() in query.lower():
+                    variables[var] = doc_type
+                    break
+            else:
+                variables[var] = "filing"
+                
+        else:
+            # Generic: use query as the variable value
+            variables[var] = query
+            
+    return variables
 
 
 # ============================================================================
@@ -197,156 +163,456 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
     
     query = state.get("query", "")
     
+    # ============================================================
+    # RELATED FACT LOOKUP (Semantic Search for Past Research)
+    # ============================================================
+    related_facts = []
+    try:
+        import asyncio
+        from services.rag_service.core.fact_store import FactStore
+        from shared.hardware.detector import detect_hardware
+        
+        store = FactStore()
+        hw = detect_hardware()
+        fact_limit = hw.optimal_fact_limit()  # Hardware-aware limit
+        
+        # Search for related past research with timeout to avoid blocking
+        related_facts = await asyncio.wait_for(
+            store.search(query, limit=fact_limit),
+            timeout=5.0  # 5 second timeout to avoid blocking research
+        )
+        
+        if related_facts:
+            logger.info(f"Planner: Found {len(related_facts)} related past facts")
+            state["related_facts"] = [
+                {"entity": f.entity, "value": f.value[:200], "source": f.source_url}
+                for f in related_facts
+            ]
+    except asyncio.TimeoutError:
+        logger.warning("Planner: Related fact lookup timed out, skipping")
+    except Exception as e:
+        logger.debug(f"Related fact lookup skipped: {e}")
+    
     # Use LLM to decompose query
     try:
         import os
         if os.getenv("OPENROUTER_API_KEY"):
             provider = OpenRouterProvider()
+            from shared.config import get_settings
+            app_config = get_settings()
+            
             config = LLMConfig(
-                model="nvidia/nemotron-3-nano-30b-a3b:free",
+                model=app_config.models.planner_model,
                 temperature=0.3,
-                max_tokens=1000,  # Increased for execution plan
+                max_tokens=32768,  # Maximum for task generation
             )
             
+            # ============================================================
+            # TEMPLATE-FIRST PLANNING (Node Assembly Engine)
+            # ============================================================
+            # Check for matching templates before calling LLM
+            # This reduces hallucination for common workflows
+            template_used = False
+            try:
+                from services.orchestrator.templates.loader import get_template_loader
+                loader = get_template_loader()
+                
+                matched_template = loader.match(query)
+                if matched_template:
+                    template = loader.load(matched_template)
+                    if template:
+                        logger.info(f"🎯 Using template: {matched_template}")
+                        
+                        # Extract variables from query
+                        variables = _extract_template_variables(query, template.get("variables", []))
+                        
+                        # Expand template into tasks
+                        expanded_tasks = loader.expand(template, variables)
+                        
+                        # Generate execution plan from expanded template
+                        execution_plan = generate_execution_plan_from_blueprint(
+                            query, 
+                            {"blueprint": expanded_tasks}
+                        )
+                        
+                        state["sub_queries"] = [query]
+                        state["hypotheses"] = []
+                        state["execution_plan"] = execution_plan.model_dump()
+                        state["status"] = "planning_complete"
+                        state["template_used"] = matched_template
+                        
+                        logger.info(
+                            f"Planner: Generated {len(execution_plan.micro_tasks)} tasks "
+                            f"from template: {matched_template}"
+                        )
+                        template_used = True
+                        
+            except Exception as e:
+                logger.warning(f"Template matching failed: {e}. Falling back to LLM.")
+            
+            # If template was used, skip LLM planning
+            if template_used:
+                return state
+            
+            # Discover relevant tools (INTELLIGENCE INJECTION - RAG)
+            try:
+                from services.mcp_host.core.session_registry import get_session_registry
+                registry = get_session_registry()
+                
+                # 1. Try High-Limit Semantic Search (RAG)
+                # This scales to 10k+ tools by finding only relevant ones
+                relevant_tools = []
+                try:
+                    # Search specifically for tools that match the query intention
+                    search_results = await asyncio.wait_for(
+                        registry.search_tools(query, limit=100), 
+                        timeout=3.0
+                    )
+                    
+                    if search_results:
+                        logger.info(f"Planner: RAG found {len(search_results)} relevant tools")
+                        # Format: "tool_name: description" for better LLM understanding
+                        relevant_tools = [
+                            f"{t.get('name', 'N/A')}: {t.get('description', '')[:100]}" 
+                            for t in search_results
+                        ]
+                except Exception as search_err:
+                    logger.warning(f"Planner RAG Search failed: {search_err}. Falling back to active list.")
+
+                # 2. Fallback: List Active/Cached Tools (Safety Net)
+                if not relevant_tools:
+                    if registry.tool_to_server:
+                        known_tools = list(registry.tool_to_server.keys())
+                        # If list is HUGE, we slice it to avoid context overflow (first 500)
+                        # LLM Context is 32k, so 500 tools is fine.
+                        relevant_tools = known_tools[:500]
+                        logger.info(f"Planner: Using fallback list of {len(relevant_tools)} tools")
+                    else:
+                        # 3. Last Resort: Try to force discovery once
+                        try:
+                            logger.info("Planner: Registry empty, forcing tool scan...")
+                            all_tools = await asyncio.wait_for(registry.list_all_tools(), timeout=5.0)
+                            relevant_tools = [t['name'] for t in all_tools][:200]
+                        except asyncio.TimeoutError:
+                             pass
+
+                # Format for LLM
+                if relevant_tools:
+                    tools_context = f"RELEVANT TOOLS ({len(relevant_tools)} found):\n"
+                    tools_context += "\n".join(relevant_tools) if ":" in relevant_tools[0] else ", ".join(relevant_tools)
+                else:
+                    tools_context = "No specific tools found. Rely on 'web_search' and 'execute_code'."
+                
+            except Exception as e:
+                logger.warning(f"Planner tool discovery CRITICAL FAILURE: {e}")
+                tools_context = "Tool Discovery Unavailable."
+
+            # JSON Blueprint System Prompt (Level 30 Architect)
             messages = [
                 LLMMessage(
                     role=LLMRole.SYSTEM,
-                    content="""You are a research planner. Decompose queries into sub-questions AND execution steps.
+                    content=f"""ACT AS: Execution Architect for Kea (Autonomous Research Engine).
+OBJECTIVE: Convert user intent into an executable JSON Blueprint.
 
-Output format:
-SUB-QUERIES:
-1. [question - be specific about what data/information is needed]
-2. [question]
+AVAILABLE TOOLS:
+{tools_context}
 
-HYPOTHESES:
-1. [testable claim]
-2. [testable claim]
+CRITICAL RULES:
+1. OUTPUT ONLY JSON. No prose, no explanations, no "I will now..."
+2. Use exact tool names from the list above. If no tool fits, use "execute_code".
+3. Tasks with same "phase" run in parallel. Higher phase waits for lower phases.
+4. Use "artifact" to declare output keys, "input_mapping" to consume outputs from other steps.
 
-EXECUTION-STEPS:
-1. [action verb] [what] [where/how] - e.g. "Search for list of all IDX companies"
-2. [action verb] [what] [where/how] - e.g. "Download historical price data for each ticker"
-3. [action verb] [what] [where/how] - e.g. "Calculate revenue growth rate using financial data"
-4. [action verb] [what] [where/how] - e.g. "Scrape annual reports from company websites"
-5. [action verb] [what] [where/how] - e.g. "Build ownership graph from extracted entities"
+OUTPUT SCHEMA:
+{{{{
+  "intent": "Brief technical summary (max 10 words)",
+  "blueprint": [
+    {{{{
+      "id": "step_1",
+      "phase": 1,
+      "tool": "yfinance_server.get_bulk_historical_data",
+      "args": {{{{"tickers": "BBCA.JK", "period": "1y"}}}},
+      "artifact": "prices_csv"
+    }}}},
+    {{{{
+      "id": "step_2", 
+      "phase": 2,
+      "tool": "pandas_ta_server.calculate_indicators",
+      "args": {{{{"indicators": ["rsi", "macd"]}}}},
+      "input_mapping": {{{{"csv_path": "{{{{step_1.artifacts.prices_csv}}}}\"}}}},
+      "artifact": "indicators"
+    }}}}
+  ]
+}}}}
 
-Be specific about:
-- What data to collect
-- What calculations to perform
-- What to extract from documents
-- What relationships to map"""
+EXAMPLE for "Compare NVDA vs AMD financials":
+{{{{
+  "intent": "Compare NVDA AMD financial metrics",
+  "blueprint": [
+    {{{{"id": "s1", "phase": 1, "tool": "yfinance_server.get_income_statement_quarterly", "args": {{{{"ticker": "NVDA"}}}}, "artifact": "nvda_income"}}}},
+    {{{{"id": "s2", "phase": 1, "tool": "yfinance_server.get_income_statement_quarterly", "args": {{{{"ticker": "AMD"}}}}, "artifact": "amd_income"}}}},
+    {{{{"id": "s3", "phase": 2, "tool": "execute_code", "args": {{{{"code": "# Compare margins"}}}}, "input_mapping": {{{{"nvda": "{{{{s1.artifacts.nvda_income}}}}\", "amd": "{{{{s2.artifacts.amd_income}}}}\"}}}}, "artifact": "comparison"}}}}
+  ]
+}}}}"""
                 ),
-                LLMMessage(role=LLMRole.USER, content=f"Decompose this research query:\n\n{query}")
+                LLMMessage(role=LLMRole.USER, content=query)
             ]
             
             response = await provider.complete(messages, config)
             
-            # Parse response
-            sub_queries = []
-            hypotheses = []
-            execution_steps = []
+            # Parse JSON Blueprint response
+            blueprint = None
+            try:
+                import json
+                import re
+                
+                # Extract JSON from response (handle markdown code blocks)
+                content = response.content.strip()
+                
+                # Try to find JSON in code blocks first
+                json_match = re.search(r'```(?:json)?\s*(\{[\s\S]*\})\s*```', content)
+                if json_match:
+                    content = json_match.group(1)
+                # Or find raw JSON object
+                elif content.startswith('{'):
+                    pass  # Already JSON
+                else:
+                    # Try to find JSON anywhere in response
+                    json_start = content.find('{')
+                    json_end = content.rfind('}') + 1
+                    if json_start >= 0 and json_end > json_start:
+                        content = content[json_start:json_end]
+                
+                blueprint = json.loads(content)
+                logger.info(f"Planner: Parsed JSON Blueprint with {len(blueprint.get('blueprint', []))} steps")
+                
+            except json.JSONDecodeError as e:
+                logger.warning(f"Planner: JSON parse failed ({e}), falling back to text parsing")
+                blueprint = None
             
-            lines = response.content.split("\n")
-            current_section = None
-            
-            for line in lines:
-                line = line.strip()
-                if "SUB-QUERIES" in line.upper():
-                    current_section = "sub_queries"
-                elif "HYPOTHESES" in line.upper():
-                    current_section = "hypotheses"
-                elif "EXECUTION" in line.upper():
-                    current_section = "execution"
-                elif line and line[0].isdigit() and "." in line:
-                    text = line.split(".", 1)[1].strip() if "." in line else line
-                    if current_section == "sub_queries":
-                        sub_queries.append(text)
-                    elif current_section == "hypotheses":
-                        hypotheses.append(text)
-                    elif current_section == "execution":
-                        execution_steps.append(text)
-            
-            state["sub_queries"] = sub_queries or [query]
-            state["hypotheses"] = hypotheses
-            
-            # Generate execution plan from steps
-            execution_plan = generate_execution_plan(query, execution_steps)
-            state["execution_plan"] = execution_plan.model_dump()
-            
-            logger.info(
-                f"Planner: Generated {len(sub_queries)} sub-queries, "
-                f"{len(hypotheses)} hypotheses, "
-                f"{len(execution_plan.micro_tasks)} micro-tasks"
-            )
+            if blueprint and "blueprint" in blueprint:
+                # Generate execution plan from JSON Blueprint
+                execution_plan = generate_execution_plan_from_blueprint(query, blueprint)
+                state["execution_plan"] = execution_plan.model_dump()
+                state["sub_queries"] = [blueprint.get("intent", query)]
+                state["hypotheses"] = []
+                
+                logger.info(
+                    f"Planner: Generated {len(execution_plan.micro_tasks)} micro-tasks "
+                    f"across {len(execution_plan.phases)} phases from JSON Blueprint"
+                )
+            else:
+                # Fallback: Parse as text (legacy compatibility)
+                sub_queries = []
+                hypotheses = []
+                execution_phases = {}
+                current_phase_name = "default"
+                
+                lines = response.content.split("\n")
+                current_section = None
+                
+                for line in lines:
+                    line = line.strip()
+                    if not line:
+                        continue
+                        
+                    if "SUB-QUERIES" in line.upper():
+                        current_section = "sub_queries"
+                        continue
+                    elif "HYPOTHESES" in line.upper():
+                        current_section = "hypotheses"
+                        continue
+                    elif "PHASE:" in line.upper():
+                        current_section = "execution"
+                        try:
+                            current_phase_name = line.split(":", 1)[1].strip().lower()
+                        except:
+                            current_phase_name = "unknown"
+                        if current_phase_name not in execution_phases:
+                            execution_phases[current_phase_name] = []
+                        continue
+                    
+                    # Extract content
+                    text = None
+                    if line[0].isdigit() and "." in line:
+                        text = line.split(".", 1)[1].strip()
+                    elif line.startswith(("-", "*", "•")):
+                        text = line[1:].strip()
+                    elif current_section == "execution" and len(line) > 10:
+                        text = line
+                    
+                    if text and current_section:
+                        if current_section == "sub_queries":
+                            sub_queries.append(text)
+                        elif current_section == "hypotheses":
+                            hypotheses.append(text)
+                        elif current_section == "execution":
+                            if current_phase_name not in execution_phases:
+                                execution_phases[current_phase_name] = []
+                            execution_phases[current_phase_name].append(text)
+                
+                state["sub_queries"] = sub_queries or [query]
+                state["hypotheses"] = hypotheses
+                
+                execution_plan = generate_execution_plan_phased(query, execution_phases)
+                state["execution_plan"] = execution_plan.model_dump()
+                
+                logger.info(
+                    f"Planner: Generated {len(execution_plan.micro_tasks)} micro-tasks "
+                    f"(text fallback mode)"
+                )
             
         else:
             # Fallback without LLM
             state["sub_queries"] = [query]
             state["hypotheses"] = []
-            state["execution_plan"] = generate_execution_plan(query, [query]).model_dump()
+            state["execution_plan"] = generate_execution_plan_phased(query, {"research": [query]}).model_dump()
             logger.info("Planner: No LLM, using query as-is")
             
     except Exception as e:
         logger.error(f"Planner error: {e}")
         state["sub_queries"] = [query]
         state["hypotheses"] = []
-        state["execution_plan"] = generate_execution_plan(query, [query]).model_dump()
+        state["execution_plan"] = generate_execution_plan_phased(query, {"research": [query]}).model_dump()
     
     state["status"] = "planning_complete"
     return state
 
 
-def generate_execution_plan(query: str, execution_steps: list[str]) -> ExecutionPlan:
+def generate_execution_plan_phased(query: str, execution_phases: dict[str, list[str]]) -> ExecutionPlan:
     """
-    Generate execution plan from LLM-generated steps.
-    Routes each step to appropriate tools.
+    Generate execution plan from Phased LLM output.
+    
+    STRICT DEPENDENCY LOGIC:
+    - All tasks in Phase N depend on ALL tasks in Phase N-1.
+    - Tasks within the same Phase are independent (Parallel).
     """
     import uuid
     
     micro_tasks = []
-    phases = set()
+    task_id_counter = 1
     
-    for i, step in enumerate(execution_steps):
-        task_id = f"task_{i+1}"
+    # Track tasks by phase for dependency linking
+    # We maintain order of phases as they appeared in the dict (insertion order preserved in Py3.7+)
+    phase_names = list(execution_phases.keys())
+    phase_task_ids: dict[str, list[str]] = {p: [] for p in phase_names}
+    
+    for i, phase_name in enumerate(phase_names):
+        steps = execution_phases[phase_name]
         
-        # Route to tool
-        primary_tool, fallbacks = route_to_tool(step)
-        
-        # Determine phase based on tool
-        if primary_tool in ["web_search", "news_search", "fetch_data"]:
-            phase = "data_collection"
-        elif primary_tool in ["scrape_url", "parse_document"]:
-            phase = "extraction"
-        elif primary_tool in ["run_python"]:
-            phase = "analysis"
-        elif primary_tool in ["build_graph"]:
-            phase = "synthesis"
-        else:
-            phase = "research"
-        
-        phases.add(phase)
-        
-        # Dependencies: each task depends on previous tasks in same phase
+        # Determine dependencies: All tasks from previous phase
         depends_on = []
         if i > 0:
-            # Simple dependency: each task depends on the previous
-            depends_on = [f"task_{i}"]
+            previous_phase = phase_names[i-1]
+            depends_on = phase_task_ids[previous_phase]
+            
+        for step in steps:
+            task_id = f"task_{task_id_counter}"
+            task_id_counter += 1
+            
+            primary_tool, fallbacks = route_to_tool(step)
+            
+            # Handle special case: execute_code needs "python_server" usually
+            # route_to_tool logic might need checking, but usually returns 'execute_code'
+            
+            micro_task = MicroTask(
+                task_id=task_id,
+                description=step,
+                tool=primary_tool,
+                inputs={"query": step},  # Basic input, refined by researcher_node
+                depends_on=depends_on,   # STRICT DEPENDENCY
+                fallback_tools=fallbacks,
+                persist=True,
+                phase=phase_name,
+            )
+            
+            micro_tasks.append(micro_task)
+            phase_task_ids[phase_name].append(task_id)
+            
+    return ExecutionPlan(
+        plan_id=f"plan_{uuid.uuid4().hex[:8]}",
+        query=query,
+        micro_tasks=micro_tasks,
+        phases=phase_names,
+        estimated_tools=len(micro_tasks),
+    )
+
+
+def generate_execution_plan_from_blueprint(query: str, blueprint: dict) -> ExecutionPlan:
+    """
+    Generate execution plan from JSON Blueprint (new format).
+    
+    Blueprint format:
+    {
+        "intent": "short description",
+        "blueprint": [
+            {"id": "s1", "phase": 1, "tool": "web_search", "args": {...}, "artifact": "key"},
+            ...
+        ]
+    }
+    """
+    import uuid
+    
+    micro_tasks = []
+    steps = blueprint.get("blueprint", [])
+    
+    # Group steps by phase for dependency calculation
+    phase_map: dict[int, list[str]] = {}  # phase_number -> [step_ids]
+    
+    for step in steps:
+        phase_num = step.get("phase", 1)
+        step_id = step.get("id", f"step_{len(micro_tasks) + 1}")
+        if phase_num not in phase_map:
+            phase_map[phase_num] = []
+        phase_map[phase_num].append(step_id)
+    
+    # Sort phases to build dependency chain
+    sorted_phases = sorted(phase_map.keys())
+    
+    for step in steps:
+        step_id = step.get("id", f"step_{len(micro_tasks) + 1}")
+        phase_num = step.get("phase", 1)
+        tool_name = step.get("tool", "execute_code")
+        args = step.get("args", {})
+        artifact_key = step.get("artifact")
+        
+        # Calculate dependencies: all steps from previous phase
+        depends_on = []
+        phase_idx = sorted_phases.index(phase_num)
+        if phase_idx > 0:
+            previous_phase = sorted_phases[phase_idx - 1]
+            depends_on = phase_map.get(previous_phase, [])
+        
+        # Build inputs from args
+        inputs = {}
+        for key, value in args.items():
+            inputs[key] = value
+        
+        # Parse input_mapping from blueprint (Node Assembly Engine)
+        input_mapping = step.get("input_mapping", {})
         
         micro_task = MicroTask(
-            task_id=task_id,
-            description=step,
-            tool=primary_tool,
-            inputs={"query": step},
+            task_id=step_id,
+            description=f"{tool_name}: {args.get('query', args.get('code', str(args)[:100]))}",
+            tool=tool_name,
+            inputs=inputs,
             depends_on=depends_on,
-            fallback_tools=fallbacks,
-            persist=True,  # Always persist (high threshold policy)
+            fallback_tools=["execute_code"] if tool_name != "execute_code" else [],
+            persist=True,
+            phase=str(phase_num),
+            input_mapping=input_mapping,
+            output_artifact=artifact_key,
         )
+        
         micro_tasks.append(micro_task)
+    
+    # Generate phase names from numbers
+    phase_names = [str(p) for p in sorted_phases]
     
     return ExecutionPlan(
         plan_id=f"plan_{uuid.uuid4().hex[:8]}",
         query=query,
         micro_tasks=micro_tasks,
-        phases=sorted(phases),
+        phases=phase_names,
         estimated_tools=len(micro_tasks),
     )
-

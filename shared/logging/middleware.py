@@ -48,15 +48,29 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         token = set_context(context)
         
         # Log request start
-        logger.info(
-            "Request started",
-            extra={
-                "method": request.method,
-                "path": request.url.path,
-                "query": str(request.query_params),
-                "client_ip": request.client.host if request.client else None,
-            }
-        )
+        start_log_data = {
+            "method": request.method,
+            "path": request.url.path,
+            "query": str(request.query_params),
+            "client_ip": request.client.host if request.client else None,
+        }
+        
+        # Verbose Mode: Log Body
+        import os
+        if os.getenv("KEA_LOG_NO_TRUNCATE") == "1":
+            try:
+                # Read and reset body
+                body_bytes = await request.body()
+                start_log_data["body"] = body_bytes.decode(errors="replace")
+                
+                # Re-inject body for downstream
+                async def receive():
+                    return {"type": "http.request", "body": body_bytes, "more_body": False}
+                request._receive = receive
+            except Exception:
+                start_log_data["body"] = "<error reading body>"
+
+        logger.info("Request started", extra=start_log_data)
         
         start_time = time.perf_counter()
         

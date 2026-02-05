@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from enum import Enum
 from typing import Any, Callable
@@ -22,6 +22,8 @@ from services.orchestrator.core.prompt_factory import (
     Domain,
     TaskType,
 )
+from services.orchestrator.core.utils import build_tool_inputs, extract_url_from_text
+from services.mcp_host.core.models import ToolResponse
 
 
 logger = get_logger(__name__)
@@ -46,6 +48,8 @@ class SubTask:
     priority: int = 1  # 1=highest
     dependencies: list[str] = field(default_factory=list)
     estimated_complexity: int = 1  # 1-5 scale
+    preferred_tool: str | None = None  # Explicit tool override from Planner
+    arguments: dict[str, Any] = field(default_factory=dict)  # Standard I/O arguments
 
 
 @dataclass
@@ -59,6 +63,7 @@ class AgentResult:
     started_at: datetime | None = None
     completed_at: datetime | None = None
     prompt_used: str = ""
+    source: str | None = None
     
     @property
     def duration_seconds(self) -> float:
@@ -88,6 +93,12 @@ class SwarmResult:
     failed: int = 0
     started_at: datetime | None = None
     completed_at: datetime | None = None
+
+    @property
+    def duration_seconds(self) -> float:
+        if self.started_at and self.completed_at:
+            return (self.completed_at - self.started_at).total_seconds()
+        return 0.0
 
 
 class TaskDecomposer:
@@ -262,7 +273,7 @@ class AgentSpawner:
         result = await spawner.execute_swarm(plan)
         
         # Get aggregated result
-        print(result.aggregated_result)
+        logger.debug(result.aggregated_result)
     """
     
     def __init__(
@@ -301,12 +312,74 @@ class AgentSpawner:
             estimated_time_seconds=len(subtasks) * 5.0,  # Rough estimate
         )
     
+    def _expand_plan(self, plan: SpawnPlan) -> SpawnPlan:
+        """
+        Bucket Pattern: Expand massive tasks into parallel shards.
+        If a task asks for '10k data' or 'massive collection', spawn multiple farmers.
+        """
+        expanded_sub = []
+        expanded_prompts = []
+        
+        for i, task in enumerate(plan.subtasks):
+            query_lower = task.query.lower()
+            
+            # Heuristic for expansion
+            is_massive = any(w in query_lower for w in ["massive", "10k", "10,000", "all items", "bucket", "parallel"])
+            
+            if is_massive and task.task_type in [TaskType.EXTRACT, TaskType.RESEARCH]:
+                # Determine expansion factor
+                factor = 5  # Default shards
+                if "100k" in query_lower: factor = 20
+                elif "10k" in query_lower or "10,000" in query_lower: factor = 10
+                elif "50k" in query_lower: factor = 15
+                
+                # Cap at reasonable max parallel
+                factor = min(factor, plan.max_parallel or 10)
+                
+                logger.info(f"💥 Expanding massive task '{task.query[:30]}...' into {factor} parallel shards")
+                
+                # Create shards
+                for j in range(1, factor + 1):
+                    # Suffix query with batch info (e.g., 'Page 1', 'Batch 1')
+                    # This allows build_tool_inputs to map it to pagination args later
+                    new_query = f"{task.query} (Batch {j})"
+                    
+                    new_task = replace(
+                        task, 
+                        subtask_id=f"{task.subtask_id}_{j}", 
+                        query=new_query
+                    )
+                    expanded_sub.append(new_task)
+                    
+                    # Replicate prompt (same instructions, just different slice of data)
+                    if i < len(plan.prompts):
+                        # We don't need deep copy of prompt object, reusing is fine OR shallow copy
+                        # GeneratedPrompt is dataclass, immutable-ish
+                        expanded_prompts.append(plan.prompts[i])
+            else:
+                # Keep original
+                expanded_sub.append(task)
+                if i < len(plan.prompts):
+                    expanded_prompts.append(plan.prompts[i])
+        
+        # Update plan
+        plan.subtasks = expanded_sub
+        plan.prompts = expanded_prompts
+        # Update estimate
+        plan.estimated_time_seconds = len(expanded_sub) * 3.0 # Parallel gain
+        
+        return plan
+
     async def execute_swarm(
         self,
         plan: SpawnPlan,
         progress_callback: Callable[[int, int], None] | None = None,
     ) -> SwarmResult:
         """Execute agent swarm based on plan."""
+        
+        # 1. Expand Plan (The "Bucket Pattern")
+        plan = self._expand_plan(plan)
+        
         swarm_result = SwarmResult(
             task_id=plan.task_id,
             agent_results=[],
@@ -387,41 +460,308 @@ class AgentSpawner:
         prompt: GeneratedPrompt,
         context_results: list[AgentResult] | None = None,
     ) -> AgentResult:
-        """Run a single agent."""
+        """Run a single agent with REAL execution capabilities."""
         agent_id = str(uuid.uuid4())[:8]
         result = AgentResult(
             agent_id=agent_id,
             subtask_id=subtask.subtask_id,
             status=AgentStatus.RUNNING,
             started_at=datetime.utcnow(),
-            prompt_used=prompt.prompt[:200],  # Truncate for logging
+            prompt_used=prompt.prompt[:200],
         )
         
+        logger.info(f"🤖 Agent {agent_id} starting task: {subtask.query[:60]}...")
+        
         try:
-            # Build context from dependencies
-            context = ""
-            if context_results:
-                findings = [r.result for r in context_results if r.result]
-                context = f"Previous findings:\n{findings}\n\n"
+            # 1. Build Context
+            context_str = ""
             
-            # Call LLM
-            if self.llm_callback:
-                llm_result = await self._call_llm(
-                    system_prompt=prompt.prompt,
-                    user_message=context + subtask.query,
-                )
-                result.result = llm_result
-                result.status = AgentStatus.COMPLETED
+            # Local Swarm Context
+            if context_results:
+                findings = [str(r.result) for r in context_results if r.result]
+                context_str += f"Context from dependent tasks:\n" + "\n".join(findings) + "\n\n"
+
+            # Global Project Context (Crucial for multi-phase workflows)
+            try:
+                from shared.context_pool import get_context_pool
+                ctx = get_context_pool()
+                if ctx.fact_pool:
+                    global_findings = [f.get("text", "")[:500] for f in ctx.fact_pool[-10:]] # Last 10 facts, truncated
+                    context_str += f"Global Context (Previous Phases):\n" + "\n".join(global_findings) + "\n\n"
+            except Exception as e:
+                logger.warning(f"Failed to fetch global context for LLM: {e}")
+            
+            # 2. Determine Action (LLM or Direct Tool)
+            # For this implementation, we treat the agent as a "Smart Worker"
+            # It uses the LLM to decide which tool to call from the registry
+            
+            from services.mcp_host.core.session_registry import get_session_registry
+            registry = get_session_registry()
+            
+            # Simple heuristic: If it looks like a direct question, ask LLM. 
+            # If it looks like "Search for X", assume tool use.
+            # We'll use a CodeGenerator prompt to get the tool loop.
+            
+            response = ""
+            
+            # Use the LLM callback if provided (The "Brain")
+            if self.llm_callback and not subtask.preferred_tool:
+                full_prompt = f"{prompt.prompt}\n\nTask: {subtask.query}\n{context_str}"
+                response = await self._call_llm(full_prompt, subtask.query)
             else:
-                # Simulate for testing
-                result.result = f"[Simulated result for: {subtask.query}]"
-                result.status = AgentStatus.COMPLETED
-                await asyncio.sleep(0.1)  # Simulate work
+                # Fallback to direct tool execution (The "Hands")
+                # PRIORITY 1: Explicit Tool from Planner
+                if subtask.preferred_tool:
+                    tool_name = subtask.preferred_tool
+                    server_name = None
+                    
+                    # Handle "server.tool" format (e.g., "yfinance_server.get_income_statement_quarterly")
+                    if "." in tool_name and "_server." in tool_name:
+                        parts = tool_name.split(".", 1)
+                        server_name = parts[0]
+                        tool_name = parts[1]
+                        logger.debug(f"   📌 Parsed server.tool format: server={server_name}, tool={tool_name}")
+                    else:
+                        # Lookup server from static registry
+                        server_name = registry.get_server_for_tool(tool_name)
+                    
+                    if not server_name:
+                         # Try mapping legacy names if needed
+                         if tool_name == "run_python": tool_name = "execute_code"
+                         server_name = registry.get_server_for_tool(tool_name)
+
+                    if server_name:
+                        try:
+                            session = await registry.get_session(server_name)
+                            
+                            # Prepare facts for context-aware parameters
+                            collected_facts = []
+                            
+                            # 1. Local Context (from this swarm's dependencies)
+                            if context_results:
+                                for r in context_results:
+                                    if r.result:
+                                        collected_facts.append({"text": str(r.result)})
+                            
+                            # 2. Global Context (from previous phases)
+                            try:
+                                from shared.context_pool import get_context_pool
+                                ctx = get_context_pool()
+                                
+                                # Add facts from pool
+                                for fact in ctx.fact_pool:
+                                    collected_facts.append({"text": fact.get("text", "")})
+                                
+                                # Add specific data items if short enough
+                                for key, item in ctx.data_pool.items():
+                                    data_str = str(item.get("data", ""))
+                                    if len(data_str) < 5000: # Limit size
+                                        collected_facts.append({"text": f"Data {key}: {data_str}"})
+                                        
+                            except Exception as e:
+                                logger.warning(f"Failed to fetch global context: {e}")
+                            
+                            # =========================================================
+                            # GLASS-BOX EXECUTION WITH SELF-CORRECTION
+                            # =========================================================
+                            if tool_name in ["execute_code", "run_python"]:
+                                from services.orchestrator.agents.code_generator import generate_python_code
+                                from services.orchestrator.agents.code_generator import generate_python_code
+
+                                
+                                attempt = 0
+                                max_attempts = 3
+                                previous_code = None
+                                previous_error = None
+                                
+                                while attempt < max_attempts:
+                                    attempt += 1
+                                    
+                                    # 1. GENERATE CODE (Autonomous)
+                                    logger.info(f"   🧠 Generating Python Code (Attempt {attempt})...")
+                                    # Only fetch files once to save IO
+                                    if attempt == 1:
+                                        files = []
+                                        try:
+                                            if hasattr(ctx, 'list_files'):
+                                                files = ctx.list_files()
+                                        except: pass
+                                    
+                                    code = await generate_python_code(
+                                        task_description=subtask.query,
+                                        facts=[{"text": f.get("text")} for f in collected_facts],
+                                        file_artifacts=files,
+                                        previous_code=previous_code,
+                                        previous_error=previous_error
+                                    )
+                                    
+                                    # 2. GLASS-BOX LOGGING (Show user the code)
+                                    logger.info(f"   📝 CODE TO EXECUTE:\n{'-'*40}\n{code}\n{'-'*40}")
+                                    
+                                    # 3. EXECUTE
+                                    args = {"code": code}
+                                    tool_res = await session.call_tool("execute_code", args)
+                                    
+                                    # 4. EVALUATE
+                                    # Normalize Result using Standard I/O
+                                    norm_res = ToolResponse.from_mcp_result("execute_code", tool_res)
+                                    
+                                    if not norm_res.is_error:
+                                        # Success!
+                                        response = f"Swarm Tool Result (execute_code):\n {norm_res.output.get_for_llm()[:2000]}"
+                                        
+                                        logger.info(f"   ✅ EXECUTION SUCCESS:\n{norm_res.output.text[:1000]}...")
+                                        break
+                                    else:
+                                        # Failure - Capture error for retry
+                                        error_msg = norm_res.output.error or str(norm_res.output.text)
+                                        logger.warning(f"   ❌ Execution Failed (Attempt {attempt}): {error_msg[:200]}")
+                                        
+                                        previous_code = code
+                                        previous_error = error_msg
+                                        
+                                        if attempt == max_attempts:
+                                            response = f"Swarm Tool Failed after {max_attempts} attempts: {error_msg}"
+                                            logger.error("   🛑 Giving up on code generation.")
+                            
+                            else:
+
+                                # STANDARD TOOL EXECUTION (Non-Code)
+                                # 0. Use Explicit Arguments if available (Standard I/O)
+                                if subtask.arguments:
+                                    args = subtask.arguments
+                                    logger.info(f"   🎯 Used Explicit Arguments from Planner: {args}")
+                                else:
+                                    # 1. Try heuristic mapping first
+                                    args = build_tool_inputs(
+                                        tool_name=tool_name, 
+                                        description=subtask.query, 
+                                        original_inputs={}, 
+                                        collected_facts=collected_facts
+                                    )
+                                
+                                # 2. DYNAMIC ARGUMENT GENERATION (The "Smart Hands" fix)
+                                # If heuristics failed (returned None or generic 'query') and it's complex tool
+                                # We MUST ask the LLM how to call it based on the schema.
+                                is_generic_arg = args is None or (len(args) == 1 and "query" in args)
+                                is_known_simple = tool_name in ["web_search", "news_search", "fetch_data"]
+                                
+                                if is_generic_arg and not is_known_simple:
+                                    try:
+                                        logger.info(f"   🔧 Fetching schema for complex tool: {tool_name}")
+                                        # Fetch schema from the live session
+                                        tools_list = await session.list_tools()
+                                        target_tool = next((t for t in tools_list if t.name == tool_name), None)
+                                        
+                                        if target_tool:
+                                            # Use LLM to map Task -> Arguments
+                                            schema_str = str(target_tool.inputSchema)
+                                            logger.info(f"   🧠 Mapping arguments using LLM for {tool_name}...")
+                                            
+                                            arg_prompt = f"""You are an API Argument Generator.
+Tool: {tool_name}
+Schema: {schema_str}
+Task: {subtask.query}
+
+Context Facts:
+{str(collected_facts)[:1000] if collected_facts else "None"}
+
+CRITICAL: Return ONLY valid JSON for the tool arguments. No markdown, no explanation."""
+                                            
+                                            arg_json = await self._call_llm(arg_prompt, "Generate JSON")
+                                            
+                                            # Clean and parse JSON
+                                            import json
+                                            cleaned_json = arg_json.replace("```json", "").replace("```", "").strip()
+                                            try:
+                                                args = json.loads(cleaned_json)
+                                                logger.info(f"   🎯 Generated Dynamic Args: {args}")
+                                            except:
+                                                logger.warning(f"   ⚠️ Failed to parse generated args: {cleaned_json[:50]}")
+                                                # Fallback to generic
+                                                if args is None: args = {"query": subtask.query}
+                                        else:
+                                            logger.warning(f"   ⚠️ Tool {tool_name} not found in session list.")
+                                    except Exception as map_err:
+                                        logger.warning(f"   ⚠️ Dynamic Argument Generation Failed: {map_err}")
+
+                                if args is None:
+                                    args = {"query": subtask.query}
+
+                                tool_res = await session.call_tool(tool_name, args)
+                                
+                                # Normalize Output
+                                norm_res = ToolResponse.from_mcp_result(tool_name, tool_res)
+                                
+                                if not norm_res.is_error:
+                                    response = f"Swarm Tool Result ({tool_name}):\n {norm_res.output.get_for_llm()[:2000]}"
+                                else:
+                                    response = f"Swarm Tool Failed ({tool_name}): {norm_res.output.error or norm_res.output.text}"
+                            # =========================================================
+                        except Exception as e:
+                            response = f"Swarm Tool Exception ({tool_name}): {e}"
+                    else:
+                        response = f"Tool {subtask.preferred_tool} not found in registry."
+
+                # PRIORITY 2: Heuristic Routing (Legacy)
+                elif "search" in subtask.query.lower() or "find" in subtask.query.lower():
+                    tool_name = "web_search"
+                    server_name = registry.get_server_for_tool(tool_name) or "search_server"
+                    
+                    try:
+                        session = await registry.get_session(server_name)
+                        tool_res = await session.call_tool(tool_name, {"query": subtask.query})
+                        
+                        if not tool_res.isError:
+                            response = f"Search Results: {str(tool_res.content)[:500]}..."
+                        else:
+                            response = f"Search Failed: {tool_res.content}"
+                    except Exception as e:
+                        response = f"Search failed: {e}"
+
+                else:
+                    # Default: Just think about it (Simulated thought, or real if connected to Planner)
+                    # Since we want "Real Pipeline", we'll attempt a generic Python solve
+                    tool_name = "execute_code" 
+                    server_name = registry.get_server_for_tool(tool_name) or "python_server"
+                    
+                    try:
+                        session = await registry.get_session(server_name)
+                        # Generate REAL code instead of dummy
+                        from services.orchestrator.agents.code_generator import generate_python_code
+                        
+                        # Gather context for generator
+                        facts = []
+                        if context_results:
+                            for r in context_results:
+                                if r.result:
+                                    facts.append({"text": str(r.result)})
+                        
+                        # Autonomous generation
+                        code = await generate_python_code(
+                            task_description=subtask.query,
+                            facts=facts
+                        )
+                        
+                        code_res = await session.call_tool(tool_name, {
+                            "code": code
+                        })
+                        response = f"Execution Result: {str(code_res.content)}"
+                    except Exception as e:
+                        response = f"Exec failed: {e}"
+
+            result.result = response
+            # Extract source metadata if available (provenance tracking)
+            if response:
+                result.source = extract_url_from_text(str(response))
+            
+            result.status = AgentStatus.COMPLETED
+            logger.info(f"✅ Agent {agent_id} completed.")
             
         except Exception as e:
             result.status = AgentStatus.FAILED
             result.error = str(e)
-            logger.error(f"Agent {agent_id} failed: {e}")
+            logger.error(f"❌ Agent {agent_id} failed: {e}")
         
         result.completed_at = datetime.utcnow()
         return result
@@ -429,18 +769,23 @@ class AgentSpawner:
     async def _call_llm(self, system_prompt: str, user_message: str) -> str:
         """Call LLM with prompt."""
         if self.llm_callback:
-            result = self.llm_callback(system_prompt, user_message)
-            if asyncio.iscoroutine(result):
-                return await result
-            return result
+            try:
+                # Support both async and sync callbacks
+                res = self.llm_callback(system_prompt, user_message)
+                if asyncio.iscoroutine(res):
+                    return await res
+                return res
+            except Exception as e:
+                logger.error(f"Agent LLM Call Failed: {e}")
+                return "LLM Failure"
         return ""
     
     async def _get_optimal_parallelism(self) -> int:
         """Get optimal parallelism based on resources."""
         try:
-            from shared.hardware import detect_hardware
-            profile = detect_hardware()
-            return min(self.max_parallel, profile.optimal_workers())
+            from shared.hardware.detector import detect_hardware
+            hw = detect_hardware()
+            return min(self.max_parallel, hw.optimal_workers())
         except ImportError:
             return self.max_parallel
     

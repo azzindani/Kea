@@ -60,10 +60,11 @@ Be fair and explain your reasoning."""
                 return self._fallback_judge(generator_output, critic_feedback)
             
             provider = OpenRouterProvider()
+            from shared.config import get_settings
             config = LLMConfig(
-                model="nvidia/nemotron-3-nano-30b-a3b:free",
+                model=get_settings().models.critic_model,
                 temperature=0.3,
-                max_tokens=800,
+                max_tokens=32768,
             )
             
             messages = [

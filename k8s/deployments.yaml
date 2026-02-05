@@ -38,10 +38,10 @@ spec:
                 secretKeyRef:
                   name: kea-secrets
                   key: jwt-secret
-            - name: REDIS_URL
-              value: "redis://redis:6379"
             - name: ORCHESTRATOR_URL
-              value: "http://orchestrator:8000"
+              value: "http://orchestrator:8001"
+            - name: RAG_SERVICE_URL
+              value: "http://rag-service:8003"
           resources:
             requests:
               memory: "256Mi"
@@ -55,12 +55,6 @@ spec:
               port: 8000
             initialDelaySeconds: 10
             periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /health/full
-              port: 8000
-            initialDelaySeconds: 5
-            periodSeconds: 5
 
 ---
 apiVersion: apps/v1
@@ -86,7 +80,7 @@ spec:
         - name: orchestrator
           image: kea/orchestrator:latest
           ports:
-            - containerPort: 8000
+            - containerPort: 8001
           env:
             - name: ENVIRONMENT
               value: "production"
@@ -100,10 +94,6 @@ spec:
                 secretKeyRef:
                   name: kea-secrets
                   key: openrouter-api-key
-            - name: REDIS_URL
-              value: "redis://redis:6379"
-            - name: QDRANT_URL
-              value: "http://qdrant:6333"
           resources:
             requests:
               memory: "512Mi"
@@ -111,12 +101,183 @@ spec:
             limits:
               memory: "2Gi"
               cpu: "1000m"
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: 8000
-            initialDelaySeconds: 15
-            periodSeconds: 10
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-host
+  labels:
+    app: kea
+    component: mcp-host
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kea
+      component: mcp-host
+  template:
+    metadata:
+      labels:
+        app: kea
+        component: mcp-host
+    spec:
+      containers:
+        - name: mcp-host
+          image: kea/mcp-host:latest
+          ports:
+            - containerPort: 8002
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: kea-secrets
+                  key: database-url
+          volumeMounts:
+            - name: artifacts
+              mountPath: /app/artifacts
+            - name: mcp-servers
+              mountPath: /app/mcp_servers
+      volumes:
+        - name: artifacts
+          persistentVolumeClaim:
+            claimName: kea-artifacts-pvc
+        - name: mcp-servers
+          configMap:
+            name: kea-mcp-servers
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-service
+  labels:
+    app: kea
+    component: rag-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kea
+      component: rag-service
+  template:
+    metadata:
+      labels:
+        app: kea
+        component: rag-service
+    spec:
+      containers:
+        - name: rag-service
+          image: kea/rag-service:latest
+          ports:
+            - containerPort: 8003
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: kea-secrets
+                  key: database-url
+            - name: OPENROUTER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: kea-secrets
+                  key: openrouter-api-key
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vault
+  labels:
+    app: kea
+    component: vault
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kea
+      component: vault
+  template:
+    metadata:
+      labels:
+        app: kea
+        component: vault
+    spec:
+      containers:
+        - name: vault
+          image: kea/vault:latest
+          ports:
+            - containerPort: 8004
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: kea-secrets
+                  key: database-url
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: swarm-manager
+  labels:
+    app: kea
+    component: swarm-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kea
+      component: swarm-manager
+  template:
+    metadata:
+      labels:
+        app: kea
+        component: swarm-manager
+    spec:
+      containers:
+        - name: swarm-manager
+          image: kea/swarm-manager:latest
+          ports:
+            - containerPort: 8005
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: kea-secrets
+                  key: database-url
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chronos
+  labels:
+    app: kea
+    component: chronos
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kea
+      component: chronos
+  template:
+    metadata:
+      labels:
+        app: kea
+        component: chronos
+    spec:
+      containers:
+        - name: chronos
+          image: kea/chronos:latest
+          ports:
+            - containerPort: 8006
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: kea-secrets
+                  key: database-url
 
 ---
 apiVersion: apps/v1
@@ -143,8 +304,6 @@ spec:
           image: kea/worker:latest
           command: ["python", "-m", "workers.research_worker"]
           env:
-            - name: ENVIRONMENT
-              value: "production"
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
@@ -155,12 +314,3 @@ spec:
                 secretKeyRef:
                   name: kea-secrets
                   key: openrouter-api-key
-            - name: REDIS_URL
-              value: "redis://redis:6379"
-          resources:
-            requests:
-              memory: "256Mi"
-              cpu: "100m"
-            limits:
-              memory: "1Gi"
-              cpu: "500m"

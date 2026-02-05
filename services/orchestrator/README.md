@@ -1,124 +1,94 @@
-# Orchestrator Service ("The Brain")
+# 🧠 Orchestrator Service ("The Brain")
 
-The **Orchestrator** is the central cognitive engine of Kea. It implements the **Agentic OODA Loop** (Observe, Orient, Decide, Act) using **LangGraph** to manage state, recursion, and decision-making. 
+The **Orchestrator Service** is the cognitive core of the Kea system, acting as the **Project Manager** in the Autonomous Enterprise Operating System. It manages the high-level reasoning, planning, and execution of complex research queries using a sophisticated **LangGraph-powered state machine** and **Directed Acyclic Graph (DAG)** execution.
 
-It is responsible for breaking down user queries, coordinating MCP tools, and synthesizing final yields.
+It coordinates between the API Gateway (Input), MCP Host (Tool Execution), and RAG Service (Memory) to deliver deep, evidence-based insights by simulating a team of specialized agents.
 
----
+## ✨ Features
 
-## 🏗️ Architecture Overview
+- **LangGraph State Machine**: Implements a cyclic research flow with checkpointing, enabling backtracking, iterative refinement, and human-in-the-loop interactions.
+- **Phased Fractal Spawning**: Dynamically groups research tasks into topological phases, executing independent tasks in parallel "swarms" while respecting strict dependencies (DAG Execution).
+- **The "Bucket Pattern"**: Automatically expands massive tasks (e.g., "Analyze 10k files") into parallel shards to maximize throughput.
+- **Cognitive Agent Personas**: Utilizes specialized agents (Planner, Researcher, Critic, Judge) with distinct prompts and reasoning styles defined in `templates/`.
+- **Multi-Agent Consensus**: Implements a Generator-Critic-Judge (GCJ) pattern to verify facts and ensure high-confidence outputs.
+- **Neural Fact Reranking**: Automatically reranks collected facts using cross-encoders to ensure only the most relevant context reaches the synthesizer (The "Keeper" Node).
+- **Enterprise "Fractal Corp" Logic**: Integrates with the Swarm Manager to enforce organizational domains (Research, Finance, Legal) and compliance guardrails.
 
-The Orchestrator operates as a **Cyclic State Machine**, allowing it to "Think Fast" (Router) and "Think Slow" (Deep Research Loop).
+## 📐 Architecture
 
-1.  **Planning Layer**: Decomposes complex queries into atomic micro-tasks.
-2.  **Execution Layer**: Distributes tasks to MCP Tools (Scraper, Analyst).
-3.  **Control Layer**: The "Keeper" monitors for context drift and hallucinations.
-4.  **Consensus Layer**: Adversarial Agents (Generator vs Critic) verify the final output.
+The Orchestrator follows a **Graph-Based Reasoning Architecture**. Unlike linear pipelines, the Orchestrator can loop back to earlier nodes if the research quality is insufficient.
+
+### 🗼 The Research Graph
+The research process flows through several distinct cognitive stages:
+
+1.  **Router**: Determines the "Intention" (Memory Fork, Shadow Lab, Deep Research).
+2.  **Planner**: Decomposes the query into sub-queries and a topological execution plan (The Blueprint).
+3.  **Researcher**: Executes the plan via Phased Fractal Spawning.
+4.  **Keeper**: Performs "Context Hygiene" to discard noise and contradictions.
+5.  **GCJ Loop**: Generator creates a draft, Critic finds weaknesses, and Judge provides the final verdict.
+6.  **Synthesizer**: Compiles the final report with citations and confidence scores.
 
 ```mermaid
 graph TD
-    Start[Query] --> Router{Intention Router}
-    Router -->|Deep Research| Planner[Planner Node]
-    
-    subgraph Execution Loop
-        Planner --> Researcher[Researcher Node]
-        Researcher --> Keeper{The Keeper}
-        Keeper --"More Data Needed"--> Researcher
-    end
-    
-    Keeper --"Sufficient"--> Generator[Generator Agent]
-    
-    subgraph Consensus Engine
-        Generator --> Critic[Critic Agent]
-        Critic --> Judge{Judge Agent}
-        Judge --"Revise"--> Generator
-    end
-    
-    Judge --"Approved"--> Synthesizer[Synthesizer Node]
-    Synthesizer --> End[Final Report]
+    Start((Start)) --> Router{Intention Router}
+    Router -->|Research| Planner[Planner Node]
+    Planner --> Researcher[Researcher Node]
+    Researcher -->|Parallel Swarm| MCP[MCP Host]
+    MCP --> Researcher
+    Researcher --> Keeper[Keeper Node]
+    Keeper --> GCJ{Consensus Engine}
+    GCJ -->|Iterate| Planner
+    GCJ -->|Approve| Synthesizer[Synthesizer Node]
+    Synthesizer --> End((End))
 ```
 
----
+## 📁 Codebase Structure
 
-## 📁 Codebase Structure & Reference
+- **`main.py`**: FastAPI entrypoint hosting the `/research` and `/chat` pipelines.
+- **`core/`**: The engine room of the orchestrator.
+    - `graph.py`: Defines the LangGraph nodes, edges, and state transitions.
+    - `pipeline.py`: Top-level integration layer handling classification and caching.
+    - `assembler.py`: **The Node Assembler**. Wires dependency graphs, resolves artifact inputs/outputs, and implements **Self-Healing** logic for failed nodes.
+    - `agent_spawner.py`: Handles parallel agent spawning for high-throughput phases.
+    - `modality.py`: Manages multi-modal inputs/outputs within the research graph.
+    - `organization.py`: Implements "Fractal Corp" departments and domain rules.
+    - `prompt_factory.py`: Generates context-aware prompts for agents.
+- **`nodes/`**: Individual LangGraph node implementations.
+    - `planner.py`: Reasoning logic for sub-query decomposition.
+    - `keeper.py`: Context filtering and contradiction detection.
+- **`agents/`**: Core agent logic and specialized code generators.
+    - `code_generator.py`: "Shadow Lab" logic for autonomous Python script generation.
+- **`templates/`**: Version-controlled prompt templates for all agent personas.
 
-| File / Directory | Component | Description | Key Classes/Functions |
-|:-----------------|:----------|:------------|:----------------------|
-| **`main.py`** | **Entry Point** | FastAPI app for the service. Manages lifecycle events. | `create_app()`, `startup_event()` |
-| **`core/`** | **Nervous System** | Core pipeline logic and state definitions. | |
-| ├── `graph.py` | State Machine | Defines the LangGraph nodes (Planner, Researcher) and edges. | `compile_research_graph()` |
-| ├── `router.py` | Classifier | Determines if a query needs Research or simple Chat. | `IntentionRouter.route()` |
-| ├── `pipeline.py` | Runner | Manages the async event loop for a single job. | `ConversationResearchPipeline.run()` |
-| **`nodes/`** | **Graph Nodes** | Deterministic steps in the state machine. | |
-| ├── `planner.py` | Strategy | Breaks query into micro-tasks (Plan JSON). | `planner_node()` |
-| ├── `researcher.py` | Muscle | Iterates plan and calls MCP tools. | `researcher_node()` |
-| ├── `keeper.py` | Controller | Checks sufficiency and context drift. | `keeper_node()` |
-| ├── `synthesizer.py`| Output | Formats final markdown report. | `synthesizer_node()` |
-| **`agents/`** | **Personas** | LLM Agents for the Consensus Engine. | |
-| ├── `generator.py` | Optimist | Drafts initial answer. | `GeneratorAgent` |
-| ├── `critic.py` | Pessimist | Audits draft for fallacies. | `CriticAgent` |
-| ├── `judge.py` | Arbiter | Decides to Approve or Revise. | `JudgeAgent` |
-| **`mcp/`** | **Integration** | Infrastructure to talk to tool servers. | `MCPOrchestrator` |
+## 🧠 Deep Dive
 
----
+### 1. Phased Fractal Spawning & DAG Execution
+The Researcher node doesn't just run tools; it builds a mini-graph of dependencies. Tasks that can run in parallel (e.g., "Search for Company A" and "Search for Company B") are batched into a **Swarm Phase**. Tasks that depend on previous outputs (e.g., "Calculate Ratio" from previously fetched Data) are held until the preceding phase completes. This ensures data integrity while maximizing throughput.
 
-## 🔬 Deep Dive: Key Subsystems
+### 2. Autonomic "Shadow Lab" Execution
+For technical research (coding, data analysis), the Orchestrator can pivot to the **Shadow Lab** path. It utilizes a `code_generator.py` agent to write custom Python scripts on the fly, which are then executed by the MCP Host. This allows Kea to solve problems it doesn't have a pre-built tool for, effectively acting as an **Autonomous Data Scientist**.
 
-### 1. The Cyclic State Graph (`core/graph.py`)
-Unlike linear chains (LangChain), Kea uses a **Graph**. This allows the system to:
-*   **Loop**: Go back to the Researcher if the data is insufficient.
-*   **Fork**: Spawn parallel research paths if the hypothesis splits.
-*   **Correct**: The Critic node can reject a draft and force a rewrite.
+### 3. Context Hygiene (The Keeper)
+To prevent "Context Poisoning", the Keeper node audits all incoming facts from the Researcher. It uses neural reranking and semantic contradiction detection to ensure that hallucinations or low-quality data are pruned before reaching the synthesis stage.
 
-### 2. The Keeper Protocol (`nodes/keeper.py`)
-The Keeper is the "Traffic Cop" of the brain. It prevents the infinite loop problem common in autonomous agents.
-*   **Drift Detection**: Scores current facts against the original User Intent vector.
-*   **Sufficiency Check**: Determines if we have enough facts to answer the question without hallucination.
-*   **Yield Control**: Decides when to stop researching and start writing.
+## 📚 Reference
 
-### 3. Adversarial Collaboration (`agents/`)
-To maximize accuracy, we use a multi-persona boardroom simulation:
-*   **Generator**: "I have found these facts, here is the conclusion."
-*   **Critic**: "You missed the date on the second fact. Source B is unreliable."
-*   **Judge**: "Objection sustained. Generator, re-write section 2."
+### Key Node Types
 
----
+| Node | Responsibility | Failure Mode |
+|:-----|:---------------|:-------------|
+| **Planner** | Strategic Decomposition (The Blueprint) | Hallucinated Tool Usage |
+| **Researcher** | Data Acquisition | Tool Execution Timeout |
+| **Keeper** | Data Integrity | False Contradiction Pruning |
+| **Synthesizer** | Narrative Construction | Lost Citations |
 
-## 🔌 API Node Reference (Internal)
+### API Reference (Internal)
 
-While the Orchestrator is usually called via `main.py`, the core Logic Units (Nodes) are distinct inputs/outputs.
-
-### 1. Planning Layer
-| Node | Input | Output | Description |
-|:-----|:------|:-------|:------------|
-| `router` | `Query` (str) | `Path` (str) | Classifies intent (RESEARCH vs CHAT). |
-| `planner` | `Query` (str) | `ExecutionPlan` (JSON) | Generates step-by-step checklist. |
-
-### 2. Execution Layer
-| Node | Input | Output | Description |
-|:-----|:------|:-------|:------------|
-| `researcher` | `Plan` | `Facts` (List[str]) | Executes tools and gathers data. |
-| `keeper` | `Facts` | `Decision` (Continue/Stop) | Validates data sufficiency. |
-
-### 3. Consensus Layer
-| Node | Input | Output | Description |
-|:-----|:------|:-------|:------------|
-| `generator` | `Facts` | `Draft` (Markdown) | Writes the first draft. |
-| `critic` | `Draft` | `Feedback` (List[str]) | Finds errors in the draft. |
-| `judge` | `Feedback` | `Verdict` (Approve/Revise) | Final decision maker. |
-
-### 4. Output Layer
-| Node | Input | Output | Description |
-|:-----|:------|:-------|:------------|
-| `synthesizer` | `Draft` | `Report` (Markdown) | Final polish and formatting. |
-
----
-
-## 🚀 Usage
-
-To run the Orchestrator service in isolation (for development):
-
-```bash
-# Start the service
-python -m services.orchestrator.main
-```
+| Endpoint | Method | Description |
+|:---------|:-------|:------------|
+| `/research` | `POST` | Start a synchronous research job. |
+| `/research/stream` | `GET` | Stream research progress via SSE. |
+| `/chat/message` | `POST` | Process a chat message through the research pipeline. |
+| `/tools` | `GET` | List all available MCP tools (via Host). |
+| `/tools/{name}` | `POST` | Execute a specific tool directly. |
+| `/health` | `GET` | Service status and active session count. |

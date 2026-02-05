@@ -1,0 +1,93 @@
+
+import yfinance as yf
+import pandas as pd
+import uuid
+import os
+
+import yfinance as yf
+import pandas as pd
+import uuid
+import os
+from shared.logging import get_logger
+
+logger = get_logger(__name__)
+
+# 1. Bulk Tools with File I/O
+async def get_bulk_historical_data(tickers: str, period: str = "1mo", interval: str = "1d") -> str:
+    """Download historical data for multiple tickers (File Return)."""
+    # tickers = "AAPL MSFT"
+    
+    try:
+        # Threaded Download
+        df = yf.download(tickers, period=period, interval=interval, group_by="ticker", threads=True, progress=False)
+        
+        # Save to temp file (Standard I/O for large data)
+        report_id = uuid.uuid4().hex[:8]
+        file_path = f"/tmp/history_{report_id}.csv"
+        # Flatten for CSV if multi-index
+        if isinstance(df.columns, pd.MultiIndex):
+             df.stack(level=0).to_csv(file_path)
+        else:
+             df.to_csv(file_path)
+             
+        return f"Fetched history for {len(tickers.split())} tickers. Data saved to file: {file_path}"
+    except Exception as e:
+        logger.error(f"Market tool error: {e}")
+        return f"Error: {str(e)}"
+
+# 2. Micro-Metric Tools (Unrolled)
+async def get_current_price(ticker: str) -> str:
+    """Get just the price."""
+    try:
+        price = yf.Ticker(ticker).fast_info.last_price
+        return str(price)
+    except: 
+        logger.error(f"Market tool error (N/A fallback)")
+        return "N/A"
+
+async def get_market_cap(ticker: str) -> str:
+    """Get Market Cap."""
+    try:
+        val = yf.Ticker(ticker).info.get("marketCap", "N/A")
+        return str(val)
+    except: 
+        logger.error(f"Market tool error (N/A fallback)")
+        return "N/A"
+
+async def get_volume(ticker: str) -> str:
+    """Get recent volume."""
+    try:
+        val = yf.Ticker(ticker).fast_info.last_volume
+        return str(val)
+    except: 
+        logger.error(f"Market tool error (N/A fallback)")
+        return "N/A"
+
+async def get_pe_ratio(ticker: str) -> str:
+    """Get Trailing PE."""
+    try:
+        val = yf.Ticker(ticker).info.get("trailingPE", "N/A")
+        return str(val)
+    except: 
+        logger.error(f"Market tool error (N/A fallback)")
+        return "N/A"
+
+async def get_beta(ticker: str) -> str:
+    """Get Beta (Volatility)."""
+    try:
+        val = yf.Ticker(ticker).info.get("beta", "N/A")
+        return str(val)
+    except: 
+        logger.error(f"Market tool error (N/A fallback)")
+        return "N/A"
+
+async def get_quote_metadata(ticker: str) -> str:
+    """Get Bid/Ask/Currency."""
+    try:
+        i = yf.Ticker(ticker).info
+        res = {k: i.get(k) for k in ["bid", "ask", "bidSize", "askSize", "currency", "financialCurrency"]}
+        return str(res)
+    except: 
+        logger.error(f"Market tool error (N/A fallback)")
+        return "N/A"
+

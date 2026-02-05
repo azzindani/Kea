@@ -1,57 +1,53 @@
 # Embedding Package
 """
 Embedding and reranking providers for RAG.
-
-Models:
-- Qwen3-Embedding-8B (OpenRouter API)
-- Qwen3-Embedding-0.6B (Local)
-- Qwen3-Reranker-0.6B (Local)
-- Qwen3-VL-Embedding-2B (Local, Vision-Language)
-- Qwen3-VL-Reranker-2B (Local, Vision-Language)
+Auto-discovered with actual export detection.
 """
 
-from shared.embedding.qwen3_embedding import (
-    EmbeddingProvider,
-    OpenRouterEmbedding,
-    LocalEmbedding,
-    create_embedding_provider,
-)
-from shared.embedding.qwen3_reranker import (
-    RerankerProvider,
-    LocalReranker,
-    RerankResult,
-    create_reranker_provider,
-)
-from shared.embedding.qwen3_vl_embedding import (
-    VLEmbeddingProvider,
-    LocalVLEmbedding,
-    VLInput,
-    create_vl_embedding_provider,
-)
-from shared.embedding.qwen3_vl_reranker import (
-    VLRerankerProvider,
-    VLRerankResult,
-    create_vl_reranker_provider,
-)
+from pathlib import Path
+from typing import Any
+import importlib
+import logging
 
-__all__ = [
-    # Text Embedding
-    "EmbeddingProvider",
-    "OpenRouterEmbedding",
-    "LocalEmbedding",
-    "create_embedding_provider",
-    # Text Reranking
-    "RerankerProvider",
-    "LocalReranker",
-    "RerankResult",
-    "create_reranker_provider",
-    # Vision-Language Embedding
-    "VLEmbeddingProvider",
-    "LocalVLEmbedding",
-    "VLInput",
-    "create_vl_embedding_provider",
-    # Vision-Language Reranking
-    "VLRerankerProvider",
-    "VLRerankResult",
-    "create_vl_reranker_provider",
-]
+logger = logging.getLogger(__name__)
+
+_DIR = Path(__file__).parent
+_discovered: dict = {}
+
+
+def _discover() -> dict:
+    global _discovered
+    if _discovered:
+        return _discovered
+    
+    exports = {}
+    for item in _DIR.iterdir():
+        if item.is_file() and item.suffix == ".py" and item.name != "__init__.py":
+            module_path = f"shared.embedding.{item.stem}"
+            try:
+                module = importlib.import_module(module_path)
+                for name in dir(module):
+                    if not name.startswith("_"):
+                        obj = getattr(module, name, None)
+                        if isinstance(obj, type) or callable(obj):
+                            exports[name] = module_path
+            except ImportError:
+                continue
+    
+    _discovered = exports
+    return exports
+
+
+def __getattr__(name: str) -> Any:
+    exports = _discover()
+    if name in exports:
+        module = importlib.import_module(exports[name])
+        return getattr(module, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__():
+    return list(_discover().keys())
+
+
+__all__ = list(_discover())

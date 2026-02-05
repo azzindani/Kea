@@ -34,6 +34,25 @@ Your role:
 - Question source reliability
 - Suggest what's missing
 
+CRITICAL - CHECK FOR HALLUCINATION:
+1. Flag ANY claim that isn't backed by the provided facts
+2. If numbers/statistics appear without source, mark as "POTENTIALLY FABRICATED"
+3. Check if the answer contains data that wasn't in the original facts
+4. Verify that acknowledged "data gaps" match what's actually missing
+5. Be especially suspicious of precise numbers, dates, or names without citations
+
+IMPORTANT - TOOL OUTPUTS ARE VALID FACTS:
+The research system uses tools (yfinance, database queries, APIs) to retrieve data.
+If the Generator cites a number (e.g., "Revenue: 75.06T") and that number appears 
+in a TOOL OUTPUT (CSV, JSON, or table string from the Researcher phase), IT IS VALID.
+Tool outputs count as source facts, not hallucinations.
+
+IMPORTANT - ALLOW DERIVED CALCULATIONS:
+Distinguish between HALLUCINATION (inventing numbers) and DERIVATION (calculating from existing data).
+If the Generator calculates metrics like Free Cash Flow (Operating Cash - CapEx) or 
+ratios like ROE (Net Income / Equity) from raw facts, DO NOT mark as hallucination.
+If the math is valid and inputs are in the source data, ACCEPT the derived value.
+
 Be constructive - don't just criticize, suggest improvements."""
     
     async def critique(self, answer: str, facts: list, sources: list) -> str:
@@ -56,10 +75,11 @@ Be constructive - don't just criticize, suggest improvements."""
                 return self._fallback_critique(answer)
             
             provider = OpenRouterProvider()
+            from shared.config import get_settings
             config = LLMConfig(
-                model="nvidia/nemotron-3-nano-30b-a3b:free",
+                model=get_settings().models.critic_model,
                 temperature=0.4,
-                max_tokens=600,
+                max_tokens=32768,
             )
             
             messages = [

@@ -1,162 +1,120 @@
 # 🚪 API Gateway Service ("The Front Door")
 
-The **API Gateway** is the centralized nerve center of the Kea system. It is responsible for routing user intentions, managing the security perimeter, orchestrating asynchronous research jobs, and handling the entire cognitive pipeline lifecycle.
+The **API Gateway** is the centralized nerve center of the **Kea v4.0 Autonomous Enterprise Operating System**. It is responsible for routing user intentions, managing the security perimeter, orchestrating asynchronous research jobs, and handling the entire cognitive pipeline lifecycle. It acts as the single point of entry for all external clients, ensuring consistent authentication, rate limiting, and request validation.
 
----
+## ✨ Features
 
-## 🏗️ Architecture Overview
+- **Centralized Security**: Unified authentication and authorization using JWT and session cookies.
+- **Smart Rate Limiting**: Tiered limiting based on user identity and IP, preventing system abuse via "Sliding Window" algorithm.
+- **Microservice Orchestration**: Seamlessly routes requests to specialized services (Orchestrator, MCP Host, RAG, etc.).
+- **Asynchronous Job Management**: Handles long-running research tasks with status tracking and result retrieval.
+- **Human-in-the-Loop (HITL)**: Provides endpoints for manual interventions and decision-making during research.
+- **Protocol Proxying**: Translates public REST API calls into internal service-to-service communication.
+- **Production-Ready Observability**: Integrated Prometheus metrics and structured JSON logging.
 
-The Gateway implements a **4-Layer Architecture** to ensure security and scalability:
+## 📐 Architecture
 
-1.  **Security Layer**: Token Bucket Rate Limiting, CORS, and Security Headers.
-2.  **Identity Layer**: Hybrid Authentication (JWT for APIs + HttpOnly Cookies for Web).
-3.  **Application Layer**: 9 specialized route modules handling diverse domains.
-4.  **Integration Layer**: Redis Queue for background jobs and Event Bus for inter-service comms.
+The Gateway implements a **4-Layer Defense-in-Depth Architecture**, ensuring that only valid, authorized, and safe requests reach the internal service mesh.
+
+1.  **Transport & Security Layer**:
+    *   **HSTS & CSP**: Rigid security headers enforced via `SecurityHeadersMiddleware`.
+    *   **Sliding Window Rate Limiting**: Managed via `RateLimitMiddleware` using a ZSET-based algorithm (100 req/min burst protect).
+    *   **CORS Management**: Dynamically resolved origins via `get_cors_origins()`.
+2.  **Identity Layer**:
+    *   **Hybrid Authentication**: Supports `JWT` for programmatic access and `HttpOnly Cookies` for browser sessions.
+    *   **Token Authority**: The Gateway acts as the central issuer; downstream services trust the injected `X-User-ID` header.
+3.  **Application Layer**:
+    *   **Route Dispatching**: Polymorphic route modules (Jobs, Graph, Memory, etc.) proxying to specialized upstream services.
+    *   **Polymorphic Jobs**: The `/jobs` endpoint handles Research, Synthesis, and Calculation job types.
+4.  **Persistence Layer**:
+    *   **Event Bus**: Internal service-to-service communication hooks.
+    *   **Postgres State**: Used for high-frequency tracking (rate limits, session metrics).
 
 ```mermaid
 graph TD
-    User((User)) -->|HTTP/REST| Gateway[API Gateway]
+    User((User)) -->|HTTP/REST| Gateway[API Gateway (Port 8000)]
     
     subgraph Layers
         Gateway --> Auth[Identity & Security]
         Auth --> Router{Route Dispatcher}
         
-        Router -->|Chat| Conversations[Cognitive Pipeline]
-        Router -->|Research| Jobs[Job Orchestrator]
-        Router -->|Control| Interventions[HITL Manager]
-        Router -->|Tools| MCP[MCP Tool Proxy]
-        Router -->|Data| Graph[Knowledge Graph]
+        Router -->|/chat/message| Orch[Orchestrator<br/>(Port 8001)]
+        Router -->|/tools/call| MCP[MCP Host<br/>(Port 8002)]
+        Router -->|/datasets| RAG[RAG Service<br/>(Port 8003)]
+        Router -->|/audit/logs| Vault[Vault Service<br/>(Port 8004)]
+        Router -->|/jobs| Chronos[Chronos Service<br/>(Port 8006)]
     end
     
-    Conversations -->|Trigger| Planner
-    Jobs -->|Push| Redis[Redis Queue]
-    Interventions -->|Pause| StateMachine
+    Orch -->|Trigger| Planner
+    Chronos -->|Schedule| Queue[Postgres Queue]
 ```
 
----
+## 📁 Codebase Structure
 
-## 📁 Codebase Structure & Reference
+The service is organized into functional modules that isolate security logic from routing and upstream communication.
 
-| File / Directory | Component | Description | Key Functions/Classes |
-|:-----------------|:----------|:------------|:----------------------|
-| **`main.py`** | **Entry Point** | App configuration, middleware assembly, and router verification. | `create_app()`, `mount_routes()` |
-| **`routes/`** | **Route Modules** | Domain-specific request handlers. | |
-| ├── `jobs.py` | Orchestration | Manages long-running research tasks via Redis/BackgroundTasks. | `create_job()`, `get_job_status()` |
-| ├── `conversations.py` | Cognitive Logic | **The Core Brain.** Handles chat messages, context, and triggers the Research Pipeline. | `send_message()`, `search_conversations()` |
-| ├── `interventions.py` | HITL | "Stop-and-Wait" logic for human approval of agent actions. | `respond_to_intervention()`, `list_pending()` |
-| ├── `mcp.py` | Tooling | Direct interface to the 17 MCP Servers for testing/bypassing agents. | `invoke_tool()`, `list_servers()` |
-| ├── `llm.py` | AI Proxy | Internal gateway for LLM switching, usage tracking, and cost calculation. | `generate()`, `enable_provider()` |
-| ├── `auth.py` | Identity | User registration, login, and JWT token issuance. | `login()`, `register()`, `refresh_token()` |
-| ├── `graph.py` | Memory | API for exploring the Knowledge Graph and Provenance chains. | `get_entity_provenance()`, `find_contradictions()` |
-| └── `artifacts.py` | Storage | Blob storage for large research outputs (PDFs, Parquet). | `upload_artifact()`, `download_artifact()` |
-| **`middleware/`** | **Middleware** | Cross-cutting concerns. | `RateLimitMiddleware`, `AuthMiddleware` |
+### 🔌 Core Components
 
----
+- **`main.py`**: The application entrypoint. Configures FastAPI, assembles the middleware stack, and mounts all polymorphic routers.
+- **`routes/`**: Implementation of API endpoints. These modules serve as "orchestrators" that validate inputs and delegate work.
+    - `auth.py`: Identity management, login, registration, and token issuance.
+    - `conversations.py`: High-level chat interface, interacting with the Orchestrator's state machine.
+    - `jobs.py`: Core research job management, proxying to the Chronos scheduling service.
+    - `mcp.py`: Interface for direct tool calls and MCP server management.
+    - `interventions.py`: Manages human-in-the-loop pause states and decision points.
+    - `system.py`: Service health, configuration exposure, and capability discovery.
+    - `artifacts.py`: Interface for uploading/downloading heavy data assets generated by the system.
+    - `graph.py`: Visualizations and graph introspection.
+    - `llm.py`: Direct LLM interaction endpoints.
+    - `memory.py`: Semantic search and memory retrieval interface.
+    - `users.py`: User profile and settings management.
+    - `analysis.py`: Endpoints for specialized data analysis tasks.
+    - `search.py`: Unified search interface spanning multiple data sources.
+    - `notifications.py`: Server-sent events (SSE) and notification management.
+    - `visualizations.py`: specialized endpoints for generating chart data.
+- **`middleware/`**: Cross-cutting concerns that process every request before it hits a route.
+    - `auth.py`: JWT/Cookie verification and identity injection into the request state.
+    - `rate_limit.py`: Sliding-window rate limiting using a shared Postgres backend.
+    - `security.py`: CSP, HSTS, and CORS header management.
+- **`clients/`**: Highly optimized HTTP/RPC clients for communicating with other Kea services.
+    - `orchestrator.py`: Client for the Reasoning/Planning engine.
+    - `mcp_client.py`: Client for the Tool Execution host.
+    - `rag_service.py`: Client for the Knowledge and Discovery service.
+- **`schemas/`**: Pydantic models for request/response validation across the gateway.
 
-## � API Endpoint Structure
+## 🧠 Deep Dive
 
-### 1. Job Dispatcher (The Core)
-Handles Research, Synthesis, and Shadow Lab execution.
+### 1. Hybrid Rate Limiting Implementation
+To prevent "DDoS by Agent" (infinite loops), the Gateway implements a tiered limiting strategy:
+- **Algorithm**: Sliding Window (ZSET-based).
+- **Backend**: Postgres Unlogged Table for global state, providing high throughput.
+- **Fail-Open Logic**: If the database becomes unavailable, the Gateway defaults to allowing requests to prioritize system availability.
+- **Key Hierarchy**: Limits are applied to `user_id` if authenticated, falling back to IP address for anonymous traffic.
 
-| Endpoint | Method | Description |
-|:---------|:-------|:------------|
-| `/api/v1/jobs` | `POST` | Submit a new polymorphic job (Research, Synthesis, Calc). |
-| `/api/v1/jobs` | `GET` | List all recent jobs with filtering/pagination. |
-| `/api/v1/jobs/{id}` | `GET` | Get real-time status, logs, and progress of a job. |
-| `/api/v1/jobs/{id}` | `DELETE` | Cancel/Terminate a running job immediately. |
-| `/api/v1/jobs/{id}/result` | `GET` | Get final job report and artifacts (Completed jobs only). |
+### 2. Service-to-Service Security & Trust
+The Gateway is the **Source of Truth for Identity**. 
+- Internal services (Orchestrator, Vault, etc.) do not implement their own authentication logic. Instead, they trust the Gateway-injected `X-User-ID` and `X-Scope` headers.
+- Internal communication is managed via a `ServiceRegistry` that can be overridden via environment variables for flexible deployment (e.g., K8s vs. Local).
 
-### 2. Memory & Knowledge Brain
-Interacts with the Vector DB, Atomic Facts, and Graphs.
+### 3. Polymorphic Job Lifecycle
+The `/jobs` endpoint implements a polymorphic pattern where different `job_type` payloads (Research, Synthesis, Shadow Lab) are validated and routed to the same underlying scheduling mechanism in **Chronos**. This allows for a unified tracking interface regardless of the job's complexity.
 
-| Endpoint | Method | Description |
-|:---------|:-------|:------------|
-| `/api/v1/memory/search` | `POST` | Perform semantic search against Atomic Facts DB. |
-| `/api/v1/graph/entities/{id}/provenance` | `GET` | Retrieve the Provenance Graph (Nodes/Edges) for UI. |
-| `/api/v1/graph/contradictions` | `GET` | Find conflicting facts in memory. |
-| `/api/v1/memory/sessions/{id}` | `GET` | Get the full session detail. |
+## 📚 Reference
 
-### 3. Artifacts & Storage
-Accessing heavy files generated by the system (Parquet, PDF, Charts).
+### API Endpoints
 
-| Endpoint | Method | Description |
-|:---------|:-------|:------------|
-| `/api/v1/artifacts/{id}` | `GET` | Get artifact metadata. |
-| `/api/v1/artifacts/{id}/download` | `GET` | Download a raw artifact file (binary stream). |
-| `/api/v1/artifacts` | `POST` | Step 1: Create artifact metadata container. |
-| `/api/v1/artifacts/{id}/upload` | `POST` | Step 2: Upload binary content (Multipart). |
+| Category | Endpoint | Method | Description |
+|:---------|:---------|:-------|:------------|
+| **Auth** | `/api/v1/auth/login` | `POST` | Exchange credentials for a JWT and session cookie. |
+| **Jobs** | `/api/v1/jobs` | `POST` | Submit a Research, Synthesis, or Calculation job. |
+| **Memory** | `/api/v1/memory/search` | `POST` | Semantic search against the Atomic Facts database. |
+| **HITL** | `/api/v1/interventions` | `GET` | List jobs waiting for human decision-making. |
+| **Chat** | `/api/v1/conversations` | `POST` | Send a message to the Orchestrator with intent detection. |
+| **System** | `/api/v1/system/health` | `GET` | Deep health check of all microservices. |
 
-### 4. Human-in-the-Loop (Interventions)
-Managing pauses, confirmations, and feedback.
-
-| Endpoint | Method | Description |
-|:---------|:-------|:------------|
-| `/api/v1/interventions` | `GET` | List all jobs currently paused waiting for human input. |
-| `/api/v1/interventions/{id}` | `GET` | Get details of the decision needed (e.g., choices). |
-| `/api/v1/interventions/{id}/respond` | `POST` | Submit human decision to resume the job. |
-
-### 5. System & Connectors
-Configuration, Capabilities, and Health.
-
-| Endpoint | Method | Description |
-|:---------|:-------|:------------|
-| `/api/v1/system/capabilities` | `GET` | List active Agents/Tools (e.g., Scraper, Analyst, Vision). |
-| `/api/v1/system/health` | `GET` | Check status of Microservices (Redis, DB, Scraper). |
-| `/api/v1/system/config` | `GET` | View global settings (Read-only). |
-| `/api/v1/system/metrics/summary` | `GET` | Get high-level system stats. |
-
-### 6. LLM Provider Management
-Managing the AI models used by the Orchestrator.
-
-| Endpoint | Method | Description |
-|:---------|:-------|:------------|
-| `/api/v1/llm/providers` | `GET` | List available providers (OpenAI, Gemini, Anthropic). |
-| `/api/v1/llm/models` | `GET` | List available models for a specific provider. |
-| `/api/v1/llm/providers/{name}/enable` | `POST` | Hot-swap: Enable a specific provider. |
-| `/api/v1/llm/usage` | `GET` | Get token usage statistics and cost estimation. |
-
-### 7. Conversations
-Multi-turn conversation management with memory.
-
-| Endpoint | Method | Description |
-|:---------|:-------|:------------|
-| `/api/v1/conversations` | `POST` | Start new conversation session. |
-| `/api/v1/conversations/{id}` | `GET` | Get conversation history and context. |
-| `/api/v1/conversations/{id}/message` | `POST` | Send message with intent detection. |
-
-### 8. MCP Tools
-Managing MCP servers and tool execution.
-
-| Endpoint | Method | Description |
-|:---------|:-------|:------------|
-| **Jobs** | `POST` | `/jobs` | Spawn async background worker. |
-| **HITL** | `POST` | `/interventions/{id}/respond` | Submit user decision to blocked agent. |
-| **Tools** | `POST` | `/mcp/invoke` | Raw tool execution (No LLM). |
-| **LLM** | `POST` | `/llm/providers/openrouter/enable`| Hot-swap LLM provider. |
-| **Graph**| `GET` | `/graph/entities/{id}/provenance`| Visualize fact derivation. |
-| **Auth** | `POST` | `/auth/login` | Returns JWT + Sets Session Cookie. |
-|:---------|:-------|:------------|
-| `/api/v1/mcp/servers` | `GET` | List active MCP servers. |
-| `/api/v1/mcp/tools` | `GET` | List all available tools across servers. |
-| `/api/v1/mcp/invoke` | `POST` | Execute a specific tool (Body: `{"tool_name": ...}`). |
-
-### 9. Authentication & Users
-User management and authentication.
-
-| Endpoint | Method | Description |
-|:---------|:-------|:------------|
-| `/api/v1/auth/login` | `POST` | Returns JWT + Sets Session Cookie. |
-| `/api/v1/auth/register` | `POST` | Register a new user. |
-| `/api/v1/users/me` | `GET/PUT` | Get or Update current user profile. |
-| `/api/v1/users/me/keys` | `GET/POST` | Manage personal API keys. |
-
----
-
-## �️ Middleware Stack
-
-Every request passes through a rigid security filter:
-
-1.  **RateLimitMiddleware`: 100 req/min (Burst protection).
-2.  **RequestLoggingMiddleware**: Structural JSON logging with `trace_id`.
-3.  **SecurityHeadersMiddleware**: HSTS, X-Frame-Options, X-Content-Type-Options.
-4.  **AuthMiddleware**: Decodes JWT/Cookie and injects `current_user` into request context.
+### Middleware Execution Order
+1. **RateLimitMiddleware**: Outermost layer; drops excessive traffic early.
+2. **RequestLoggingMiddleware**: Generates `trace_id` for request tracking.
+3. **SecurityHeadersMiddleware**: Sets standard security headers (CSP, HSTS).
+4. **AuthMiddleware**: Identifies the user and populates `request.state.user`.
+5. **CORS (FastAPI Default)**: Innermost layer; handles cross-origin requests.

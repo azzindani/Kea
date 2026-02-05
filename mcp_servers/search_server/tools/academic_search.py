@@ -25,14 +25,17 @@ async def academic_search_tool(arguments: dict) -> ToolResult:
     Args:
         arguments: Tool arguments containing:
             - query: Search query
-            - max_results: Max results (default 10)
+            - max_results: Max results (default: hardware-aware)
             - source: arxiv, semantic_scholar, or both (default: both)
     
     Returns:
         ToolResult with paper results
     """
+    from shared.hardware.detector import detect_hardware
+    
     query = arguments.get("query", "")
-    max_results = arguments.get("max_results", 10)
+    hw = detect_hardware()
+    max_results = arguments.get("max_results", hw.optimal_max_results())
     source = arguments.get("source", "both")
     
     if not query:
@@ -77,8 +80,8 @@ async def academic_search_tool(arguments: dict) -> ToolResult:
             output += f"**URL:** [{paper['url']}]({paper['url']})\n"
         
         if paper.get("abstract"):
-            abstract = paper["abstract"][:500]
-            output += f"\n> {abstract}...\n"
+            abstract = paper["abstract"]
+            output += f"\n> {abstract}\n"
         
         output += "\n---\n\n"
     
@@ -136,7 +139,7 @@ async def _search_arxiv(query: str, max_results: int) -> list[dict]:
             
             results.append({
                 "title": title.text.strip() if title is not None else "Unknown",
-                "authors": ", ".join(authors[:3]) + ("..." if len(authors) > 3 else ""),
+                "authors": ", ".join(authors),
                 "abstract": summary.text.strip() if summary is not None else "",
                 "year": year,
                 "url": link or "",
@@ -172,7 +175,7 @@ async def _search_semantic_scholar(query: str, max_results: int) -> list[dict]:
             
             results.append({
                 "title": paper.get("title", "Unknown"),
-                "authors": ", ".join(author_names) + ("..." if len(authors) > 3 else ""),
+                "authors": ", ".join(author_names),
                 "abstract": paper.get("abstract", ""),
                 "year": str(paper.get("year", "")),
                 "url": paper.get("url", ""),

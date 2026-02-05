@@ -1,0 +1,17 @@
+[project]
+name = "ytdlp_server"
+version = "0.1.0"
+description = "MCP Server for ytdlp_server"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp",
+    "pydantic",
+    "python-dotenv",
+    "structlog",
+    "wrapt",
+    "yt-dlp",
+]
+
+[tool.uv]
+dev-dependencies = []

@@ -1,0 +1,18 @@
+[project]
+name = "ccxt_server"
+version = "0.1.0"
+description = "MCP Server for ccxt_server"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "ccxt",
+    "mcp",
+    "pandas",
+    "pydantic",
+    "python-dotenv",
+    "structlog",
+    "wrapt",
+]
+
+[tool.uv]
+dev-dependencies = []

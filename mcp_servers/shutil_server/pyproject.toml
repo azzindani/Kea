@@ -1,0 +1,16 @@
+[project]
+name = "shutil_server"
+version = "0.1.0"
+description = "MCP Server for shutil_server"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp",
+    "pydantic",
+    "python-dotenv",
+    "structlog",
+    "wrapt",
+]
+
+[tool.uv]
+dev-dependencies = []

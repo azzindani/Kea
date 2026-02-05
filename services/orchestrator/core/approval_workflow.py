@@ -14,7 +14,7 @@ from uuid import uuid4
 
 from shared.logging import get_logger
 
-from .audit_trail import AuditEventType, get_audit_trail
+from services.vault.core.audit_trail import AuditEventType, get_audit_trail
 
 
 logger = get_logger(__name__)

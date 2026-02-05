@@ -21,6 +21,7 @@ logger = get_logger(__name__)
 
 class Domain(str, Enum):
     """Research domains."""
+    RESEARCH = "research"
     FINANCE = "finance"
     MEDICAL = "medical"
     LEGAL = "legal"
@@ -79,174 +80,71 @@ class GeneratedPrompt:
 # Domain Templates
 # =============================================================================
 
-DOMAIN_TEMPLATES = {
-    Domain.FINANCE: """You are a forensic financial analyst with expertise in:
-- Securities analysis and valuation
-- Corporate financial statements (10-K, 10-Q, 8-K)
-- Market trends and macroeconomic indicators
-- Risk assessment and due diligence
-
-When analyzing financial data:
-1. Always cite specific numbers with sources
-2. Note data recency (financial data ages quickly)
-3. Distinguish between GAAP and non-GAAP metrics
-4. Consider market conditions and sector context
-5. Flag any red flags or inconsistencies
-
-Be precise with numbers. Use proper financial terminology.""",
-
-    Domain.MEDICAL: """You are a clinical research specialist with expertise in:
-- Medical literature and clinical trials
-- Drug mechanisms and interactions
-- Disease pathophysiology
-- Healthcare regulations and guidelines
-
-When researching medical topics:
-1. Prioritize peer-reviewed sources (PubMed, clinical trials)
-2. Note study quality (RCT > observational > case report)
-3. Include sample sizes and statistical significance
-4. Distinguish correlation from causation
-5. Note any conflicts of interest
-
-IMPORTANT: Always recommend consulting healthcare professionals for medical decisions.""",
-
-    Domain.LEGAL: """You are a legal research specialist with expertise in:
-- Case law and statutory interpretation
-- Regulatory frameworks
-- Contract analysis
-- Compliance requirements
-
-When analyzing legal matters:
-1. Cite specific statutes, regulations, or cases
-2. Note jurisdiction relevance
-3. Distinguish binding precedent from persuasive authority
-4. Consider recent legislative changes
-5. Identify potential counterarguments
-
-IMPORTANT: This is legal research, not legal advice. Recommend consulting licensed attorneys.""",
-
-    Domain.ENGINEERING: """You are a technical systems analyst with expertise in:
-- Software architecture and design patterns
-- System performance and optimization
-- Data engineering and pipelines
-- Infrastructure and DevOps
-
-When analyzing technical systems:
-1. Consider scalability and performance implications
-2. Note security considerations
-3. Evaluate trade-offs between approaches
-4. Reference industry best practices
-5. Consider maintainability and technical debt
-
-Be specific about technologies, versions, and configurations.""",
-
-    Domain.ACADEMIC: """You are a scholarly research analyst with expertise in:
-- Academic literature synthesis
-- Research methodology evaluation
-- Citation networks and impact analysis
-- Cross-disciplinary connections
-
-When conducting academic research:
-1. Prioritize peer-reviewed sources
-2. Note citation counts and journal impact factors
-3. Identify seminal works and emerging trends
-4. Evaluate methodology rigor
-5. Synthesize across multiple perspectives
-
-Maintain academic objectivity and acknowledge limitations.""",
-
-    Domain.DATA: """You are a data engineering specialist with expertise in:
-- Data pipeline design and ETL
-- Data quality and validation
-- Statistical analysis and visualization
-- Database optimization
-
-When working with data:
-1. Verify data quality and completeness
-2. Note any biases or sampling issues
-3. Use appropriate statistical methods
-4. Visualize patterns and anomalies
-5. Document transformations and assumptions
-
-Be precise about data types, scales, and statistical significance.""",
-
-    Domain.GENERAL: """You are a versatile research analyst capable of:
-- Synthesizing information from multiple sources
-- Identifying patterns and connections
-- Evaluating source credibility
-- Presenting findings clearly
-
-When conducting research:
-1. Verify claims with multiple sources
-2. Note source credibility and recency
-3. Distinguish facts from opinions
-4. Acknowledge uncertainty
-5. Structure findings logically
-
-Maintain objectivity and intellectual rigor.""",
-}
-
-
 # =============================================================================
-# Task Modifiers
+# Domain Templates & Task Modifiers (Loaded from Config)
 # =============================================================================
 
-TASK_MODIFIERS = {
-    TaskType.RESEARCH: """
-Focus on comprehensive investigation:
-- Explore multiple angles and perspectives
-- Dig deep into primary sources
-- Build a complete picture of the topic""",
-
-    TaskType.ANALYSIS: """
-Focus on analytical rigor:
-- Apply appropriate analytical frameworks
-- Quantify where possible
-- Identify patterns and anomalies
-- Draw evidence-based conclusions""",
-
-    TaskType.SUMMARIZE: """
-Focus on concise synthesis:
-- Distill key points without losing nuance
-- Prioritize actionable insights
-- Use clear, accessible language
-- Highlight the most important findings""",
-
-    TaskType.COMPARE: """
-Focus on systematic comparison:
-- Use consistent evaluation criteria
-- Create comparison matrices where helpful
-- Note similarities and differences
-- Identify relative strengths and weaknesses""",
-
-    TaskType.EXTRACT: """
-Focus on precise data extraction:
-- Extract exactly what's requested
-- Maintain data fidelity
-- Note any missing or uncertain data
-- Structure output for easy processing""",
-
-    TaskType.VALIDATE: """
-Focus on verification:
-- Cross-reference claims with multiple sources
-- Identify supporting and contradicting evidence
-- Assess source credibility
-- Rate confidence for each claim""",
-
-    TaskType.FORECAST: """
-Focus on forward-looking analysis:
-- Identify trends and patterns
-- Consider multiple scenarios
-- Quantify uncertainty ranges
-- Note key assumptions and risk factors""",
-
-    TaskType.EXPLAIN: """
-Focus on clear explanation:
-- Break down complex concepts
-- Use analogies and examples
-- Build understanding progressively
-- Anticipate follow-up questions""",
+# Default fallbacks in case config is missing (Minimal set)
+DEFAULT_DOMAIN_TEMPLATES = {
+    Domain.GENERAL: """You are a versatile research analyst.
+Verify claims, note credibility, and structure findings logically."""
 }
+
+DEFAULT_TASK_MODIFIERS = {
+    TaskType.RESEARCH: "Focus on comprehensive investigation."
+}
+
+def load_prompts_config() -> tuple[dict, dict]:
+    """Load templates from configs/prompts.yaml."""
+    import yaml
+    from pathlib import Path
+    
+    try:
+        # Resolve path relative to project root
+        root_path = Path(__file__).resolve().parents[3]
+        config_path = root_path / "configs" / "prompts.yaml"
+        
+        if not config_path.exists():
+            logger.warning(f"Prompts config not found at {config_path}")
+            return {}, {}
+            
+        with open(config_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+            
+        # Convert keys to Enum if possible
+        domains = {}
+        for k, v in data.get("domains", {}).items():
+            try:
+                # Match enum by value or name
+                enum_key = None
+                for d in Domain:
+                    if d.value == k or d.name.lower() == k.lower():
+                        enum_key = d
+                        break
+                if enum_key:
+                    domains[enum_key] = v
+            except Exception:
+                pass
+                
+        tasks = {}
+        for k, v in data.get("tasks", {}).items():
+            try:
+                enum_key = None
+                for t in TaskType:
+                    if t.value == k or t.name.lower() == k.lower():
+                        enum_key = t
+                        break
+                if enum_key:
+                    tasks[enum_key] = v
+            except Exception:
+                pass
+                
+        return domains, tasks
+        
+    except Exception as e:
+        logger.error(f"Failed to load prompts config: {e}")
+        return {}, {}
+
 
 
 # =============================================================================
@@ -274,8 +172,15 @@ class PromptFactory:
     VERSION = "1.0.0"
     
     def __init__(self):
-        self._domain_templates = DOMAIN_TEMPLATES.copy()
-        self._task_modifiers = TASK_MODIFIERS.copy()
+        self._domain_templates = DEFAULT_DOMAIN_TEMPLATES.copy()
+        self._task_modifiers = DEFAULT_TASK_MODIFIERS.copy()
+        
+        # Load from config
+        domains, tasks = load_prompts_config()
+        self._domain_templates.update(domains)
+        self._task_modifiers.update(tasks)
+        
+        logger.info(f"PromptFactory initialized with {len(self._domain_templates)} domains and {len(self._task_modifiers)} task modifiers")
     
     def detect_domain(self, query: str) -> Domain:
         """Detect domain from query text."""

@@ -1,17 +1,8 @@
-"""
-Fetch URL Tool.
-
-Simple HTTP GET with retry logic and User-Agent rotation.
-"""
-
 from __future__ import annotations
-
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
-
-from shared.mcp.protocol import ToolResult, TextContent
+import random
 from shared.logging import get_logger
-
 
 logger = get_logger(__name__)
 
@@ -23,7 +14,6 @@ USER_AGENTS = [
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
 ]
 
-
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
 async def _fetch_with_retry(url: str, timeout: int, headers: dict) -> httpx.Response:
     """Fetch URL with retry logic."""
@@ -32,43 +22,21 @@ async def _fetch_with_retry(url: str, timeout: int, headers: dict) -> httpx.Resp
         response.raise_for_status()
         return response
 
-
-async def fetch_url_tool(arguments: dict) -> ToolResult:
-    """
-    Fetch URL content via HTTP GET.
-    
-    Args:
-        arguments: Tool arguments containing:
-            - url: URL to fetch
-            - timeout: Request timeout (default 30)
-            - headers: Optional headers dict
-    
-    Returns:
-        ToolResult with page content or error
-    """
-    url = arguments.get("url", "")
-    timeout = arguments.get("timeout", 30)
-    custom_headers = arguments.get("headers", {})
-    
-    if not url:
-        return ToolResult(
-            content=[TextContent(text="Error: URL is required")],
-            isError=True
-        )
+async def fetch_url_tool(url: str, timeout: int = 30, headers: dict = {}) -> str:
+    """Fetch URL content via HTTP GET request."""
+    if not url: return "Error: URL is required"
     
     # Build headers with User-Agent rotation
-    import random
-    headers = {
+    req_headers = {
         "User-Agent": random.choice(USER_AGENTS),
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
         "Accept-Encoding": "gzip, deflate, br",
-        **custom_headers
+        **headers
     }
     
     try:
-        response = await _fetch_with_retry(url, timeout, headers)
-        
+        response = await _fetch_with_retry(url, timeout, req_headers)
         content_type = response.headers.get("content-type", "")
         
         # Handle different content types
@@ -84,30 +52,11 @@ async def fetch_url_tool(arguments: dict) -> ToolResult:
         if len(text) > max_length:
             text = text[:max_length] + f"\n\n[Truncated: {len(text)} chars total]"
         
-        logger.info(
-            "URL fetched successfully",
-            extra={"url": url, "status": response.status_code, "length": len(text)}
-        )
-        
-        return ToolResult(
-            content=[TextContent(text=text)]
-        )
+        return text
         
     except httpx.HTTPStatusError as e:
-        logger.warning(f"HTTP error fetching {url}: {e.response.status_code}")
-        return ToolResult(
-            content=[TextContent(text=f"HTTP Error {e.response.status_code}: {e.response.reason_phrase}")],
-            isError=True
-        )
+        return f"HTTP Error {e.response.status_code}: {e.response.reason_phrase}"
     except httpx.TimeoutException:
-        logger.warning(f"Timeout fetching {url}")
-        return ToolResult(
-            content=[TextContent(text=f"Timeout after {timeout}s fetching {url}")],
-            isError=True
-        )
+        return f"Timeout after {timeout}s fetching {url}"
     except Exception as e:
-        logger.error(f"Error fetching {url}: {e}")
-        return ToolResult(
-            content=[TextContent(text=f"Error: {str(e)}")],
-            isError=True
-        )
+        return f"Error: {str(e)}"

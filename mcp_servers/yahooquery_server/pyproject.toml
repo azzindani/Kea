@@ -1,0 +1,18 @@
+[project]
+name = "yahooquery_server"
+version = "0.1.0"
+description = "MCP Server for yahooquery_server"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp",
+    "pandas",
+    "pydantic",
+    "python-dotenv",
+    "structlog",
+    "wrapt",
+    "yahooquery",
+]
+
+[tool.uv]
+dev-dependencies = []

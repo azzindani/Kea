@@ -20,6 +20,10 @@ from services.api_gateway.middleware.auth import get_current_user, get_current_u
 logger = get_logger(__name__)
 router = APIRouter()
 
+import httpx
+from shared.service_registry import ServiceRegistry, ServiceName
+ORCHESTRATOR_URL = ServiceRegistry.get_url(ServiceName.ORCHESTRATOR)
+
 
 # ============================================================================
 # Request/Response Models
@@ -362,16 +366,37 @@ async def send_message(
         await manager.update_conversation(conversation_id, title=title)
     
     # Run research pipeline
+    # Run research pipeline
     try:
-        from services.orchestrator.core.pipeline import get_research_pipeline
-        
-        pipeline = await get_research_pipeline()
-        result = await pipeline.process_message(
-            conversation_id=conversation_id,
-            content=request.content,
-            user_id=user.user_id,
-            attachments=request.attachments,
-        )
+        # Call Orchestrator Service
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                f"{ORCHESTRATOR_URL}/chat/message",
+                json={
+                    "conversation_id": conversation_id,
+                    "content": request.content,
+                    "user_id": user.user_id,
+                    "attachments": request.attachments or [],
+                },
+            )
+            
+            if response.status_code != 200:
+                raise Exception(f"Orchestrator returned {response.status_code}: {response.text}")
+                
+            data = response.json()
+            
+            # Simple wrapper to match expected 'result' interface
+            class ResearchResult:
+                def __init__(self, d):
+                    self.content = d.get("content", "")
+                    self.sources = d.get("sources", [])
+                    self.tool_calls = d.get("tool_calls", [])
+                    self.confidence = d.get("confidence", 0.0)
+                    self.query_type = d.get("query_type", "research")
+                    self.duration_ms = d.get("duration_ms", 0)
+                    self.was_cached = d.get("was_cached", False)
+            
+            result = ResearchResult(data)
         
         # Store assistant response with sources
         assistant_msg = await manager.add_message(

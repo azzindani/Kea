@@ -110,10 +110,14 @@ async def list_providers():
 @router.get("/models")
 async def list_models(provider: str | None = None):
     """List available models."""
+    from shared.config import get_settings
+    settings = get_settings()
+    default_model = settings.models.default_model
+    
     models = [
         LLMModel(
-            id="nvidia/nemotron-3-nano-30b-a3b:free",
-            name="Nemotron 3 Nano 30B",
+            id=default_model,
+            name="Default Model (Configured)",
             provider="openrouter",
             context_length=32000,
             supports_vision=False,

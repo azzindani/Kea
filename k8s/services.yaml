@@ -29,42 +29,110 @@ spec:
     app: kea
     component: orchestrator
   ports:
-    - port: 8000
-      targetPort: 8000
+    - port: 8001
+      targetPort: 8001
   type: ClusterIP
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: redis
+  name: mcp-host
   labels:
     app: kea
-    component: redis
+    component: mcp-host
 spec:
   selector:
     app: kea
-    component: redis
+    component: mcp-host
   ports:
-    - port: 6379
-      targetPort: 6379
+    - port: 8002
+      targetPort: 8002
   type: ClusterIP
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: qdrant
+  name: rag-service
   labels:
     app: kea
-    component: qdrant
+    component: rag-service
 spec:
   selector:
     app: kea
-    component: qdrant
+    component: rag-service
   ports:
-    - port: 6333
-      targetPort: 6333
+    - port: 8003
+      targetPort: 8003
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault
+  labels:
+    app: kea
+    component: vault
+spec:
+  selector:
+    app: kea
+    component: vault
+  ports:
+    - port: 8004
+      targetPort: 8004
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: swarm-manager
+  labels:
+    app: kea
+    component: swarm-manager
+spec:
+  selector:
+    app: kea
+    component: swarm-manager
+  ports:
+    - port: 8005
+      targetPort: 8005
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chronos
+  labels:
+    app: kea
+    component: chronos
+spec:
+  selector:
+    app: kea
+    component: chronos
+  ports:
+    - port: 8006
+      targetPort: 8006
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  labels:
+    app: kea
+    component: postgres
+spec:
+  selector:
+    app: kea
+    component: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
   type: ClusterIP
 
 ---

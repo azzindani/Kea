@@ -1,0 +1,55 @@
+{
+    "name": "data_pipeline",
+    "description": "Generic data pipeline for downloading, processing, and analyzing data",
+    "variables": [
+        "source_url",
+        "output_format"
+    ],
+    "blueprint": [
+        {
+            "id": "fetch_data",
+            "phase": 1,
+            "tool": "web_search",
+            "args": {
+                "query": "{{source_url}}"
+            },
+            "artifact": "raw_data"
+        },
+        {
+            "id": "clean_data",
+            "phase": 2,
+            "tool": "execute_code",
+            "args": {
+                "code": "# Clean and validate the raw data"
+            },
+            "input_mapping": {
+                "data": "{{fetch_data.artifacts.raw_data}}"
+            },
+            "artifact": "cleaned_data"
+        },
+        {
+            "id": "analyze_data",
+            "phase": 3,
+            "tool": "execute_code",
+            "args": {
+                "code": "# Perform statistical analysis"
+            },
+            "input_mapping": {
+                "data": "{{clean_data.artifacts.cleaned_data}}"
+            },
+            "artifact": "analysis_results"
+        },
+        {
+            "id": "format_output",
+            "phase": 4,
+            "tool": "execute_code",
+            "args": {
+                "code": "# Format output as {{output_format}}"
+            },
+            "input_mapping": {
+                "results": "{{analyze_data.artifacts.analysis_results}}"
+            },
+            "artifact": "final_output"
+        }
+    ]
+}

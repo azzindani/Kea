@@ -1,0 +1,21 @@
+[project]
+name = "matplotlib_server"
+version = "0.1.0"
+description = "MCP Server for matplotlib_server"
+requires-python = ">=3.10"
+dependencies = [
+    "matplotlib",
+    "mcp",
+    "numpy",
+    "pandas",
+    "pillow",
+    "pydantic",
+    "python-dotenv",
+    "scipy",
+    "seaborn",
+    "structlog",
+    "wrapt",
+]
+
+[tool.uv]
+dev-dependencies = []

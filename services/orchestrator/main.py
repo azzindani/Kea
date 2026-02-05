@@ -14,7 +14,7 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field
 
 from services.orchestrator.core.graph import compile_research_graph, GraphState
-from services.orchestrator.mcp.client import get_mcp_orchestrator
+from services.mcp_host.core.session_registry import get_session_registry
 from shared.config import get_settings
 from shared.logging import get_logger
 from shared.logging.middleware import RequestLoggingMiddleware
@@ -23,32 +23,57 @@ from shared.schemas import ResearchStatus
 logger = get_logger(__name__)
 
 # Global state
-mcp_orchestrator = None
+registry = None
 research_graph = None
-server_configs = []
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle manager for the FastAPI app."""
-    global mcp_orchestrator, research_graph, server_configs
+    global registry, research_graph
     
     settings = get_settings()
     
     logger.info("Starting Orchestrator service")
     
-    # Initialize MCP orchestrator
-    mcp_orchestrator = get_mcp_orchestrator()
+    # Initialize Registry (Auto-Discovery)
+    registry = get_session_registry()
     
-    # Start MCP servers based on config
-    server_configs = [
-        {"name": server.name, "command": server.command}
-        for server in settings.mcp.servers
-        if server.enabled and server.command
-    ]
+    # Static RAG Population (Background)
+    # This pushes the ~660 discovered tools (name+docstring) to Postgres
+    # so the Planner can find them via semantic search.
+    import asyncio
+    asyncio.create_task(registry.register_discovered_tools())
     
-    if server_configs:
-        await mcp_orchestrator.start_servers(server_configs)
-        logger.info(f"Started {len(server_configs)} MCP servers")
+    # await registry.list_all_tools() # DISABLED: Warmup causes hangs in threaded startup. Rely on JIT.
+    logger.info(f"Registry initialized (Lazy Mode + Static RAG)")
+
+    # =========================================================================
+    # Initialize Enterprise Subsystems
+    # =========================================================================
+    try:
+        from services.vault.core.audit_trail import configure_audit_trail, AuditBackend
+        from services.swarm_manager.core.compliance import get_compliance_engine
+        
+        # 2. Compliance Engine (Guardrails)
+        compliance = get_compliance_engine()
+        logger.info(f"Compliance Engine initialized with {len(compliance.rules)} rule sets")
+        
+        # 3. Organization (The Corporate Structure)
+        from services.orchestrator.core.organization import get_organization, Domain
+        org = get_organization()
+        if not org.list_departments():
+            org.create_department("Research", Domain.RESEARCH)
+            org.create_department("Finance", Domain.FINANCE)
+            org.create_department("Legal", Domain.LEGAL)
+            logger.info("Organization structure initialized: Research, Finance, Legal")
+
+        # 4. Memory (The Mind)
+        from services.orchestrator.core.conversation import get_conversation_manager
+        memory = get_conversation_manager()
+        logger.info("Conversation Memory initialized")
+        
+    except Exception as e:
+        logger.error(f"Failed to initialize enterprise systems: {e}")
     
     # Compile research graph
     research_graph = compile_research_graph()
@@ -57,8 +82,8 @@ async def lifespan(app: FastAPI):
     yield
     
     # Cleanup
-    if mcp_orchestrator:
-        await mcp_orchestrator.stop_servers()
+    if registry:
+        await registry.shutdown()
     
     logger.info("Orchestrator service stopped")
 
@@ -106,22 +131,18 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "orchestrator",
-        "mcp_servers": len(mcp_orchestrator._servers) if mcp_orchestrator else 0,
+        "active_sessions": len(registry.active_sessions) if registry else 0,
     }
 
 
 @app.get("/tools")
 async def list_tools():
     """List all available MCP tools."""
-    if not mcp_orchestrator:
+    if not registry:
         return {"tools": []}
     
-    return {
-        "tools": [
-            {"name": t.name, "description": t.description}
-            for t in mcp_orchestrator.tools
-        ]
-    }
+    tools = await registry.list_all_tools()
+    return {"tools": tools}
 
 
 @app.post("/research", response_model=ResearchResponse)
@@ -176,23 +197,100 @@ async def start_research(request: ResearchRequest):
         )
         
     except Exception as e:
-        logger.error(f"Research job {job_id} failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        error_msg = str(e) or f"Unknown error ({type(e).__name__})"
+        logger.error(f"Research job {job_id} failed: {error_msg}", exc_info=True)
+        raise HTTPException(status_code=500, detail=error_msg)
 
 
 @app.post("/tools/{tool_name}")
 async def call_tool(tool_name: str, arguments: dict[str, Any]):
     """Call a specific MCP tool directly."""
-    if not mcp_orchestrator:
-        raise HTTPException(status_code=503, detail="MCP orchestrator not initialized")
+    if not registry:
+        raise HTTPException(status_code=503, detail="Registry not initialized")
     
-    result = await mcp_orchestrator.call_tool(tool_name, arguments)
+    server_name = registry.get_server_for_tool(tool_name)
+    if not server_name:
+        # JIT
+        await registry.list_all_tools()
+        server_name = registry.get_server_for_tool(tool_name)
+        
+    if not server_name:
+         raise HTTPException(status_code=404, detail=f"Tool {tool_name} not found")
+
+    try:
+        session = await registry.get_session(server_name)
+        result = await session.call_tool(tool_name, arguments)
+        
+        return {
+            "tool": tool_name,
+            "is_error": result.isError,
+            "content": [c.model_dump() for c in result.content],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Pipeline Endpoint (Chat)
+# ============================================================================
+
+class ChatMessageRequest(BaseModel):
+    conversation_id: str
+    content: str
+    user_id: str
+    attachments: list[str] = []
+
+@app.post("/chat/message")
+async def process_chat_message(request: ChatMessageRequest):
+    """
+    Process a chat message through the research pipeline.
     
-    return {
-        "tool": tool_name,
-        "is_error": result.isError,
-        "content": [c.model_dump() for c in result.content],
-    }
+    This endpoint:
+    1. Classifies the query
+    2. Checks cache
+    3. Runs research graph if needed
+    4. Logs to audit trail
+    5. Returns the result (content, sources, etc.)
+    """
+    from services.orchestrator.core.pipeline import get_research_pipeline
+    
+    try:
+        pipeline = await get_research_pipeline()
+        
+        # Note: pipeline.process_message does NOT store to DB if called directly.
+        # But pipeline.process_and_store DOES.
+        # However, Gateway's conversation route typically adds the User message first,
+        # then expects the Assistant message to be generated.
+        # If we use process_message, we just get the result, and Gateway can save the Assistant message.
+        # OR we let Orchestrator save it.
+        # Let's check conversations.py again.
+        # conversations.py: adds User msg, then calls pipeline.process_message, then adds Assistant msg.
+        # So we should return the Result, and let Gateway save the Assistant msg (or Orchestrator).
+        # To keep Gateway as the "Interface Layer", it handles DB interaction for the conversation view.
+        # Orchestrator provides the "Result".
+        
+        result = await pipeline.process_message(
+            conversation_id=request.conversation_id,
+            content=request.content,
+            user_id=request.user_id,
+            attachments=request.attachments,
+        )
+        
+        return {
+            "content": result.content,
+            "confidence": result.confidence,
+            "sources": result.sources,
+            "tool_calls": result.tool_calls,
+            "facts": result.facts,
+            "duration_ms": result.duration_ms,
+            "query_type": result.query_type,
+            "was_cached": result.was_cached,
+        }
+        
+    except Exception as e:
+        logger.error(f"Pipeline processing failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 # ============================================================================
@@ -323,17 +421,26 @@ async def stream_research(query: str, depth: int = 2, max_sources: int = 10):
 # Main
 # ============================================================================
 
+# Force Proactor loop for Windows subprocess support
+import sys
+import asyncio
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
 def main():
     """Run the orchestrator service."""
     import uvicorn
     
     settings = get_settings()
     
+    from shared.service_registry import ServiceRegistry, ServiceName
+    
     uvicorn.run(
         "services.orchestrator.main:app",
         host=settings.api_host,
-        port=settings.api_port,
-        reload=settings.is_development,
+        port=ServiceRegistry.get_port(ServiceName.ORCHESTRATOR),
+        reload=False, 
+        loop="asyncio",
     )
 
 
