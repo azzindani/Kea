@@ -284,25 +284,25 @@ def _set_dynamic_limits(score: ComplexityScore) -> None:
         logger.debug(f"Hardware detection skipped: {e}")
 
     if tier == ComplexityTier.TRIVIAL:
-        score.max_subtasks = int(max(2, entities) * hw_multiplier)
-        score.max_phases = max(1, int(1 * hw_multiplier))
-        score.max_depth = max(1, int(1 * hw_multiplier))
-        score.max_parallel = max(2, int(2 * hw_multiplier))
-        score.max_research_iterations = max(1, int(1 * hw_multiplier))
+        score.max_subtasks = int(max(5, entities * 2) * hw_multiplier)  # Increased from 2
+        score.max_phases = max(3, int(3 * hw_multiplier))  # Increased from 1
+        score.max_depth = max(2, int(2 * hw_multiplier))  # Increased from 1
+        score.max_parallel = max(4, int(4 * hw_multiplier))  # Increased from 2
+        score.max_research_iterations = max(2, int(2 * hw_multiplier))  # Increased from 1
 
     elif tier == ComplexityTier.LOW:
-        score.max_subtasks = int(max(3, entities + 1) * hw_multiplier)
-        score.max_phases = max(2, int(2 * hw_multiplier))
-        score.max_depth = max(2, int(2 * hw_multiplier))
-        score.max_parallel = max(4, int(4 * hw_multiplier))
-        score.max_research_iterations = max(2, int(2 * hw_multiplier))
+        score.max_subtasks = int(max(10, entities * 3) * hw_multiplier)  # Increased from 3
+        score.max_phases = max(6, int(6 * hw_multiplier))  # Increased from 2
+        score.max_depth = max(4, int(4 * hw_multiplier))  # Increased from 2
+        score.max_parallel = max(8, int(8 * hw_multiplier))  # Increased from 4
+        score.max_research_iterations = max(3, int(3 * hw_multiplier))  # Increased from 2
 
     elif tier == ComplexityTier.MEDIUM:
-        score.max_subtasks = int(max(6, entities * 2) * hw_multiplier)
-        score.max_phases = max(3, int(3 * hw_multiplier))
-        score.max_depth = max(3, int(3 * hw_multiplier))
-        score.max_parallel = max(6, int(6 * hw_multiplier))
-        score.max_research_iterations = max(3, int(3 * hw_multiplier))
+        score.max_subtasks = int(max(20, entities * 5) * hw_multiplier)  # Increased from 6
+        score.max_phases = max(10, int(10 * hw_multiplier))  # Increased from 3
+        score.max_depth = max(6, int(6 * hw_multiplier))  # Increased from 3
+        score.max_parallel = max(12, int(12 * hw_multiplier))  # Increased from 6
+        score.max_research_iterations = max(5, int(5 * hw_multiplier))  # Increased from 3
 
     elif tier == ComplexityTier.HIGH:
         score.max_subtasks = int(max(12, entities * 3) * hw_multiplier)

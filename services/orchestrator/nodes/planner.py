@@ -159,6 +159,8 @@ async def _validate_tool_arguments(execution_plan: ExecutionPlan, query: str) ->
     """
     Validate tool arguments against FULL JSON schema (not just required params).
 
+    CRITICAL: Uses Postgres RAG for schemas (NOT list_all_tools() which loads ALL servers!)
+
     Validates:
     - Required parameters present ✅
     - Parameter TYPES match (string, int, array, object) ✅
@@ -178,15 +180,29 @@ async def _validate_tool_arguments(execution_plan: ExecutionPlan, query: str) ->
 
     registry = get_session_registry()
 
-    # Get tool schemas
+    # Get tool schemas from Postgres RAG (FAST - doesn't load servers!)
+    tool_schemas = {}
     try:
-        all_tools_raw = await registry.list_all_tools()
-        tool_schemas = {t['name']: t.get('inputSchema', {}) for t in all_tools_raw}
+        if registry.pg_registry:
+            # Query only the tools we need (not all 2000+)
+            for task in execution_plan.micro_tasks:
+                tool_name = task.tool
+                # Search for this specific tool in RAG
+                results = await registry.pg_registry.search_tools(tool_name, limit=1)
+                if results:
+                    tool_schemas[tool_name] = results[0].get('inputSchema', {})
+        else:
+            logger.warning("Postgres registry unavailable, skipping schema validation")
+            return execution_plan
     except Exception as e:
-        logger.warning(f"Could not fetch tool schemas: {e}")
+        logger.warning(f"Could not fetch tool schemas from RAG: {e}")
         return execution_plan
 
+    logger.info(f"🔍 Validating {len(execution_plan.micro_tasks)} tasks against tool schemas...")
+
     fixed_tasks = []
+    validation_stats = {'passed': 0, 'fixed': 0, 'failed': 0}
+
     for task in execution_plan.micro_tasks:
         tool_name = task.tool
         args = task.args or {}
@@ -194,7 +210,8 @@ async def _validate_tool_arguments(execution_plan: ExecutionPlan, query: str) ->
         # Get schema for this tool
         schema = tool_schemas.get(tool_name, {})
         if not schema:
-            # No schema available, keep as-is
+            # No schema available, keep as-is but log
+            logger.warning(f"⚠️ No schema found for {tool_name}, skipping validation")
             fixed_tasks.append(task)
             continue
 
@@ -204,23 +221,28 @@ async def _validate_tool_arguments(execution_plan: ExecutionPlan, query: str) ->
         if validation_result['valid']:
             # Schema validation passed
             logger.info(f"✅ {tool_name} schema validation passed")
+            validation_stats['passed'] += 1
             fixed_tasks.append(task)
             continue
 
         # Schema validation failed - try to fix
         logger.warning(
-            f"⚠️ {tool_name} schema validation failed: {', '.join(validation_result['errors'][:3])}. "
-            f"Attempting to fix..."
+            f"⚠️ {tool_name} validation failed: {', '.join(validation_result['errors'][:2])}"
         )
 
-        # Fix missing required parameters
+        # Fix missing required parameters by extracting from query
         if validation_result['missing_required']:
+            logger.info(f"🔧 Extracting missing params: {validation_result['missing_required']}")
             extracted_args = _extract_params_from_query(
                 query,
                 validation_result['missing_required'],
                 schema.get('properties', {})
             )
-            args = {**args, **extracted_args}
+            if extracted_args:
+                logger.info(f"✅ Extracted: {extracted_args}")
+                args = {**args, **extracted_args}
+            else:
+                logger.warning(f"❌ Could not extract params from query")
 
         # Fix type mismatches
         if validation_result['type_errors']:
@@ -229,7 +251,7 @@ async def _validate_tool_arguments(execution_plan: ExecutionPlan, query: str) ->
         # Remove extra parameters
         if validation_result['extra_params']:
             for extra_param in validation_result['extra_params']:
-                logger.warning(f"🗑️ Removing extra param '{extra_param}' from {tool_name}")
+                logger.info(f"🗑️ Removing extra param '{extra_param}'")
                 args.pop(extra_param, None)
 
         # Update task with fixed args
@@ -238,14 +260,18 @@ async def _validate_tool_arguments(execution_plan: ExecutionPlan, query: str) ->
         # Re-validate after fixes
         revalidation = _validate_against_json_schema(args, schema, tool_name)
         if revalidation['valid']:
-            logger.info(f"✅ Successfully fixed {tool_name} arguments")
+            logger.info(f"✅ {tool_name} fixed successfully")
+            validation_stats['fixed'] += 1
         else:
-            logger.error(
-                f"❌ Could not fully fix {tool_name} arguments. "
-                f"Remaining errors: {', '.join(revalidation['errors'][:3])}"
-            )
+            logger.error(f"❌ {tool_name} still invalid: {', '.join(revalidation['errors'][:2])}")
+            validation_stats['failed'] += 1
 
         fixed_tasks.append(task)
+
+    logger.info(
+        f"📊 Validation complete: {validation_stats['passed']} passed, "
+        f"{validation_stats['fixed']} fixed, {validation_stats['failed']} failed"
+    )
 
     execution_plan.micro_tasks = fixed_tasks
     return execution_plan
