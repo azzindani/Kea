@@ -216,14 +216,15 @@ def analyze_execution_progress(state: dict[str, Any]) -> dict[str, Any]:
     # Count completed and failed from actual invocations
     # Note: success=True means the tool (or fallback) succeeded
     completed_tasks = sum(1 for inv in tool_invocations if inv.get("success", False))
-    failed_tasks = sum(1 for inv in tool_invocations if not inv.get("success", True) and inv.get("error"))
+    # Count failures: any invocation with success=False (not requiring 'error' field)
+    failed_tasks = sum(1 for inv in tool_invocations if inv.get("success") is False)
     
     # Unique task IDs that succeeded
     completed_task_ids = {inv.get("task_id") for inv in tool_invocations if inv.get("success", False)}
     
     # Identify tasks to retry (failed with no success in any attempt)
     should_retry = []
-    failed_task_ids = {inv.get("task_id") for inv in tool_invocations if not inv.get("success", True) and inv.get("error")}
+    failed_task_ids = {inv.get("task_id") for inv in tool_invocations if inv.get("success") is False}
     for task_id in failed_task_ids:
         if task_id not in completed_task_ids:
             # This task failed and hasn't succeeded yet
@@ -340,15 +341,27 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
     state["execution_progress"] = progress
     
     # ============================================================
-    # STOP ON ALL FAILURES (prevents hallucination)
+    # REPLAN ON ALL FAILURES (instead of stopping, give LLM another chance)
     # ============================================================
-    if progress["total_tasks"] > 0 and progress["completed_tasks"] == 0 and progress["failed_tasks"] == progress["total_tasks"]:
-        logger.error(f"Keeper: ALL tool calls failed ({progress['failed_tasks']}/{progress['total_tasks']})")
-        logger.error(f"   Stopping to prevent hallucination - no valid facts collected")
-        state["should_continue"] = False
-        state["stop_reason"] = "all_tools_failed"
-        state["confidence"] = 0.0
-        return state
+    replan_count = state.get("replan_count", 0)
+    max_replans = config.research.max_depth  # Use same limit as iterations
+    
+    if progress["total_tasks"] > 0 and progress["completed_tasks"] == 0 and progress["failed_tasks"] > 0:
+        if replan_count < max_replans:
+            logger.warning(f"Keeper: ALL tool calls failed ({progress['failed_tasks']}/{progress['total_tasks']})")
+            logger.warning(f"   Triggering REPLAN (attempt {replan_count + 1}/{max_replans}) - LLM will receive error feedback")
+            state["should_continue"] = True  # Continue the loop
+            state["stop_reason"] = "replan"   # Route to planner, not researcher
+            state["replan_count"] = replan_count + 1
+            state["confidence"] = 0.0
+            return state
+        else:
+            logger.error(f"Keeper: ALL tool calls failed after {max_replans} replans")
+            logger.error(f"   Stopping to prevent infinite loop - no valid facts collected")
+            state["should_continue"] = False
+            state["stop_reason"] = "max_replans_exceeded"
+            state["confidence"] = 0.0
+            return state
     
     # ============================================================
     # CHECK LOCAL ITERATION LIMIT (user-specified)

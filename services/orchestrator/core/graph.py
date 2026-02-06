@@ -103,6 +103,9 @@ class GraphState(TypedDict, total=False):
     # Revision loop control (for Judge -> Generator retry)
     revision_count: int
     max_revisions: int
+    
+    # Replan loop control (for Keeper -> Planner retry when all tools fail)
+    replan_count: int
 
 
 # ============================================================================
@@ -650,6 +653,25 @@ async def researcher_node(state: GraphState) -> GraphState:
                     "success": node_result.status == NodeStatus.COMPLETED,
                     "persist": True,
                 })
+                
+                # ERROR FEEDBACK LOOP: Capture failed nodes for LLM self-correction
+                if node_result.status == NodeStatus.FAILED:
+                    # Find the corresponding micro_task to get tool name and args
+                    micro_task = next(
+                        (t for t in micro_tasks if t.get("task_id") == node_id),
+                        {}
+                    )
+                    error_feedback.append({
+                        "tool": micro_task.get("tool", "unknown"),
+                        "task_id": node_id,
+                        "error": str(node_result.error or node_result.output or "Unknown error")[:500],
+                        "args": micro_task.get("inputs", {}),
+                        "description": micro_task.get("description", ""),
+                    })
+                    logger.warning(
+                        f"📝 Captured error for LLM feedback: {micro_task.get('tool')} - "
+                        f"{str(node_result.error or 'Unknown')[:100]}"
+                    )
 
             logger.info(
                 f"✅ DAG complete: {dag_result.completed} ok, "
@@ -1359,8 +1381,15 @@ async def synthesizer_node(state: GraphState) -> GraphState:
 # Routing Functions
 # ============================================================================
 
-def should_continue_research(state: GraphState) -> Literal["researcher", "generator"]:
-    """Decide whether to continue research or move to synthesis."""
+def should_continue_research(state: GraphState) -> Literal["researcher", "generator", "planner"]:
+    """Decide whether to continue research, replan, or move to synthesis."""
+    # REPLAN PATH: When all tools failed with errors, go back to planner
+    # This allows the LLM to receive error_feedback and correct tool calls
+    stop_reason = state.get("stop_reason", "")
+    if stop_reason == "replan":
+        logger.info("🔄 Replanning: Routing back to planner with error feedback")
+        return "planner"
+    
     if state.get("should_continue", False):
         return "researcher"
     return "generator"
@@ -1419,12 +1448,13 @@ def build_research_graph() -> StateGraph:
     graph.add_edge(NodeName.PLANNER.value, NodeName.RESEARCHER.value)
     graph.add_edge(NodeName.RESEARCHER.value, NodeName.KEEPER.value)
     
-    # Conditional edge: continue research or synthesize
+    # Conditional edge: continue research, replan, or synthesize
     graph.add_conditional_edges(
         NodeName.KEEPER.value,
         should_continue_research,
         {
             "researcher": NodeName.RESEARCHER.value,
+            "planner": NodeName.PLANNER.value,  # Replan path for error correction
             "generator": NodeName.GENERATOR.value,
         }
     )
