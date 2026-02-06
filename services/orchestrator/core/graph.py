@@ -239,32 +239,59 @@ async def _llm_correct_tool_parameters(
             max_tokens=500,
         )
 
+        # Get tool schema for intelligent correction
+        tool_schema_info = ""
+        try:
+            from services.mcp_host.core.session_registry import get_session_registry
+            registry = get_session_registry()
+            all_tools = await registry.list_all_tools()
+
+            # Find this tool's schema
+            for tool in all_tools:
+                if tool.get("name") == tool_name:
+                    schema = tool.get("inputSchema", {})
+                    if schema:
+                        tool_schema_info = f"\n**Tool Schema:** {json.dumps(schema, indent=2)}"
+                    break
+        except:
+            pass
+
         messages = [
             LLMMessage(
                 role=LLMRole.SYSTEM,
-                content="""You are a parameter correction AI. When a financial tool fails, you extract the correct parameters from the context.
+                content="""You are an intelligent parameter correction AI. When a tool execution fails, you analyze the error and suggest corrected parameters.
 
-CRITICAL RULES:
-1. Output ONLY valid JSON with corrected parameters
-2. For company names → extract correct stock ticker
-3. For Indonesian companies → add .JK suffix (e.g., BBCA.JK not BCA.JK)
-4. For US companies → use plain ticker (e.g., AAPL not AAPL.US)
-5. If query mentions "BCA Bank" → ticker is BBCA.JK (Bank Central Asia)
-6. If unsure, return empty dict: {}
+YOUR TASK:
+- Read the error message carefully
+- Understand what went wrong (wrong format, missing data, incorrect value, etc.)
+- Extract the correct parameter values from the user's query
+- Return ONLY valid JSON with the corrected parameters
 
-Output format: {"ticker": "BBCA.JK"} or {"symbol": "NVDA"} etc."""
+RULES:
+1. Output ONLY JSON - no explanations, no markdown
+2. Preserve parameter names from failed arguments
+3. Fix values based on error message + user intent
+4. If you can't determine the fix, return empty dict: {}
+5. Be domain-agnostic - works for financial, web scraping, data analysis, any tool
+
+EXAMPLES:
+- Stock ticker error → extract correct ticker from company name
+- URL error → fix malformed URL or extract from query
+- Date format error → convert to expected format
+- Missing required param → extract from query context"""
             ),
             LLMMessage(
                 role=LLMRole.USER,
-                content=f"""Tool failed. Help me fix the parameters:
+                content=f"""A tool execution failed. Analyze and suggest parameter corrections:
 
-**Original Query:** {query}
-**Task:** {task_description}
-**Tool:** {tool_name}
-**Failed Arguments:** {json.dumps(failed_arguments)}
-**Error:** {error_message}
+**User Query:** {query}
+**Task Description:** {task_description}
+**Tool Name:** {tool_name}
+**Arguments That Failed:** {json.dumps(failed_arguments, indent=2)}
+**Error Message:** {error_message}{tool_schema_info}
 
-What are the CORRECT parameters? Return JSON only."""
+Based on the error, what are the CORRECT parameters?
+Return JSON only, matching the parameter names from failed arguments."""
             )
         ]
 
@@ -695,7 +722,7 @@ async def researcher_node(state: GraphState) -> GraphState:
                     session = await registry.get_session(server_name)
                     result = await session.call_tool(name, current_args)
 
-                    # Check if result contains error (needs retry)
+                    # Generic error detection (works for any tool/domain)
                     error_detected = False
                     if result and hasattr(result, "content"):
                         content_text = ""
@@ -703,15 +730,22 @@ async def researcher_node(state: GraphState) -> GraphState:
                             if hasattr(c, "text"):
                                 content_text += c.text
 
-                        # Check for error keywords
-                        error_keywords = [
-                            "no data found", "data unavailable", "not found",
-                            "invalid ticker", "invalid symbol", "no data", "unavailable"
+                        # Generic error indicators (not domain-specific)
+                        generic_errors = [
+                            "error", "exception", "failed", "invalid",
+                            "not found", "unavailable", "unable to",
+                            "could not", "cannot", "no data", "no results"
                         ]
-                        for keyword in error_keywords:
-                            if keyword in content_text.lower():
-                                error_detected = True
-                                break
+
+                        # Check if output looks like an error
+                        lower_text = content_text.lower()
+                        for error_term in generic_errors:
+                            if error_term in lower_text:
+                                # Additional check: Is this a substantial error or just mention?
+                                # Real errors are usually short and contain error term early
+                                if len(content_text.strip()) < 200 or lower_text.find(error_term) < 100:
+                                    error_detected = True
+                                    break
 
                         # If error and we have retries left, attempt correction
                         if error_detected and retry_count < max_retries:
