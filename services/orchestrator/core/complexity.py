@@ -250,46 +250,75 @@ def _set_dynamic_limits(score: ComplexityScore) -> None:
     tier = score.tier
     entities = score.entity_count
 
+    # Hardware-aware multiplier (scale up on better hardware)
+    hw_multiplier = 1.0
+    try:
+        from shared.hardware.detector import detect_hardware
+        hw = detect_hardware()
+        cpu_count = hw.cpu_count
+        ram_gb = hw.total_memory_gb
+
+        # Calculate hardware capability score
+        # 4 cores + 31GB RAM = multiplier of 2.0x (can handle 2x more tasks)
+        # 8 cores + 64GB RAM = multiplier of 3.5x
+        # 192 cores + 1TB RAM = multiplier of 15x+
+        cpu_factor = min(cpu_count / 4.0, 10.0)  # 4 cores = 1.0x, 192 cores = 10x
+        ram_factor = min(ram_gb / 16.0, 5.0)     # 16GB = 1.0x, 1TB = 5x
+        hw_multiplier = max(1.0, (cpu_factor + ram_factor) / 2)
+
+        logger.info(
+            f"🔧 Hardware multiplier: {hw_multiplier:.1f}x "
+            f"(CPU: {cpu_count} cores, RAM: {ram_gb:.1f}GB)"
+        )
+    except Exception as e:
+        logger.debug(f"Hardware detection skipped: {e}")
+
     if tier == ComplexityTier.TRIVIAL:
-        score.max_subtasks = max(2, entities)
-        score.max_phases = 1
-        score.max_depth = 1
-        score.max_parallel = 2
-        score.max_research_iterations = 1
+        score.max_subtasks = int(max(2, entities) * hw_multiplier)
+        score.max_phases = max(1, int(1 * hw_multiplier))
+        score.max_depth = max(1, int(1 * hw_multiplier))
+        score.max_parallel = max(2, int(2 * hw_multiplier))
+        score.max_research_iterations = max(1, int(1 * hw_multiplier))
 
     elif tier == ComplexityTier.LOW:
-        score.max_subtasks = max(3, entities + 1)
-        score.max_phases = 2
-        score.max_depth = 2
-        score.max_parallel = 4
-        score.max_research_iterations = 2
+        score.max_subtasks = int(max(3, entities + 1) * hw_multiplier)
+        score.max_phases = max(2, int(2 * hw_multiplier))
+        score.max_depth = max(2, int(2 * hw_multiplier))
+        score.max_parallel = max(4, int(4 * hw_multiplier))
+        score.max_research_iterations = max(2, int(2 * hw_multiplier))
 
     elif tier == ComplexityTier.MEDIUM:
-        score.max_subtasks = max(6, entities * 2)
-        score.max_phases = 3
-        score.max_depth = 3
-        score.max_parallel = 6
-        score.max_research_iterations = 3
+        score.max_subtasks = int(max(6, entities * 2) * hw_multiplier)
+        score.max_phases = max(3, int(3 * hw_multiplier))
+        score.max_depth = max(3, int(3 * hw_multiplier))
+        score.max_parallel = max(6, int(6 * hw_multiplier))
+        score.max_research_iterations = max(3, int(3 * hw_multiplier))
 
     elif tier == ComplexityTier.HIGH:
-        score.max_subtasks = max(12, entities * 3)
-        score.max_phases = 5
-        score.max_depth = 5
-        score.max_parallel = 10
-        score.max_research_iterations = 4
+        score.max_subtasks = int(max(12, entities * 3) * hw_multiplier)
+        score.max_phases = max(5, int(5 * hw_multiplier))
+        score.max_depth = max(5, int(5 * hw_multiplier))
+        score.max_parallel = max(10, int(10 * hw_multiplier))
+        score.max_research_iterations = max(4, int(4 * hw_multiplier))
 
     elif tier == ComplexityTier.EXTREME:
-        score.max_subtasks = max(25, entities * 3)
-        score.max_phases = 8
-        score.max_depth = 7
-        score.max_parallel = 15
-        score.max_research_iterations = 5
+        score.max_subtasks = int(max(25, entities * 3) * hw_multiplier)
+        score.max_phases = max(8, int(8 * hw_multiplier))
+        score.max_depth = max(7, int(7 * hw_multiplier))
+        score.max_parallel = max(15, int(15 * hw_multiplier))
+        score.max_research_iterations = max(5, int(5 * hw_multiplier))
 
-    # Apply hardware-aware caps
+    # Apply reasonable caps (don't go crazy even on big hardware)
     try:
         from shared.hardware.detector import detect_hardware
         hw = detect_hardware()
         hw_workers = hw.optimal_workers()
+        # Cap parallel at optimal workers, but allow more tasks/phases for deep research
         score.max_parallel = min(score.max_parallel, hw_workers)
+        # Increased caps to utilize many tools effectively:
+        # - 2000 tools available → need many phases to explore them
+        # - 3600s timeout → can handle 200+ phases
+        score.max_subtasks = min(score.max_subtasks, 1000)  # Increased from 500
+        score.max_phases = min(score.max_phases, 200)       # Increased from 50
     except Exception:
         pass

@@ -43,7 +43,7 @@ async def divergence_node(state: dict[str, Any]) -> dict[str, Any]:
             config = LLMConfig(
                 model=get_settings().models.default_model,
                 temperature=0.8,  # Higher for creativity
-                max_tokens=500,
+                max_tokens=32768,
             )
             
             facts_text = "\n".join([str(f)[:100] for f in facts[:5]])
