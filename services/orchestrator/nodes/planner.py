@@ -570,7 +570,7 @@ PARAMETER EXTRACTION RULES:
 - Check "REQUIRED PARAMS" or "required" field to know which params are mandatory
 - Extract parameter values from the user query (e.g., company name, ticker, period)
 - If a parameter is missing from the query, use reasonable defaults or skip optional params
-- CRITICAL: NEVER generate empty args {{{{}}}}} if the tool requires parameters"""
+- CRITICAL: NEVER generate empty "args" if the tool requires parameters (all required params must be included)"""
                 ),
                 LLMMessage(role=LLMRole.USER, content=query)
             ]
