@@ -654,8 +654,12 @@ async def researcher_node(state: GraphState) -> GraphState:
 
         from services.orchestrator.core.utils import build_tool_inputs
 
-        # 2. Unified Tool Handler (INTELLIGENCE INJECTED)
+        # 2. Unified Tool Handler with Intelligent Retry (INTELLIGENCE INJECTED)
         async def unified_tool_handler(name: str, args: dict) -> Any:
+            """
+            Execute tool with intelligent retry on parameter errors.
+            Used by both DAG executor and legacy executor.
+            """
             # Resolve target server dynamically
             server_name = registry.get_server_for_tool(name)
 
@@ -680,13 +684,73 @@ async def researcher_node(state: GraphState) -> GraphState:
             if not server_name:
                 raise ValueError(f"Tool {name} not found in SessionRegistry.")
 
-            # Execute
-            try:
-                session = await registry.get_session(server_name)
-                result = await session.call_tool(name, args)
-            except Exception as e:
-                logger.error(f"Tool execution failed: {e}")
-                raise ValueError(f"Tool {name} failed: {e}")
+            # Execute with intelligent retry loop
+            result = None
+            retry_count = 0
+            max_retries = 2
+            current_args = args.copy()
+
+            while retry_count <= max_retries:
+                try:
+                    session = await registry.get_session(server_name)
+                    result = await session.call_tool(name, current_args)
+
+                    # Check if result contains error (needs retry)
+                    error_detected = False
+                    if result and hasattr(result, "content"):
+                        content_text = ""
+                        for c in result.content:
+                            if hasattr(c, "text"):
+                                content_text += c.text
+
+                        # Check for error keywords
+                        error_keywords = [
+                            "no data found", "data unavailable", "not found",
+                            "invalid ticker", "invalid symbol", "no data", "unavailable"
+                        ]
+                        for keyword in error_keywords:
+                            if keyword in content_text.lower():
+                                error_detected = True
+                                break
+
+                        # If error and we have retries left, attempt correction
+                        if error_detected and retry_count < max_retries:
+                            retry_count += 1
+                            logger.warning(
+                                f"🔄 Tool {name} returned error. "
+                                f"Attempting LLM correction (retry {retry_count}/{max_retries})"
+                            )
+
+                            # Use LLM to correct parameters
+                            corrected_args = await _llm_correct_tool_parameters(
+                                query=state.get("query", ""),
+                                task_description=f"Execute {name}",
+                                tool_name=name,
+                                failed_arguments=current_args,
+                                error_message=content_text[:500]
+                            )
+
+                            if corrected_args:
+                                logger.info(f"✅ LLM corrected arguments: {corrected_args}")
+                                current_args = corrected_args
+                                # Loop will retry with corrected args
+                            else:
+                                logger.warning(f"⚠️ LLM couldn't suggest correction, returning error result")
+                                break  # No correction possible, return error result
+                        else:
+                            # No error or no retries left
+                            break
+                    else:
+                        # No content to check, return as-is
+                        break
+
+                except Exception as e:
+                    logger.error(f"Tool execution failed: {e}")
+                    if retry_count < max_retries:
+                        retry_count += 1
+                        logger.warning(f"⚠️ Retrying after exception (retry {retry_count}/{max_retries})")
+                    else:
+                        raise ValueError(f"Tool {name} failed after {max_retries} retries: {e}")
 
             # AUTONOMIC MEMORY INTERCEPTOR
             try:
@@ -696,7 +760,7 @@ async def researcher_node(state: GraphState) -> GraphState:
                     trace_id=job_id,
                     source_node=name,
                     result=result,
-                    inputs=args
+                    inputs=current_args  # Use final args (may be corrected)
                 )
             except Exception as e:
                 logger.warning(f"Interceptor failed (non-blocking): {e}")
@@ -792,76 +856,15 @@ async def researcher_node(state: GraphState) -> GraphState:
                             content_text += c.text
 
                     # Strict Error Filtering (Prevent "Error is a Fact")
-                    error_detected = False
-                    error_keywords = ["tool not found", "error:", "exception", "no data found", "not found", "invalid", "failed"]
+                    # Note: Retry logic is now in unified_tool_handler, not here
+                    error_keywords = ["tool not found", "error:", "exception"]
                     for keyword in error_keywords:
                         if keyword in content_text.lower():
-                            error_detected = True
+                            success = False
                             break
 
-                    if error_detected or len(content_text) < 5:
+                    if len(content_text) < 5:
                         success = False
-
-                        # INTELLIGENT RETRY LOOP: Use LLM to fix parameters
-                        retry_count = 0
-                        max_retries = 2
-
-                        while not success and retry_count < max_retries:
-                            retry_count += 1
-                            logger.warning(
-                                f"🔄 Tool failed: {calls[idx].tool_name}. "
-                                f"Attempting LLM correction (retry {retry_count}/{max_retries})"
-                            )
-
-                            # Use LLM to extract correct parameters from query + error
-                            corrected_args = await _llm_correct_tool_parameters(
-                                query=state.get("query", ""),
-                                task_description=task.get("description", ""),
-                                tool_name=calls[idx].tool_name,
-                                failed_arguments=calls[idx].arguments,
-                                error_message=content_text[:500]
-                            )
-
-                            if corrected_args:
-                                logger.info(f"✅ LLM corrected arguments: {corrected_args}")
-
-                                # Retry with corrected arguments
-                                retry_call = ToolCall(
-                                    tool_name=calls[idx].tool_name,
-                                    arguments=corrected_args
-                                )
-                                retry_result = await unified_tool_handler(
-                                    retry_call.tool_name,
-                                    retry_call.arguments
-                                )
-
-                                # Check retry result
-                                retry_content = ""
-                                if retry_result and hasattr(retry_result, "content"):
-                                    for c in retry_result.content:
-                                        if hasattr(c, "text"):
-                                            retry_content += c.text
-
-                                # Check if retry succeeded
-                                retry_success = True
-                                for keyword in error_keywords:
-                                    if keyword in retry_content.lower():
-                                        retry_success = False
-                                        break
-
-                                if retry_success and len(retry_content) >= 5:
-                                    # Retry succeeded!
-                                    logger.info(f"🎉 Retry succeeded with corrected arguments!")
-                                    success = True
-                                    content_text = retry_content
-                                    # Update the call for fact storage
-                                    calls[idx] = retry_call
-                                    break
-                                else:
-                                    logger.warning(f"⚠️ Retry {retry_count} still failed")
-                            else:
-                                logger.warning(f"⚠️ LLM couldn't suggest correction")
-                                break
 
                 if success:
                     # Generate source URL for citation
