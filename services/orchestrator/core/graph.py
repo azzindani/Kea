@@ -202,6 +202,62 @@ async def planner_node(state: GraphState) -> GraphState:
     return {**state, **updated_state}
 
 @audited(AuditEventType.TOOL_CALLED, "Researcher Node executed iteration")
+def _generate_source_url(tool_name: str, arguments: dict, output_text: str) -> str:
+    """
+    Generate source URL for fact citation based on tool and arguments.
+
+    Args:
+        tool_name: Name of the tool that generated the fact
+        arguments: Tool arguments used
+        output_text: Tool output text
+
+    Returns:
+        Source URL for citation
+    """
+    # Financial data tools
+    if "yfinance" in tool_name or "yahooquery" in tool_name:
+        ticker = arguments.get("ticker") or arguments.get("symbol") or arguments.get("tickers", "").split(",")[0]
+        if ticker:
+            return f"https://finance.yahoo.com/quote/{ticker.strip()}"
+        return "https://finance.yahoo.com"
+
+    # Crypto tools
+    if "ccxt" in tool_name:
+        symbol = arguments.get("symbol", "BTC/USDT")
+        exchange = arguments.get("exchange", "binance")
+        return f"https://{exchange}.com/trade/{symbol.replace('/', '_')}"
+
+    # Web search
+    if "search" in tool_name.lower():
+        query = arguments.get("query", "")
+        return f"https://duckduckgo.com/?q={query.replace(' ', '+')}" if query else "https://duckduckgo.com"
+
+    # Web scraping
+    if "fetch_url" in tool_name or "scrape" in tool_name:
+        url = arguments.get("url")
+        if url and isinstance(url, str) and url.startswith("http"):
+            return url
+        return "web_scrape"
+
+    # SEC/EDGAR
+    if "sec" in tool_name or "edgar" in tool_name:
+        cik = arguments.get("cik") or arguments.get("ticker")
+        if cik:
+            return f"https://www.sec.gov/cgi-bin/browse-edgar?CIK={cik}"
+        return "https://www.sec.gov"
+
+    # Code execution - no external URL
+    if "execute_code" in tool_name or "python" in tool_name:
+        return "internal_computation"
+
+    # Database queries
+    if "duckdb" in tool_name or "sql" in tool_name:
+        return "internal_database"
+
+    # Default: tool name as source
+    return f"tool:{tool_name}"
+
+
 async def researcher_node(state: GraphState) -> GraphState:
     """Execute research using execution plan with dynamic tool routing and PARALLEL execution."""
     iteration = state.get("iteration", 1)
@@ -405,15 +461,64 @@ async def researcher_node(state: GraphState) -> GraphState:
             dag_result = await dag_executor.execute(workflow_nodes)
 
             # Harvest results into facts/sources/tool_invocations
+            # CRITICAL: Filter out error outputs to prevent "error as fact" problem
             for node_id, node_result in dag_result.node_results.items():
                 if node_result.status == NodeStatus.COMPLETED and node_result.output:
-                    facts.append({
-                        "text": str(node_result.output),
-                        "query": f"DAG Node {node_id}",
-                        "source": node_result.metadata.get("source", "dag_executor"),
-                        "task_id": node_id,
-                        "persist": True,
-                    })
+                    output_text = str(node_result.output)
+
+                    # Strict Error Filtering (same as legacy executor)
+                    is_error = False
+                    error_keywords = [
+                        "tool not found",
+                        "not found in registry",
+                        "error:",
+                        "exception",
+                        "failed:",
+                        "schema not found",
+                    ]
+
+                    for keyword in error_keywords:
+                        if keyword in output_text.lower():
+                            is_error = True
+                            logger.warning(
+                                f"⚠️ Keeper: Filtering error output from {node_id}: "
+                                f"{output_text[:100]}"
+                            )
+                            break
+
+                    # Also skip empty or very short outputs
+                    if len(output_text.strip()) < 5:
+                        is_error = True
+
+                    # Only add valid facts
+                    if not is_error:
+                        # CRITICAL: Add source_url for citation tracking
+                        tool_name = node_result.metadata.get("source", "dag_executor")
+                        source_url = _generate_source_url(
+                            tool_name,
+                            node_result.metadata.get("arguments", {}),
+                            output_text
+                        )
+
+                        facts.append({
+                            "text": output_text,
+                            "query": f"DAG Node {node_id}",
+                            "source": tool_name,
+                            "source_url": source_url,  # Add URL for citations
+                            "task_id": node_id,
+                            "persist": True,
+                        })
+
+                        # Track unique sources
+                        if source_url and source_url not in sources:
+                            sources.append({
+                                "url": source_url,
+                                "title": f"DAG Node {node_id}",
+                                "tool": tool_name,
+                                "task_id": node_id
+                            })
+                    else:
+                        logger.debug(f"Keeper: Skipped error fact from {node_id}")
 
                 tool_invocations.append({
                     "task_id": node_id,
@@ -602,10 +707,18 @@ async def researcher_node(state: GraphState) -> GraphState:
                         success = False
 
                 if success:
+                    # Generate source URL for citation
+                    source_url = _generate_source_url(
+                        calls[idx].tool_name,
+                        calls[idx].arguments,
+                        content_text
+                    )
+
                     fact = {
                         "text": content_text,
                         "query": task.get("description", ""),
                         "source": calls[idx].tool_name,
+                        "source_url": source_url,  # Add URL for citations
                         "task_id": t_id,
                         "persist": t_persist
                     }
@@ -619,13 +732,25 @@ async def researcher_node(state: GraphState) -> GraphState:
                         if isinstance(url_arg, str) and url_arg.startswith("http"):
                             extracted_urls.append(url_arg)
 
+                    # Always include the generated source_url as a source
+                    if source_url and source_url.startswith("http"):
+                        if source_url not in [s.get("url") for s in sources]:
+                            sources.append({
+                                "url": source_url,
+                                "title": task.get("description", ""),
+                                "tool": calls[idx].tool_name,
+                                "task_id": t_id
+                            })
+
+                    # Add any URLs extracted from content
                     for url in extracted_urls:
-                        sources.append({
-                            "url": url,
-                            "title": task.get("description", ""),
-                            "tool": calls[idx].tool_name,
-                            "task_id": t_id
-                        })
+                        if url not in [s.get("url") for s in sources]:
+                            sources.append({
+                                "url": url,
+                                "title": task.get("description", ""),
+                                "tool": calls[idx].tool_name,
+                                "task_id": t_id
+                            })
 
                     # Store in DataPool for bucket pattern
                     try:
@@ -848,14 +973,18 @@ async def generator_node(state: GraphState) -> GraphState:
     facts = state.get("facts", [])
     sources = state.get("sources", [])
     query = state.get("query", "")
-    
+    critic_feedback = state.get("critic_feedback", None)  # For revisions
+    revision_count = state.get("revision_count", 0)
+
     logger.info(f"Query: {query[:100]}...")
     logger.info(f"Facts available: {len(facts)}")
+    if revision_count > 0:
+        logger.info(f"⚠️ REVISION ATTEMPT #{revision_count}")
     logger.info("-"*70)
     logger.info("Calling LLM to generate comprehensive answer...")
-    
+
     generator = GeneratorAgent()
-    output = await generator.generate(query, facts, sources)
+    output = await generator.generate(query, facts, sources, revision_feedback=critic_feedback)
     
     logger.info(f"\n✅ Generator Output ({len(output)} chars):")
     logger.info("-"*70)
