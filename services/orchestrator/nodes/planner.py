@@ -195,72 +195,16 @@ def _extract_template_variables(query: str, expected_vars: list[str]) -> dict[st
 
     variables = {}
     query_upper = query.upper()
-    query_lower = query.lower()
-
-    # Company name to ticker mapping (common cases)
-    company_to_ticker = {
-        # Indonesian Banks
-        "bca bank": "BBCA.JK",
-        "bank central asia": "BBCA.JK",
-        "bca": "BBCA.JK",
-        "bank bca": "BBCA.JK",
-        "bri": "BBRI.JK",
-        "bank rakyat indonesia": "BBRI.JK",
-        "mandiri": "BMRI.JK",
-        "bank mandiri": "BMRI.JK",
-        "bni": "BBNI.JK",
-        "bank negara indonesia": "BBNI.JK",
-        "btn": "BBTN.JK",
-        "bank tabungan negara": "BBTN.JK",
-
-        # US Tech
-        "nvidia": "NVDA",
-        "apple": "AAPL",
-        "microsoft": "MSFT",
-        "google": "GOOGL",
-        "alphabet": "GOOGL",
-        "amazon": "AMZN",
-        "meta": "META",
-        "facebook": "META",
-        "tesla": "TSLA",
-
-        # Crypto (for crypto tools)
-        "bitcoin": "BTC/USDT",
-        "ethereum": "ETH/USDT",
-        "btc": "BTC/USDT",
-        "eth": "ETH/USDT",
-    }
 
     for var in expected_vars:
         if var.lower() == "ticker":
-            # Strategy 1: Check for exact ticker pattern (BBCA.JK, NVDA)
-            ticker_match = re.search(r'\b([A-Z]{2,5}\.[A-Z]{2})\b', query_upper)  # Exchange suffix
-            if not ticker_match:
-                ticker_match = re.search(r'\b([A-Z]{2,5})\b', query_upper)  # Plain ticker
-
+            # Simple extraction: look for ticker patterns, let retry loop fix errors
+            ticker_match = re.search(r'\b([A-Z]{2,5}(?:\.[A-Z]{2,3})?)\b', query_upper)
             if ticker_match:
-                matched_ticker = ticker_match.group(1)
-                # Verify it's not a common word (avoid false positives like "BCA" from "BCA Bank")
-                if len(matched_ticker) >= 3 or '.' in matched_ticker:
-                    variables[var] = matched_ticker
-                    continue
-
-            # Strategy 2: Check company name mapping
-            ticker_found = None
-            for company_name, ticker in company_to_ticker.items():
-                if company_name in query_lower:
-                    # Prefer longer matches (e.g., "bca bank" over "bca")
-                    if ticker_found is None or len(company_name) > len(ticker_found[0]):
-                        ticker_found = (company_name, ticker)
-
-            if ticker_found:
-                variables[var] = ticker_found[1]
-                logger.info(f"📊 Mapped '{ticker_found[0]}' → {ticker_found[1]}")
-                continue
-
-            # Strategy 3: Default to first word (fallback)
-            words = query.split()
-            variables[var] = words[0].upper() if words else "AAPL"
+                variables[var] = ticker_match.group(1)
+            else:
+                # Fallback: use query company name, retry loop will correct via LLM
+                variables[var] = query.strip()
                 
         elif var.lower() == "company":
             # Use first few words as company name
