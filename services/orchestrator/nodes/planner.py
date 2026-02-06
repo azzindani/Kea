@@ -205,7 +205,7 @@ async def _validate_tool_arguments(execution_plan: ExecutionPlan, query: str) ->
 
     for task in execution_plan.micro_tasks:
         tool_name = task.tool
-        args = task.args or {}
+        args = task.inputs or {}
 
         # Get schema for this tool
         schema = tool_schemas.get(tool_name, {})

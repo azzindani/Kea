@@ -295,7 +295,9 @@ class DAGExecutor:
 
         # Check if artifact exists in store
         if node.output_artifact:
-            cached_value = self.store.get(cache_key, node.output_artifact)
+            # ArtifactStore.get() takes a single reference string in format "step_id.artifacts.key"
+            cache_reference = f"{cache_key}.artifacts.{node.output_artifact}"
+            cached_value = self.store.get(cache_reference)
             if cached_value is not None:
                 # Return a NodeResult with cached data
                 return NodeResult(
