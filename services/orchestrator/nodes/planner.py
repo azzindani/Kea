@@ -255,7 +255,7 @@ async def _validate_tool_arguments(execution_plan: ExecutionPlan, query: str) ->
                 args.pop(extra_param, None)
 
         # Update task with fixed args
-        task.args = args
+        task.inputs = args
 
         # Re-validate after fixes
         revalidation = _validate_against_json_schema(args, schema, tool_name)
@@ -813,6 +813,26 @@ QUERY COMPLEXITY: {complexity.tier.value.upper()}
   Complex queries with many entities need {complexity.max_subtasks}+ steps.
   Generate as many steps as the query ACTUALLY requires — do NOT default to 3."""
 
+            # ============================================================
+            # ERROR FEEDBACK LOOP (Self-Correction from Previous Failures)
+            # Inject previous tool failures so LLM learns from mistakes
+            # ============================================================
+            error_feedback_section = ""
+            error_feedback = state.get("error_feedback", [])
+            if error_feedback:
+                error_feedback_section = "\n\n⚠️ PREVIOUS TOOL FAILURES (LEARN FROM THESE):\n"
+                error_feedback_section += "The following tool calls FAILED in the previous iteration. "
+                error_feedback_section += "You MUST correct these mistakes:\n\n"
+                for i, err in enumerate(error_feedback[:5], 1):  # Limit to 5 to avoid context overflow
+                    error_feedback_section += f"{i}. TOOL: {err.get('tool', 'unknown')}\n"
+                    error_feedback_section += f"   FAILED ARGS: {err.get('args', {})}\n"
+                    error_feedback_section += f"   ERROR: {err.get('error', 'unknown')[:200]}\n"
+                    error_feedback_section += f"   TASK: {err.get('description', '')[:100]}\n\n"
+                error_feedback_section += "CORRECTION GUIDANCE:\n"
+                error_feedback_section += "- If ticker was wrong (e.g., 'BBCA' failed), use correct exchange suffix (e.g., 'BBCA.JK')\n"
+                error_feedback_section += "- If parameter was missing, ensure you include ALL required parameters from the schema\n"
+                error_feedback_section += "- If tool doesn't exist, use an alternative from the AVAILABLE TOOLS list\n"
+
             # JSON Blueprint System Prompt (Level 30 Architect)
             messages = [
                 LLMMessage(
@@ -820,6 +840,7 @@ QUERY COMPLEXITY: {complexity.tier.value.upper()}
                     content=f"""ACT AS: Execution Architect for Kea (Autonomous Research Engine).
 OBJECTIVE: Convert user intent into an executable JSON Blueprint with PRECISE INPUT MAPPING.
 {complexity_guidance}
+{error_feedback_section}
 
 AVAILABLE TOOLS:
 {tools_context}

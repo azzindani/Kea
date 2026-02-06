@@ -80,6 +80,10 @@ class GraphState(TypedDict, total=False):
     artifacts: list[str]
     tool_invocations: list[dict]  # Record of tool calls
     
+    # Error Feedback Loop (Self-Correction)
+    # Stores errors from failed tool calls to inject into LLM for learning
+    error_feedback: list[dict]  # [{"tool": str, "error": str, "args": dict, "suggestion": str}]
+    
     # Consensus
     generator_output: str
     critic_feedback: str
@@ -94,6 +98,7 @@ class GraphState(TypedDict, total=False):
     max_iterations: int
     should_continue: bool
     error: str | None
+    stop_reason: str  # Reason for stopping (confidence_achieved, all_tools_failed, etc.)
     
     # Revision loop control (for Judge -> Generator retry)
     revision_count: int
@@ -384,6 +389,7 @@ async def researcher_node(state: GraphState) -> GraphState:
     facts = state.get("facts", [])
     sources = state.get("sources", [])
     tool_invocations = state.get("tool_invocations", [])
+    error_feedback = state.get("error_feedback", [])  # Error feedback for LLM self-correction
     
     # Reset context pool for new research iteration
     if iteration == 1:
@@ -1007,6 +1013,17 @@ async def researcher_node(state: GraphState) -> GraphState:
                         error_text = error_text.replace("Tool execution error:", "Missing parameter:")
 
                     logger.warning(f"   ❌ Task {t_id} ({tool_name}) FAILED: {error_text}")
+                    
+                    # ERROR FEEDBACK LOOP: Capture error for LLM self-correction
+                    # This allows the planner to learn from mistakes on retry
+                    error_feedback.append({
+                        "tool": tool_name,
+                        "task_id": t_id,
+                        "error": error_text[:500],  # Truncate for context window
+                        "args": calls[idx].arguments,
+                        "description": task.get("description", ""),
+                    })
+                    
                     # Prevent re-execution to avoid infinite loop
                     completed.add(t_id)
 
@@ -1133,6 +1150,7 @@ async def researcher_node(state: GraphState) -> GraphState:
         "facts": facts,
         "sources": sources,
         "tool_invocations": tool_invocations,
+        "error_feedback": error_feedback,  # Pass errors to LLM for self-correction on retry
     }
 
 

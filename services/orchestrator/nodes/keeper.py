@@ -42,13 +42,15 @@ def get_hardware_aware_limits() -> tuple[int, int]:
 
 def get_adaptive_threshold(iteration: int) -> float:
     """
-    Calculate adaptive confidence threshold based on iteration.
+    Get fixed confidence threshold (no degradation).
     
-    Uses config values: initial_threshold, degradation_rate, min_threshold.
+    Enterprise Mode: Always require 0.95 confidence.
+    This ensures Kea maintains high quality output standards.
+    The retry loop will continue until this threshold is met.
     """
     config = _get_config()
-    threshold = config.confidence.initial_threshold - (iteration * config.confidence.degradation_rate)
-    return max(threshold, config.confidence.min_threshold)
+    # No degradation - always return initial threshold (0.95)
+    return config.confidence.initial_threshold
 
 
 async def calculate_agreement_score(facts: list[dict]) -> float:
@@ -338,6 +340,17 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
     state["execution_progress"] = progress
     
     # ============================================================
+    # STOP ON ALL FAILURES (prevents hallucination)
+    # ============================================================
+    if progress["total_tasks"] > 0 and progress["completed_tasks"] == 0 and progress["failed_tasks"] == progress["total_tasks"]:
+        logger.error(f"Keeper: ALL tool calls failed ({progress['failed_tasks']}/{progress['total_tasks']})")
+        logger.error(f"   Stopping to prevent hallucination - no valid facts collected")
+        state["should_continue"] = False
+        state["stop_reason"] = "all_tools_failed"
+        state["confidence"] = 0.0
+        return state
+    
+    # ============================================================
     # CHECK LOCAL ITERATION LIMIT (user-specified)
     # ============================================================
     if iteration >= max_iterations:
@@ -360,22 +373,27 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
         state["agreement_score"] = agreement_score
         state["confidence_threshold"] = current_threshold
         
+        # Store actual confidence in state for final report
+        state["confidence"] = agreement_score
+        
         # If agreement exceeds threshold, we have confident answer
         if agreement_score >= current_threshold:
-            logger.info(f"✅ Keeper: Confidence {agreement_score:.3f} >= {current_threshold:.2f} - stopping")
+            logger.info(f"Keeper: Confidence {agreement_score:.3f} >= {current_threshold:.2f} - PASSED")
             state["should_continue"] = False
             state["stop_reason"] = "confidence_achieved"
             return state
+        else:
+            logger.warning(f"Keeper: Confidence {agreement_score:.3f} < {current_threshold:.2f} - below standard")
         
-        # If all tasks complete, stop regardless
+        # If all tasks complete, stop regardless (but keep actual confidence score)
         if progress["completed_tasks"] >= progress["total_tasks"]:
             logger.info("Keeper: All execution plan tasks complete")
+            logger.info(f"   Final confidence: {agreement_score:.3f} (required: {current_threshold:.2f})")
             state["should_continue"] = False
             return state
         
-        # Log degradation for next iteration
-        next_threshold = get_adaptive_threshold(iteration + 1)
-        logger.info(f"   📉 Threshold will degrade to {next_threshold:.2f} next iteration")
+        # No degradation - threshold stays at 0.95
+        logger.info(f"   Threshold remains at {current_threshold:.2f} (no degradation)")
     
     # ============================================================
     # CHECK CONTEXT DRIFT
