@@ -268,7 +268,7 @@ class AgenticWorkflow:
         config = LLMConfig(
             model=self.model,
             temperature=0.3,
-            max_tokens=4096,
+            max_tokens=32768,
         )
         
         messages = [
@@ -492,7 +492,7 @@ What should I do next? Respond with JSON only."""
         config = LLMConfig(
             model=self.model,
             temperature=0.3,
-            max_tokens=4096,
+            max_tokens=32768,
         )
         
         # Compile all gathered information

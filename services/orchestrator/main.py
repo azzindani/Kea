@@ -358,7 +358,7 @@ async def stream_research(query: str, depth: int = 2, max_sources: int = 10):
                 from shared.llm.provider import LLMMessage, LLMRole
                 
                 provider = OpenRouterProvider()
-                config = LLMConfig(temperature=0.7, max_tokens=1000)
+                config = LLMConfig(temperature=0.7, max_tokens=32768)
                 
                 # Phase 1: Planning
                 yield f"data: {json.dumps({'event': 'phase', 'phase': 'planning'})}\n\n"

@@ -164,7 +164,7 @@ class EnvironmentConfig:
             rate_limit_per_minute=30,
             # Short timeouts
             request_timeout_seconds=30,
-            research_timeout_seconds=180,
+            research_timeout_seconds=3600,  # 1 hour for deep research with many tools
             tool_timeout_seconds=20,
             # Large cache
             cache_size_mb=200,
@@ -202,7 +202,7 @@ class EnvironmentConfig:
             rate_limit_per_minute=1000,
             # Long timeouts for debugging
             request_timeout_seconds=300,
-            research_timeout_seconds=600,
+            research_timeout_seconds=3600,  # 1 hour for deep research with many tools
             tool_timeout_seconds=120,
             # Small cache
             cache_size_mb=50,

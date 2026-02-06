@@ -236,7 +236,7 @@ async def _llm_correct_tool_parameters(
         config = LLMConfig(
             model=get_settings().models.planner_model,
             temperature=0.3,
-            max_tokens=4096,  # Increased from 500 for multi-parameter correction
+            max_tokens=32768,  # Max out for comprehensive parameter correction
         )
 
         # Get tool schema for intelligent correction
@@ -441,7 +441,7 @@ async def researcher_node(state: GraphState) -> GraphState:
                     cfg = LLMConfig(
                         model=app_cfg.models.planner_model,
                         temperature=0.3,
-                        max_tokens=4096,
+                        max_tokens=32768,
                     )
                     msgs = [
                         LLMMessage(role=LLMRole.SYSTEM, content=system_prompt),

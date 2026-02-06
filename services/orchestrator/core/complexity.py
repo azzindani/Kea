@@ -313,10 +313,12 @@ def _set_dynamic_limits(score: ComplexityScore) -> None:
         from shared.hardware.detector import detect_hardware
         hw = detect_hardware()
         hw_workers = hw.optimal_workers()
-        # Cap parallel at optimal workers, but allow more tasks/phases
+        # Cap parallel at optimal workers, but allow more tasks/phases for deep research
         score.max_parallel = min(score.max_parallel, hw_workers)
-        # Cap max_subtasks at 500 (even 192-core machines shouldn't spawn 1000s of tasks)
-        score.max_subtasks = min(score.max_subtasks, 500)
-        score.max_phases = min(score.max_phases, 50)
+        # Increased caps to utilize many tools effectively:
+        # - 2000 tools available → need many phases to explore them
+        # - 3600s timeout → can handle 200+ phases
+        score.max_subtasks = min(score.max_subtasks, 1000)  # Increased from 500
+        score.max_phases = min(score.max_phases, 200)       # Increased from 50
     except Exception:
         pass

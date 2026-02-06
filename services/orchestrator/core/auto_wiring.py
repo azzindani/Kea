@@ -324,7 +324,7 @@ class AutoWirer:
         config = LLMConfig(
             model=self.settings.models.planner_model,
             temperature=0.0,
-            max_tokens=8192,  # Increased from 1000 for complex multi-param schemas
+            max_tokens=32768,  # Max out for comprehensive parameter mapping
         )
 
         messages = [
