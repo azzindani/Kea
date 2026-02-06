@@ -1,1 +1,20 @@
-[project]name = "ml_server"version = "0.1.0"description = "MCP Server for ml_server"readme = "README.md"requires-python = ">=3.12"dependencies = [    "mcp",    "numpy",    "pandas",    "pydantic",    "python-dotenv",    "scikit-learn",    "scipy",    "structlog",    "wrapt",][tool.uv]dev-dependencies = []
+[project]
+name = "ml_server"
+version = "0.1.0"
+description = "MCP Server for ml_server"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "mcp",
+    "numpy",
+    "pandas",
+    "pydantic",
+    "python-dotenv",
+    "scikit-learn",
+    "scipy",
+    "structlog",
+    "wrapt",
+]
+
+[tool.uv]
+dev-dependencies = []

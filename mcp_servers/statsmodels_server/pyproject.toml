@@ -1,1 +1,21 @@
-[project]name = "statsmodels_server"version = "0.1.0"description = "MCP Server for statsmodels_server"readme = "README.md"requires-python = ">=3.12"dependencies = [    "mcp",    "numpy",    "pandas",    "pydantic",    "python-dotenv",    "scipy",    "statsmodels",    "structlog",    "tabulate",    "wrapt",][tool.uv]dev-dependencies = []
+[project]
+name = "statsmodels_server"
+version = "0.1.0"
+description = "MCP Server for statsmodels_server"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "mcp",
+    "numpy",
+    "pandas",
+    "pydantic",
+    "python-dotenv",
+    "scipy",
+    "statsmodels",
+    "structlog",
+    "tabulate",
+    "wrapt",
+]
+
+[tool.uv]
+dev-dependencies = []

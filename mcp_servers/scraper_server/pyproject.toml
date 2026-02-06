@@ -1,1 +1,20 @@
-[project]name = "scraper_server"version = "0.1.0"description = "MCP Server for Scraper"readme = "README.md"requires-python = ">=3.12"dependencies = [    "beautifulsoup4",    "httpx",    "mcp",    "playwright",    "pydantic",    "python-dotenv",    "structlog",    "tenacity",    "wrapt",][tool.uv]dev-dependencies = []
+[project]
+name = "scraper_server"
+version = "0.1.0"
+description = "MCP Server for Scraper"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "beautifulsoup4",
+    "httpx",
+    "mcp",
+    "playwright",
+    "pydantic",
+    "python-dotenv",
+    "structlog",
+    "tenacity",
+    "wrapt",
+]
+
+[tool.uv]
+dev-dependencies = []

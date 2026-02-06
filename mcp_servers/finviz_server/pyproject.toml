@@ -1,1 +1,20 @@
-[project]name = "finviz_server"version = "0.1.0"description = "MCP Server for Finviz Finance"readme = "README.md"requires-python = ">=3.12"dependencies = [    "finvizfinance",    "mcp",    "pandas",    "pydantic",    "python-dotenv",    "structlog",    "tabulate",    "wrapt",    "yfinance",][tool.uv]dev-dependencies = []
+[project]
+name = "finviz_server"
+version = "0.1.0"
+description = "MCP Server for Finviz Finance"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "finvizfinance",
+    "mcp",
+    "pandas",
+    "pydantic",
+    "python-dotenv",
+    "structlog",
+    "tabulate",
+    "wrapt",
+    "yfinance",
+]
+
+[tool.uv]
+dev-dependencies = []

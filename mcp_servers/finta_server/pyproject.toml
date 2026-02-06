@@ -1,1 +1,20 @@
-[project]name = "finta_server"version = "0.1.0"description = "MCP Server for finta_server"readme = "README.md"requires-python = ">=3.12"dependencies = [    "finta",    "mcp",    "numpy",    "pandas",    "pydantic",    "python-dotenv",    "structlog",    "tabulate",    "wrapt",][tool.uv]dev-dependencies = []
+[project]
+name = "finta_server"
+version = "0.1.0"
+description = "MCP Server for finta_server"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "finta",
+    "mcp",
+    "numpy",
+    "pandas",
+    "pydantic",
+    "python-dotenv",
+    "structlog",
+    "tabulate",
+    "wrapt",
+]
+
+[tool.uv]
+dev-dependencies = []

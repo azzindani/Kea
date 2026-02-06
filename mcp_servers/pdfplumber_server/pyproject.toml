@@ -1,1 +1,18 @@
-[project]name = "pdfplumber_server"version = "0.1.0"description = "MCP Server for pdfplumber_server"readme = "README.md"requires-python = ">=3.12"dependencies = [    "mcp",    "pandas",    "pdfplumber",    "pydantic",    "python-dotenv",    "structlog",    "wrapt",][tool.uv]dev-dependencies = []
+[project]
+name = "pdfplumber_server"
+version = "0.1.0"
+description = "MCP Server for pdfplumber_server"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "mcp",
+    "pandas",
+    "pdfplumber",
+    "pydantic",
+    "python-dotenv",
+    "structlog",
+    "wrapt",
+]
+
+[tool.uv]
+dev-dependencies = []

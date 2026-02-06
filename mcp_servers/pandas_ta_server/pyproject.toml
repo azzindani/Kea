@@ -1,1 +1,20 @@
-[project]name = "pandas_ta_server"version = "0.1.0"description = "MCP Server for pandas_ta_server"readme = "README.md"requires-python = ">=3.12"dependencies = [    "mcp",    "numpy",    "pandas",    "pandas-ta",    "pydantic",    "python-dotenv",    "structlog",    "tabulate",    "wrapt",][tool.uv]dev-dependencies = []
+[project]
+name = "pandas_ta_server"
+version = "0.1.0"
+description = "MCP Server for pandas_ta_server"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "mcp",
+    "numpy",
+    "pandas",
+    "pandas-ta",
+    "pydantic",
+    "python-dotenv",
+    "structlog",
+    "tabulate",
+    "wrapt",
+]
+
+[tool.uv]
+dev-dependencies = []

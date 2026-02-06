@@ -1,1 +1,20 @@
-[project]name = "seaborn_server"version = "0.1.0"description = "MCP Server for seaborn_server"requires-python = ">=3.12"dependencies = [    "matplotlib",    "mcp",    "numpy",    "pandas",    "pydantic",    "python-dotenv",    "scipy",    "seaborn",    "structlog",    "wrapt",][tool.uv]dev-dependencies = []
+[project]
+name = "seaborn_server"
+version = "0.1.0"
+description = "MCP Server for seaborn_server"
+requires-python = ">=3.12"
+dependencies = [
+    "matplotlib",
+    "mcp",
+    "numpy",
+    "pandas",
+    "pydantic",
+    "python-dotenv",
+    "scipy",
+    "seaborn",
+    "structlog",
+    "wrapt",
+]
+
+[tool.uv]
+dev-dependencies = []

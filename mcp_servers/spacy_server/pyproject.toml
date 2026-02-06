@@ -1,1 +1,17 @@
-[project]name = "spacy_server"version = "0.1.0"description = "MCP Server for spacy_server"readme = "README.md"requires-python = ">=3.12"dependencies = [    "mcp",    "pydantic",    "python-dotenv",    "spacy",    "structlog",    "wrapt",][tool.uv]dev-dependencies = []
+[project]
+name = "spacy_server"
+version = "0.1.0"
+description = "MCP Server for spacy_server"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "mcp",
+    "pydantic",
+    "python-dotenv",
+    "spacy",
+    "structlog",
+    "wrapt",
+]
+
+[tool.uv]
+dev-dependencies = []

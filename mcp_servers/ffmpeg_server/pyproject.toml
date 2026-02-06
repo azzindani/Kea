@@ -1,1 +1,17 @@
-[project]name = "ffmpeg_server"version = "0.1.0"description = "MCP Server for ffmpeg_server"readme = "README.md"requires-python = ">=3.12"dependencies = [    "ffmpeg-python",    "mcp",    "pydantic",    "python-dotenv",    "structlog",    "wrapt",][tool.uv]dev-dependencies = []
+[project]
+name = "ffmpeg_server"
+version = "0.1.0"
+description = "MCP Server for ffmpeg_server"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "ffmpeg-python",
+    "mcp",
+    "pydantic",
+    "python-dotenv",
+    "structlog",
+    "wrapt",
+]
+
+[tool.uv]
+dev-dependencies = []
