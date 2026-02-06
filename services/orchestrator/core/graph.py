@@ -202,6 +202,90 @@ async def planner_node(state: GraphState) -> GraphState:
     return {**state, **updated_state}
 
 @audited(AuditEventType.TOOL_CALLED, "Researcher Node executed iteration")
+async def _llm_correct_tool_parameters(
+    query: str,
+    task_description: str,
+    tool_name: str,
+    failed_arguments: dict,
+    error_message: str
+) -> dict | None:
+    """
+    Use LLM to intelligently correct tool parameters after failure.
+
+    Args:
+        query: Original user query
+        task_description: Specific task description
+        tool_name: Tool that failed
+        failed_arguments: Arguments that caused failure
+        error_message: Error message from failed execution
+
+    Returns:
+        Corrected arguments dict, or None if can't correct
+    """
+    try:
+        import os
+        if not os.getenv("OPENROUTER_API_KEY"):
+            return None
+
+        from shared.llm import OpenRouterProvider, LLMConfig
+        from shared.llm.provider import LLMMessage, LLMRole
+        from shared.config import get_settings
+        import json
+
+        provider = OpenRouterProvider()
+        config = LLMConfig(
+            model=get_settings().models.planner_model,
+            temperature=0.3,
+            max_tokens=500,
+        )
+
+        messages = [
+            LLMMessage(
+                role=LLMRole.SYSTEM,
+                content="""You are a parameter correction AI. When a financial tool fails, you extract the correct parameters from the context.
+
+CRITICAL RULES:
+1. Output ONLY valid JSON with corrected parameters
+2. For company names → extract correct stock ticker
+3. For Indonesian companies → add .JK suffix (e.g., BBCA.JK not BCA.JK)
+4. For US companies → use plain ticker (e.g., AAPL not AAPL.US)
+5. If query mentions "BCA Bank" → ticker is BBCA.JK (Bank Central Asia)
+6. If unsure, return empty dict: {}
+
+Output format: {"ticker": "BBCA.JK"} or {"symbol": "NVDA"} etc."""
+            ),
+            LLMMessage(
+                role=LLMRole.USER,
+                content=f"""Tool failed. Help me fix the parameters:
+
+**Original Query:** {query}
+**Task:** {task_description}
+**Tool:** {tool_name}
+**Failed Arguments:** {json.dumps(failed_arguments)}
+**Error:** {error_message}
+
+What are the CORRECT parameters? Return JSON only."""
+            )
+        ]
+
+        response = await provider.complete(messages, config)
+        content = response.content.strip()
+
+        # Extract JSON from response
+        import re
+        json_match = re.search(r'\{[^}]+\}', content)
+        if json_match:
+            corrected = json.loads(json_match.group(0))
+            if corrected:  # Non-empty dict
+                return corrected
+
+        return None
+
+    except Exception as e:
+        logger.error(f"LLM parameter correction failed: {e}")
+        return None
+
+
 def _generate_source_url(tool_name: str, arguments: dict, output_text: str) -> str:
     """
     Generate source URL for fact citation based on tool and arguments.
@@ -708,10 +792,76 @@ async def researcher_node(state: GraphState) -> GraphState:
                             content_text += c.text
 
                     # Strict Error Filtering (Prevent "Error is a Fact")
-                    if "tool not found" in content_text.lower() or "error:" in content_text.lower() or "exception" in content_text.lower():
+                    error_detected = False
+                    error_keywords = ["tool not found", "error:", "exception", "no data found", "not found", "invalid", "failed"]
+                    for keyword in error_keywords:
+                        if keyword in content_text.lower():
+                            error_detected = True
+                            break
+
+                    if error_detected or len(content_text) < 5:
                         success = False
-                    elif len(content_text) < 5:
-                        success = False
+
+                        # INTELLIGENT RETRY LOOP: Use LLM to fix parameters
+                        retry_count = 0
+                        max_retries = 2
+
+                        while not success and retry_count < max_retries:
+                            retry_count += 1
+                            logger.warning(
+                                f"🔄 Tool failed: {calls[idx].tool_name}. "
+                                f"Attempting LLM correction (retry {retry_count}/{max_retries})"
+                            )
+
+                            # Use LLM to extract correct parameters from query + error
+                            corrected_args = await _llm_correct_tool_parameters(
+                                query=state.get("query", ""),
+                                task_description=task.get("description", ""),
+                                tool_name=calls[idx].tool_name,
+                                failed_arguments=calls[idx].arguments,
+                                error_message=content_text[:500]
+                            )
+
+                            if corrected_args:
+                                logger.info(f"✅ LLM corrected arguments: {corrected_args}")
+
+                                # Retry with corrected arguments
+                                retry_call = ToolCall(
+                                    tool_name=calls[idx].tool_name,
+                                    arguments=corrected_args
+                                )
+                                retry_result = await unified_tool_handler(
+                                    retry_call.tool_name,
+                                    retry_call.arguments
+                                )
+
+                                # Check retry result
+                                retry_content = ""
+                                if retry_result and hasattr(retry_result, "content"):
+                                    for c in retry_result.content:
+                                        if hasattr(c, "text"):
+                                            retry_content += c.text
+
+                                # Check if retry succeeded
+                                retry_success = True
+                                for keyword in error_keywords:
+                                    if keyword in retry_content.lower():
+                                        retry_success = False
+                                        break
+
+                                if retry_success and len(retry_content) >= 5:
+                                    # Retry succeeded!
+                                    logger.info(f"🎉 Retry succeeded with corrected arguments!")
+                                    success = True
+                                    content_text = retry_content
+                                    # Update the call for fact storage
+                                    calls[idx] = retry_call
+                                    break
+                                else:
+                                    logger.warning(f"⚠️ Retry {retry_count} still failed")
+                            else:
+                                logger.warning(f"⚠️ LLM couldn't suggest correction")
+                                break
 
                 if success:
                     # Generate source URL for citation
