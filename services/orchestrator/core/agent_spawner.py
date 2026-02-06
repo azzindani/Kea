@@ -753,9 +753,30 @@ CRITICAL: Return ONLY valid JSON for the tool arguments. No markdown, no explana
             # Extract source metadata if available (provenance tracking)
             if response:
                 result.source = extract_url_from_text(str(response))
-            
-            result.status = AgentStatus.COMPLETED
-            logger.info(f"✅ Agent {agent_id} completed.")
+
+            # Determine agent status based on result quality
+            # If tool execution failed, mark agent as FAILED (not COMPLETED)
+            if response and isinstance(response, str):
+                error_indicators = [
+                    "Swarm Tool Failed",
+                    "Swarm Tool Exception",
+                    "Tool reported an error",
+                    "Exec failed:",
+                    "LLM Failure"
+                ]
+
+                has_error = any(indicator in response for indicator in error_indicators)
+
+                if has_error:
+                    result.status = AgentStatus.FAILED
+                    result.error = response[:200]  # Store error message
+                    logger.warning(f"⚠️ Agent {agent_id} completed with tool failure.")
+                else:
+                    result.status = AgentStatus.COMPLETED
+                    logger.info(f"✅ Agent {agent_id} completed.")
+            else:
+                result.status = AgentStatus.COMPLETED
+                logger.info(f"✅ Agent {agent_id} completed.")
             
         except Exception as e:
             result.status = AgentStatus.FAILED

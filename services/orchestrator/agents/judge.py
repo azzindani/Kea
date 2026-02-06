@@ -40,19 +40,24 @@ Be fair and explain your reasoning."""
         query: str,
         generator_output: str,
         critic_feedback: str,
+        facts: list[dict] | None = None,
     ) -> dict[str, Any]:
         """
         Judge between Generator and Critic.
-        
+
         Args:
             query: Original research question
             generator_output: The Generator's answer
             critic_feedback: The Critic's critique
-            
+            facts: Optional list of facts for quality-based confidence calculation
+
         Returns:
             Dict with verdict, final_answer, confidence
         """
         logger.info("Judge: Evaluating arguments")
+
+        # Calculate fact-based confidence (default if facts provided)
+        fact_based_confidence = self._calculate_fact_quality(facts) if facts else None
         
         try:
             import os
@@ -93,24 +98,35 @@ Provide:
             content = response.content
             verdict = "Accept"
             confidence = 0.7
-            
+
             if "reject" in content.lower():
                 verdict = "Reject"
                 confidence = 0.3
             elif "revise" in content.lower():
                 verdict = "Revise"
                 confidence = 0.6
-            
-            # Extract confidence if specified
+
+            # Extract confidence if specified by LLM
             import re
             conf_match = re.search(r'confidence[:\s]+(\d+\.?\d*)', content.lower())
             if conf_match:
                 try:
-                    confidence = float(conf_match.group(1))
-                    if confidence > 1:
-                        confidence = confidence / 100
+                    llm_confidence = float(conf_match.group(1))
+                    if llm_confidence > 1:
+                        llm_confidence = llm_confidence / 100
+                    confidence = llm_confidence
                 except ValueError:
                     pass
+
+            # Override with fact-based confidence if available and more accurate
+            # This prevents false confidence when all facts are errors
+            if fact_based_confidence is not None:
+                # Blend LLM confidence with fact quality (70% fact, 30% LLM)
+                confidence = fact_based_confidence * 0.7 + confidence * 0.3
+                logger.info(
+                    f"Judge: Blended confidence {confidence:.2f} "
+                    f"(fact quality: {fact_based_confidence:.2f}, LLM: {confidence*0.3/0.7:.2f})"
+                )
             
             logger.info(f"Judge: Verdict={verdict}, Confidence={confidence:.2f}")
             
@@ -133,3 +149,68 @@ Provide:
             "final_answer": generator_output,
             "confidence": 0.5,
         }
+
+    def _calculate_fact_quality(self, facts: list[dict] | None) -> float | None:
+        """
+        Calculate confidence based on fact quality.
+
+        Analyzes facts to determine how many are errors vs valid data.
+        Returns confidence from 0.0 (all errors) to 1.0 (all valid).
+
+        Args:
+            facts: List of fact dicts with "text" field
+
+        Returns:
+            Confidence score 0.0-1.0, or None if facts unavailable
+        """
+        if not facts:
+            return None
+
+        total_facts = len(facts)
+        if total_facts == 0:
+            return None
+
+        # Count error facts
+        error_count = 0
+        error_indicators = [
+            "failed",
+            "error",
+            "exception",
+            "unable to",
+            "could not",
+            "cannot",
+            "not found",
+            "unavailable",
+            "tool reported an error",
+        ]
+
+        for fact in facts:
+            fact_text = ""
+            if isinstance(fact, dict):
+                fact_text = str(fact.get("text", ""))
+            else:
+                fact_text = str(fact)
+
+            fact_lower = fact_text.lower()
+
+            # Check if this fact is an error
+            is_error = any(indicator in fact_lower for indicator in error_indicators)
+            if is_error:
+                error_count += 1
+
+        # Calculate quality score
+        valid_facts = total_facts - error_count
+        quality_score = valid_facts / total_facts
+
+        # Apply penalties for high error rates
+        # 0% errors = 1.0 confidence
+        # 50% errors = 0.4 confidence
+        # 100% errors = 0.1 confidence (not 0.0 - maybe errors have some info)
+        confidence = max(0.1, quality_score * 0.9 + 0.1)
+
+        logger.info(
+            f"Fact quality: {valid_facts}/{total_facts} valid "
+            f"({error_count} errors) → confidence {confidence:.2f}"
+        )
+
+        return confidence

@@ -236,7 +236,7 @@ async def _llm_correct_tool_parameters(
         config = LLMConfig(
             model=get_settings().models.planner_model,
             temperature=0.3,
-            max_tokens=500,
+            max_tokens=4096,  # Increased from 500 for multi-parameter correction
         )
 
         # Get tool schema for intelligent correction
@@ -714,7 +714,18 @@ async def researcher_node(state: GraphState) -> GraphState:
             # Execute with intelligent retry loop
             result = None
             retry_count = 0
-            max_retries = 2
+
+            # Hardware-aware retry limit (more retries for free APIs with high quotas)
+            # Free tier: 1000/day = plenty of budget for retries
+            # With 4+ cores, can handle 5-8 retries efficiently
+            try:
+                from shared.hardware.detector import detect_hardware
+                hw = detect_hardware()
+                # Scale retries with CPU cores: more cores = can handle more retries in parallel
+                max_retries = min(8, max(3, hw.cpu_count // 2))  # 3-8 retries based on CPU
+            except Exception:
+                max_retries = 5  # Default to 5 retries (was 2)
+
             current_args = args.copy()
 
             while retry_count <= max_retries:
@@ -1235,13 +1246,14 @@ async def judge_node(state: GraphState) -> GraphState:
     query = state.get("query", "")
     generator_output = state.get("generator_output", "")
     critic_feedback = state.get("critic_feedback", "")
-    
+    facts = state.get("atomic_facts", [])  # Get facts for quality-based confidence
+
     logger.info(f"Evaluating: Generator ({len(generator_output)} chars) vs Critic ({len(critic_feedback)} chars)")
     logger.info("-"*70)
     logger.info("Calling LLM to make final judgment...")
-    
+
     judge = JudgeAgent()
-    result = await judge.judge(query, generator_output, critic_feedback)
+    result = await judge.judge(query, generator_output, critic_feedback, facts=facts)
     
     verdict = result.get("verdict", "Accept")
     confidence = result.get("confidence", 0.5)
