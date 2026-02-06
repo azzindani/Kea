@@ -178,34 +178,89 @@ def route_to_tool(task_description: str) -> tuple[str, list[str]]:
 def _extract_template_variables(query: str, expected_vars: list[str]) -> dict[str, str]:
     """
     Extract variable values from query for template expansion.
-    
+
     Uses pattern matching to find common variable types:
     - ticker: Stock symbols like BBCA.JK, NVDA, AAPL
     - company: Company names
     - period: Time periods like 1y, 6mo, 3mo
-    
+
     Args:
         query: User's research query
         expected_vars: List of variable names the template expects
-        
+
     Returns:
         Dict of variable name -> extracted value
     """
     import re
-    
+
     variables = {}
     query_upper = query.upper()
-    
+    query_lower = query.lower()
+
+    # Company name to ticker mapping (common cases)
+    company_to_ticker = {
+        # Indonesian Banks
+        "bca bank": "BBCA.JK",
+        "bank central asia": "BBCA.JK",
+        "bca": "BBCA.JK",
+        "bank bca": "BBCA.JK",
+        "bri": "BBRI.JK",
+        "bank rakyat indonesia": "BBRI.JK",
+        "mandiri": "BMRI.JK",
+        "bank mandiri": "BMRI.JK",
+        "bni": "BBNI.JK",
+        "bank negara indonesia": "BBNI.JK",
+        "btn": "BBTN.JK",
+        "bank tabungan negara": "BBTN.JK",
+
+        # US Tech
+        "nvidia": "NVDA",
+        "apple": "AAPL",
+        "microsoft": "MSFT",
+        "google": "GOOGL",
+        "alphabet": "GOOGL",
+        "amazon": "AMZN",
+        "meta": "META",
+        "facebook": "META",
+        "tesla": "TSLA",
+
+        # Crypto (for crypto tools)
+        "bitcoin": "BTC/USDT",
+        "ethereum": "ETH/USDT",
+        "btc": "BTC/USDT",
+        "eth": "ETH/USDT",
+    }
+
     for var in expected_vars:
         if var.lower() == "ticker":
-            # Look for stock ticker patterns (e.g., BBCA.JK, NVDA, AAPL)
-            ticker_match = re.search(r'\b([A-Z]{1,5}(?:\.[A-Z]{1,3})?)\b', query_upper)
+            # Strategy 1: Check for exact ticker pattern (BBCA.JK, NVDA)
+            ticker_match = re.search(r'\b([A-Z]{2,5}\.[A-Z]{2})\b', query_upper)  # Exchange suffix
+            if not ticker_match:
+                ticker_match = re.search(r'\b([A-Z]{2,5})\b', query_upper)  # Plain ticker
+
             if ticker_match:
-                variables[var] = ticker_match.group(1)
-            else:
-                # Default to first word as ticker
-                words = query.split()
-                variables[var] = words[0].upper() if words else "AAPL"
+                matched_ticker = ticker_match.group(1)
+                # Verify it's not a common word (avoid false positives like "BCA" from "BCA Bank")
+                if len(matched_ticker) >= 3 or '.' in matched_ticker:
+                    variables[var] = matched_ticker
+                    continue
+
+            # Strategy 2: Check company name mapping
+            ticker_found = None
+            for company_name, ticker in company_to_ticker.items():
+                if company_name in query_lower:
+                    # Prefer longer matches (e.g., "bca bank" over "bca")
+                    if ticker_found is None or len(company_name) > len(ticker_found[0]):
+                        ticker_found = (company_name, ticker)
+
+            if ticker_found:
+                variables[var] = ticker_found[1]
+                logger.info(f"📊 Mapped '{ticker_found[0]}' → {ticker_found[1]}")
+                continue
+
+            # Strategy 3: Default to first word (fallback)
+            words = query.split()
+            variables[var] = words[0].upper() if words else "AAPL"
                 
         elif var.lower() == "company":
             # Use first few words as company name

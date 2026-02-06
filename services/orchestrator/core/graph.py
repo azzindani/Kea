@@ -493,10 +493,17 @@ async def researcher_node(state: GraphState) -> GraphState:
                     # Only add valid facts
                     if not is_error:
                         # CRITICAL: Add source_url for citation tracking
-                        tool_name = node_result.metadata.get("source", "dag_executor")
+                        metadata = node_result.metadata or {}
+                        tool_name = metadata.get("source") or metadata.get("tool") or "dag_executor"
+                        arguments = metadata.get("arguments") or metadata.get("args") or {}
+
+                        # Ensure tool_name is string, not None
+                        if not isinstance(tool_name, str):
+                            tool_name = "unknown_tool"
+
                         source_url = _generate_source_url(
                             tool_name,
-                            node_result.metadata.get("arguments", {}),
+                            arguments,
                             output_text
                         )
 
@@ -708,16 +715,19 @@ async def researcher_node(state: GraphState) -> GraphState:
 
                 if success:
                     # Generate source URL for citation
+                    tool_name = calls[idx].tool_name or "unknown_tool"
+                    arguments = calls[idx].arguments or {}
+
                     source_url = _generate_source_url(
-                        calls[idx].tool_name,
-                        calls[idx].arguments,
+                        tool_name,
+                        arguments,
                         content_text
                     )
 
                     fact = {
                         "text": content_text,
                         "query": task.get("description", ""),
-                        "source": calls[idx].tool_name,
+                        "source": tool_name,
                         "source_url": source_url,  # Add URL for citations
                         "task_id": t_id,
                         "persist": t_persist
