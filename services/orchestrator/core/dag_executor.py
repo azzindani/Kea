@@ -206,7 +206,16 @@ class DAGExecutor:
         """Execute a single node with semaphore control."""
         async with self._semaphore:
             try:
-                result = await self._dispatch_node(node)
+                # ARTIFACT REUSE: Check if we have a cached result for this exact task
+                # This prevents re-running successful tools on retry
+                cached_result = self._check_artifact_cache(node)
+                if cached_result:
+                    logger.info(f"♻️ Reusing cached artifact for {node.id} (skipping execution)")
+                    result = cached_result
+                else:
+                    # Execute normally
+                    result = await self._dispatch_node(node)
+
                 node.result = result
                 node.status = result.status
 
@@ -215,12 +224,18 @@ class DAGExecutor:
                     self._result.completed += 1
                     self._result.node_results[node.id] = result
 
-                    # Store artifacts
+                    # Store artifacts with both node.id and cache key
                     if node.output_artifact and result.artifacts:
                         for key, value in result.artifacts.items():
                             self.store.store(node.id, key, value)
+                            # Also store with cache key for reuse
+                            cache_key = self._get_artifact_cache_key(node)
+                            self.store.store(cache_key, key, value)
                     elif node.output_artifact and result.output is not None:
                         self.store.store(node.id, node.output_artifact, result.output)
+                        # Also store with cache key for reuse
+                        cache_key = self._get_artifact_cache_key(node)
+                        self.store.store(cache_key, node.output_artifact, result.output)
 
                     # Register any children spawned (from loop/switch nodes)
                     for child_id in result.children_spawned:
@@ -258,6 +273,40 @@ class DAGExecutor:
 
             finally:
                 self._running.discard(node.id)
+
+    def _get_artifact_cache_key(self, node: WorkflowNode) -> str:
+        """Generate deterministic cache key from tool + args for artifact reuse."""
+        import hashlib
+        import json
+
+        # Create deterministic key from tool name + args
+        key_data = {
+            'tool': node.tool,
+            'args': node.args
+        }
+        key_str = json.dumps(key_data, sort_keys=True)
+        key_hash = hashlib.md5(key_str.encode()).hexdigest()[:8]
+
+        return f"cache_{node.tool}_{key_hash}"
+
+    def _check_artifact_cache(self, node: WorkflowNode) -> NodeResult | None:
+        """Check if we have a cached artifact for this exact task."""
+        cache_key = self._get_artifact_cache_key(node)
+
+        # Check if artifact exists in store
+        if node.output_artifact:
+            cached_value = self.store.get(cache_key, node.output_artifact)
+            if cached_value is not None:
+                # Return a NodeResult with cached data
+                return NodeResult(
+                    node_id=node.id,
+                    status=NodeStatus.COMPLETED,
+                    output=cached_value,
+                    artifacts={node.output_artifact: cached_value},
+                    metadata={'cached': True, 'cache_key': cache_key}
+                )
+
+        return None
 
     async def _dispatch_node(self, node: WorkflowNode) -> NodeResult:
         """Dispatch execution based on node type."""
