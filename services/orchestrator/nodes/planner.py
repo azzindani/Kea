@@ -410,9 +410,24 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
                             name = t.get('name', 'N/A')
                             desc = t.get('description', '')[:200]
                             schema = t.get('inputSchema', {})
-                            # Compact schema representation
-                            schema_str = str(schema).replace("{", "{{").replace("}", "}}")
-                            relevant_tools.append(f"TOOL: {name}\nDESCRIPTION: {desc}\nSCHEMA: {schema_str}\n")
+
+                            # Format schema as JSON for LLM clarity (not Python dict)
+                            import json
+                            schema_json = json.dumps(schema, indent=2)
+                            # Escape braces for f-string
+                            schema_escaped = schema_json.replace("{", "{{").replace("}", "}}")
+
+                            # Extract required parameters for emphasis
+                            required_params = schema.get('required', [])
+                            properties = schema.get('properties', {})
+
+                            tool_doc = f"TOOL: {name}\n"
+                            tool_doc += f"DESCRIPTION: {desc}\n"
+                            if required_params:
+                                tool_doc += f"REQUIRED PARAMS: {', '.join(required_params)}\n"
+                            tool_doc += f"FULL SCHEMA (JSON):\n{schema_escaped}\n"
+
+                            relevant_tools.append(tool_doc)
                 except Exception as search_err:
                     logger.warning(f"Planner RAG Search failed: {search_err}. Falling back to active list.")
 
@@ -421,30 +436,42 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
                     if registry.tool_to_server:
                         known_tools = list(registry.tool_to_server.keys())
                         # Slice to avoid context overflow
-                        target_tools = known_tools[:100]
-                        logger.info(f"Planner: Using fallback list of {len(target_tools)} tools")
-                        
-                        # We need schemas for these tools. Attempt to fetch if possible, 
-                        # otherwise fall back to name:desc.
-                        # Since we can't easily fetch schemas for 100 tools quickly without RAG,
-                        # we might process them in batches or accept lower fidelity here.
-                        # For now, let's try to get schemas for the first 20 most likely relevant?
-                        # Or just list them.
-                        
-                        # HEURISTIC: Just list names for fallback to avoid latency spike
-                        relevant_tools = [f"TOOL: {t}" for t in target_tools]
+                        target_tools = known_tools[:50]  # Reduced from 100 to fit context
+                        logger.warning(f"Planner: RAG search failed, using fallback list of {len(target_tools)} tools (NAME ONLY - schemas unavailable)")
+
+                        # Fallback: Tool names only (no schemas available without RAG)
+                        # This will cause the LLM to make best-effort parameter guessing
+                        # which is why we have the retry loop in unified_tool_handler
+                        relevant_tools = [
+                            f"TOOL: {t}\nDESCRIPTION: (schema unavailable - use retry loop for parameter correction)\n"
+                            for t in target_tools
+                        ]
                     else:
                         # 3. Last Resort: Try to force discovery once
                         try:
                             logger.info("Planner: Registry empty, forcing tool scan...")
                             all_tools = await asyncio.wait_for(registry.list_all_tools(), timeout=5.0)
                             # Here we HAVE schemas
+                            import json
                             for t in all_tools[:50]:
                                 name = t.get('name', 'N/A')
-                                desc = t.get('description', '')[:100]
+                                desc = t.get('description', '')[:200]
                                 schema = t.get('inputSchema', {})
-                                schema_str = str(schema).replace("{", "{{").replace("}", "}}")
-                                relevant_tools.append(f"TOOL: {name}\nDESCRIPTION: {desc}\nSCHEMA: {schema_str}\n")
+
+                                # Format schema as JSON (not Python dict)
+                                schema_json = json.dumps(schema, indent=2)
+                                schema_escaped = schema_json.replace("{", "{{").replace("}", "}}")
+
+                                # Extract required parameters
+                                required_params = schema.get('required', [])
+
+                                tool_doc = f"TOOL: {name}\n"
+                                tool_doc += f"DESCRIPTION: {desc}\n"
+                                if required_params:
+                                    tool_doc += f"REQUIRED PARAMS: {', '.join(required_params)}\n"
+                                tool_doc += f"FULL SCHEMA (JSON):\n{schema_escaped}\n"
+
+                                relevant_tools.append(tool_doc)
                         except asyncio.TimeoutError:
                              pass
 
@@ -484,10 +511,16 @@ AVAILABLE TOOLS:
 
 CRITICAL RULES:
 1. OUTPUT ONLY JSON. No prose, no explanations.
-2. SELECTIVITY: Use only the tools necessary to answer the user query.
-3. DEPENDENCIES: Tasks with same "phase" run in parallel. Higher phase waits for lower phases.
-4. ARTIFACTS: Use "artifact" to assign a variable name to each step's output (e.g., "csv_file", "search_results").
-5. INPUT MAPPING (The Core Mechanic):
+2. TOOL SELECTION: Use ONLY tools from the AVAILABLE TOOLS list above. NEVER invent or hallucinate tool names.
+3. SCHEMA COMPLIANCE: For each tool you use:
+   - Read its FULL SCHEMA to understand required and optional parameters
+   - Extract parameter names from "properties" field
+   - Populate ALL required parameters (listed in "REQUIRED PARAMS" or "required" field)
+   - Use correct parameter types (string, number, boolean, array, object)
+   - NEVER leave "args" empty if the tool requires parameters
+4. DEPENDENCIES: Tasks with same "phase" run in parallel. Higher phase waits for lower phases.
+5. ARTIFACTS: Use "artifact" to assign a variable name to each step's output (e.g., "csv_file", "search_results").
+6. INPUT MAPPING (The Core Mechanic):
    - You MUST map outputs from previous steps to inputs of subsequent steps using `input_mapping`.
    - Syntax: `{{{{step_id.artifacts.artifact_name}}}}` refers to the output of `step_id`.
    - Deep Selection: You can access JSON fields or array items:
@@ -505,27 +538,39 @@ CRITICAL RULES:
    - "type": "merge" -> Combine results.
      - `merge_inputs`: ["s1", "s2"]
 
-OUTPUT SCHEMA:
+OUTPUT SCHEMA EXAMPLE:
 {{{{
-  "intent": "Brief technical summary",
+  "intent": "Brief technical summary of what will be done",
   "blueprint": [
     {{{{
       "id": "step_1",
       "phase": 1,
-      "tool": "yfinance_server.get_bulk_historical_data",
-      "args": {{{{"tickers": "BBCA.JK", "period": "1y"}}}},
-      "artifact": "prices_csv"
+      "tool": "get_balance_sheet_annual",
+      "args": {{{{
+        "ticker": "BBCA.JK"
+      }}}},
+      "description": "Fetch annual balance sheet for BBCA",
+      "artifact": "balance_sheet"
     }}}},
     {{{{
       "id": "step_2",
       "phase": 2,
-      "tool": "pandas_ta_server.calculate_indicators",
-      "args": {{{{"indicators": ["rsi", "macd"]}}}},
-      "input_mapping": {{{{"csv_path": "{{{{step_1.artifacts.prices_csv}}}}"}}}},
-      "artifact": "indicators"
+      "tool": "get_income_statement_annual",
+      "args": {{{{
+        "ticker": "BBCA.JK"
+      }}}},
+      "description": "Fetch annual income statement for BBCA",
+      "artifact": "income_stmt"
     }}}}
   ]
-}}}}"""
+}}}}
+
+PARAMETER EXTRACTION RULES:
+- Read the tool's FULL SCHEMA to find parameter names under "properties"
+- Check "REQUIRED PARAMS" or "required" field to know which params are mandatory
+- Extract parameter values from the user query (e.g., company name, ticker, period)
+- If a parameter is missing from the query, use reasonable defaults or skip optional params
+- CRITICAL: NEVER generate empty args {{{{}}}}} if the tool requires parameters"""
                 ),
                 LLMMessage(role=LLMRole.USER, content=query)
             ]
