@@ -250,25 +250,35 @@ def _set_dynamic_limits(score: ComplexityScore) -> None:
     tier = score.tier
     entities = score.entity_count
 
-    # Hardware-aware multiplier (scale up on better hardware)
+    # Hardware-aware multiplier (scale based on RAM, not CPU)
+    # CPU can run at 100% without crash, but RAM (OOM) kills processes!
     hw_multiplier = 1.0
     try:
         from shared.hardware.detector import detect_hardware
         hw = detect_hardware()
-        cpu_count = hw.cpu_count
         ram_gb = hw.total_memory_gb
 
-        # Calculate hardware capability score
-        # 4 cores + 31GB RAM = multiplier of 2.0x (can handle 2x more tasks)
-        # 8 cores + 64GB RAM = multiplier of 3.5x
-        # 192 cores + 1TB RAM = multiplier of 15x+
-        cpu_factor = min(cpu_count / 4.0, 10.0)  # 4 cores = 1.0x, 192 cores = 10x
-        ram_factor = min(ram_gb / 16.0, 5.0)     # 16GB = 1.0x, 1TB = 5x
-        hw_multiplier = max(1.0, (cpu_factor + ram_factor) / 2)
+        # RAM-based scaling (the real bottleneck for task spawning)
+        # 16GB RAM = 1.0x baseline
+        # 31GB RAM (Kaggle) = 1.9x
+        # 64GB RAM = 4.0x
+        # 256GB RAM = 16x
+        # 1TB RAM = 64x (capped at 20x below)
+        ram_multiplier = ram_gb / 16.0  # 16GB = 1.0x
+        hw_multiplier = max(1.0, min(ram_multiplier, 20.0))  # Cap at 20x
+
+        # GPU factor (bonus multiplier if GPU available)
+        gpu_multiplier = 1.0
+        if hasattr(hw, 'gpu_count') and hw.gpu_count > 0:
+            # GPU helps with embedding calculations, not task spawning
+            # Add 0.2x per GPU (up to 1.0x bonus for 5+ GPUs)
+            gpu_multiplier = 1.0 + min(hw.gpu_count * 0.2, 1.0)
+
+        hw_multiplier *= gpu_multiplier
 
         logger.info(
             f"🔧 Hardware multiplier: {hw_multiplier:.1f}x "
-            f"(CPU: {cpu_count} cores, RAM: {ram_gb:.1f}GB)"
+            f"(RAM: {ram_gb:.1f}GB, GPUs: {getattr(hw, 'gpu_count', 0)})"
         )
     except Exception as e:
         logger.debug(f"Hardware detection skipped: {e}")
@@ -308,17 +318,28 @@ def _set_dynamic_limits(score: ComplexityScore) -> None:
         score.max_parallel = max(15, int(15 * hw_multiplier))
         score.max_research_iterations = max(5, int(5 * hw_multiplier))
 
-    # Apply reasonable caps (don't go crazy even on big hardware)
+    # Apply OOM-safe caps (RAM-aware, prevents crashes)
     try:
         from shared.hardware.detector import detect_hardware
         hw = detect_hardware()
-        hw_workers = hw.optimal_workers()
-        # Cap parallel at optimal workers, but allow more tasks/phases for deep research
-        score.max_parallel = min(score.max_parallel, hw_workers)
+
+        # Use safe parallel limit (respects RAM pressure, prevents OOM)
+        # If RAM > 80%, this will reduce parallelism automatically
+        safe_workers = hw.safe_parallel_limit()
+        score.max_parallel = min(score.max_parallel, safe_workers)
+
         # Increased caps to utilize many tools effectively:
         # - 2000 tools available → need many phases to explore them
         # - 3600s timeout → can handle 200+ phases
+        # - RAM-based: more RAM = more tasks (OOM is the real bottleneck, not CPU)
         score.max_subtasks = min(score.max_subtasks, 1000)  # Increased from 500
         score.max_phases = min(score.max_phases, 200)       # Increased from 50
+
+        # Log if memory pressure is high
+        if hw.should_queue_tasks():
+            logger.warning(
+                f"⚠️ High memory pressure ({hw.memory_pressure():.0%}). "
+                f"Parallel tasks reduced to {safe_workers} to prevent OOM."
+            )
     except Exception:
         pass

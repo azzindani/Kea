@@ -57,7 +57,8 @@ Be fair and explain your reasoning."""
         logger.info("Judge: Evaluating arguments")
 
         # Calculate fact-based confidence (default if facts provided)
-        fact_based_confidence = self._calculate_fact_quality(facts) if facts else None
+        # CRITICAL: If NO facts collected, confidence should be 0% (not 70%!)
+        fact_based_confidence = self._calculate_fact_quality(facts) if facts else 0.0
         
         try:
             import os
@@ -119,14 +120,22 @@ Provide:
                     pass
 
             # Override with fact-based confidence if available and more accurate
-            # This prevents false confidence when all facts are errors
+            # This prevents false confidence when all facts are errors or no facts exist
             if fact_based_confidence is not None:
-                # Blend LLM confidence with fact quality (70% fact, 30% LLM)
-                confidence = fact_based_confidence * 0.7 + confidence * 0.3
-                logger.info(
-                    f"Judge: Blended confidence {confidence:.2f} "
-                    f"(fact quality: {fact_based_confidence:.2f}, LLM: {confidence*0.3/0.7:.2f})"
-                )
+                if fact_based_confidence == 0.0:
+                    # NO facts or ALL facts are errors → confidence must be 0%
+                    confidence = 0.0
+                    logger.warning(
+                        f"Judge: No valid facts collected! Setting confidence to 0% "
+                        f"(was LLM: {confidence:.2f})"
+                    )
+                else:
+                    # Blend LLM confidence with fact quality (70% fact, 30% LLM)
+                    confidence = fact_based_confidence * 0.7 + confidence * 0.3
+                    logger.info(
+                        f"Judge: Blended confidence {confidence:.2f} "
+                        f"(fact quality: {fact_based_confidence:.2f}, LLM: {confidence*0.3/0.7:.2f})"
+                    )
             
             logger.info(f"Judge: Verdict={verdict}, Confidence={confidence:.2f}")
             

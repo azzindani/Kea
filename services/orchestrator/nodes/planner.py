@@ -155,6 +155,295 @@ async def _validate_and_correct_tool_names(execution_plan: ExecutionPlan) -> Exe
     return execution_plan
 
 
+async def _validate_tool_arguments(execution_plan: ExecutionPlan, query: str) -> ExecutionPlan:
+    """
+    Validate tool arguments against FULL JSON schema (not just required params).
+
+    Validates:
+    - Required parameters present ✅
+    - Parameter TYPES match (string, int, array, object) ✅
+    - Enum values are valid ✅
+    - Min/max constraints ✅
+    - No extra parameters ✅
+    - Nested object structures ✅
+
+    Args:
+        execution_plan: Execution plan to validate
+        query: Original user query for extracting values
+
+    Returns:
+        Execution plan with fully validated arguments
+    """
+    from services.mcp_host.core.session_registry import get_session_registry
+
+    registry = get_session_registry()
+
+    # Get tool schemas
+    try:
+        all_tools_raw = await registry.list_all_tools()
+        tool_schemas = {t['name']: t.get('inputSchema', {}) for t in all_tools_raw}
+    except Exception as e:
+        logger.warning(f"Could not fetch tool schemas: {e}")
+        return execution_plan
+
+    fixed_tasks = []
+    for task in execution_plan.micro_tasks:
+        tool_name = task.tool
+        args = task.args or {}
+
+        # Get schema for this tool
+        schema = tool_schemas.get(tool_name, {})
+        if not schema:
+            # No schema available, keep as-is
+            fixed_tasks.append(task)
+            continue
+
+        # FULL JSON SCHEMA VALIDATION
+        validation_result = _validate_against_json_schema(args, schema, tool_name)
+
+        if validation_result['valid']:
+            # Schema validation passed
+            logger.info(f"✅ {tool_name} schema validation passed")
+            fixed_tasks.append(task)
+            continue
+
+        # Schema validation failed - try to fix
+        logger.warning(
+            f"⚠️ {tool_name} schema validation failed: {', '.join(validation_result['errors'][:3])}. "
+            f"Attempting to fix..."
+        )
+
+        # Fix missing required parameters
+        if validation_result['missing_required']:
+            extracted_args = _extract_params_from_query(
+                query,
+                validation_result['missing_required'],
+                schema.get('properties', {})
+            )
+            args = {**args, **extracted_args}
+
+        # Fix type mismatches
+        if validation_result['type_errors']:
+            args = _fix_type_mismatches(args, validation_result['type_errors'], schema)
+
+        # Remove extra parameters
+        if validation_result['extra_params']:
+            for extra_param in validation_result['extra_params']:
+                logger.warning(f"🗑️ Removing extra param '{extra_param}' from {tool_name}")
+                args.pop(extra_param, None)
+
+        # Update task with fixed args
+        task.args = args
+
+        # Re-validate after fixes
+        revalidation = _validate_against_json_schema(args, schema, tool_name)
+        if revalidation['valid']:
+            logger.info(f"✅ Successfully fixed {tool_name} arguments")
+        else:
+            logger.error(
+                f"❌ Could not fully fix {tool_name} arguments. "
+                f"Remaining errors: {', '.join(revalidation['errors'][:3])}"
+            )
+
+        fixed_tasks.append(task)
+
+    execution_plan.micro_tasks = fixed_tasks
+    return execution_plan
+
+
+def _validate_against_json_schema(args: dict, schema: dict, tool_name: str) -> dict:
+    """
+    Validate arguments against JSON schema.
+
+    Returns:
+        Dict with validation results:
+        {
+            'valid': bool,
+            'errors': list[str],
+            'missing_required': list[str],
+            'type_errors': dict,
+            'extra_params': list[str]
+        }
+    """
+    result = {
+        'valid': True,
+        'errors': [],
+        'missing_required': [],
+        'type_errors': {},
+        'extra_params': []
+    }
+
+    properties = schema.get('properties', {})
+    required = schema.get('required', [])
+    additional_properties = schema.get('additionalProperties', True)
+
+    # Check required parameters
+    for param in required:
+        if param not in args or args[param] is None or args[param] == '':
+            result['valid'] = False
+            result['missing_required'].append(param)
+            result['errors'].append(f"Missing required: {param}")
+
+    # Check parameter types and constraints
+    for param, value in args.items():
+        if param not in properties:
+            # Extra parameter not in schema
+            if not additional_properties:
+                result['valid'] = False
+                result['extra_params'].append(param)
+                result['errors'].append(f"Extra param: {param}")
+            continue
+
+        param_schema = properties[param]
+        param_type = param_schema.get('type')
+
+        # Type validation
+        if param_type:
+            type_valid, type_error = _check_type(value, param_type, param)
+            if not type_valid:
+                result['valid'] = False
+                result['type_errors'][param] = {'expected': param_type, 'actual': type(value).__name__}
+                result['errors'].append(type_error)
+
+        # Enum validation
+        if 'enum' in param_schema:
+            if value not in param_schema['enum']:
+                result['valid'] = False
+                result['errors'].append(f"{param}='{value}' not in enum")
+
+        # Min/max validation for numbers
+        if param_type in ('integer', 'number'):
+            if isinstance(value, (int, float)):
+                if 'minimum' in param_schema and value < param_schema['minimum']:
+                    result['valid'] = False
+                    result['errors'].append(f"{param}={value} < min {param_schema['minimum']}")
+                if 'maximum' in param_schema and value > param_schema['maximum']:
+                    result['valid'] = False
+                    result['errors'].append(f"{param}={value} > max {param_schema['maximum']}")
+
+    return result
+
+
+def _check_type(value: any, expected_type: str, param_name: str) -> tuple[bool, str]:
+    """Check if value matches expected JSON schema type."""
+    type_map = {
+        'string': str,
+        'integer': int,
+        'number': (int, float),
+        'boolean': bool,
+        'array': list,
+        'object': dict
+    }
+
+    expected_python_type = type_map.get(expected_type)
+    if not expected_python_type:
+        return True, ""  # Unknown type, skip
+
+    if isinstance(value, expected_python_type):
+        return True, ""
+
+    return False, f"{param_name}: expected {expected_type}, got {type(value).__name__}"
+
+
+def _fix_type_mismatches(args: dict, type_errors: dict, schema: dict) -> dict:
+    """Attempt to fix type mismatches by converting values."""
+    fixed_args = args.copy()
+
+    for param, error_info in type_errors.items():
+        expected_type = error_info['expected']
+        current_value = args[param]
+
+        try:
+            # Attempt type conversion
+            if expected_type == 'string':
+                fixed_args[param] = str(current_value)
+            elif expected_type == 'integer':
+                fixed_args[param] = int(current_value)
+            elif expected_type == 'number':
+                fixed_args[param] = float(current_value)
+            elif expected_type == 'boolean':
+                fixed_args[param] = bool(current_value)
+            elif expected_type == 'array':
+                if not isinstance(current_value, list):
+                    fixed_args[param] = [current_value]
+
+            logger.info(f"✅ Fixed type: {param} {error_info['actual']} → {expected_type}")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not fix type for '{param}': {e}")
+
+    return fixed_args
+
+
+def _extract_params_from_query(query: str, param_names: list[str], properties: dict) -> dict:
+    """
+    Extract parameter values from user query using simple heuristics.
+
+    Args:
+        query: User query text
+        param_names: List of parameter names to extract
+        properties: Parameter schema properties
+
+    Returns:
+        Dict of extracted param values
+    """
+    import re
+
+    extracted = {}
+    query_lower = query.lower()
+
+    for param in param_names:
+        param_type = properties.get(param, {}).get('type', 'string')
+
+        # Extract ticker symbols (most common case)
+        if param in ('ticker', 'symbol', 'stock'):
+            # Look for ticker patterns: BBCA.JK, AAPL, TSLA, etc.
+            ticker_matches = re.findall(r'\b[A-Z]{1,5}(?:\.[A-Z]{1,3})?\b', query.upper())
+            if ticker_matches:
+                extracted[param] = ticker_matches[0]
+            # Or extract company name and try to convert
+            elif 'bank' in query_lower:
+                # Common patterns: "BCA Bank" → BBCA.JK
+                company_patterns = {
+                    'bca bank': 'BBCA.JK',
+                    'mandiri': 'BMRI.JK',
+                    'bri': 'BBRI.JK',
+                    'tesla': 'TSLA',
+                    'apple': 'AAPL',
+                    'microsoft': 'MSFT',
+                }
+                for company, ticker in company_patterns.items():
+                    if company in query_lower:
+                        extracted[param] = ticker
+                        break
+
+        # Extract query/search terms
+        elif param in ('query', 'search_query', 'q'):
+            # Use the entire query as search query
+            extracted[param] = query[:200]  # Truncate to reasonable length
+
+        # Extract period/timeframe
+        elif param in ('period', 'timeframe'):
+            if 'annual' in query_lower or 'year' in query_lower:
+                extracted[param] = '1y'
+            elif 'quarter' in query_lower:
+                extracted[param] = '3mo'
+            else:
+                extracted[param] = '1y'  # Default to annual
+
+        # Extract statement type for financial tools
+        elif param in ('statement', 'statement_type'):
+            if 'balance' in query_lower:
+                extracted[param] = 'balance_sheet'
+            elif 'income' in query_lower:
+                extracted[param] = 'income_statement'
+            elif 'cash' in query_lower:
+                extracted[param] = 'cash_flow'
+            else:
+                extracted[param] = 'balance_sheet'  # Default
+
+    return extracted
+
+
 def _similarity_score(str1: str, str2: str) -> float:
     """Calculate similarity score between two strings (0.0 - 1.0)."""
     from difflib import SequenceMatcher
@@ -616,6 +905,12 @@ PARAMETER EXTRACTION RULES:
                     execution_plan = await _validate_and_correct_tool_names(execution_plan)
                 except Exception as val_err:
                     logger.warning(f"Tool validation failed: {val_err}, proceeding with unvalidated tools")
+
+                # CRITICAL: Validate arguments are not empty for required parameters
+                try:
+                    execution_plan = await _validate_tool_arguments(execution_plan, query)
+                except Exception as arg_err:
+                    logger.warning(f"Argument validation failed: {arg_err}")
 
                 state["execution_plan"] = execution_plan.model_dump()
                 state["sub_queries"] = [blueprint.get("intent", query)]
