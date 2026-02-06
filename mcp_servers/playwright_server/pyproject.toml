@@ -1,17 +1,1 @@
-[project]
-name = "playwright_server"
-version = "0.1.0"
-description = "MCP Server for playwright_server"
-readme = "README.md"
-requires-python = ">=3.10"
-dependencies = [
-    "mcp",
-    "playwright",
-    "pydantic",
-    "python-dotenv",
-    "structlog",
-    "wrapt",
-]
-
-[tool.uv]
-dev-dependencies = []
+[project]name = "playwright_server"version = "0.1.0"description = "MCP Server for playwright_server"readme = "README.md"requires-python = ">=3.12"dependencies = [    "mcp",    "playwright",    "pydantic",    "python-dotenv",    "structlog",    "wrapt",][tool.uv]dev-dependencies = []

@@ -1,18 +1,1 @@
-[project]
-name = "search_server"
-version = "0.1.0"
-description = "MCP Server for search_server"
-readme = "README.md"
-requires-python = ">=3.10"
-dependencies = [
-    "duckduckgo-search",
-    "httpx",
-    "mcp",
-    "pydantic",
-    "python-dotenv",
-    "structlog",
-    "wrapt",
-]
-
-[tool.uv]
-dev-dependencies = []
+[project]name = "search_server"version = "0.1.0"description = "MCP Server for search_server"readme = "README.md"requires-python = ">=3.12"dependencies = [    "duckduckgo-search",    "httpx",    "mcp",    "pydantic",    "python-dotenv",    "structlog",    "wrapt",][tool.uv]dev-dependencies = []

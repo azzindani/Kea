@@ -1,18 +1,1 @@
-[project]
-name = "python_edgar_server"
-version = "0.1.0"
-description = "MCP Server for python_edgar_server"
-readme = "README.md"
-requires-python = ">=3.10"
-dependencies = [
-    "edgartools",
-    "mcp",
-    "pandas",
-    "pydantic",
-    "python-dotenv",
-    "structlog",
-    "wrapt",
-]
-
-[tool.uv]
-dev-dependencies = []
+[project]name = "python_edgar_server"version = "0.1.0"description = "MCP Server for python_edgar_server"readme = "README.md"requires-python = ">=3.12"dependencies = [    "edgartools",    "mcp",    "pandas",    "pydantic",    "python-dotenv",    "structlog",    "wrapt",][tool.uv]dev-dependencies = []
