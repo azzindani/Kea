@@ -73,7 +73,33 @@ class HardwareProfile:
         if self.ram_total_gb == 0:
             return 1.0
         return 1.0 - (self.ram_available_gb / self.ram_total_gb)
-    
+
+    def should_queue_tasks(self) -> bool:
+        """Check if tasks should be queued due to high memory pressure.
+
+        Returns True if RAM usage > 80%, preventing OOM crashes.
+        Process queue should wait until memory pressure drops before spawning new tasks.
+        """
+        pressure = self.memory_pressure()
+        return pressure > 0.80  # Queue if >80% RAM used
+
+    def safe_parallel_limit(self) -> int:
+        """Calculate safe parallel task limit based on current RAM pressure.
+
+        Reduces parallelism when memory is tight to prevent OOM.
+        """
+        pressure = self.memory_pressure()
+        base_limit = self.optimal_workers()
+
+        if pressure > 0.90:  # Critical: 90%+ RAM used
+            return max(1, base_limit // 4)  # Reduce to 25%
+        elif pressure > 0.80:  # High: 80-90% RAM used
+            return max(1, base_limit // 2)  # Reduce to 50%
+        elif pressure > 0.70:  # Moderate: 70-80% RAM used
+            return max(2, int(base_limit * 0.75))  # Reduce to 75%
+        else:  # Normal: <70% RAM used
+            return base_limit  # Full parallelism
+
     def is_constrained(self) -> bool:
         """Check if running in constrained environment."""
         return self.environment in ("colab", "kaggle") or self.ram_total_gb < 8

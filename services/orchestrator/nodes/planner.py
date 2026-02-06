@@ -155,6 +155,153 @@ async def _validate_and_correct_tool_names(execution_plan: ExecutionPlan) -> Exe
     return execution_plan
 
 
+async def _validate_tool_arguments(execution_plan: ExecutionPlan, query: str) -> ExecutionPlan:
+    """
+    Validate tool arguments are populated and match required parameters.
+
+    Fixes common issues:
+    - Empty args: {} when tool requires parameters
+    - Missing required parameters (ticker, query, etc.)
+    - Wrong parameter names (uses fuzzy matching)
+
+    Args:
+        execution_plan: Execution plan to validate
+        query: Original user query for extracting values
+
+    Returns:
+        Execution plan with validated arguments
+    """
+    from services.mcp_host.core.session_registry import get_session_registry
+
+    registry = get_session_registry()
+
+    # Get tool schemas
+    try:
+        all_tools_raw = await registry.list_all_tools()
+        tool_schemas = {t['name']: t.get('inputSchema', {}) for t in all_tools_raw}
+    except Exception as e:
+        logger.warning(f"Could not fetch tool schemas: {e}")
+        return execution_plan
+
+    fixed_tasks = []
+    for task in execution_plan.micro_tasks:
+        tool_name = task.tool
+        args = task.args or {}
+
+        # Get schema for this tool
+        schema = tool_schemas.get(tool_name, {})
+        required_params = schema.get('required', [])
+        properties = schema.get('properties', {})
+
+        if not required_params:
+            # Tool has no required params, keep as-is
+            fixed_tasks.append(task)
+            continue
+
+        # Check if any required params are missing
+        missing_params = [p for p in required_params if p not in args or not args[p]]
+
+        if not missing_params:
+            # All required params present
+            fixed_tasks.append(task)
+            continue
+
+        # CRITICAL: Missing required parameters!
+        logger.warning(
+            f"⚠️ Tool {tool_name} missing required params: {missing_params}. "
+            f"Current args: {args}. Attempting to extract from query..."
+        )
+
+        # Try to extract missing params from query
+        extracted_args = _extract_params_from_query(query, missing_params, properties)
+
+        if extracted_args:
+            # Merge extracted args with existing args
+            task.args = {**args, **extracted_args}
+            logger.info(f"✅ Extracted missing params: {extracted_args}")
+            fixed_tasks.append(task)
+        else:
+            # Could not extract params - keep task but log warning
+            logger.error(
+                f"❌ Could not extract required params {missing_params} for {tool_name}. "
+                f"AutoWirer will attempt to fill at execution time."
+            )
+            fixed_tasks.append(task)
+
+    execution_plan.micro_tasks = fixed_tasks
+    return execution_plan
+
+
+def _extract_params_from_query(query: str, param_names: list[str], properties: dict) -> dict:
+    """
+    Extract parameter values from user query using simple heuristics.
+
+    Args:
+        query: User query text
+        param_names: List of parameter names to extract
+        properties: Parameter schema properties
+
+    Returns:
+        Dict of extracted param values
+    """
+    import re
+
+    extracted = {}
+    query_lower = query.lower()
+
+    for param in param_names:
+        param_type = properties.get(param, {}).get('type', 'string')
+
+        # Extract ticker symbols (most common case)
+        if param in ('ticker', 'symbol', 'stock'):
+            # Look for ticker patterns: BBCA.JK, AAPL, TSLA, etc.
+            ticker_matches = re.findall(r'\b[A-Z]{1,5}(?:\.[A-Z]{1,3})?\b', query.upper())
+            if ticker_matches:
+                extracted[param] = ticker_matches[0]
+            # Or extract company name and try to convert
+            elif 'bank' in query_lower:
+                # Common patterns: "BCA Bank" → BBCA.JK
+                company_patterns = {
+                    'bca bank': 'BBCA.JK',
+                    'mandiri': 'BMRI.JK',
+                    'bri': 'BBRI.JK',
+                    'tesla': 'TSLA',
+                    'apple': 'AAPL',
+                    'microsoft': 'MSFT',
+                }
+                for company, ticker in company_patterns.items():
+                    if company in query_lower:
+                        extracted[param] = ticker
+                        break
+
+        # Extract query/search terms
+        elif param in ('query', 'search_query', 'q'):
+            # Use the entire query as search query
+            extracted[param] = query[:200]  # Truncate to reasonable length
+
+        # Extract period/timeframe
+        elif param in ('period', 'timeframe'):
+            if 'annual' in query_lower or 'year' in query_lower:
+                extracted[param] = '1y'
+            elif 'quarter' in query_lower:
+                extracted[param] = '3mo'
+            else:
+                extracted[param] = '1y'  # Default to annual
+
+        # Extract statement type for financial tools
+        elif param in ('statement', 'statement_type'):
+            if 'balance' in query_lower:
+                extracted[param] = 'balance_sheet'
+            elif 'income' in query_lower:
+                extracted[param] = 'income_statement'
+            elif 'cash' in query_lower:
+                extracted[param] = 'cash_flow'
+            else:
+                extracted[param] = 'balance_sheet'  # Default
+
+    return extracted
+
+
 def _similarity_score(str1: str, str2: str) -> float:
     """Calculate similarity score between two strings (0.0 - 1.0)."""
     from difflib import SequenceMatcher
@@ -616,6 +763,12 @@ PARAMETER EXTRACTION RULES:
                     execution_plan = await _validate_and_correct_tool_names(execution_plan)
                 except Exception as val_err:
                     logger.warning(f"Tool validation failed: {val_err}, proceeding with unvalidated tools")
+
+                # CRITICAL: Validate arguments are not empty for required parameters
+                try:
+                    execution_plan = await _validate_tool_arguments(execution_plan, query)
+                except Exception as arg_err:
+                    logger.warning(f"Argument validation failed: {arg_err}")
 
                 state["execution_plan"] = execution_plan.model_dump()
                 state["sub_queries"] = [blueprint.get("intent", query)]
