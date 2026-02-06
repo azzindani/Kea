@@ -53,6 +53,115 @@ class ExecutionPlan(BaseModel):
     
 
 # ============================================================================
+# Tool Validation & Fuzzy Matching
+# ============================================================================
+
+async def _validate_and_correct_tool_names(execution_plan: ExecutionPlan) -> ExecutionPlan:
+    """
+    Validate tool names from LLM against 2K+ tool registry and auto-correct common hallucinations.
+
+    Common hallucinations:
+    - get_balance_sheet → get_balance_sheet_annual
+    - get_income_statement → get_income_statement_annual
+    - get_financial_ratios → calculate_indicators (closest alternative)
+
+    Args:
+        execution_plan: Execution plan with potentially hallucinated tool names
+
+    Returns:
+        Execution plan with validated and corrected tool names
+    """
+    from services.mcp_host.core.session_registry import get_session_registry
+    from difflib import get_close_matches
+
+    registry = get_session_registry()
+
+    # Get available tools (2K+ tools from RAG)
+    if not registry.tool_to_server:
+        await registry.list_all_tools()
+
+    available_tools = set(registry.tool_to_server.keys())
+
+    # Common hallucination aliases
+    aliases = {
+        "get_balance_sheet": "get_balance_sheet_annual",
+        "get_income_statement": "get_income_statement_annual",
+        "get_cash_flow": "get_cash_flow_annual",
+        "get_cash_flow_statement": "get_cash_flow_statement_annual",
+        "get_financial_ratios": "calculate_indicators",
+        "get_financials": "get_full_report",
+        "search": "web_search",
+        "scrape": "fetch_url",
+        "scrape_url": "fetch_url",
+        "google_search": "web_search",
+        "bing_search": "web_search",
+    }
+
+    corrected_tasks = []
+    removed_count = 0
+    corrected_count = 0
+
+    for task in execution_plan.micro_tasks:
+        tool_name = task.tool
+
+        # Check if tool exists
+        if tool_name in available_tools:
+            corrected_tasks.append(task)
+            continue
+
+        # Check aliases first (fast lookup)
+        if tool_name in aliases:
+            corrected_tool = aliases[tool_name]
+            if corrected_tool in available_tools:
+                logger.warning(
+                    f"🔧 Correcting hallucinated tool: {tool_name} → {corrected_tool}"
+                )
+                task.tool = corrected_tool
+                corrected_tasks.append(task)
+                corrected_count += 1
+                continue
+
+        # Fuzzy match (edit distance for typos)
+        matches = get_close_matches(tool_name, available_tools, n=1, cutoff=0.8)
+
+        if matches:
+            corrected_tool = matches[0]
+            logger.warning(
+                f"🔧 Fuzzy-matched tool: {tool_name} → {corrected_tool} "
+                f"(similarity: {_similarity_score(tool_name, corrected_tool):.2f})"
+            )
+            task.tool = corrected_tool
+            corrected_tasks.append(task)
+            corrected_count += 1
+        else:
+            # Tool doesn't exist and can't be matched - remove task
+            logger.error(
+                f"❌ Tool not found in 2K+ registry: {tool_name}. "
+                f"Removing task: {task.description[:100]}"
+            )
+            removed_count += 1
+            # Don't add to corrected_tasks (filtered out)
+
+    logger.info(
+        f"✅ Tool validation complete: "
+        f"{len(execution_plan.micro_tasks)} → {len(corrected_tasks)} tasks "
+        f"({corrected_count} corrected, {removed_count} removed)"
+    )
+
+    # Update execution plan with corrected tasks
+    execution_plan.micro_tasks = corrected_tasks
+    execution_plan.estimated_tools = len(corrected_tasks)
+
+    return execution_plan
+
+
+def _similarity_score(str1: str, str2: str) -> float:
+    """Calculate similarity score between two strings (0.0 - 1.0)."""
+    from difflib import SequenceMatcher
+    return SequenceMatcher(None, str1, str2).ratio()
+
+
+# ============================================================================
 # Tool Routing Logic
 # ============================================================================
 
@@ -457,10 +566,17 @@ OUTPUT SCHEMA:
             if blueprint and "blueprint" in blueprint:
                 # Generate execution plan from JSON Blueprint
                 execution_plan = generate_execution_plan_from_blueprint(query, blueprint)
+
+                # CRITICAL: Validate and correct tool names against 2K+ tool registry
+                try:
+                    execution_plan = await _validate_and_correct_tool_names(execution_plan)
+                except Exception as val_err:
+                    logger.warning(f"Tool validation failed: {val_err}, proceeding with unvalidated tools")
+
                 state["execution_plan"] = execution_plan.model_dump()
                 state["sub_queries"] = [blueprint.get("intent", query)]
                 state["hypotheses"] = []
-                
+
                 logger.info(
                     f"Planner: Generated {len(execution_plan.micro_tasks)} micro-tasks "
                     f"across {len(execution_plan.phases)} phases from JSON Blueprint"
