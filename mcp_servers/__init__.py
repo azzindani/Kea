@@ -10,9 +10,9 @@ Uses ACTUAL EXPORT DETECTION to find real class names.
 from pathlib import Path
 from typing import Dict, Any
 import importlib
-import logging
+from shared.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 _SERVERS_DIR = Path(__file__).parent
 _discovered_exports: Dict[str, str] = {}

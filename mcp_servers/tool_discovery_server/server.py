@@ -68,12 +68,12 @@ async def run_op(op_func, diff_args=None, **kwargs):
 
 # --- SEARCH TOOLS ---
 @mcp.tool()
-async def search_pypi(query: str, max_results: int = 10) -> str:
+async def search_pypi(query: str, max_results: int = 100000) -> str:
     """Search PyPI for Python packages."""
     return await run_op(search.search_pypi, query=query, max_results=max_results)
 
 @mcp.tool()
-async def search_npm(query: str, max_results: int = 10) -> str:
+async def search_npm(query: str, max_results: int = 100000) -> str:
     """Search npm for JavaScript/Node packages."""
     return await run_op(search.search_npm, query=query, max_results=max_results)
 

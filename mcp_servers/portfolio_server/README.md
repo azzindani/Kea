@@ -1,6 +1,6 @@
-# 🔌 Geopy Server
+# 🔌 Portfolio Server
 
-The `geopy_server` is an MCP server providing tools for **Geopy Server** functionality.
+The `portfolio_server` is an MCP server providing tools for **Portfolio Server** functionality.
 It is designed to be used within the Kea ecosystem.
 
 ## 🧰 Tools
@@ -10,13 +10,16 @@ No tools explicitly detected in `server.py`.
 ## 📦 Dependencies
 
 The following packages are required:
+- `pyportfolioopt`
 - `pandas`
-- `geopy`
+- `numpy`
+- `matplotlib`
+- `scipy`
 
 ## 🚀 Usage
 
 This server is automatically discovered by the **MCP Host**. To run it manually:
 
 ```bash
-uv run python -m mcp_servers.geopy_server.server
+uv run python -m mcp_servers.portfolio_server.server
 ```

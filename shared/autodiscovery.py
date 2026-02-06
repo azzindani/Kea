@@ -8,9 +8,9 @@ This enables self-adapting packages that sense their own capabilities.
 from pathlib import Path
 from typing import Any, Dict, Optional, Callable
 import importlib
-import logging
+from shared.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class AutoDiscovery:

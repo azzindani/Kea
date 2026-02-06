@@ -44,6 +44,8 @@ graph TD
     - `postgres_audit.py`: Direct database interactions for the audit trail.
     - `postgres_store.py`: General-purpose relational storage management.
     - `vector_store.py`: Interface for high-dimensional storage (used by other services for raw embeddings).
+    - `artifact_bus.py`: Manages the transport of large data artifacts between services.
+    - `encryption.py`: Handling of cryptographic operations for data security.
 
 ## 🧠 Deep Dive
 

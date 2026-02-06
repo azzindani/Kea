@@ -27,7 +27,7 @@ logger = structlog.get_logger()
 mcp = FastMCP("academic_server")
 
 @mcp.tool()
-async def pubmed_search(query: str, max_results: int = 10, sort: str = "relevance", min_date: Optional[str] = None, max_date: Optional[str] = None) -> str:
+async def pubmed_search(query: str, max_results: int = 100000, sort: str = "relevance", min_date: Optional[str] = None, max_date: Optional[str] = None) -> str:
     """Search PubMed/NCBI for medical and biomedical research papers.
     Args:
         query: Search query
@@ -39,7 +39,7 @@ async def pubmed_search(query: str, max_results: int = 10, sort: str = "relevanc
     return await pubmed_ops.pubmed_search(query, max_results, sort, min_date, max_date)
 
 @mcp.tool()
-async def arxiv_search(query: str, max_results: int = 10, category: Optional[str] = None, sort_by: str = "relevance") -> str:
+async def arxiv_search(query: str, max_results: int = 100000, category: Optional[str] = None, sort_by: str = "relevance") -> str:
     """Search arXiv for physics, math, CS, and other research papers.
     Args:
         query: Search query
@@ -50,7 +50,7 @@ async def arxiv_search(query: str, max_results: int = 10, category: Optional[str
     return await arxiv_ops.arxiv_search(query, max_results, category, sort_by)
 
 @mcp.tool()
-async def semantic_scholar_search(query: str, max_results: int = 10, year: Optional[str] = None, fields_of_study: Optional[List[str]] = None) -> str:
+async def semantic_scholar_search(query: str, max_results: int = 100000, year: Optional[str] = None, fields_of_study: Optional[List[str]] = None) -> str:
     """Search Semantic Scholar for papers with citation data.
     Args:
         query: Search query

@@ -45,6 +45,10 @@ graph TD
     - `dataset_loader.py`: Integration with Hugging Face `datasets` for streaming ingestion.
     - `graph_rag.py`: Implements the Knowledge Graph for fact relationships and provenance.
     - `postgres_artifacts.py`: Database-backed persistence for artifact metadata.
+    - `admin_service.py`: Administrative operations for Knowledge Graph management.
+    - `context_synthesis.py`: Logic for synthesizing retrieved facts into coherent context.
+    - `fact_retrieval.py`: Core logic for searching and retrieving atomic facts.
+    - `ingestion_pipeline.py`: Pipeline for processing and ingesting new data sources.
 - **`schemas/`**: Pydantic models for `AtomicFact`, `Dataset`, and API requests.
 
 ## 🧠 Deep Dive

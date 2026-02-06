@@ -27,12 +27,12 @@ logger = structlog.get_logger()
 mcp = FastMCP("crawler_server")
 
 @mcp.tool()
-async def web_crawler(start_url: str, max_depth: int = 5, max_pages: int = 100, same_domain: bool = True, delay: float = 0.5) -> str:
+async def web_crawler(start_url: str, max_depth: int = 1000, max_pages: int = 100000, same_domain: bool = True, delay: float = 0.5) -> str:
     """Recursively crawl a website with depth control.
     Args:
         start_url: Starting URL to crawl
-        max_depth: Maximum crawl depth (1-5)
-        max_pages: Maximum pages to crawl (1-100)
+        max_depth: Maximum crawl depth (default: 1000)
+        max_pages: Maximum pages to crawl (default: 100000)
         same_domain: Stay on same domain only
         delay: Delay between requests in seconds
     """
