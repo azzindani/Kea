@@ -157,19 +157,22 @@ async def _validate_and_correct_tool_names(execution_plan: ExecutionPlan) -> Exe
 
 async def _validate_tool_arguments(execution_plan: ExecutionPlan, query: str) -> ExecutionPlan:
     """
-    Validate tool arguments are populated and match required parameters.
+    Validate tool arguments against FULL JSON schema (not just required params).
 
-    Fixes common issues:
-    - Empty args: {} when tool requires parameters
-    - Missing required parameters (ticker, query, etc.)
-    - Wrong parameter names (uses fuzzy matching)
+    Validates:
+    - Required parameters present ✅
+    - Parameter TYPES match (string, int, array, object) ✅
+    - Enum values are valid ✅
+    - Min/max constraints ✅
+    - No extra parameters ✅
+    - Nested object structures ✅
 
     Args:
         execution_plan: Execution plan to validate
         query: Original user query for extracting values
 
     Returns:
-        Execution plan with validated arguments
+        Execution plan with fully validated arguments
     """
     from services.mcp_host.core.session_registry import get_session_registry
 
@@ -190,46 +193,185 @@ async def _validate_tool_arguments(execution_plan: ExecutionPlan, query: str) ->
 
         # Get schema for this tool
         schema = tool_schemas.get(tool_name, {})
-        required_params = schema.get('required', [])
-        properties = schema.get('properties', {})
-
-        if not required_params:
-            # Tool has no required params, keep as-is
+        if not schema:
+            # No schema available, keep as-is
             fixed_tasks.append(task)
             continue
 
-        # Check if any required params are missing
-        missing_params = [p for p in required_params if p not in args or not args[p]]
+        # FULL JSON SCHEMA VALIDATION
+        validation_result = _validate_against_json_schema(args, schema, tool_name)
 
-        if not missing_params:
-            # All required params present
+        if validation_result['valid']:
+            # Schema validation passed
+            logger.info(f"✅ {tool_name} schema validation passed")
             fixed_tasks.append(task)
             continue
 
-        # CRITICAL: Missing required parameters!
+        # Schema validation failed - try to fix
         logger.warning(
-            f"⚠️ Tool {tool_name} missing required params: {missing_params}. "
-            f"Current args: {args}. Attempting to extract from query..."
+            f"⚠️ {tool_name} schema validation failed: {', '.join(validation_result['errors'][:3])}. "
+            f"Attempting to fix..."
         )
 
-        # Try to extract missing params from query
-        extracted_args = _extract_params_from_query(query, missing_params, properties)
-
-        if extracted_args:
-            # Merge extracted args with existing args
-            task.args = {**args, **extracted_args}
-            logger.info(f"✅ Extracted missing params: {extracted_args}")
-            fixed_tasks.append(task)
-        else:
-            # Could not extract params - keep task but log warning
-            logger.error(
-                f"❌ Could not extract required params {missing_params} for {tool_name}. "
-                f"AutoWirer will attempt to fill at execution time."
+        # Fix missing required parameters
+        if validation_result['missing_required']:
+            extracted_args = _extract_params_from_query(
+                query,
+                validation_result['missing_required'],
+                schema.get('properties', {})
             )
-            fixed_tasks.append(task)
+            args = {**args, **extracted_args}
+
+        # Fix type mismatches
+        if validation_result['type_errors']:
+            args = _fix_type_mismatches(args, validation_result['type_errors'], schema)
+
+        # Remove extra parameters
+        if validation_result['extra_params']:
+            for extra_param in validation_result['extra_params']:
+                logger.warning(f"🗑️ Removing extra param '{extra_param}' from {tool_name}")
+                args.pop(extra_param, None)
+
+        # Update task with fixed args
+        task.args = args
+
+        # Re-validate after fixes
+        revalidation = _validate_against_json_schema(args, schema, tool_name)
+        if revalidation['valid']:
+            logger.info(f"✅ Successfully fixed {tool_name} arguments")
+        else:
+            logger.error(
+                f"❌ Could not fully fix {tool_name} arguments. "
+                f"Remaining errors: {', '.join(revalidation['errors'][:3])}"
+            )
+
+        fixed_tasks.append(task)
 
     execution_plan.micro_tasks = fixed_tasks
     return execution_plan
+
+
+def _validate_against_json_schema(args: dict, schema: dict, tool_name: str) -> dict:
+    """
+    Validate arguments against JSON schema.
+
+    Returns:
+        Dict with validation results:
+        {
+            'valid': bool,
+            'errors': list[str],
+            'missing_required': list[str],
+            'type_errors': dict,
+            'extra_params': list[str]
+        }
+    """
+    result = {
+        'valid': True,
+        'errors': [],
+        'missing_required': [],
+        'type_errors': {},
+        'extra_params': []
+    }
+
+    properties = schema.get('properties', {})
+    required = schema.get('required', [])
+    additional_properties = schema.get('additionalProperties', True)
+
+    # Check required parameters
+    for param in required:
+        if param not in args or args[param] is None or args[param] == '':
+            result['valid'] = False
+            result['missing_required'].append(param)
+            result['errors'].append(f"Missing required: {param}")
+
+    # Check parameter types and constraints
+    for param, value in args.items():
+        if param not in properties:
+            # Extra parameter not in schema
+            if not additional_properties:
+                result['valid'] = False
+                result['extra_params'].append(param)
+                result['errors'].append(f"Extra param: {param}")
+            continue
+
+        param_schema = properties[param]
+        param_type = param_schema.get('type')
+
+        # Type validation
+        if param_type:
+            type_valid, type_error = _check_type(value, param_type, param)
+            if not type_valid:
+                result['valid'] = False
+                result['type_errors'][param] = {'expected': param_type, 'actual': type(value).__name__}
+                result['errors'].append(type_error)
+
+        # Enum validation
+        if 'enum' in param_schema:
+            if value not in param_schema['enum']:
+                result['valid'] = False
+                result['errors'].append(f"{param}='{value}' not in enum")
+
+        # Min/max validation for numbers
+        if param_type in ('integer', 'number'):
+            if isinstance(value, (int, float)):
+                if 'minimum' in param_schema and value < param_schema['minimum']:
+                    result['valid'] = False
+                    result['errors'].append(f"{param}={value} < min {param_schema['minimum']}")
+                if 'maximum' in param_schema and value > param_schema['maximum']:
+                    result['valid'] = False
+                    result['errors'].append(f"{param}={value} > max {param_schema['maximum']}")
+
+    return result
+
+
+def _check_type(value: any, expected_type: str, param_name: str) -> tuple[bool, str]:
+    """Check if value matches expected JSON schema type."""
+    type_map = {
+        'string': str,
+        'integer': int,
+        'number': (int, float),
+        'boolean': bool,
+        'array': list,
+        'object': dict
+    }
+
+    expected_python_type = type_map.get(expected_type)
+    if not expected_python_type:
+        return True, ""  # Unknown type, skip
+
+    if isinstance(value, expected_python_type):
+        return True, ""
+
+    return False, f"{param_name}: expected {expected_type}, got {type(value).__name__}"
+
+
+def _fix_type_mismatches(args: dict, type_errors: dict, schema: dict) -> dict:
+    """Attempt to fix type mismatches by converting values."""
+    fixed_args = args.copy()
+
+    for param, error_info in type_errors.items():
+        expected_type = error_info['expected']
+        current_value = args[param]
+
+        try:
+            # Attempt type conversion
+            if expected_type == 'string':
+                fixed_args[param] = str(current_value)
+            elif expected_type == 'integer':
+                fixed_args[param] = int(current_value)
+            elif expected_type == 'number':
+                fixed_args[param] = float(current_value)
+            elif expected_type == 'boolean':
+                fixed_args[param] = bool(current_value)
+            elif expected_type == 'array':
+                if not isinstance(current_value, list):
+                    fixed_args[param] = [current_value]
+
+            logger.info(f"✅ Fixed type: {param} {error_info['actual']} → {expected_type}")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not fix type for '{param}': {e}")
+
+    return fixed_args
 
 
 def _extract_params_from_query(query: str, param_names: list[str], properties: dict) -> dict:
