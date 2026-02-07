@@ -193,12 +193,15 @@ class StressTestRunner:
         logger.info("RESULTS (SDK):")
         
         if job_metrics.report:
-            logger.info("FINAL REPORT:")
-            logger.info(f"{job_metrics.report}\n")
+            print("\n" + "="*70)
+            print("FINAL REPORT:")
+            print("="*70)
+            print(job_metrics.report)
+            print("="*70 + "\n")
             
         logger.info(f"  Duration: {job_metrics.duration_ms / 1000:.1f}s")
         logger.info(f"  Success: {job_metrics.success}")
-        logger.info(f"  Confidence: {job_metrics.confidence:.0%}")
+        logger.info(f"  Confidence: {job_metrics.confidence:.1%}")
         logger.info(f"  Facts: {job_metrics.facts_count}")
         logger.info(f"  Sources: {job_metrics.sources_count}")
         logger.info("-"*40)

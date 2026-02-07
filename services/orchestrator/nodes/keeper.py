@@ -620,6 +620,8 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
             # LOW CONFIDENCE REPLAN: When tasks complete but confidence is low
             # Trigger a replan to generate additional research tasks
             # ============================================================
+            logger.info(f"   🔍 DEBUG: completed={progress['completed_tasks']}, total={progress['total_tasks']}, replan_count={state.get('replan_count', 0)}")
+            
             if progress["completed_tasks"] >= progress["total_tasks"]:
                 replan_count = state.get("replan_count", 0)
                 max_replans = 2  # Prevent infinite replanning
