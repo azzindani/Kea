@@ -78,27 +78,44 @@ class ResearchRunner:
 
             logger.info(f"Job submitted successfully. Server ID: {job_id}")
             
-            # 2. Poll for Completion
+            # 2. Poll for Completion with retry on network errors
             status = "running"
+            poll_errors = 0
+            max_poll_errors = 5  # Allow up to 5 consecutive network errors
+            
             while status in ["running", "pending", "queued"]:
                 await asyncio.sleep(self.poll_interval)
                 
-                # Poll status endpoint
-                status_resp = await self.client.get(f"/api/v1/jobs/{job_id}")
-                if status_resp.status_code != 200:
-                    logger.warning(f"Status check failed: {status_resp.status_code}")
-                    continue
-                
-                data = status_resp.json()
-                status = data.get("status", "unknown").lower()
-                
-                # Update metrics from server progress
-                if "metrics" in data:
-                    srv_metrics = data["metrics"]
-                    # Sync tokens/tools if server provides them in real-time
-                    pass
-                
-                logger.debug(f"Job {job_id} status: {status}")
+                try:
+                    # Poll status endpoint
+                    status_resp = await self.client.get(f"/api/v1/jobs/{job_id}")
+                    poll_errors = 0  # Reset on success
+                    
+                    if status_resp.status_code != 200:
+                        logger.warning(f"Status check failed: {status_resp.status_code}")
+                        continue
+                    
+                    data = status_resp.json()
+                    status = data.get("status", "unknown").lower()
+                    
+                    # Update metrics from server progress
+                    if "metrics" in data:
+                        srv_metrics = data["metrics"]
+                        # Sync tokens/tools if server provides them in real-time
+                        pass
+                    
+                    logger.debug(f"Job {job_id} status: {status}")
+                    
+                except Exception as poll_err:
+                    poll_errors += 1
+                    logger.warning(f"Poll error {poll_errors}/{max_poll_errors}: {type(poll_err).__name__}: {poll_err}")
+                    
+                    if poll_errors >= max_poll_errors:
+                        logger.error(f"Max poll errors reached, giving up on job {job_id}")
+                        raise
+                    
+                    # Wait longer before retrying after error
+                    await asyncio.sleep(self.poll_interval * 2)
             
             # 3. Retrieve Results
             if status == "completed":
