@@ -198,9 +198,9 @@ class StressTestRunner:
             
         logger.info(f"  Duration: {job_metrics.duration_ms / 1000:.1f}s")
         logger.info(f"  Success: {job_metrics.success}")
-        logger.info(f"  LLM Calls: {job_metrics.llm_calls}")
-        logger.info(f"  Tool Iterations: {job_metrics.tool_iterations}")
-        logger.info(f"  Efficiency Ratio: {job_metrics.efficiency_ratio:.1f}x")
+        logger.info(f"  Confidence: {job_metrics.confidence:.0%}")
+        logger.info(f"  Facts: {job_metrics.facts_count}")
+        logger.info(f"  Sources: {job_metrics.sources_count}")
         logger.info("-"*40)
         
         # Export query results

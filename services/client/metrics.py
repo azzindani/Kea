@@ -62,6 +62,9 @@ class JobMetrics:
     success: bool = False
     error: Optional[str] = None
     report: Optional[str] = None
+    confidence: float = 0.0
+    facts_count: int = 0
+    sources_count: int = 0
     efficiency_ratio: float = 0.0
     
     def calculate_efficiency(self):

@@ -1381,10 +1381,23 @@ async def judge_node(state: GraphState) -> GraphState:
         revision_count += 1
         logger.info(f"🔄 Revision requested. Count: {revision_count}")
     
+    # IMPORTANT: Preserve reward confidence from Keeper, store judge's confidence separately
+    # The reward score is calculated based on research quality metrics (facts, tools, errors)
+    # The judge's confidence is a quality assessment of the generated answer
+    reward_confidence = state.get("confidence", 0.0)
+    if reward_confidence > 0:
+        # Reward confidence was calculated by Keeper - preserve it
+        final_confidence = reward_confidence
+        logger.info(f"📊 Preserving reward confidence: {reward_confidence:.0%} (Judge suggested: {confidence:.0%})")
+    else:
+        # No reward score yet, fallback to judge's assessment
+        final_confidence = confidence
+    
     return {
         **state,
         "judge_verdict": verdict,
-        "confidence": confidence,
+        "judge_confidence": confidence,  # Judge's assessment (for logging/debug)
+        "confidence": final_confidence,   # Actual confidence (GRPO or fallback)
         "revision_count": revision_count,
     }
 

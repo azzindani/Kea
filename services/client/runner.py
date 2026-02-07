@@ -91,18 +91,13 @@ class ResearchRunner:
                    # Store the report
                    self.metrics._current_job.report = result_data.get("report")
                    
-                   # Update metrics if server provides them
-                   # Note: The server result might have different shape, typically:
-                   # { "report": "...", "metrics": { "llm_calls": 10, ... } }
-                   if "metrics" in result_data:
-                       m = result_data["metrics"]
-                       self.metrics._current_job.llm_calls = m.get("llm_calls", 0)
-                       self.metrics._current_job.tool_iterations = m.get("tool_iterations", 0)
-                       self.metrics._current_job.llm_tokens_total = m.get("total_tokens", 0)
+                   # API returns these at top level (not nested in metrics)
+                   # JobResult schema: job_id, status, report, confidence, facts_count, sources_count, artifact_ids
+                   self.metrics._current_job.confidence = result_data.get("confidence", 0.0)
+                   self.metrics._current_job.facts_count = result_data.get("facts_count", 0)
+                   self.metrics._current_job.sources_count = result_data.get("sources_count", 0)
                    
-                   # If server doesn't provide metrics yet, we might need to estimate
-                   # or just accept 0 for now until server is updated.
-                   pass
+                   logger.info(f"Result received: confidence={result_data.get('confidence')}, facts={result_data.get('facts_count')}, sources={result_data.get('sources_count')}")
                 
                 self.metrics.end_job(success=True)
                 logger.info(f"✅ Job {job_id} Completed Successfully")
