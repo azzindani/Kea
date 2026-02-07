@@ -191,6 +191,11 @@ class StressTestRunner:
         logger.info("")
         logger.info("-"*40)
         logger.info("RESULTS (SDK):")
+        
+        if job_metrics.report:
+            logger.info("FINAL REPORT:")
+            logger.info(f"{job_metrics.report}\n")
+            
         logger.info(f"  Duration: {job_metrics.duration_ms / 1000:.1f}s")
         logger.info(f"  Success: {job_metrics.success}")
         logger.info(f"  LLM Calls: {job_metrics.llm_calls}")
