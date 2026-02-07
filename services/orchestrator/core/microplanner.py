@@ -155,15 +155,38 @@ class Microplanner:
                 )
                 return MicroplanAction.EXPAND
 
-            # If output contains error markers but node reported success
-            error_markers = ["error", "not found", "no data", "empty result", "nan"]
+            # STRICTER ERROR DETECTION: Only match actual error patterns
+            # Avoid false positives from valid data containing "error" as a word
+            # e.g., markdown tables, financial data with "margin of error", etc.
             output_lower = output_str.lower()
-            if any(m in output_lower for m in error_markers):
-                # Only expand if this is a data-fetching node
+            
+            # These are DEFINITIVE error patterns (phrase-level, not word-level)
+            definitive_error_patterns = [
+                "tool not found",
+                "not found in registry",
+                "missing required parameter",
+                "tool reported an error",
+                "no data returned",
+                "empty result returned",
+                "rate limit exceeded",
+                "authentication failed",
+                "invalid ticker",
+                "symbol not found",
+                "connection refused",
+                "timeout error",
+            ]
+            
+            # Only trigger expansion if:
+            # 1. Output is suspiciously short (likely an error message, not data)
+            # 2. AND matches a definitive error pattern
+            is_short_output = len(output_str.strip()) < 200  # Real data is usually longer
+            has_error = any(pattern in output_lower for pattern in definitive_error_patterns)
+            
+            if has_error and is_short_output:
                 if node.node_type in (NodeType.TOOL, NodeType.CODE):
                     logger.info(
-                        f"🔍 Microplanner: {node.id} output contains error "
-                        f"markers, considering expansion"
+                        f"🔍 Microplanner: {node.id} detected definitive error, "
+                        f"considering expansion"
                     )
                     return MicroplanAction.EXPAND
 

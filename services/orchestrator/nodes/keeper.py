@@ -101,6 +101,149 @@ async def calculate_agreement_score(facts: list[dict]) -> float:
         return 0.5
 
 
+async def calculate_grpo_reward(
+    facts: list[dict],
+    tool_invocations: list[dict],
+    query: str,
+    error_feedback: list[dict] | None = None,
+    completed_calls: set | None = None,
+) -> dict[str, float]:
+    """
+    GRPO-Style Reward Scoring for Kea (Generative Reward Policy Optimization).
+    
+    Combines multiple signals into a comprehensive reward score that guides
+    the research loop more intelligently than simple agreement scoring.
+    
+    Returns:
+        Dict with individual scores and final reward:
+        {
+            "relevance": float,      # How relevant are facts to query?
+            "novelty": float,        # Are we learning new things?
+            "success_rate": float,   # % of tools that succeeded
+            "citation_coverage": float,  # Do facts have sources?
+            "efficiency": float,     # Fewer steps = better
+            "penalty": float,        # Deductions for errors/duplicates
+            "final_reward": float,   # Weighted combination
+        }
+    """
+    scores = {
+        "relevance": 0.0,
+        "novelty": 0.0,
+        "success_rate": 0.0,
+        "citation_coverage": 0.0,
+        "efficiency": 0.0,
+        "penalty": 0.0,
+        "final_reward": 0.0,
+    }
+    
+    # ============================================================
+    # 1. RELEVANCE SCORE (How relevant are facts to the query?)
+    # ============================================================
+    if facts and query:
+        try:
+            from shared.embedding.model_manager import get_embedding_provider
+            import numpy as np
+            
+            provider = get_embedding_provider()
+            
+            # Get query embedding
+            query_emb = await provider.embed([query[:500]])
+            
+            # Get fact embeddings (limit for performance)
+            fact_texts = [f.get("text", "")[:500] for f in facts[:10]]
+            fact_embs = await provider.embed(fact_texts)
+            
+            if query_emb and fact_embs:
+                query_vec = np.array(query_emb[0])
+                fact_vecs = np.array(fact_embs)
+                
+                # Cosine similarity between query and each fact
+                query_norm = query_vec / (np.linalg.norm(query_vec) + 1e-8)
+                fact_norms = fact_vecs / (np.linalg.norm(fact_vecs, axis=1, keepdims=True) + 1e-8)
+                similarities = np.dot(fact_norms, query_norm)
+                
+                scores["relevance"] = float(np.mean(similarities))
+        except Exception as e:
+            logger.debug(f"GRPO relevance calculation failed: {e}")
+            scores["relevance"] = 0.5 if facts else 0.0
+    
+    # ============================================================
+    # 2. NOVELTY SCORE (Are facts diverse and non-redundant?)
+    # ============================================================
+    if facts and len(facts) >= 2:
+        # Calculate agreement score as a proxy for redundancy
+        agreement_score = await calculate_agreement_score(facts)
+        # Lower agreement = more novelty (diverse information)
+        # But we cap it - too low agreement might mean noise
+        scores["novelty"] = 1.0 - min(0.7, max(0.3, agreement_score))
+    else:
+        scores["novelty"] = 0.3  # Default for insufficient data
+    
+    # ============================================================
+    # 3. TOOL SUCCESS RATE
+    # ============================================================
+    if tool_invocations:
+        successes = sum(1 for inv in tool_invocations if inv.get("success", False))
+        total = len(tool_invocations)
+        scores["success_rate"] = successes / total if total > 0 else 0.0
+    
+    # ============================================================
+    # 4. CITATION COVERAGE (Do facts have traceable sources?)
+    # ============================================================
+    if facts:
+        with_sources = sum(1 for f in facts if f.get("source_url") or f.get("source"))
+        scores["citation_coverage"] = with_sources / len(facts)
+    
+    # ============================================================
+    # 5. EFFICIENCY (Fewer unique calls = better)
+    # ============================================================
+    unique_calls = len(completed_calls) if completed_calls else len(tool_invocations)
+    # Target: 3-8 calls for typical research. Penalize excess.
+    optimal_calls = 5
+    if unique_calls > 0:
+        efficiency_ratio = min(optimal_calls / unique_calls, 1.0)
+        scores["efficiency"] = efficiency_ratio
+    
+    # ============================================================
+    # 6. PENALTY CALCULATION (Errors, Duplicates, Hallucinations)
+    # ============================================================
+    penalty = 0.0
+    
+    # Penalty for errors
+    error_count = len(error_feedback) if error_feedback else 0
+    penalty += error_count * 0.1  # -0.1 per error
+    
+    # Penalty for failed tools
+    failures = sum(1 for inv in tool_invocations if inv.get("success") is False) if tool_invocations else 0
+    penalty += failures * 0.05  # -0.05 per failure
+    
+    # Cap penalty at 0.5 (don't make reward negative)
+    scores["penalty"] = min(0.5, penalty)
+    
+    # ============================================================
+    # FINAL WEIGHTED REWARD
+    # ============================================================
+    # Weights inspired by GRPO: prioritize relevance and success
+    final_reward = (
+        0.30 * scores["relevance"] +
+        0.15 * scores["novelty"] +
+        0.25 * scores["success_rate"] +
+        0.15 * scores["citation_coverage"] +
+        0.15 * scores["efficiency"] -
+        scores["penalty"]
+    )
+    
+    # Clamp to [0, 1]
+    scores["final_reward"] = max(0.0, min(1.0, final_reward))
+    
+    logger.info(f"📊 GRPO Score: {scores['final_reward']:.3f} "
+                f"(rel={scores['relevance']:.2f}, nov={scores['novelty']:.2f}, "
+                f"succ={scores['success_rate']:.2f}, cit={scores['citation_coverage']:.2f}, "
+                f"eff={scores['efficiency']:.2f}, pen=-{scores['penalty']:.2f})")
+    
+    return scores
+
+
 # ============================================================================
 # Persistence Layer (Always Persist Policy)
 # ============================================================================
@@ -372,26 +515,41 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
         return state
     
     # ============================================================
-    # ADAPTIVE CONFIDENCE CHECK (0.95 - 0.05 per iteration)
+    # GRPO-STYLE CONFIDENCE CHECK (Multi-signal reward scoring)
     # ============================================================
     min_facts = 3
     if len(facts) >= min_facts:
         # Calculate adaptive threshold for this iteration
         current_threshold = get_adaptive_threshold(iteration)
         
-        # Calculate agreement score from facts (using embeddings)
-        agreement_score = await calculate_agreement_score(facts)
+        # Get additional state for GRPO scoring
+        query = state.get("query", "")
+        error_feedback = state.get("error_feedback", [])
+        completed_calls = state.get("completed_calls", set())
         
-        logger.info(f"Keeper: Agreement score {agreement_score:.3f}, threshold {current_threshold:.2f}")
-        state["agreement_score"] = agreement_score
+        # Calculate GRPO reward score (replaces simple agreement scoring)
+        grpo_scores = await calculate_grpo_reward(
+            facts=facts,
+            tool_invocations=tool_invocations,
+            query=query,
+            error_feedback=error_feedback,
+            completed_calls=completed_calls,
+        )
+        
+        # Use final_reward as the confidence metric
+        confidence_score = grpo_scores["final_reward"]
+        
+        logger.info(f"Keeper: GRPO confidence {confidence_score:.3f}, threshold {current_threshold:.2f}")
+        state["grpo_scores"] = grpo_scores  # Store detailed breakdown
+        state["agreement_score"] = confidence_score  # Backward compatibility
         state["confidence_threshold"] = current_threshold
         
         # Store actual confidence in state for final report
-        state["confidence"] = agreement_score
+        state["confidence"] = confidence_score
         
-        # If agreement exceeds threshold, we have confident answer
-        if agreement_score >= current_threshold:
-            logger.info(f"Keeper: Confidence {agreement_score:.3f} >= {current_threshold:.2f} - PASSED")
+        # If confidence exceeds threshold, we have confident answer
+        if confidence_score >= current_threshold:
+            logger.info(f"Keeper: GRPO Confidence {confidence_score:.3f} >= {current_threshold:.2f} - PASSED")
             state["should_continue"] = False
             state["stop_reason"] = "confidence_achieved"
             return state

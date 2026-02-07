@@ -106,6 +106,9 @@ class GraphState(TypedDict, total=False):
     
     # Replan loop control (for Keeper -> Planner retry when all tools fail)
     replan_count: int
+    
+    # Deduplication (skip repeated tool calls)
+    completed_calls: set  # Set of call hashes: hash(tool_name + json(args))
 
 
 # ============================================================================
@@ -393,6 +396,7 @@ async def researcher_node(state: GraphState) -> GraphState:
     sources = state.get("sources", [])
     tool_invocations = state.get("tool_invocations", [])
     error_feedback = state.get("error_feedback", [])  # Error feedback for LLM self-correction
+    completed_calls = state.get("completed_calls", set())  # Deduplication: skip repeated calls
     
     # Reset context pool for new research iteration
     if iteration == 1:
@@ -656,22 +660,36 @@ async def researcher_node(state: GraphState) -> GraphState:
                 
                 # ERROR FEEDBACK LOOP: Capture failed nodes for LLM self-correction
                 if node_result.status == NodeStatus.FAILED:
-                    # Find the corresponding micro_task to get tool name and args
-                    micro_task = next(
-                        (t for t in micro_tasks if t.get("task_id") == node_id),
-                        {}
+                    # Get workflow node to extract tool name and args
+                    workflow_node = next(
+                        (n for n in workflow_nodes if n.id == node_id),
+                        None
                     )
-                    error_feedback.append({
-                        "tool": micro_task.get("tool", "unknown"),
-                        "task_id": node_id,
-                        "error": str(node_result.error or node_result.output or "Unknown error")[:500],
-                        "args": micro_task.get("inputs", {}),
-                        "description": micro_task.get("description", ""),
-                    })
-                    logger.warning(
-                        f"📝 Captured error for LLM feedback: {micro_task.get('tool')} - "
-                        f"{str(node_result.error or 'Unknown')[:100]}"
-                    )
+                    if workflow_node:
+                        error_feedback.append({
+                            "tool": workflow_node.tool or "unknown",
+                            "task_id": node_id,
+                            "error": str(node_result.error or node_result.output or "Unknown error")[:500],
+                            "args": workflow_node.args or {},
+                            "description": workflow_node.description or "",
+                        })
+                        logger.warning(
+                            f"📝 Captured error for LLM feedback: {workflow_node.tool} - "
+                            f"{str(node_result.error or 'Unknown')[:100]}"
+                        )
+                    else:
+                        # Fallback if workflow node not found
+                        error_feedback.append({
+                            "tool": "unknown",
+                            "task_id": node_id,
+                            "error": str(node_result.error or node_result.output or "Unknown error")[:500],
+                            "args": {},
+                            "description": "",
+                        })
+                        logger.warning(
+                            f"📝 Captured error for LLM feedback: {node_id} - "
+                            f"{str(node_result.error or 'Unknown')[:100]}"
+                        )
 
             logger.info(
                 f"✅ DAG complete: {dag_result.completed} ok, "
@@ -715,6 +733,32 @@ async def researcher_node(state: GraphState) -> GraphState:
             Execute tool with intelligent retry on parameter errors.
             Used by both DAG executor and legacy executor.
             """
+            nonlocal completed_calls  # Access outer variable
+            
+            # ============================================================
+            # DEDUPLICATION: Skip repeated tool calls with same args
+            # ============================================================
+            import hashlib
+            import json as json_mod
+            
+            # Create deterministic hash of tool call
+            args_str = json_mod.dumps(args, sort_keys=True, default=str)
+            call_hash = hashlib.md5(f"{name}:{args_str}".encode()).hexdigest()
+            
+            if call_hash in completed_calls:
+                logger.info(f"⏭️ DEDUP: Skipping duplicate call: {name}({list(args.keys())})")
+                # Return cached result from context pool if available
+                cached_key = f"cache_{name}_{call_hash[:8]}"
+                cached_result = ctx.get_data(cached_key)
+                if cached_result:
+                    logger.info(f"   📦 Using cached result from {cached_key}")
+                    return cached_result
+                # If no cache, still skip but return a marker
+                return f"[Duplicate call skipped: {name}]"
+            
+            # Mark as in-progress (add to set)
+            completed_calls.add(call_hash)
+            
             # Resolve target server dynamically
             server_name = registry.get_server_for_tool(name)
 
@@ -1173,6 +1217,7 @@ async def researcher_node(state: GraphState) -> GraphState:
         "sources": sources,
         "tool_invocations": tool_invocations,
         "error_feedback": error_feedback,  # Pass errors to LLM for self-correction on retry
+        "completed_calls": completed_calls,  # Persist deduplication cache
     }
 
 
