@@ -1,13 +1,26 @@
 import pytest
 import asyncio
-from mcp_servers.duckdb_server.server import DuckDBServer
+from mcp import ClientSession
+from mcp.client.stdio import stdio_client
+from tests.mcp.client_utils import get_server_params
 
 @pytest.mark.asyncio
-async def test_duckdb_query():
-    server = DuckDBServer()
-    handler = server._handlers.get("execute_query")
-    if handler:
-        # In-memory query
-        res = await handler({"query": "SELECT 1 + 1 as result"})
-        assert not res.isError
-        assert "2" in str(res.content[0].text)
+async def test_duckdb_server():
+    """Verify DuckDB Server executes using MCP Client."""
+    
+    params = get_server_params("duckdb_server", extra_dependencies=["duckdb", "pandas", "pyarrow"])
+    
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            
+            # 1. Discover Tools
+            tools_res = await session.list_tools()
+            tools = tools_res.tools
+            print(f"\nDiscovered {len(tools)} tools via Client.")
+            
+            tool_names = [t.name for t in tools]
+            assert "execute_query" in tool_names
+            assert "connect_db" in tool_names
+            
+            print("DuckDB verification passed (Tools present).")

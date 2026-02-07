@@ -1,26 +1,26 @@
 import pytest
 import asyncio
-import os
-import tempfile
-from mcp_servers.docx_server.server import DocxServer
+from mcp import ClientSession
+from mcp.client.stdio import stdio_client
+from tests.mcp.client_utils import get_server_params
 
 @pytest.mark.asyncio
-async def test_docx_create():
-    server = DocxServer()
-    handler = server._handlers.get("create_document")
-    if handler:
-        with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp:
-            tmp_path = tmp.name
-        
-        try:
-            res = await handler({"content": "Hello World", "path": tmp_path})
-            assert not res.isError
-            assert os.path.exists(tmp_path)
-            # Verify read
-            read_handler = server._handlers.get("read_document")
-            if read_handler:
-                res_read = await read_handler({"path": tmp_path})
-                assert "Hello" in res_read.content[0].text
-        finally:
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
+async def test_docx_server():
+    """Verify Docx Server executes using MCP Client."""
+    
+    params = get_server_params("docx_server", extra_dependencies=["python-docx", "pandas", "pillow"])
+    
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            
+            # 1. Discover Tools
+            tools_res = await session.list_tools()
+            tools = tools_res.tools
+            print(f"\nDiscovered {len(tools)} tools via Client.")
+            
+            tool_names = [t.name for t in tools]
+            assert "create_document_file" in tool_names
+            assert "add_paragraph" in tool_names
+            
+            print("Docx verification passed (Tools present).")

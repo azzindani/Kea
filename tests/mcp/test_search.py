@@ -1,9 +1,26 @@
 import pytest
 import asyncio
-from mcp_servers.search_server.server import SearchServer
+from mcp import ClientSession
+from mcp.client.stdio import stdio_client
+from tests.mcp.client_utils import get_server_params
 
 @pytest.mark.asyncio
 async def test_search_server():
-    server = SearchServer()
-    tools = server.get_tools()
-    assert len(tools) > 0, "SearchServer has no tools"
+    """Verify Search Server executes using MCP Client."""
+    
+    # Needs requests usually for Tavily or similar APIs
+    params = get_server_params("search_server", extra_dependencies=["requests"])
+    
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            
+            # 1. Discover Tools
+            tools_res = await session.list_tools()
+            tools = tools_res.tools
+            print(f"\nDiscovered {len(tools)} tools via Client.")
+            
+            tool_names = [t.name for t in tools]
+            assert "web_search" in tool_names
+            
+            print("Search verification passed (Tools present).")

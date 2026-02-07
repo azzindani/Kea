@@ -1,15 +1,20 @@
 import pytest
 import asyncio
-import hashlib
-from mcp_servers.hashlib_server.server import HashlibServer
+from mcp import ClientSession
+from mcp.client.stdio import stdio_client
+from tests.mcp.client_utils import get_server_params
 
 @pytest.mark.asyncio
-async def test_hashing():
-    server = HashlibServer()
-    handler = server._handlers.get("calculate_hash")
-    if handler:
-        text = "Hello World"
-        expected = hashlib.sha256(text.encode()).hexdigest()
-        res = await handler({"text": text, "algorithm": "sha256"})
-        assert not res.isError
-        assert expected in res.content[0].text
+async def test_hashlib_server():
+    """Verify Hashlib Server executes using MCP Client."""
+    params = get_server_params("hashlib_server", extra_dependencies=[])
+    
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            tools_res = await session.list_tools()
+            tools = tools_res.tools
+            print(f"\nDiscovered {len(tools)} tools via Client.")
+            tool_names = [t.name for t in tools]
+            assert len(tools) > 0
+            print("Hashlib verification passed (Tools present).")

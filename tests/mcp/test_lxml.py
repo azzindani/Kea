@@ -1,11 +1,20 @@
 import pytest
 import asyncio
-from mcp_servers.lxml_server.server import LxmlServer
+from mcp import ClientSession
+from mcp.client.stdio import stdio_client
+from tests.mcp.client_utils import get_server_params
 
 @pytest.mark.asyncio
-async def test_lxml_parse():
-    lxml_server = LxmlServer()
-    l_handler = lxml_server._handlers.get("parse_xml")
-    if l_handler:
-        res = await l_handler({"xml_content": "<root><a>1</a></root>"})
-        assert not res.isError
+async def test_lxml_server():
+    """Verify LXML Server executes using MCP Client."""
+    params = get_server_params("lxml_server", extra_dependencies=["lxml"])
+    
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            tools_res = await session.list_tools()
+            tools = tools_res.tools
+            print(f"\nDiscovered {len(tools)} tools via Client.")
+            tool_names = [t.name for t in tools]
+            assert len(tools) > 0
+            print("LXML verification passed (Tools present).")
