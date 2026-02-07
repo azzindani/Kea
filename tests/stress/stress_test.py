@@ -527,8 +527,8 @@ class TestStressQueries:
                     elif metrics.duration_ms > 5000:
                          logger.warning(f"⚠️ Low concurrency ({metrics.concurrency_factor:.2f}x). Expected parallel execution for heavy workload.")
             else:
-                logger.error(f"❌ Query {query_id} FAILED: {metrics.error_message}")
-                pytest.fail(f"Query {query_id} failed: {metrics.error_message}")
+                logger.error(f"❌ Query {query_id} FAILED: {metrics.error}")
+                pytest.fail(f"Query {query_id} failed: {metrics.error}")
         
         # Cleanup
         await runner.cleanup()

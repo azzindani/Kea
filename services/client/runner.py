@@ -38,17 +38,27 @@ class ResearchRunner:
         try:
             # 1. Submit Job
             # Note: We must adhere to the exact API expected by the orchestrator
+            # API Gateway routes jobs to /api/v1/jobs
             payload = {
                 "query": query,
-                "job_id": job_id,
-                # Default configuration
-                "depth": 3,
-                "breadth": 3
+                "job_type": "deep_research", # Required by API Gateway
+                "depth": 2,
+                "max_sources": 50
             }
             
-            response = await self.client.post("/api/v1/research/submit", json=payload)
+            response = await self.client.post("/api/v1/jobs/", json=payload)
             if response.status_code != 200:
                 raise RuntimeError(f"Failed to submit job: {response.text}")
+            
+            job_data = response.json()
+            # Ensure we use the ID returned by server if different
+            server_job_id = job_data.get("job_id")
+            if server_job_id:
+                job_id = server_job_id
+                # Update metrics with real ID
+                self.metrics._current_job.job_id = job_id
+
+            logger.info(f"Job submitted successfully. Server ID: {job_id}")
             
             # 2. Poll for Completion
             status = "running"
@@ -56,8 +66,7 @@ class ResearchRunner:
                 await asyncio.sleep(self.poll_interval)
                 
                 # Poll status endpoint
-                # Assuming /api/v1/research/status/{job_id}
-                status_resp = await self.client.get(f"/api/v1/research/status/{job_id}")
+                status_resp = await self.client.get(f"/api/v1/jobs/{job_id}")
                 if status_resp.status_code != 200:
                     logger.warning(f"Status check failed: {status_resp.status_code}")
                     continue
@@ -69,14 +78,13 @@ class ResearchRunner:
                 if "metrics" in data:
                     srv_metrics = data["metrics"]
                     # Sync tokens/tools if server provides them in real-time
-                    # For now, we rely on final report or implicit tracking
                     pass
                 
                 logger.debug(f"Job {job_id} status: {status}")
             
             # 3. Retrieve Results
             if status == "completed":
-                result_resp = await self.client.get(f"/api/v1/research/results/{job_id}")
+                result_resp = await self.client.get(f"/api/v1/jobs/{job_id}/result")
                 if result_resp.status_code == 200:
                    result_data = result_resp.json()
                    # Here we would parse final metrics if available
@@ -87,6 +95,12 @@ class ResearchRunner:
                 
             else:
                 error_msg = f"Job finished with status: {status}"
+                # Try to get error details
+                if status == "failed":
+                     status_resp = await self.client.get(f"/api/v1/jobs/{job_id}")
+                     if status_resp.status_code == 200:
+                         error_msg = status_resp.json().get("error", error_msg)
+                
                 self.metrics.end_job(success=False, error=error_msg)
                 logger.error(f"❌ Job {job_id} Failed: {error_msg}")
 
