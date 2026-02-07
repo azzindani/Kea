@@ -44,8 +44,11 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from tests.stress.queries import QUERIES, get_query, StressQuery
-from tests.stress.metrics import MetricsCollector, QueryMetrics
-from tests.stress.conftest import AuthenticatedAPIClient, API_GATEWAY_URL, ORCHESTRATOR_URL
+# Use the new Client SDK components
+from services.client.metrics import MetricsCollector, JobMetrics
+from services.client.runner import ResearchRunner
+from services.client.api import ResearchClient
+from tests.stress.conftest import API_GATEWAY_URL, ORCHESTRATOR_URL
 
 from shared.hardware.detector import detect_hardware, HardwareProfile
 from shared.logging import get_logger
@@ -100,12 +103,10 @@ def pytest_addoption(parser):
 
 class StressTestRunner:
     """
-    Runs stress tests against Kea research pipeline via API.
+    Wraps the production ResearchRunner for stress testing purposes.
     
-    Key principle: 10,000 documents = 10,000 tool iterations ≠ 10,000 LLM calls
-    
-    This version uses the API Gateway instead of direct imports,
-    properly exercising the full microservices stack.
+    Delegates logic to services.client.runner.ResearchRunner to ensure
+    tests exercise the exact same code path as the production CLI.
     """
     
     def __init__(
@@ -117,71 +118,57 @@ class StressTestRunner:
         
         self.metrics = MetricsCollector()
         self.hardware: HardwareProfile | None = None
-        self.api_client: AuthenticatedAPIClient | None = None
+        
+        # Production components
+        self.client: ResearchClient | None = None
+        self.runner: ResearchRunner | None = None
         
         self._initialized = False
     
     async def initialize(self) -> None:
-        """Initialize Kea services via API."""
+        """Initialize Client SDK."""
         if self._initialized:
             return
         
         logger.info("="*60)
-        logger.info("INITIALIZING KEA STRESS TEST (API MODE)")
+        logger.info("INITIALIZING STRESS TEST (SDK MODE)")
         logger.info("="*60)
         
-        # Detect hardware
+        # Detect hardware for logging purposes
         self.hardware = detect_hardware()
         logger.info(f"Hardware: {self.hardware.cpu_threads} threads, "
                    f"{self.hardware.ram_total_gb:.1f}GB RAM, "
                    f"env={self.hardware.environment}")
         
-        # Initialize authenticated API client
+        # Initialize SDK components
         try:
-            self.api_client = AuthenticatedAPIClient(API_GATEWAY_URL)
-            await self.api_client.initialize()
-            logger.info(f"API Client: Authenticated as user {self.api_client.user_id}")
+            # Use test credentials hardcoded for stress tests (found in old conftest)
+            self.client = ResearchClient(
+                base_url=API_GATEWAY_URL,
+                email="stress_test@example.com",
+                password="stress_test_password_123",
+                name="Stress Test User"
+            )
+            await self.client.initialize()
+            
+            self.runner = ResearchRunner(self.client, self.metrics)
+            
+            logger.info(f"SDK Client: Authenticated as user {self.client.user_id}")
         except Exception as e:
-            logger.error(f"Failed to authenticate with API Gateway: {e}")
+            logger.error(f"Failed to authenticate SDK Client: {e}")
             raise
-        
-        # Verify services are healthy
-        await self._check_services()
         
         self._initialized = True
         logger.info("="*60)
-    
-    async def _check_services(self) -> None:
-        """Verify required services are running."""
-        # Check API Gateway health
-        try:
-            response = await self.api_client.get("/health")
-            if response.status_code != 200:
-                raise Exception(f"API Gateway unhealthy: {response.text}")
-            logger.info("API Gateway: Healthy")
-        except Exception as e:
-            logger.error(f"API Gateway health check failed: {e}")
-            raise
-        
-        # Check Orchestrator health
-        try:
-            async with httpx.AsyncClient(timeout=10) as client:
-                response = await client.get(f"{ORCHESTRATOR_URL}/health")
-                if response.status_code != 200:
-                    raise Exception(f"Orchestrator unhealthy: {response.text}")
-                logger.info("Orchestrator: Healthy")
-        except Exception as e:
-            logger.error(f"Orchestrator health check failed: {e}")
-            raise
-    
+
     async def cleanup(self) -> None:
         """Cleanup resources."""
-        if self.api_client:
-            await self.api_client.close()
-    
-    async def run_query(self, query: StressQuery) -> QueryMetrics:
+        if self.client:
+            await self.client.close()
+
+    async def run_query(self, query: StressQuery) -> JobMetrics:
         """
-        Run a single stress test query via API.
+        Run a single stress test query via SDK.
         
         Returns metrics for the query execution.
         """
@@ -196,38 +183,29 @@ class StressTestRunner:
         logger.info(f"Expected efficiency ratio: {query.expected_tool_iterations / query.expected_llm_calls:.0f}x")
         logger.info("")
         
-        # Start metrics
-        self.metrics.start_query(query.id, query.name)
+        # Delegate to production runner
+        # Note: We pass the query prompt directly
+        job_metrics = await self.runner.run_query(query.prompt)
         
-        try:
-            # Execute via API
-            result = await self._execute_via_api(query)
-            
-            # End metrics
-            metrics = self.metrics.end_query(success=True)
-            
-            # Log results
-            logger.info("")
-            logger.info("-"*40)
-            logger.info("RESULTS:")
-            logger.info(f"  Duration: {metrics.duration_ms / 1000:.1f}s")
-            logger.info(f"  Total Tool Time: {metrics.total_tool_duration_ms / 1000:.1f}s")
-            logger.info(f"  Concurrency Factor: {metrics.concurrency_factor:.2f}x")
-            logger.info(f"  LLM Calls: {metrics.llm_calls}")
-            logger.info(f"  Tool Iterations: {metrics.tool_iterations}")
-            logger.info(f"  Efficiency Ratio: {metrics.efficiency_ratio:.1f}x")
-            logger.info(f"  Peak Memory: {metrics.peak_memory_mb:.1f}MB")
-            logger.info("-"*40)
-            
-        except Exception as e:
-            logger.error(f"Query failed: {e}")
-            metrics = self.metrics.end_query(success=False, error=e)
+        # Log results
+        logger.info("")
+        logger.info("-"*40)
+        logger.info("RESULTS (SDK):")
+        logger.info(f"  Duration: {job_metrics.duration_ms / 1000:.1f}s")
+        logger.info(f"  Success: {job_metrics.success}")
+        logger.info(f"  LLM Calls: {job_metrics.llm_calls}")
+        logger.info(f"  Tool Iterations: {job_metrics.tool_iterations}")
+        logger.info(f"  Efficiency Ratio: {job_metrics.efficiency_ratio:.1f}x")
+        logger.info("-"*40)
         
         # Export query results
         result_path = self.output_dir / f"query_{query.id}_result.json"
-        self.metrics.export_query(metrics, str(result_path))
         
-        return metrics
+        # Use metrics collector export
+        with open(result_path, "w") as f:
+             json.dump(job_metrics.to_dict(), f, indent=2, default=str)
+        
+        return job_metrics
     
     async def _execute_via_api(self, query: StressQuery) -> dict:
         """
