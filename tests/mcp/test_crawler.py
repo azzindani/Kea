@@ -29,3 +29,44 @@ async def test_crawler_server():
             assert "sitemap_parser" in tool_names
             
             print("Crawler verification passed (Tools present).")
+
+@pytest.mark.asyncio
+async def test_crawler_real_simulation():
+    """
+    REAL SIMULATION: Crawl a real website and extract content.
+    """
+    params = get_server_params("crawler_server", extra_dependencies=["beautifulsoup4", "requests", "crawl4ai"])
+    
+    print(f"\n--- Starting Real-World Simulation: Crawler ---")
+    
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            
+            # 1. Discover Tools
+            tools_res = await session.list_tools()
+            tool_names = [t.name for t in tools_res.tools]
+            
+            target_url = "https://example.com"
+            print(f"1. Target URL: {target_url}")
+            
+            if "web_crawler" in tool_names:
+                print("   Using 'web_crawler'...")
+                # Assuming simple args
+                res = await session.call_tool("web_crawler", arguments={"url": target_url})
+            else:
+                print(" [WARN] No obvious crawl tool found in:", tool_names)
+                return
+
+            if res.isError:
+                 print(f" [FAIL] Crawl: {res.content[0].text if res.content else 'Error'}")
+            else:
+                 content = res.content[0].text
+                 print(f" [PASS] Crawl successful. Content len: {len(content)}")
+                 assert "Example Domain" in content
+            
+            print("--- Crawler Simulation Complete ---")
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(pytest.main(["-v", "-s", __file__]))

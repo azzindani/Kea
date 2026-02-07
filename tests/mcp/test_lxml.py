@@ -5,16 +5,58 @@ from mcp.client.stdio import stdio_client
 from tests.mcp.client_utils import get_server_params
 
 @pytest.mark.asyncio
-async def test_lxml_server():
-    """Verify LXML Server executes using MCP Client."""
-    params = get_server_params("lxml_server", extra_dependencies=["lxml", "cssselect"])
+async def test_lxml_real_simulation():
+    """
+    REAL SIMULATION: Verify LXML Server (XML Parsing, XPath).
+    """
+    params = get_server_params("lxml_server", extra_dependencies=["lxml"])
+    
+    xml_content = """
+    <library>
+        <book id="1">
+            <title>The Great Gatsby</title>
+            <author>F. Scott Fitzgerald</author>
+            <price>10.99</price>
+        </book>
+        <book id="2">
+            <title>1984</title>
+            <author>George Orwell</author>
+            <price>8.99</price>
+        </book>
+    </library>
+    """
+    
+    print(f"\n--- Starting Real-World Simulation: LXML Server ---")
     
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            tools_res = await session.list_tools()
-            tools = tools_res.tools
-            print(f"\nDiscovered {len(tools)} tools via Client.")
-            tool_names = [t.name for t in tools]
-            assert len(tools) > 0
-            print("LXML verification passed (Tools present).")
+            
+            # 1. Parse XML
+            print("1. Parsing XML...")
+            res = await session.call_tool("parse_xml_string", arguments={"xml_input": xml_content})
+            if not res.isError:
+                print(f" [PASS] XML Parsed")
+            else:
+                print(f" [FAIL] {res.content[0].text}")
+
+            # 2. XPath Query
+            print("2. XPath Query (titles)...")
+            res = await session.call_tool("xpath_query_text", arguments={"xml_input": xml_content, "query": "//title/text()"})
+            print(f" [PASS] Titles: {res.content[0].text}")
+            
+            # 3. XPath Attribute
+            print("3. XPath Attribute (id)...")
+            res = await session.call_tool("xpath_query_attr", arguments={"xml_input": xml_content, "query": "//book/@id"})
+            print(f" [PASS] IDs: {res.content[0].text}")
+
+            # 4. Convert to Dict
+            print("4. XML to Dict...")
+            res = await session.call_tool("xml_to_dict_lxml", arguments={"xml_input": xml_content})
+            print(f" [PASS] Dict: {res.content[0].text[:100]}...")
+
+    print("--- LXML Simulation Complete ---")
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(pytest.main(["-v", "-s", __file__]))

@@ -5,6 +5,17 @@ import json
 import structlog
 from typing import Union, List, Dict, Any
 
+import math
+
+def safe_float(val: Any) -> float:
+    try:
+        f = float(val)
+        if math.isnan(f) or math.isinf(f):
+            return 0.0
+        return f
+    except:
+        return 0.0
+
 logger = structlog.get_logger()
 
 # Extend pandas with quantstats (standard practice)

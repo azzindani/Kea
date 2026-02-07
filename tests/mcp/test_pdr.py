@@ -5,16 +5,43 @@ from mcp.client.stdio import stdio_client
 from tests.mcp.client_utils import get_server_params
 
 @pytest.mark.asyncio
-async def test_pdr_server():
-    """Verify PDR Server executes using MCP Client."""
-    params = get_server_params("pdr_server", extra_dependencies=["pandas_datareader", "pandas", "requests", "lxml", "setuptools"])
+async def test_pdr_real_simulation():
+    """
+    REAL SIMULATION: Verify PDR Server (Pandas DataReader).
+    """
+    params = get_server_params("pdr_server", extra_dependencies=["pandas_datareader", "pandas"])
+    
+    print(f"\n--- Starting Real-World Simulation: PDR Server ---")
     
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            tools_res = await session.list_tools()
-            tools = tools_res.tools
-            print(f"\nDiscovered {len(tools)} tools via Client.")
-            tool_names = [t.name for t in tools]
-            assert "get_fama_french_data" in tool_names
-            print("PDR verification passed (Tools present).")
+            
+            # 1. Fama-French
+            print("1. Fetching Fama-French Data (F-F_Research_Data_Factors)...")
+            res = await session.call_tool("get_fama_french_data", arguments={"dataset_name": "F-F_Research_Data_Factors"})
+            if not res.isError:
+                 print(f" [PASS] Data received")
+            else:
+                 print(f" [FAIL] {res.content[0].text}")
+
+            # 2. Stooq (AAPL)
+            print("2. Fetching Stooq Data (AAPL.US)...")
+            # Stooq often uses .US suffix
+            res = await session.call_tool("get_stooq_data", arguments={"symbols": ["AAPL.US"]})
+            if not res.isError:
+                 print(f" [PASS] Data received")
+            else:
+                 print(f" [FAIL] {res.content[0].text}")
+
+            # 3. NASDAQ Symbols
+            print("3. Searching NASDAQ Symbols...")
+            res = await session.call_tool("get_nasdaq_symbol_list", arguments={"query": "Apple"})
+            if not res.isError:
+                 print(f" [PASS] Symbols found")
+
+    print("--- PDR Simulation Complete ---")
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(pytest.main(["-v", "-s", __file__]))

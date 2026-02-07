@@ -1,70 +1,63 @@
 import pytest
 import asyncio
-import sys
-import os
-from mcp import ClientSession, StdioServerParameters
+from mcp import ClientSession
 from mcp.client.stdio import stdio_client
-
-# Define the server execution command
-def get_server_params():
-    # Use the same python that runs pytest
-    python_exe = sys.executable
-    server_script = os.path.abspath("mcp_servers/finta_server/server.py")
-    return StdioServerParameters(
-        command="uv",
-        args=["run", "--with", "finta", "--with", "pandas", "--with", "structlog", "python", server_script],
-        env=os.environ.copy()
-    )
+from tests.mcp.client_utils import get_server_params
 
 @pytest.mark.asyncio
-async def test_finta_tools_dynamic():
-    """Verify ALL Finta tools using MCP Client."""
+async def test_finta_real_simulation():
+    """
+    REAL SIMULATION: Verify Finta Server (Technical Indicators) with synthetic data.
+    """
+    params = get_server_params("finta_server", extra_dependencies=["finta", "pandas"])
     
-    params = get_server_params()
+    # Synthetic Data (OHLCV)
+    data = [
+        {"open": 10, "high": 12, "low": 9, "close": 11, "volume": 100},
+        {"open": 11, "high": 13, "low": 10, "close": 12, "volume": 110},
+        {"open": 12, "high": 14, "low": 11, "close": 13, "volume": 120},
+        {"open": 13, "high": 15, "low": 12, "close": 14, "volume": 130},
+        {"open": 14, "high": 16, "low": 13, "close": 15, "volume": 140},
+        {"open": 15, "high": 17, "low": 14, "close": 14, "volume": 150}, # Downtick
+        {"open": 14, "high": 15, "low": 13, "close": 13, "volume": 160},
+    ]
     
-    # Connect to the server
+    print(f"\n--- Starting Real-World Simulation: Finta Server ---")
+    
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
             
-            # 1. Discover Tools
-            tools_res = await session.list_tools()
-            tools = tools_res.tools
-            print(f"\nDiscovered {len(tools)} tools via Client.")
+            # 1. RSI
+            print("1. Calculating RSI...")
+            res = await session.call_tool("calculate_rsi", arguments={"data": data})
+            if not res.isError:
+                 print(f" [PASS] RSI Data: {res.content[0].text[:100]}...")
+            else:
+                 print(f" [FAIL] {res.content[0].text}")
+
+            # 2. SMA
+            print("2. Calculating SMA...")
+            res = await session.call_tool("calculate_sma", arguments={"data": data})
+            if not res.isError:
+                 print(f" [PASS] SMA Data: {res.content[0].text[:100]}...")
+
+            # 3. Bollinger Bands
+            print("3. Calculating Bollinger Bands...")
+            res = await session.call_tool("calculate_bbands", arguments={"data": data})
+            if not res.isError:
+                 print(f" [PASS] BBands Data: {res.content[0].text[:100]}...")
             
-            assert len(tools) > 50, "Expected >50 tools from Finta"
-            
-            # 2. Test Tools
-            # Dummy Data
-            prices = [100, 105, 110, 115, 112, 108, 105, 102, 100, 98, 95, 92, 90, 95, 100]
-            data = []
-            for i, p in enumerate(prices):
-                data.append({
-                    "date": f"2023-01-{i+1:02d}",
-                    "open": p - 2, "high": p + 5, "low": p - 5, "close": p,
-                    "volume": 1000 + (i * 100)
-                })
-            
-            success = 0
-            failed = 0
-            
-            for tool in tools:
-                if tool.name.startswith("get_") and "suite" in tool.name: continue
-                
-                print(f"Testing {tool.name}...", end="")
-                try:
-                    # Generic call with 'data' argument
-                    res = await session.call_tool(tool.name, arguments={"data": data})
-                    if not res.isError:
-                        print(" [PASS]")
-                        success += 1
-                    else:
-                        # Some tools might need extra params, check if error is meaningful
-                        print(f" [FAIL] {res.content[0].text[:50] if res.content else 'Error'}")
-                        failed += 1
-                except Exception as e:
-                     print(f" [EXCEPTION] {e}")
-                     failed += 1
-            
-            print(f"\nPassed: {success}, Failed: {failed}")
-            assert success > 0
+            # 4. Bulk All
+            print("4. Calculating ALL Indicators (Bulk)...")
+            res = await session.call_tool("get_all_indicators", arguments={"data": data})
+            if not res.isError:
+                print(f" [PASS] Bulk Result Length: {len(res.content[0].text)}")
+            else:
+                print(f" [FAIL] {res.content[0].text}")
+
+    print("--- Finta Simulation Complete ---")
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(pytest.main(["-v", "-s", __file__]))

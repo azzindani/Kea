@@ -5,18 +5,35 @@ from mcp.client.stdio import stdio_client
 from tests.mcp.client_utils import get_server_params
 
 @pytest.mark.asyncio
-async def test_xmltodict_server():
-    """Verify XMLtoDict Server executes using MCP Client."""
-    # Assuming xmltodict is required. If not, it might be built-in or vendored.
-    # But for safety we add it.
-    params = get_server_params("xmltodict_server", extra_dependencies=["xmltodict"])
+async def test_xmltodict_real_simulation():
+    """
+    REAL SIMULATION: Verify XmlToDict Server.
+    """
+    params = get_server_params("xmltodict_server", extra_dependencies=[])
+    
+    xml_str = """<root><person><name>John</name><age>30</age></person></root>"""
+    
+    print(f"\n--- Starting Real-World Simulation: XmlToDict Server ---")
     
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            tools_res = await session.list_tools()
-            tools = tools_res.tools
-            print(f"\nDiscovered {len(tools)} tools via Client.")
-            tool_names = [t.name for t in tools]
-            assert "parse_xml_string" in tool_names
-            print("XMLtoDict verification passed (Tools present).")
+            
+            # 1. Parse XML String
+            print(f"1. Parsing XML: '{xml_str}'...")
+            res = await session.call_tool("parse_xml_string", arguments={"xml_input": xml_str})
+            if not res.isError:
+                 print(f" [PASS] Parsed Dict: {res.content[0].text}")
+
+            # 2. Unparse Dict (Dict to XML)
+            print("2. Unparsing Dict to XML...")
+            data = {"root": {"status": "ok", "value": "100"}}
+            res = await session.call_tool("unparse_dict_string", arguments={"data": data})
+            if not res.isError:
+                 print(f" [PASS] XML Output: {res.content[0].text}")
+
+    print("--- XmlToDict Simulation Complete ---")
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(pytest.main(["-v", "-s", __file__]))

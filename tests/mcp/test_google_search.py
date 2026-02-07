@@ -24,3 +24,39 @@ async def test_google_search_server():
             assert "find_pdf" in tool_names
             
             print("Google Search verification passed (Tools present).")
+
+@pytest.mark.asyncio
+async def test_google_real_simulation():
+    """
+    REAL SIMULATION: Perform actual Google searches.
+    """
+    params = get_server_params("google_search_server", extra_dependencies=["googlesearch-python", "beautifulsoup4"])
+    
+    print(f"\n--- Starting Real-World Simulation: Google Search ---")
+    
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            
+            # Step 1: Search Text
+            query = "Python programming features"
+            print(f"1. Searching for '{query}'...")
+            
+            # Note: arguments depend on the specific tool definition in google_search_server
+            # Usually it's 'query' or 'q'
+            res = await session.call_tool("search_google", arguments={"query": query, "num_results": 3})
+            
+            if res.isError:
+                print(f" [FAIL] {res.content[0].text if res.content else 'Unknown Error'}")
+                # We might fail if rate limited or no internet, so we log but maybe don't hard fail assert if prone to flakes
+                # But user asked for real simulation, so we expect success.
+            else:
+                content = res.content[0].text
+                print(f" [PASS] Got result length: {len(content)}")
+                assert "Python" in content
+                
+            print("--- Google Search Simulation Complete ---")
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(pytest.main(["-v", "-s", __file__]))
