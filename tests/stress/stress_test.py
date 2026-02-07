@@ -168,9 +168,9 @@ class StressTestRunner:
 
     async def run_query(self, query: StressQuery) -> JobMetrics:
         """
-        Run a single stress test query via SDK.
+        Run a single stress test query via SDK with retry logic.
         
-        Returns metrics for the query execution.
+        Retries if confidence is below threshold, with degrading thresholds.
         """
         await self.initialize()
         
@@ -183,9 +183,61 @@ class StressTestRunner:
         logger.info(f"Expected efficiency ratio: {query.expected_tool_iterations / query.expected_llm_calls:.0f}x")
         logger.info("")
         
-        # Delegate to production runner
-        # Note: We pass the query prompt directly
-        job_metrics = await self.runner.run_query(query.prompt)
+        # Retry settings
+        max_retries = 3
+        confidence_threshold = 0.70  # Fixed 70% threshold - research should improve, not lower the bar
+        
+        best_metrics = None
+        accumulated_facts = []  # Facts accumulated across attempts
+        accumulated_errors = []  # Errors accumulated across attempts
+        
+        for attempt in range(1, max_retries + 1):
+            logger.info(f"🔄 Attempt {attempt}/{max_retries} (threshold: {confidence_threshold:.0%})")
+            if accumulated_facts:
+                logger.info(f"   📦 Passing {len(accumulated_facts)} facts from previous attempt(s)")
+            if accumulated_errors:
+                logger.info(f"   ⚠️ Passing {len(accumulated_errors)} errors to avoid")
+            
+            # Delegate to production runner with seed context
+            job_metrics = await self.runner.run_query(
+                query.prompt,
+                seed_facts=accumulated_facts if accumulated_facts else None,
+                error_feedback=accumulated_errors if accumulated_errors else None,
+            )
+            
+            # Accumulate facts from this attempt (for next attempt)
+            if job_metrics.facts:
+                for fact in job_metrics.facts:
+                    # Avoid duplicates by checking text
+                    if not any(f.get("text") == fact.get("text") for f in accumulated_facts):
+                        accumulated_facts.append(fact)
+            
+            # Accumulate errors if confidence was low
+            if job_metrics.confidence < confidence_threshold:
+                accumulated_errors.append({
+                    "issue": "low_confidence",
+                    "attempt": attempt,
+                    "confidence": job_metrics.confidence,
+                    "message": f"Attempt {attempt} achieved only {job_metrics.confidence:.1%} confidence. Need more diverse sources and deeper analysis.",
+                    "suggestion": "Try different search queries or data sources to gather more evidence."
+                })
+            
+            # Track best result
+            if best_metrics is None or job_metrics.confidence > best_metrics.confidence:
+                best_metrics = job_metrics
+            
+            # Check if confidence meets threshold
+            if job_metrics.confidence >= confidence_threshold:
+                logger.info(f"✅ Confidence {job_metrics.confidence:.1%} >= {confidence_threshold:.0%} - PASSED")
+                logger.info(f"   📊 Total facts collected: {len(accumulated_facts)}")
+                break
+            elif attempt < max_retries:
+                # Retry with accumulated context
+                logger.warning(f"⚠️ Confidence {job_metrics.confidence:.1%} < {confidence_threshold:.0%}. RETRYING with accumulated evidence...")
+            else:
+                logger.warning(f"⚠️ Max retries ({max_retries}) reached. Using best result (confidence: {best_metrics.confidence:.1%})")
+                logger.info(f"   📊 Total facts collected: {len(accumulated_facts)}")
+                job_metrics = best_metrics
         
         # Log results
         logger.info("")

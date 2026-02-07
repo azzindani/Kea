@@ -26,12 +26,24 @@ class ResearchRunner:
         self.metrics = metrics
         self.poll_interval = 2.0  # Seconds
     
-    async def run_query(self, query: str) -> JobMetrics:
+    async def run_query(
+        self, 
+        query: str,
+        seed_facts: list[dict] | None = None,
+        error_feedback: list[dict] | None = None,
+    ) -> JobMetrics:
         """
         Run a single research query and return metrics.
+        
+        Args:
+            query: The research query to run
+            seed_facts: Optional facts from previous attempt to build upon
+            error_feedback: Optional errors from previous attempt to learn from
         """
         job_id = str(uuid.uuid4())
-        logger.info(f"🚀 Starting Research Job {job_id}: '{query}'")
+        seed_count = len(seed_facts) if seed_facts else 0
+        error_count = len(error_feedback) if error_feedback else 0
+        logger.info(f"🚀 Starting Research Job {job_id}: '{query}' (seed_facts={seed_count}, errors={error_count})")
         
         self.metrics.start_job(job_id, query)
         
@@ -43,8 +55,14 @@ class ResearchRunner:
                 "query": query,
                 "job_type": "deep_research", # Required by API Gateway
                 "depth": 2,
-                "max_sources": 50
+                "max_sources": 50,
             }
+            
+            # Add seed context if provided (for cross-attempt sharing)
+            if seed_facts:
+                payload["seed_facts"] = seed_facts
+            if error_feedback:
+                payload["error_feedback"] = error_feedback
             
             response = await self.client.post("/api/v1/jobs/", json=payload)
             if response.status_code != 200:
@@ -92,10 +110,14 @@ class ResearchRunner:
                    self.metrics._current_job.report = result_data.get("report")
                    
                    # API returns these at top level (not nested in metrics)
-                   # JobResult schema: job_id, status, report, confidence, facts_count, sources_count, artifact_ids
+                   # JobResult schema: job_id, status, report, confidence, facts_count, sources_count, facts, errors
                    self.metrics._current_job.confidence = result_data.get("confidence", 0.0)
                    self.metrics._current_job.facts_count = result_data.get("facts_count", 0)
                    self.metrics._current_job.sources_count = result_data.get("sources_count", 0)
+                   
+                   # Store facts and errors for cross-attempt context sharing
+                   self.metrics._current_job.facts = result_data.get("facts", [])
+                   self.metrics._current_job.errors = result_data.get("errors", [])
                    
                    logger.info(f"Result received: confidence={result_data.get('confidence')}, facts={result_data.get('facts_count')}, sources={result_data.get('sources_count')}")
                 

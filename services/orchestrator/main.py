@@ -109,6 +109,10 @@ class ResearchRequest(BaseModel):
     query: str = Field(..., min_length=1, description="Research query")
     depth: int = Field(default=2, ge=1, le=5, description="Research depth")
     max_sources: int = Field(default=10, ge=1, le=50, description="Max sources")
+    
+    # Cross-attempt context sharing (for retry scenarios)
+    seed_facts: list[dict] | None = Field(default=None, description="Facts from previous attempt to build upon")
+    error_feedback: list[dict] | None = Field(default=None, description="Errors from previous attempt to avoid")
 
 
 class ResearchResponse(BaseModel):
@@ -119,6 +123,10 @@ class ResearchResponse(BaseModel):
     confidence: float = 0.0
     sources_count: int = 0
     facts_count: int = 0
+    
+    # Cross-attempt context (for retry scenarios)
+    facts: list[dict] = []  # Actual facts for passing to next attempt
+    errors: list[dict] = []  # Errors encountered for next attempt to avoid
 
 
 # ============================================================================
@@ -159,9 +167,12 @@ async def start_research(request: ResearchRequest):
     
     job_id = f"job-{uuid.uuid4().hex[:8]}"
     
-    logger.info(f"Starting research job {job_id}", extra={"query": request.query[:100]})
+    seed_count = len(request.seed_facts) if request.seed_facts else 0
+    error_count = len(request.error_feedback) if request.error_feedback else 0
+    logger.info(f"Starting research job {job_id} (seed_facts={seed_count}, errors={error_count})", 
+                extra={"query": request.query[:100]})
     
-    # Build initial state
+    # Build initial state with seed context (for cross-attempt sharing)
     initial_state: GraphState = {
         "job_id": job_id,
         "query": request.query,
@@ -169,7 +180,7 @@ async def start_research(request: ResearchRequest):
         "status": ResearchStatus.PENDING.value,
         "sub_queries": [],
         "hypotheses": [],
-        "facts": [],
+        "facts": request.seed_facts or [],  # Initialize with seed facts
         "sources": [],
         "artifacts": [],
         "generator_output": "",
@@ -181,6 +192,7 @@ async def start_research(request: ResearchRequest):
         "max_iterations": request.depth,
         "should_continue": True,
         "error": None,
+        "error_feedback": request.error_feedback or [],  # Initialize with previous errors
     }
     
     try:
@@ -194,6 +206,8 @@ async def start_research(request: ResearchRequest):
             confidence=final_state.get("confidence", 0.0),
             sources_count=len(final_state.get("sources", [])),
             facts_count=len(final_state.get("facts", [])),
+            facts=final_state.get("facts", []),  # Return facts for cross-attempt sharing
+            errors=final_state.get("error_feedback", []),  # Return errors for next attempt
         )
         
     except Exception as e:

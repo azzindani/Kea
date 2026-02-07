@@ -67,6 +67,10 @@ class JobMetrics:
     sources_count: int = 0
     efficiency_ratio: float = 0.0
     
+    # Cross-attempt context (for retry sharing)
+    facts: List[dict] = field(default_factory=list)  # Actual facts for passing to next attempt
+    errors: List[dict] = field(default_factory=list)  # Errors for next attempt to avoid
+    
     def calculate_efficiency(self):
         """Update efficiency ratio."""
         if self.llm_calls > 0:

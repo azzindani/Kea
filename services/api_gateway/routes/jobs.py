@@ -262,11 +262,16 @@ async def get_job_store() -> JobStore:
 # Background Task: Run Research Job
 # ============================================================================
 
-async def run_research_job(job_id: str):
+async def run_research_job(
+    job_id: str,
+    seed_facts: list[dict] | None = None,
+    error_feedback: list[dict] | None = None,
+):
     """
     Execute research job via Orchestrator API.
     
     This is the background task that actually runs the research.
+    Supports cross-attempt context sharing via seed_facts and error_feedback.
     """
     store = await get_job_store()
     job = await store.get(job_id)
@@ -278,18 +283,30 @@ async def run_research_job(job_id: str):
     # Update status to running
     await store.update(job_id, status=ResearchStatus.RUNNING, progress=0.1)
     
-    logger.info(f"Starting research job {job_id}", extra={"query": job["query"][:100]})
+    seed_count = len(seed_facts) if seed_facts else 0
+    error_count = len(error_feedback) if error_feedback else 0
+    logger.info(f"Starting research job {job_id} (seed_facts={seed_count}, errors={error_count})", 
+                extra={"query": job["query"][:100]})
     
     try:
         # Call Orchestrator's research endpoint via API
+        # Include seed context for cross-attempt sharing
+        payload = {
+            "query": job["query"],
+            "depth": job["depth"],
+            "max_sources": job["max_sources"],
+        }
+        
+        # Add seed context if provided (for retry scenarios)
+        if seed_facts:
+            payload["seed_facts"] = seed_facts
+        if error_feedback:
+            payload["error_feedback"] = error_feedback
+            
         async with httpx.AsyncClient(timeout=600.0) as client:
             response = await client.post(
                 f"{ORCHESTRATOR_URL}/research",
-                json={
-                    "query": job["query"],
-                    "depth": job["depth"],
-                    "max_sources": job["max_sources"],
-                },
+                json=payload,
             )
             
             if response.status_code != 200:
@@ -332,6 +349,10 @@ class CreateJobRequest(BaseModel):
     job_type: JobType = JobType.DEEP_RESEARCH
     depth: int = Field(default=2, ge=1, le=5)
     max_sources: int = Field(default=10, ge=1, le=50)
+    
+    # Cross-attempt context sharing (for retry scenarios)
+    seed_facts: list[dict] | None = Field(default=None, description="Facts from previous attempt to build upon")
+    error_feedback: list[dict] | None = Field(default=None, description="Errors from previous attempt to avoid")
 
 
 class JobStatus(BaseModel):
@@ -353,6 +374,10 @@ class JobResult(BaseModel):
     facts_count: int
     sources_count: int
     artifact_ids: list[str]
+    
+    # Cross-attempt context (for retry scenarios)
+    facts: list[dict] = []  # Actual facts for passing to next attempt
+    errors: list[dict] = []  # Errors encountered for next attempt to avoid
 
 
 # ============================================================================
@@ -381,15 +406,24 @@ async def create_job(
         job_type=request.job_type,
         depth=request.depth,
         max_sources=request.max_sources,
+        seed_facts=request.seed_facts,  # Cross-attempt context
+        error_feedback=request.error_feedback,  # Cross-attempt context
     )
     
     logger.info(f"Created job {job_id}", extra={
         "query": request.query[:100],
         "user_id": user.user_id,
+        "seed_facts_count": len(request.seed_facts) if request.seed_facts else 0,
+        "error_feedback_count": len(request.error_feedback) if request.error_feedback else 0,
     })
     
-    # Queue background task to execute job
-    background_tasks.add_task(run_research_job, job_id)
+    # Queue background task to execute job (with seed context)
+    background_tasks.add_task(
+        run_research_job, 
+        job_id, 
+        seed_facts=request.seed_facts,
+        error_feedback=request.error_feedback,
+    )
     
     return JobStatus(
         job_id=job_id,
