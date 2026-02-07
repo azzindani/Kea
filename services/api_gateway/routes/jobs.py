@@ -101,6 +101,8 @@ class JobStore:
         job_type: JobType,
         depth: int,
         max_sources: int,
+        seed_facts: list[dict] | None = None,  # Accepted but not stored - passed to background task
+        error_feedback: list[dict] | None = None,  # Accepted but not stored - passed to background task
     ) -> dict:
         """Create new job in database."""
         await self.initialize()
