@@ -554,12 +554,12 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
             state["stop_reason"] = "confidence_achieved"
             return state
         else:
-            logger.warning(f"Keeper: Confidence {agreement_score:.3f} < {current_threshold:.2f} - below standard")
+            logger.warning(f"Keeper: Confidence {confidence_score:.3f} < {current_threshold:.2f} - below standard")
         
         # If all tasks complete, stop regardless (but keep actual confidence score)
         if progress["completed_tasks"] >= progress["total_tasks"]:
             logger.info("Keeper: All execution plan tasks complete")
-            logger.info(f"   Final confidence: {agreement_score:.3f} (required: {current_threshold:.2f})")
+            logger.info(f"   Final confidence: {confidence_score:.3f} (required: {current_threshold:.2f})")
             state["should_continue"] = False
             return state
         
