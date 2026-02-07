@@ -551,9 +551,27 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
     
     if all_tools_succeeded and len(facts) >= sufficient_facts:
         logger.info(f"✅ Keeper: SUCCESS-BASED EXIT - All tools succeeded with {len(facts)} facts")
-        logger.info(f"   No need to continue - data collection complete")
+        
+        # CALCULATE CONFIDENCE before exiting (was missing before!)
+        query = state.get("query", "")
+        error_feedback = state.get("error_feedback", [])
+        completed_calls = state.get("completed_calls", set())
+        
+        grpo_scores = await calculate_grpo_reward(
+            facts=facts,
+            tool_invocations=tool_invocations,
+            query=query,
+            error_feedback=error_feedback,
+            completed_calls=completed_calls,
+        )
+        
+        confidence_score = grpo_scores["final_reward"]
+        state["confidence"] = confidence_score
+        state["grpo_scores"] = grpo_scores
         state["should_continue"] = False
-        state["stop_reason"] = "success_complete"
+        state["stop_reason"] = f"success_complete_{confidence_score:.0%}"
+        
+        logger.info(f"   GRPO Confidence: {confidence_score:.0%}")
         return state
     
     # ============================================================

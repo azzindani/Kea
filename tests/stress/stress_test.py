@@ -522,54 +522,22 @@ class TestStressQueries:
             assert metrics is not None, "Metrics should be collected"
             
             if metrics.success:
-                # Fixed efficiency threshold - NO DEGRADATION
-                # Quality should increase with evidence, not by lowering standards
+                # Report results - NO RETRIES (orchestrator handles internal iterations)
+                # The orchestrator's researcher_node has its own iteration loop that
+                # accumulates evidence. Retrying at stress test level restarts from scratch.
+                
+                target_efficiency = 0.95
+                
                 if metrics.llm_calls > 0:
-                    target_threshold = 0.95
-                    max_retries = 3
-                    
-                    best_efficiency = metrics.efficiency_ratio
-                    best_metrics = metrics
-                    
-                    # Check if we meet the high standard
-                    if metrics.efficiency_ratio >= target_threshold:
-                        logger.info(f"✅ Efficiency {metrics.efficiency_ratio:.2f} >= {target_threshold} - EXCELLENT")
+                    if metrics.efficiency_ratio >= target_efficiency:
+                        logger.info(f"✅ Efficiency {metrics.efficiency_ratio:.2f} >= {target_efficiency} - EXCELLENT")
                     else:
-                        # Try to improve with retries (gather more evidence)
                         logger.info(
-                            f"📊 Efficiency {metrics.efficiency_ratio:.2f} < {target_threshold:.2f}. "
-                            f"Retrying to gather more evidence..."
-                        )
-                        
-                        for retry in range(1, max_retries + 1):
-                            logger.info(f"🔄 Retry {retry}/{max_retries} for Query {query_id}...")
-                            retry_metrics = await runner.run_query(query)
-                            
-                            if not retry_metrics.success:
-                                logger.error(f"❌ Retry {retry} failed: {retry_metrics.error_message}")
-                                continue
-                            
-                            if retry_metrics.efficiency_ratio > best_efficiency:
-                                best_efficiency = retry_metrics.efficiency_ratio
-                                best_metrics = retry_metrics
-                                logger.info(f"📈 Improved to {best_efficiency:.2f}")
-                            
-                            if best_efficiency >= target_threshold:
-                                logger.info(f"✅ Target {target_threshold:.2f} achieved after {retry} retries!")
-                                break
-                        
-                        metrics = best_metrics
-                    
-                    # Report actual achieved efficiency (no failure for being below threshold)
-                    if metrics.efficiency_ratio >= target_threshold:
-                        logger.info(f"✅ Query {query_id} PASSED - Efficiency: {metrics.efficiency_ratio:.2f}")
-                    else:
-                        logger.warning(
-                            f"⚠️ Query {query_id} completed with efficiency {metrics.efficiency_ratio:.2f} "
-                            f"(target: {target_threshold:.2f}). Research quality may be lower than ideal."
+                            f"📊 Efficiency {metrics.efficiency_ratio:.2f} < {target_efficiency:.2f}. "
+                            f"Orchestrator's internal loop handles evidence collection."
                         )
                 
-                logger.info(f"✅ Query {query_id} COMPLETED (Final)")
+                logger.info(f"✅ Query {query_id} COMPLETED")
                 logger.info(f"   Efficiency ratio: {metrics.efficiency_ratio:.1f}x")
                 
                 # Verify Concurrency (Generic Check)
