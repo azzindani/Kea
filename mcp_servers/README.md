@@ -11,6 +11,20 @@ The `mcp_servers/` directory contains the **Model Context Protocol (MCP)** compl
 - **Stealth Browsing & Extraction**: High-fidelity scraping via Playwright with built-in anti-bot evasion and automatic markdown conversion.
 - **Zero-Trust Tooling**: Every tool execution is logged, audited, and resource-gated by the Swarm Manager.
 
+## ✅ Verification
+
+To verify that all MCP servers are correctly installed and can register their tools, run the connectivity test suite:
+
+```bash
+uv run pytest tests/mcp/test_server_connectivity.py -v -s
+```
+
+This command will:
+1.  **Discover** all servers in this directory.
+2.  **Spawn** each server using `uv` (installing dependencies JIT).
+3.  **Verify** that tools can be listed via the MCP protocol.
+
+
 ---
 
 ## 📐 Architecture

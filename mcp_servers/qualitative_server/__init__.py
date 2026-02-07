@@ -1,5 +1,5 @@
-# Qualitative Analysis MCP Server
-"""Qualitative research tools. Auto-discovered with actual export detection."""
+# Qualitative Server
+"""Auto-discovered with actual export detection."""
 
 from pathlib import Path
 from typing import Any
@@ -16,15 +16,15 @@ def _discover() -> dict:
     exports = {}
     for item in _DIR.iterdir():
         if item.is_file() and item.suffix == ".py" and item.name != "__init__.py":
-            module_path = f"mcp_servers.qualitative_server.{item.stem}"
+            module_path = f".{item.stem}"
             try:
-                module = importlib.import_module(module_path)
+                module = importlib.import_module(module_path, package=__name__)
                 for name in dir(module):
                     if not name.startswith("_"):
                         obj = getattr(module, name, None)
                         if isinstance(obj, type) or callable(obj):
                             exports[name] = module_path
-            except ImportError:
+            except Exception:
                 continue
     _discovered = exports
     return exports
@@ -42,4 +42,6 @@ def __dir__():
     return list(_discover().keys())
 
 
-__all__ = list(_discover())
+# Lazy discovery to prevent import loops
+# __all__ = list(_discover())
+__all__ = []
