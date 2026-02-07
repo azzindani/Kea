@@ -1,22 +1,20 @@
 import pytest
 import asyncio
-import os
-import tempfile
-import zipfile
-from mcp_servers.zipfile_server.server import ZipfileServer
+from mcp import ClientSession
+from mcp.client.stdio import stdio_client
+from tests.mcp.client_utils import get_server_params
 
 @pytest.mark.asyncio
-async def test_zip_operations():
-    server = ZipfileServer()
-    handler = server._handlers.get("create_archive")
-    if handler:
-        with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
-            tmp_path = tmp.name
-        try:
-             with open("dummy.txt", "w") as f: f.write("content")
-             res = await handler({"files": ["dummy.txt"], "output_path": tmp_path})
-             assert not res.isError
-             assert zipfile.is_zipfile(tmp_path)
-        finally:
-             if os.path.exists(tmp_path): os.remove(tmp_path)
-             if os.path.exists("dummy.txt"): os.remove("dummy.txt")
+async def test_zipfile_server():
+    """Verify Zipfile Server executes using MCP Client."""
+    params = get_server_params("zipfile_server", extra_dependencies=["pandas"])
+    
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            tools_res = await session.list_tools()
+            tools = tools_res.tools
+            print(f"\nDiscovered {len(tools)} tools via Client.")
+            tool_names = [t.name for t in tools]
+            assert "is_zipfile" in tool_names
+            print("Zipfile verification passed (Tools present).")

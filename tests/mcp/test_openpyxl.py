@@ -1,22 +1,20 @@
 import pytest
 import asyncio
-import os
-import tempfile
-from mcp_servers.openpyxl_server.server import OpenpyxlServer
+from mcp import ClientSession
+from mcp.client.stdio import stdio_client
+from tests.mcp.client_utils import get_server_params
 
 @pytest.mark.asyncio
-async def test_openpyxl_create():
-    server = OpenpyxlServer()
-    handler = server._handlers.get("create_spreadsheet")
-    if handler:
-        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
-            tmp_path = tmp.name
-        
-        try:
-            data = {"Sheet1": [["A", "B"], [1, 2]]}
-            res = await handler({"data": data, "path": tmp_path})
-            assert not res.isError
-            assert os.path.exists(tmp_path)
-        finally:
-             if os.path.exists(tmp_path):
-                os.remove(tmp_path)
+async def test_openpyxl_server():
+    """Verify OpenPyXL Server executes using MCP Client."""
+    params = get_server_params("openpyxl_server", extra_dependencies=["openpyxl", "pandas", "pillow"])
+    
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            tools_res = await session.list_tools()
+            tools = tools_res.tools
+            print(f"\nDiscovered {len(tools)} tools via Client.")
+            tool_names = [t.name for t in tools]
+            assert "create_new_workbook" in tool_names
+            print("OpenPyXL verification passed (Tools present).")

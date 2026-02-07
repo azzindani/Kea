@@ -7,7 +7,7 @@ from tests.mcp.client_utils import get_server_params
 @pytest.mark.asyncio
 async def test_finviz_server():
     """Verify Finviz Server executes using MCP Client."""
-    params = get_server_params("finviz_server", extra_dependencies=["finviz"])
+    params = get_server_params("finviz_server", extra_dependencies=["finvizfinance", "pandas"])
     
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:

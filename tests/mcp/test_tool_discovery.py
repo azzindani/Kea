@@ -1,14 +1,20 @@
 import pytest
 import asyncio
-from mcp_servers.tool_discovery_server.server import ToolDiscoveryServer
+from mcp import ClientSession
+from mcp.client.stdio import stdio_client
+from tests.mcp.client_utils import get_server_params
 
 @pytest.mark.asyncio
-async def test_tool_discovery():
-    server = ToolDiscoveryServer()
-    handler = server._handlers.get("find_tool")
-    if handler:
-        try:
-             res = await handler({"query": "stock price"})
-             assert not res.isError
-        except Exception:
-             pass
+async def test_tool_discovery_server():
+    """Verify Tool Discovery Server executes using MCP Client."""
+    params = get_server_params("tool_discovery_server", extra_dependencies=["httpx"])
+    
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            tools_res = await session.list_tools()
+            tools = tools_res.tools
+            print(f"\nDiscovered {len(tools)} tools via Client.")
+            tool_names = [t.name for t in tools]
+            assert "search_pypi" in tool_names
+            print("Tool Discovery verification passed (Tools present).")

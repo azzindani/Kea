@@ -7,7 +7,7 @@ from tests.mcp.client_utils import get_server_params
 @pytest.mark.asyncio
 async def test_lxml_server():
     """Verify LXML Server executes using MCP Client."""
-    params = get_server_params("lxml_server", extra_dependencies=["lxml"])
+    params = get_server_params("lxml_server", extra_dependencies=["lxml", "cssselect"])
     
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
