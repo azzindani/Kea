@@ -1,11 +1,74 @@
 
-from yahooquery import Ticker
+from yahooquery import Ticker, search
 import pandas as pd
 from shared.mcp.protocol import ToolResult, TextContent
 from shared.logging import get_logger
 import json
 
 logger = get_logger(__name__)
+
+
+# --- TICKER SEARCH HANDLER ---
+
+async def search_ticker_handler(query: str, limit: int = 10) -> str:
+    """
+    Search for stock ticker symbols by company name or keywords.
+    
+    Use this tool BEFORE calling financial tools when you're unsure of the exact ticker symbol.
+    For example: "BCA Bank Indonesia" -> "BBCA.JK"
+    
+    Args:
+        query: Company name or keywords to search for (e.g., "BCA Bank", "Bank Central Asia")
+        limit: Maximum number of results to return (default: 10)
+        
+    Returns:
+        JSON list of matching symbols with name, exchange, and type
+    """
+    if not query or not query.strip():
+        return "Error: No search query provided"
+    
+    try:
+        # Use yahooquery's search function
+        results = search(query)
+        
+        if not results:
+            return f"No results found for '{query}'"
+        
+        # Extract quotes (the ticker matches)
+        quotes = results.get("quotes", [])
+        
+        if not quotes:
+            return f"No ticker symbols found for '{query}'"
+        
+        # Limit results
+        quotes = quotes[:limit]
+        
+        # Format response
+        formatted = []
+        for q in quotes:
+            formatted.append({
+                "symbol": q.get("symbol", ""),
+                "name": q.get("shortname") or q.get("longname", ""),
+                "exchange": q.get("exchange", ""),
+                "type": q.get("quoteType", ""),
+                "score": q.get("score", 0),
+            })
+        
+        # Create markdown output for easy reading
+        output = f"### Ticker Search Results for '{query}'\n\n"
+        output += "| Symbol | Name | Exchange | Type |\n"
+        output += "|--------|------|----------|------|\n"
+        
+        for f in formatted:
+            output += f"| {f['symbol']} | {f['name'][:40]} | {f['exchange']} | {f['type']} |\n"
+        
+        output += f"\n**Top Match:** `{formatted[0]['symbol']}` ({formatted[0]['name']})\n"
+        
+        return output
+        
+    except Exception as e:
+        logger.error(f"Ticker search error for '{query}': {e}")
+        return f"Error searching for '{query}': {str(e)}"
 
 class SmartTicker:
     """

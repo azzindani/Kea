@@ -827,9 +827,13 @@ QUERY COMPLEXITY: {complexity.tier.value.upper()}
                     error_feedback_section += f"{i}. TOOL: {err.get('tool', 'unknown')}\n"
                     error_feedback_section += f"   FAILED ARGS: {err.get('args', {})}\n"
                     error_feedback_section += f"   ERROR: {err.get('error', 'unknown')[:200]}\n"
-                    error_feedback_section += f"   TASK: {err.get('description', '')[:100]}\n\n"
+                    error_feedback_section += f"   TASK: {err.get('description', '')[:100]}\n"
+                    # Include dynamic suggestion if present
+                    if err.get('suggestion'):
+                        error_feedback_section += f"   ➡️ SUGGESTION: {err.get('suggestion')}\n"
+                    error_feedback_section += "\n"
                 error_feedback_section += "CORRECTION GUIDANCE:\n"
-                error_feedback_section += "- If ticker was wrong (e.g., 'BBCA' failed), use correct exchange suffix (e.g., 'BBCA.JK')\n"
+                error_feedback_section += "- If ticker was wrong, use search_ticker('company name') to find the correct symbol FIRST\n"
                 error_feedback_section += "- If parameter was missing, ensure you include ALL required parameters from the schema\n"
                 error_feedback_section += "- If tool doesn't exist, use an alternative from the AVAILABLE TOOLS list\n"
 

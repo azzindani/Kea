@@ -174,6 +174,12 @@ class Microplanner:
                 "symbol not found",
                 "connection refused",
                 "timeout error",
+                # Ticker/data availability errors (indicates wrong ticker)
+                "data unavailable",
+                "balance sheet data unavailable",
+                "income statement data unavailable",
+                "cash flow data unavailable",
+                "no data available for",
             ]
             
             # Only trigger expansion if:

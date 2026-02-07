@@ -29,6 +29,24 @@ logger = structlog.get_logger()
 # Create the FastMCP server
 mcp = FastMCP("yahooquery_server", dependencies=["yahooquery", "pandas"])
 
+# --- Ticker Search Tool (USE FIRST when unsure of ticker symbol) ---
+@mcp.tool()
+async def search_ticker(query: str, limit: int = 5) -> str:
+    """ALWAYS USE THIS FIRST when you don't know the exact stock ticker symbol.
+    
+    Searches for stock ticker symbols by company name or keywords.
+    Example: search_ticker("BCA Bank Indonesia") returns "BBCA.JK"
+    
+    Args:
+        query: Company name or keywords (e.g., "BCA Bank", "Bank Central Asia", "Apple")
+        limit: Maximum results to return (default: 5)
+    
+    Returns:
+        Table of matching symbols with name, exchange, and type.
+        Use the symbol from the results in subsequent financial API calls.
+    """
+    return await ticker.search_ticker_handler(query, limit)
+
 # --- Core Ticker Tools ---
 @mcp.tool()
 async def get_fundamental_snapshot(tickers: str) -> str:

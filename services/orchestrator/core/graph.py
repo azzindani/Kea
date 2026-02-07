@@ -666,12 +666,35 @@ async def researcher_node(state: GraphState) -> GraphState:
                         None
                     )
                     if workflow_node:
+                        error_str = str(node_result.error or node_result.output or "Unknown error")[:500]
+                        
+                        # Detect ticker-related failures and add suggestions
+                        suggestion = ""
+                        error_lower = error_str.lower()
+                        ticker_error_patterns = [
+                            "data unavailable",
+                            "symbol not found", 
+                            "no data returned",
+                            "invalid ticker",
+                            "not found",
+                        ]
+                        if any(pattern in error_lower for pattern in ticker_error_patterns):
+                            # Extract ticker from args if present
+                            args = workflow_node.args or {}
+                            ticker_used = args.get("tickers") or args.get("ticker") or args.get("symbol") or ""
+                            suggestion = (
+                                f"TICKER ERROR: '{ticker_used}' may be incorrect. "
+                                f"Use search_ticker('{ticker_used}') to find the correct symbol. "
+                                f"For Indonesian stocks, use .JK suffix (e.g., BBCA.JK not BCA.JK)."
+                            )
+                        
                         error_feedback.append({
                             "tool": workflow_node.tool or "unknown",
                             "task_id": node_id,
-                            "error": str(node_result.error or node_result.output or "Unknown error")[:500],
+                            "error": error_str,
                             "args": workflow_node.args or {},
                             "description": workflow_node.description or "",
+                            "suggestion": suggestion,  # Dynamic suggestion for self-correction
                         })
                         logger.warning(
                             f"📝 Captured error for LLM feedback: {workflow_node.tool} - "
