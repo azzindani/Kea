@@ -438,7 +438,9 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
     
     config = _get_config()
     iteration = state.get("iteration", 0)
-    max_iterations = state.get("max_iterations", config.loop_safety.max_global_iterations)
+    # Sensible cap: Even if config allows more, limit to 5 iterations for most queries
+    config_max = state.get("max_iterations", config.loop_safety.max_global_iterations)
+    max_iterations = min(config_max, 5)  # Hard cap at 5 iterations
     query = state.get("query", "")
     facts = state.get("facts", [])
     job_id = state.get("job_id", "unknown")
@@ -511,7 +513,47 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
     # ============================================================
     if iteration >= max_iterations:
         logger.info(f"Keeper: Max iterations ({max_iterations}) reached")
+        logger.info(f"   Proceeding to final report with achieved confidence score")
+        
+        # Calculate GRPO score even when exiting due to max iterations
+        # This ensures the final report shows the actual achieved confidence
+        query = state.get("query", "")
+        error_feedback = state.get("error_feedback", [])
+        completed_calls = state.get("completed_calls", set())
+        
+        grpo_scores = await calculate_grpo_reward(
+            facts=facts,
+            tool_invocations=tool_invocations,
+            query=query,
+            error_feedback=error_feedback,
+            completed_calls=completed_calls,
+        )
+        
+        confidence_score = grpo_scores["final_reward"]
+        state["confidence"] = confidence_score
+        state["grpo_scores"] = grpo_scores
+        state["stop_reason"] = f"max_iterations_with_{confidence_score:.0%}_confidence"
+        
+        logger.info(f"   Final GRPO confidence: {confidence_score:.0%}")
         state["should_continue"] = False
+        return state
+    
+    # ============================================================
+    # SUCCESS-BASED EARLY EXIT (prevents infinite looping)
+    # When ALL tools succeed AND we have sufficient facts, STOP
+    # ============================================================
+    sufficient_facts = 5  # Minimum facts to consider research "complete"
+    all_tools_succeeded = (
+        progress["total_tasks"] > 0 and 
+        progress["failed_tasks"] == 0 and
+        progress["completed_tasks"] >= progress["total_tasks"]
+    )
+    
+    if all_tools_succeeded and len(facts) >= sufficient_facts:
+        logger.info(f"✅ Keeper: SUCCESS-BASED EXIT - All tools succeeded with {len(facts)} facts")
+        logger.info(f"   No need to continue - data collection complete")
+        state["should_continue"] = False
+        state["stop_reason"] = "success_complete"
         return state
     
     # ============================================================
