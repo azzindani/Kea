@@ -44,6 +44,25 @@ async def test_numpy_real_simulation():
             res = await session.call_tool("rand_normal", arguments={"size": [2, 2]})
             print(f" [PASS] Random: {res.content[0].text}")
 
+            # 6. Manipulation (Reshape)
+            print("6. Reshape...")
+            flat = [1, 2, 3, 4]
+            res = await session.call_tool("reshape", arguments={"a": flat, "newshape": [2, 2]})
+            if not res.isError:
+                 print(f" [PASS] Reshaped: {res.content[0].text}")
+
+            # 7. Logic
+            print("7. Logical AND...")
+            res = await session.call_tool("logical_and", arguments={"x1": [True, False], "x2": [True, True]})
+            if not res.isError:
+                 print(f" [PASS] Logic: {res.content[0].text}")
+
+            # 8. Solve Linear Equation
+            print("8. Solve (Ax = b)...")
+            res = await session.call_tool("solve", arguments={"a": [[3, 1], [1, 2]], "b": [9, 8]})
+            if not res.isError:
+                 print(f" [PASS] Solution: {res.content[0].text}")
+
     print("--- Numpy Simulation Complete ---")
 
 if __name__ == "__main__":

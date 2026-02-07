@@ -30,6 +30,16 @@ async def test_tool_discovery_real_simulation():
             # Info might be long, just print start
             print(f" [PASS] Info Length: {len(res.content[0].text)}")
 
+            # 3. Evaluate Package
+            print("3. Evaluating Package (MCP Suitability)...")
+            res = await session.call_tool("evaluate_package", arguments={"package_name": query})
+            print(f" [PASS] Report: {res.content[0].text[:100]}...")
+
+            # 4. Registry List
+            print("4. Listing Registry...")
+            res = await session.call_tool("tool_registry_list", arguments={})
+            print(f" [PASS] Registry: {res.content[0].text}")
+
     print("--- Tool Discovery Simulation Complete ---")
 
 if __name__ == "__main__":

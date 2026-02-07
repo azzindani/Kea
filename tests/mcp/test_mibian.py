@@ -9,7 +9,7 @@ async def test_mibian_real_simulation():
     """
     REAL SIMULATION: Verify Mibian Server (Options Pricing).
     """
-    params = get_server_params("mibian_server", extra_dependencies=[])
+    params = get_server_params("mibian_server", extra_dependencies=["mibian"])
     
     # BS Parameters
     S = 100  # Underlying Price
@@ -59,6 +59,19 @@ async def test_mibian_real_simulation():
             res = await session.call_tool("calculate_implied_volatility", arguments=iv_args)
             if not res.isError:
                 print(f" [PASS] IV: {res.content[0].text}%")
+
+            # 4. Bulk Option Chain
+            print("4. Option Chain (S=100, K=[90,100,110])...")
+            chain_args = {
+                "underlyingPrice": S,
+                "strikes": [90, 100, 110],
+                "interestRate": r,
+                "daysToExpiration": t,
+                "volatility": v
+            }
+            res = await session.call_tool("price_option_chain", arguments=chain_args)
+            if not res.isError:
+                 print(f" [PASS] Chain: {res.content[0].text[:100]}...")
 
     print("--- Mibian Simulation Complete ---")
 

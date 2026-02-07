@@ -48,8 +48,14 @@ async def test_finta_real_simulation():
             if not res.isError:
                  print(f" [PASS] BBands Data: {res.content[0].text[:100]}...")
             
-            # 4. Bulk All
-            print("4. Calculating ALL Indicators (Bulk)...")
+            # 4. Ichimoku (Cloud)
+            print("4. Calculating Ichimoku (Cloud)...")
+            res = await session.call_tool("calculate_ichimoku", arguments={"data": data})
+            if not res.isError:
+                 print(f" [PASS] Ichimoku Data: {res.content[0].text[:100]}...")
+
+            # 5. Bulk All
+            print("5. Calculating ALL Indicators (Bulk)...")
             res = await session.call_tool("get_all_indicators", arguments={"data": data})
             if not res.isError:
                 print(f" [PASS] Bulk Result Length: {len(res.content[0].text)}")

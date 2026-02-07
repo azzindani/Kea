@@ -45,6 +45,25 @@ async def test_shutil_real_simulation():
             res = await session.call_tool("get_disk_usage", arguments={"path": "."})
             print(f" [PASS] Usage: {res.content[0].text}")
 
+            # 5. Archive
+            print("5. Archiving...")
+            # Create a dummy dir to archive
+            dummy_dir = f"{test_dir}/archive_me"
+            if not os.path.exists(dummy_dir): os.makedirs(dummy_dir)
+            with open(f"{dummy_dir}/f1.txt", "w") as f: f.write("content")
+            
+            await session.call_tool("make_archive", arguments={"base_name": f"{test_dir}/my_archive", "format": "zip", "root_dir": dummy_dir})
+            
+            # 6. Bulk Copy
+            print("6. Bulk Copy...")
+            bulk_dest = f"{test_dir}/bulk_dest"
+            if not os.path.exists(bulk_dest): os.makedirs(bulk_dest)
+            await session.call_tool("bulk_copy_files", arguments={"files": [f"{dummy_dir}/f1.txt"], "destination_dir": bulk_dest})
+
+            # 7. Super Tools
+            print("7. Super Tools (Organize)...")
+            await session.call_tool("organize_by_extension", arguments={"directory": bulk_dest})
+
     # Cleanup
     import shutil
     if os.path.exists(test_dir):

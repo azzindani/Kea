@@ -54,6 +54,37 @@ async def test_duckdb_real_simulation():
                     print(" [INFO] Spatial extension might need loading (install_extension spatial)")
             except Exception as e:
                 print(f" [WARN] Spatial test skipped: {e}")
+            
+            # 8. Import/Export
+            print("7. Import/Export (CSV)...")
+            csv_path = "test_export.csv"
+            try:
+                # Direct export first
+                res = await session.call_tool("export_csv", arguments={"table_or_query": "users", "file_path": csv_path})
+                if not res.isError:
+                    print(f" [PASS] Export CSV: {res.content[0].text}")
+                else:
+                    print(f" [FAIL] Export CSV: {res.content[0].text}")
+            except Exception as e:
+                 print(f" [WARN] Export failed: {e}")
+                
+            # 9. Full Text Search
+            print("8. Full Text Search...")
+            try:
+                # Create FTS index on 'name'
+                res = await session.call_tool("fts_create_index", arguments={"table_name": "users", "id_col": "id", "text_cols": ["name"]})
+                if not res.isError:
+                    res = await session.call_tool("fts_search", arguments={"table_name": "users", "keyword": "Alice"})
+                    print(f" [PASS] FTS Search: {res.content[0].text}")
+                else:
+                    print(f" [INFO] FTS not available or failed: {res.content[0].text}")
+            except Exception as e:
+                print(f" [WARN] FTS failed: {e}")
+
+            if os.path.exists(csv_path):
+                try:
+                    os.remove(csv_path)
+                except: pass
 
             # 7. Cleanup
             await session.call_tool("drop_table", arguments={"table_name": "users"})

@@ -31,6 +31,18 @@ async def test_wbgapi_real_simulation():
             res = await session.call_tool("search_economies", arguments={"query": "United"})
             print(f" [PASS] Matches: {res.content[0].text}")
 
+            # 3. Get Topic
+            print("3. Getting Topic (3)...")
+            res = await session.call_tool("get_topic", arguments={"topic_id": 3}) # Economy & Growth
+            if not res.isError:
+                 print(f" [PASS] Topic: {res.content[0].text}")
+
+            # 4. List Regions
+            print("4. Listing Regions...")
+            res = await session.call_tool("list_regions", arguments={})
+            if not res.isError:
+                 print(f" [PASS] Regions: {res.content[0].text[:50]}...")
+
     print("--- World Bank Simulation Complete ---")
 
 if __name__ == "__main__":

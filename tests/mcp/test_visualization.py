@@ -49,6 +49,18 @@ async def test_visualization_real_simulation():
             if not res.isError:
                  print(f" [PASS] Heatmap Created")
 
+            # 3. Distribution Plot
+            print("3. Creating Distribution Plot...")
+            res = await session.call_tool("create_distribution_plot", arguments={"data_url": abs_path, "columns": ["y"]})
+            if not res.isError:
+                 print(f" [PASS] Distribution Created")
+
+            # 4. Pairplot
+            print("4. Creating Pairplot...")
+            res = await session.call_tool("create_pairplot", arguments={"data_url": abs_path, "columns": ["x", "y"], "color_column": "category"})
+            if not res.isError:
+                 print(f" [PASS] Pairplot Created")
+
     # Cleanup
     if os.path.exists(csv_path):
         os.remove(csv_path)

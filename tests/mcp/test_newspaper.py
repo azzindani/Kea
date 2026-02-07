@@ -9,7 +9,7 @@ async def test_newspaper_real_simulation():
     """
     REAL SIMULATION: Verify Newspaper Server (Article Extraction).
     """
-    params = get_server_params("newspaper_server", extra_dependencies=["newspaper3k"])
+    params = get_server_params("newspaper_server", extra_dependencies=["newspaper3k", "lxml[html_clean]"])
     
     # Real URL - Using a stable tech news article or main page
     # Let's use a BBC article or similar. 

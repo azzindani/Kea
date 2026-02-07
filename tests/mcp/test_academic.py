@@ -63,6 +63,17 @@ async def test_academic_real_simulation():
                 else:
                      print(f" [FAIL] {res.content[0].text}")
 
+            # 6. Paper Downloader
+            if "paper_downloader" in tool_names:
+                # Use open access DOI
+                doi = "10.1371/journal.pcbi.1004668" 
+                print(f"5. Testing Paper Downloader ('{doi}')...")
+                res = await session.call_tool("paper_downloader", arguments={"doi": doi})
+                if not res.isError:
+                     print(f" [PASS] Result: {res.content[0].text}")
+                else:
+                     print(f" [WARN] Download failed (expected in some envs): {res.content[0].text}")
+
     print("--- Academic Simulation Complete ---")
 
 if __name__ == "__main__":

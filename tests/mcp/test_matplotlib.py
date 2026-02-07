@@ -59,6 +59,34 @@ async def test_matplotlib_real_simulation():
                      except:
                         pass
 
+            # 4. Histogram
+            print("4. Plotting Histogram...")
+            import numpy as np
+            data = np.random.randn(100).tolist()
+            res = await session.call_tool("plot_hist", arguments={"x": data, "title": "Hist Test"})
+            if not res.isError:
+                 print(f" [PASS] Hist Saved: {res.content[0].text}")
+            
+            # 5. Heatmap
+            print("5. Plotting Heatmap...")
+            matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+            res = await session.call_tool("plot_heatmap", arguments={"data": matrix, "title": "Heatmap Test"})
+            if not res.isError:
+                 print(f" [PASS] Heatmap Saved: {res.content[0].text}")
+                 
+            # 6. 3D Surface
+            print("6. Plotting 3D Surface...")
+            # Simple meshgrid data simulation
+            X = [[-1, 0, 1], [-1, 0, 1], [-1, 0, 1]]
+            Y = [[-1, -1, -1], [0, 0, 0], [1, 1, 1]]
+            Z = [[1, 0, 1], [0, 0, 0], [1, 0, 1]]
+            res = await session.call_tool("plot_surface", arguments={"X": X, "Y": Y, "Z": Z, "title": "3D Test"})
+            if not res.isError:
+                 print(f" [PASS] 3D Saved: {res.content[0].text}")
+                 
+            # Cleanup all
+            # (Assuming cleanup logic is improved or just manual check)
+
     print("--- Matplotlib Simulation Complete ---")
 
 if __name__ == "__main__":

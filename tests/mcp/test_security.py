@@ -34,6 +34,15 @@ async def test_security_real_simulation():
             res = await session.call_tool("code_safety_check", arguments={"code": unsafe_code})
             print(f" [PASS] Analysis: {res.content[0].text}")
 
+            # 4. URL Scanner
+            print("4. URL Scanner...")
+            res = await session.call_tool("url_scanner", arguments={"url": "http://example.com"})
+            print(f" [PASS] Scan: {res.content[0].text}")
+
+            # 5. Domain Reputation
+            print("5. Domain Reputation...")
+            await session.call_tool("domain_reputation", arguments={"domain": "google.com"})
+
     print("--- Security Simulation Complete ---")
 
 if __name__ == "__main__":

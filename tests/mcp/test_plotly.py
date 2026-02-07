@@ -57,6 +57,20 @@ async def test_plotly_real_simulation():
                     try: os.remove(path)
                     except: pass
 
+            # 4. Candlestick
+            print("4. Plotting Candlestick...")
+            ohlc = [
+                {"x": "2023-01-01", "open": 10, "high": 15, "low": 5, "close": 12},
+                {"x": "2023-01-02", "open": 12, "high": 18, "low": 10, "close": 15}
+            ]
+            res = await session.call_tool("plot_candlestick", arguments={"data": ohlc, "x": "x", "open": "open", "high": "high", "low": "low", "close": "close"})
+            if not res.isError:
+                 print(f" [PASS] Candlestick created")
+                 path = res.content[0].text
+                 if os.path.exists(path):
+                    try: os.remove(path)
+                    except: pass
+
     print("--- Plotly Simulation Complete ---")
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ async def test_scraper_real_simulation():
     """
     REAL SIMULATION: Verify Scraper Server (Web Scraping).
     """
-    params = get_server_params("scraper_server", extra_dependencies=[])
+    params = get_server_params("scraper_server", extra_dependencies=["playwright", "lxml"])
     
     url = "https://example.com"
     
@@ -27,13 +27,14 @@ async def test_scraper_real_simulation():
             else:
                  print(f" [FAIL] {res.content[0].text}")
 
-            # 2. Browser Scrape (if installed)
-            # Might invoke playwright, skipping to avoid dependency hell if not configured
-            # But checking if tool exists
-            tools = await session.list_tools()
-            tool_names = [t.name for t in tools.tools]
-            if "browser_scrape_page" in tool_names:
-                print("2. Browser Scrape (Skipping for speed/stability)...")
+            # 2. Browser Scrape
+            print("2. Browser Scrape...")
+            # We assume playwright is installed with the server dependencies
+            res = await session.call_tool("browser_scrape_page", arguments={"url": url, "screenshot": True})
+            if not res.isError:
+                 print(f" [PASS] Browser scrape successful")
+            else:
+                 print(f" [WARN] Browser scrape failed (maybe browser not installed): {res.content[0].text}")
 
     print("--- Scraper Simulation Complete ---")
 

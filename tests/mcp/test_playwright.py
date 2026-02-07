@@ -47,6 +47,14 @@ async def test_playwright_real_simulation():
                 if os.path.exists(screenshot_path):
                     os.remove(screenshot_path)
 
+            # 5. Input Operations (Type/Click)
+            # Using a simple input on example.com (it has a search box on some versions, or we can just try typing into body to test the tool won't crash)
+            # Actually example.com is static. Let's just try to get element text of h1 to verify DOM tool again, or try to 'click' the link.
+            print("5. Clicking Element...")
+            res = await session.call_tool("click_element", arguments={"selector": "a"}) # The 'More information' link
+            if not res.isError:
+                 print(f" [PASS] Clicked link")
+
     print("--- Playwright Simulation Complete ---")
 
 if __name__ == "__main__":

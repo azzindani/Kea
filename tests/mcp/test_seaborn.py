@@ -49,7 +49,18 @@ async def test_seaborn_real_simulation():
                     try: os.remove(path)
                     except: pass
 
-            # 3. Auto Plot
+            # 3. Complex Plots
+            print("3. Complex Plots...")
+            await session.call_tool("boxplot", arguments={"data": data, "x": "group", "y": "y"})
+            await session.call_tool("violinplot", arguments={"data": data, "x": "group", "y": "y"})
+            
+            # Heatmap requires matrix data
+            matrix = [{"a": 1, "b": 2}, {"a": 3, "b": 4}]
+            await session.call_tool("heatmap", arguments={"data": matrix})
+            
+            await session.call_tool("pairplot", arguments={"data": data})
+
+            # 4. Auto Plot
             print("3. Auto Plot...")
             res = await session.call_tool("auto_plot", arguments={"data": data, "x": "x", "y": "y"})
             if not res.isError:

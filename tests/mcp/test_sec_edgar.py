@@ -33,7 +33,23 @@ async def test_sec_edgar_real_simulation():
             # 2. List Filings
             print(f"2. Listing Filings for {ticker}...")
             res = await session.call_tool("list_filings", arguments={"ticker": ticker})
-            print(f" [PASS] Listings: {res.content[0].text}")
+            print(f" [PASS] Listings: {res.content[0].text[:100]}...")
+
+            # 3. Latest 8-K
+            print(f"3. Downloading latest 8-K for {ticker}...")
+            res = await session.call_tool("get_8k_latest", arguments={"ticker": ticker})
+            if not res.isError:
+                 print(f" [PASS] 8-K Path: {res.content[0].text}")
+
+            # 4. Search in Filing (using previous path if available, else skip)
+            # For simulation, we assume some filing exists or we search library
+            print("4. Searching Library...")
+            await session.call_tool("search_all_filings", arguments={"query": "revenue", "ticker": ticker})
+
+            # 5. Sentiment
+            print("5. Sentiment Analysis...")
+            # We can pass text directly to avoid file I/O dependencies in simulation
+            await session.call_tool("get_filing_sentiment", arguments={"text": "The company performed very well and revenue increased significantly."})
 
     print("--- SEC Edgar Simulation Complete ---")
 

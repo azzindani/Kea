@@ -10,6 +10,7 @@ if root_path not in sys.path:
 # dependencies = [
 #   "mcp",
 #   "structlog",
+#   "xmltodict",
 # ]
 # ///
 

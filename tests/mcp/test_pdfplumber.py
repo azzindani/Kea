@@ -51,6 +51,18 @@ async def test_pdfplumber_real_simulation():
             res = await session.call_tool("extract_tables", arguments={"path": pdf_file, "page_number": 1})
             print(f" [PASS] Tables found")
 
+            # 5. Extract Images
+            print("5. Extracting Images...")
+            res = await session.call_tool("extract_images", arguments={"path": pdf_file, "page_number": 1})
+            if not res.isError:
+                 print(f" [PASS] Images extracted")
+
+            # 6. Extract Hyperlinks
+            print("6. Extracting Hyperlinks...")
+            res = await session.call_tool("extract_hyperlinks", arguments={"path": pdf_file, "page_number": 1})
+            if not res.isError:
+                 print(f" [PASS] Hyperlinks extracted")
+
     # Cleanup
     if os.path.exists(pdf_file):
         try:

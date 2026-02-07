@@ -92,6 +92,27 @@ async def test_bs4_real_simulation():
             res = await session.call_tool("to_markdown", arguments={"soup_id": soup_id})
             if not res.isError:
                 print(f" [PASS] Markdown Preview:\n{res.content[0].text[:100]}...")
+
+            # 8. Super Tools
+            print("7. Super Tools (bulk_extract)...")
+            res = await session.call_tool("bulk_extract", arguments={
+                "selector_map": {"title": "h1", "desc": ".desc"},
+                "soup_id": soup_id
+            })
+            if not res.isError:
+                print(f" [PASS] Bulk: {res.content[0].text}")
+            
+            print("   Super Tools (view_tree)...")
+            res = await session.call_tool("view_tree", arguments={"soup_id": soup_id, "depth": 2})
+            if not res.isError:
+                print(f" [PASS] Tree:\n{res.content[0].text[:100]}...")
+
+            print("   Super Tools (extract_table)...")
+            # Create a table first since none exists
+            await session.call_tool("insert_after", arguments={"selector": "h1", "html": "<table><tr><td>A</td><td>B</td></tr><tr><td>1</td><td>2</td></tr></table>", "soup_id": soup_id})
+            res = await session.call_tool("extract_table", arguments={"soup_id": soup_id})
+            if not res.isError:
+                print(f" [PASS] Table: {res.content[0].text}")
             
             # 8. Cleanup
             await session.call_tool("close_soup", arguments={"soup_id": soup_id})

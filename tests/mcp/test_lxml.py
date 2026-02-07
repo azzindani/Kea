@@ -9,7 +9,7 @@ async def test_lxml_real_simulation():
     """
     REAL SIMULATION: Verify LXML Server (XML Parsing, XPath).
     """
-    params = get_server_params("lxml_server", extra_dependencies=["lxml"])
+    params = get_server_params("lxml_server", extra_dependencies=["lxml", "cssselect"])
     
     xml_content = """
     <library>
@@ -54,6 +54,19 @@ async def test_lxml_real_simulation():
             print("4. XML to Dict...")
             res = await session.call_tool("xml_to_dict_lxml", arguments={"xml_input": xml_content})
             print(f" [PASS] Dict: {res.content[0].text[:100]}...")
+            
+            # 5. Transform
+            print("5. Transforming (Absolute Links)...")
+            html_with_rel = '<html><body><a href="page.html">Link</a></body></html>'
+            res = await session.call_tool("make_links_absolute", arguments={"html_input": html_with_rel, "base_url": "http://example.com/"})
+            if not res.isError:
+                 print(f" [PASS] Absolute: {res.content[0].text}")
+            
+            print("6. Cleaning HTML...")
+            dirty = '<div><script>bad</script>Good</div>'
+            res = await session.call_tool("clean_html", arguments={"html_input": dirty})
+            if not res.isError:
+                 print(f" [PASS] Clean: {res.content[0].text}")
 
     print("--- LXML Simulation Complete ---")
 

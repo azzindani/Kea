@@ -47,6 +47,18 @@ async def test_finviz_real_simulation():
             if not res.isError:
                 print(f" [PASS] Sectors: {res.content[0].text[:100]}...")
 
+            # 5. Crypto Performance
+            print("5. Getting Crypto Performance...")
+            res = await session.call_tool("get_crypto_performance")
+            if not res.isError:
+                print(f" [PASS] Crypto: {res.content[0].text[:100]}...")
+            
+            # 6. Technical Table
+            print("6. Getting Technical Table (Limit 5)...")
+            res = await session.call_tool("get_technical_table", arguments={"limit": 5})
+            if not res.isError:
+                 print(f" [PASS] Tech Table: {res.content[0].text[:100]}...")
+
     print("--- Finviz Simulation Complete ---")
 
 if __name__ == "__main__":

@@ -30,24 +30,44 @@ async def test_ffmpeg_real_simulation():
                 res = await session.call_tool("get_ffmpeg_version")
                 print(f" [PASS] Version: {res.content[0].text}")
 
-            # 3. Validation (Dummy File)
-            print("3. Validating 'test_video.mp4' (Non-existent)...")
-            res = await session.call_tool("validate_media_file", arguments={"path": "non_existent_video.mp4"})
-            print(f" [PASS] Validation Result: {res.content[0].text}")
-            
-            # 4. Create dummy file to test probe failure gracefully
-            with open("dummy_test.txt", "w") as f:
-                f.write("Not a video")
-            
-            print("4. Probing Invalid File...")
+            # 3. Create Test Video (Active Simulation)
+            print("3. Generating Test Video (color test source)...")
             try:
-                res = await session.call_tool("probe_file", arguments={"path": "dummy_test.txt"})
-                print(f" [INFO] Probe Result: {res.content[0].text}")
-            except Exception as e:
-                print(f" [PASS] Probe failed as expected: {e}")
+                import ffmpeg
+                test_video = "test_gen.mp4"
+                test_output = "test_out.mkv"
+            
+                # Generate 3 seconds of video
+                ffmpeg.input('testsrc=size=320x240:rate=30', f='lavfi').output(test_video, t=3).overwrite_output().run(quiet=True)
+                print(" [PASS] Test video generated")
                 
-            if os.path.exists("dummy_test.txt"):
-                os.remove("dummy_test.txt")
+                # 4. Probe & Info
+                print("4. Probing & Info...")
+                res = await session.call_tool("probe_file", arguments={"path": test_video})
+                if not res.isError:
+                    print(f" [PASS] Probe: {res.content[0].text[:50]}...")
+                
+                res = await session.call_tool("get_duration", arguments={"path": test_video})
+                print(f" [PASS] Duration: {res.content[0].text}")
+
+                res = await session.call_tool("get_resolution", arguments={"path": test_video})
+                print(f" [PASS] Resolution: {res.content[0].text}")
+
+                # 5. Conversion
+                print("5. Converting to MKV...")
+                res = await session.call_tool("convert_format", arguments={"input_path": test_video, "output_path": test_output})
+                if not res.isError:
+                     print(f" [PASS] Conversion: {res.content[0].text}")
+                
+            except ImportError:
+                print(" [WARN] ffmpeg-python not installed in test env. Skipping generation.")
+            except Exception as e:
+                print(f" [WARN] FFmpeg generation/test failed: {e}")
+
+            # Cleanup
+            if os.path.exists(test_video): os.remove(test_video)
+            if os.path.exists(test_output): os.remove(test_output)
+            if os.path.exists("dummy_test.txt"): os.remove("dummy_test.txt")
 
     print("--- FFmpeg Simulation Complete ---")
 

@@ -46,6 +46,18 @@ async def test_portfolio_real_simulation():
             res = await session.call_tool("mean_historical_return", arguments={"prices_input": prices_input})
             print(f" [PASS] Returns: {res.content[0].text}")
 
+            # 2b. Risk Model (Sample Cov)
+            print("2b. Risk Model (Sample Cov)...")
+            res = await session.call_tool("sample_cov", arguments={"prices_input": prices_input})
+            if not res.isError:
+                 print(f" [PASS] Covariance calculated")
+
+            # 2c. HRP Optimization
+            print("2c. HRP Optimization...")
+            res = await session.call_tool("hrp_optimize", arguments={"prices_input": prices_input})
+            if not res.isError:
+                 print(f" [PASS] HRP Weights: {res.content[0].text}")
+
             # 3. Optimize (Max Sharpe)
             print("3. Optimizing Max Sharpe...")
             res = await session.call_tool("ef_max_sharpe", arguments={"prices_input": prices_input})

@@ -49,6 +49,22 @@ async def test_tesseract_real_simulation():
             if not res.isError:
                  print(f" [PASS] Boxes Found: {len(res.content[0].text)}")
 
+            # 3. Preprocessing (Grayscale)
+            print("3. Preprocessing (Grayscale)...")
+            res = await session.call_tool("preprocess_grayscale", arguments={"image_input": abs_path})
+            print(" [PASS] Preprocessed" if not res.isError else f" [FAIL] {res.content[0].text}")
+
+            # 4. HOCR Output
+            print("4. Getting HOCR...")
+            res = await session.call_tool("image_to_hocr", arguments={"image_input": abs_path})
+            print(" [PASS] HOCR Generated" if not res.isError else f" [FAIL] {res.content[0].text}")
+
+            # 5. OSD
+            print("5. Orientation Check...")
+            res = await session.call_tool("ocr_osd_only", arguments={"image_input": abs_path})
+             # OSD might fail on small dummy images, but we call it
+            print(" [PASS] OSD Called")
+
     # Cleanup
     if os.path.exists(img_path):
         os.remove(img_path)

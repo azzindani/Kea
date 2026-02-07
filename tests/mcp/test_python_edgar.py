@@ -35,6 +35,12 @@ async def test_python_edgar_real_simulation():
             res = await session.call_tool("find_filings", arguments={"ticker": ticker, "form": "10-K", "limit": 1})
             if not res.isError:
                  print(f" [PASS] Filings found")
+            
+            # 3. Filing Sections
+            print("3. Getting Filing Sections...")
+            res = await session.call_tool("get_filing_sections", arguments={"ticker": ticker, "form": "10-K"})
+            if not res.isError:
+                 print(f" [PASS] Sections listed")
 
     print("--- Python Edgar Simulation Complete ---")
 

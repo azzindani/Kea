@@ -45,6 +45,41 @@ async def test_document_real_simulation():
             else:
                 print(f" [FAIL] {res.content[0].text}")
 
+            if not res.isError:
+                print(f" [PASS] JSON Content: {res.content[0].text}")
+            else:
+                print(f" [FAIL] {res.content[0].text}")
+
+            # 4. Docx Parser
+            print("4. Docx Parser (Create dummy)...")
+            import docx
+            doc = docx.Document()
+            doc.add_paragraph("Hello from Document Server Test")
+            doc.save("test_doc_parser.docx")
+            
+            res = await session.call_tool("docx_parser", arguments={"url": "test_doc_parser.docx"})
+            if not res.isError:
+                print(f" [PASS] Docx Text: {res.content[0].text}")
+            else:
+                print(f" [FAIL] {res.content[0].text}")
+                
+            # 5. Xlsx Parser
+            print("5. Xlsx Parser (Create dummy)...")
+            import pandas as pd
+            df = pd.DataFrame({"A": [1, 2], "B": [3, 4]})
+            df.to_excel("test_doc_parser.xlsx", index=False)
+            
+            res = await session.call_tool("xlsx_parser", arguments={"url": "test_doc_parser.xlsx"})
+            if not res.isError:
+                print(f" [PASS] Xlsx Content: {res.content[0].text}")
+            else:
+                print(f" [FAIL] {res.content[0].text}")
+
+            # Cleanup
+            import os
+            if os.path.exists("test_doc_parser.docx"): os.remove("test_doc_parser.docx")
+            if os.path.exists("test_doc_parser.xlsx"): os.remove("test_doc_parser.xlsx")
+
     print("--- Document Simulation Complete ---")
 
 if __name__ == "__main__":

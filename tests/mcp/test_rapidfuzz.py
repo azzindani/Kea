@@ -36,6 +36,25 @@ async def test_rapidfuzz_real_simulation():
             res = await session.call_tool("deduplicate_list", arguments={"items": dupes})
             print(f" [PASS] Unique: {res.content[0].text}")
 
+            # 4. Distances
+            print("4. Distances...")
+            await session.call_tool("levenshtein_distance", arguments={"s1": "kitten", "s2": "sitting"})
+            await session.call_tool("jaro_winkler_similarity", arguments={"s1": "shackleford", "s2": "shackelford"})
+
+            # 5. Matrix & Process
+            print("5. Matrix & Process...")
+            await session.call_tool("cdist_distance", arguments={"queries": ["cat"], "choices": ["cat", "dog"], "metric": "Levenshtein"})
+            await session.call_tool("extractOne", arguments={"query": "apple", "choices": choices})
+
+            # 6. Super Tools
+            print("6. Super Tools...")
+            await session.call_tool("cluster_strings", arguments={"items": ["apple", "aple", "banana", "banan"]})
+            await session.call_tool("fuzzy_merge_datasets", arguments={
+                "list_a": [{"name": "Apple", "val": 1}],
+                "list_b": [{"name": "Aple", "val": 2}],
+                "key_a": "name", "key_b": "name"
+            })
+
     print("--- RapidFuzz Simulation Complete ---")
 
 if __name__ == "__main__":

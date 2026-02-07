@@ -62,6 +62,18 @@ async def test_networkx_real_simulation():
             if not res.isError:
                  print(f" [PASS] Communities found")
 
+            # 5. MST
+            print("5. Minimum Spanning Tree...")
+            res = await session.call_tool("minimum_spanning_tree", arguments={"graph": graph})
+            if not res.isError:
+                 print(f" [PASS] MST Calculated")
+
+            # 6. PageRank
+            print("6. PageRank...")
+            res = await session.call_tool("pagerank", arguments={"graph": graph})
+            if not res.isError:
+                 print(f" [PASS] PageRank Calculated")
+
     print("--- NetworkX Simulation Complete ---")
 
 if __name__ == "__main__":

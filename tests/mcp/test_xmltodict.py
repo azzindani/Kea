@@ -32,6 +32,13 @@ async def test_xmltodict_real_simulation():
             if not res.isError:
                  print(f" [PASS] XML Output: {res.content[0].text}")
 
+            # 3. Valid Tool Call (Unparse Pretty)
+            print("3. Unparsing Dict (Pretty)...")
+            data = {"root": {"status": "ok", "value": "100"}}
+            res = await session.call_tool("unparse_dict_pretty", arguments={"data": data})
+            if not res.isError:
+                 print(f" [PASS] XML Output: {res.content[0].text}")
+
     print("--- XmlToDict Simulation Complete ---")
 
 if __name__ == "__main__":

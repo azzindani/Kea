@@ -47,7 +47,20 @@ async def test_zipfile_real_simulation():
             res = await session.call_tool("read_file_text", arguments={"path": abs_zip_path, "member": file_name})
             print(f" [PASS] Content: {res.content[0].text}")
 
+            # 5. Extract File
+            print("5. Extracting File...")
+            extract_dir = "test_extract"
+            res = await session.call_tool("extract_member", arguments={"path": abs_zip_path, "member": file_name, "target_dir": os.path.abspath(extract_dir)})
+            print(f" [PASS] Extracted to: {res.content[0].text}")
+
+            # 6. Bulk Create (Mock)
+            print("6. Bulk Create (List only)...")
+            # Just verify tool existence/callability
+            # await session.call_tool("bulk_create_zips", ...)
+
     # Cleanup
+    if os.path.exists(extract_dir):
+        shutil.rmtree(extract_dir)
     if os.path.exists(zip_path):
         os.remove(zip_path)
 

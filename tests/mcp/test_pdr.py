@@ -9,7 +9,7 @@ async def test_pdr_real_simulation():
     """
     REAL SIMULATION: Verify PDR Server (Pandas DataReader).
     """
-    params = get_server_params("pdr_server", extra_dependencies=["pandas_datareader", "pandas"])
+    params = get_server_params("pdr_server", extra_dependencies=["pandas_datareader", "pandas", "setuptools"])
     
     print(f"\n--- Starting Real-World Simulation: PDR Server ---")
     
@@ -39,6 +39,12 @@ async def test_pdr_real_simulation():
             res = await session.call_tool("get_nasdaq_symbol_list", arguments={"query": "Apple"})
             if not res.isError:
                  print(f" [PASS] Symbols found")
+
+            # 4. Factor Dashboard
+            print("4. Fetching Factor Dashboard...")
+            res = await session.call_tool("get_factor_dashboard")
+            if not res.isError:
+                 print(f" [PASS] Dashboard data received")
 
     print("--- PDR Simulation Complete ---")
 

@@ -58,6 +58,19 @@ async def test_html5lib_real_simulation():
             res = await session.call_tool("serialize_pretty", arguments={"html_input": html_content})
             print(f" [PASS] Pretty HTML:\n{res.content[0].text[:100]}...")
 
+            # 5. Super Tools
+            print("5. Repairing Broken HTML...")
+            broken_html = "<div><p>Unclosed tag"
+            res = await session.call_tool("repair_html_page", arguments={"html_input": broken_html})
+            if not res.isError:
+                 print(f" [PASS] Repaired: {res.content[0].text}")
+
+            print("6. Extracting Tables (Resilient)...")
+            table_html = "<table><tr><td>Data1</td><td>Data2</td></tr></table>"
+            res = await session.call_tool("table_extractor_resilient", arguments={"html_input": table_html})
+            if not res.isError:
+                 print(f" [PASS] Extracted: {res.content[0].text}")
+
     print("--- HTML5Lib Simulation Complete ---")
 
 if __name__ == "__main__":

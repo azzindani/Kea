@@ -40,6 +40,15 @@ async def test_ml_real_simulation():
             if not res.isError:
                 print(f" [PASS] Anomalies: {res.content[0].text[:100]}...")
 
+            # 4. Time Series Forecast
+            print("4. Forecasting...")
+            # Using simple generated data URL or data structure if tool supports it.
+            # Tool signature says data_url is required.
+            # Let's use the same data_url but forecast 'sepal_length' (treated as series)
+            res = await session.call_tool("time_series_forecast", arguments={"data_url": data_url, "value_column": "sepal_length", "periods": 5})
+            if not res.isError:
+                 print(f" [PASS] Forecast: {res.content[0].text[:100]}...")
+
     print("--- ML Simulation Complete ---")
 
 if __name__ == "__main__":

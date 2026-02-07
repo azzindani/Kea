@@ -31,6 +31,21 @@ async def test_regulatory_real_simulation():
             if not res.isError:
                  print(f" [PASS] eCFR results received")
 
+            # 3. Federal Register
+            print("3. Federal Register...")
+            await session.call_tool("federal_register_search", arguments={"query": "AI safety"})
+
+            # 4. Global Data (WTO/IMF)
+            print("4. Global Data...")
+            # These might fail without keys or network, but we call them
+            try:
+                await session.call_tool("wto_data", arguments={"indicator": "trade_merchandise_export", "year": 2022})
+            except: pass
+            
+            try:
+                await session.call_tool("imf_data", arguments={"indicator": "NGDP_RPCH", "country": "US", "year": "2023"})
+            except: pass
+
     print("--- Regulatory Simulation Complete ---")
 
 if __name__ == "__main__":

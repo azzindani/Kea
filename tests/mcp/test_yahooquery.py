@@ -35,6 +35,18 @@ async def test_yahooquery_real_simulation():
             res = await session.call_tool("get_trending_symbols", arguments={"country": "united states", "count": 3})
             print(f" [PASS] Trending: {res.content[0].text}")
 
+            # 4. Income Statement
+            print("4. Getting Income Statement...")
+            res = await session.call_tool("get_income_statement", arguments={"ticker": ticker})
+            if not res.isError:
+                 print(f" [PASS] Income Stmt Rows: {len(res.content[0].text)}")
+
+            # 5. Balance Sheet
+            print("5. Getting Balance Sheet...")
+            res = await session.call_tool("get_balance_sheet", arguments={"ticker": ticker})
+            if not res.isError:
+                 print(f" [PASS] Balance Sheet Rows: {len(res.content[0].text)}")
+
     print("--- YahooQuery Simulation Complete ---")
 
 if __name__ == "__main__":

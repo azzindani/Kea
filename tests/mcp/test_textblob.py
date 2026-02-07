@@ -35,6 +35,21 @@ async def test_textblob_real_simulation():
             res = await session.call_tool("detect_language", arguments={"text": "Bonjour tout le monde"})
             print(f" [PASS] Language: {res.content[0].text}")
 
+            # 4. Noun Phrases
+            print("4. Extracting Noun Phrases...")
+            res = await session.call_tool("extract_noun_phrases", arguments={"text": text})
+            print(f" [PASS] Phrases: {res.content[0].text}")
+
+            # 5. Word Definitions
+            print("5. Word Definition (Analysis)...")
+            res = await session.call_tool("define_word", arguments={"word": "analysis"})
+            print(f" [PASS] Def: {res.content[0].text[:50]}...")
+
+            # 6. Full Report
+            print("6. Full Text Report...")
+            res = await session.call_tool("full_text_report", arguments={"text": text})
+            print(f" [PASS] Report Generated")
+
     print("--- TextBlob Simulation Complete ---")
 
 if __name__ == "__main__":

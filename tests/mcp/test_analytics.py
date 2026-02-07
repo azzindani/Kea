@@ -55,9 +55,46 @@ async def test_analytics_real_simulation():
             # 5. Statistical Test
             if "statistical_test" in tool_names:
                 print("4. Testing Statistical Test (T-Test)...")
-                # Test sepal_length group by species if possible, or just basic numeric
-                # analytics_server might expect specific args
-                pass 
+                # Test sepal_length group by species (first 2 species)
+                # We need to filter data first? Or just run on whole?
+                # The tool takes column1, column2, or group_column.
+                res = await session.call_tool("statistical_test", arguments={
+                    "data_url": data_url, 
+                    "test_type": "ttest",
+                    "column1": "sepal_length",
+                    "group_column": "species" 
+                })
+                if not res.isError:
+                    print(f" [PASS] T-Test Result: {res.content[0].text[:50]}...")
+                else:
+                    print(f" [FAIL] {res.content[0].text}")
+
+            # 6. Data Cleaner
+            if "data_cleaner" in tool_names:
+                print("5. Testing Data Cleaner...")
+                res = await session.call_tool("data_cleaner", arguments={
+                    "data_url": data_url,
+                    "handle_missing": "drop",
+                    "remove_duplicates": True
+                })
+                if not res.isError:
+                    print(f" [PASS] Cleaned summary: {res.content[0].text[:50]}...")
+                else:
+                    print(f" [FAIL] {res.content[0].text}")
+
+            # 7. Feature Engineer
+            if "feature_engineer" in tool_names:
+                print("6. Testing Feature Engineer...")
+                # Operations format depends on implementation, passing empty to see help or no-op
+                res = await session.call_tool("feature_engineer", arguments={
+                    "data_url": data_url,
+                    "operations": ["log_transform:sepal_width"] 
+                })
+                if not res.isError:
+                    print(f" [PASS] Engineered summary: {res.content[0].text[:50]}...")
+                else:
+                    # Might fail if op not supported, strict check later
+                    print(f" [WARN/FAIL] {res.content[0].text}") 
 
     print("--- Analytics Simulation Complete ---")
 
