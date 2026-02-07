@@ -1151,8 +1151,8 @@ async def researcher_node(state: GraphState) -> GraphState:
             except ImportError:
                 pass
             
-            # Extract text from facts for reranking
-            fact_texts = [f.get("text", "")[:2000] for f in facts]
+            # Extract text from facts for reranking (increased limit for financial tables)
+            fact_texts = [f.get("text", "")[:8000] for f in facts]
             
             # Use top_k from config
             # (Previously was hardware aware, now config driven, which can be hardware aware if we tune defaults)

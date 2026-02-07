@@ -607,7 +607,7 @@ class AgentSpawner:
                                     
                                     if not norm_res.is_error:
                                         # Success!
-                                        response = f"Swarm Tool Result (execute_code):\n {norm_res.output.get_for_llm()[:2000]}"
+                                        response = f"Swarm Tool Result (execute_code):\n {norm_res.output.get_for_llm()[:8000]}"
                                         
                                         logger.info(f"   ✅ EXECUTION SUCCESS:\n{norm_res.output.text[:1000]}...")
                                         break
@@ -693,7 +693,7 @@ CRITICAL: Return ONLY valid JSON for the tool arguments. No markdown, no explana
                                 norm_res = ToolResponse.from_mcp_result(tool_name, tool_res)
                                 
                                 if not norm_res.is_error:
-                                    response = f"Swarm Tool Result ({tool_name}):\n {norm_res.output.get_for_llm()[:2000]}"
+                                    response = f"Swarm Tool Result ({tool_name}):\n {norm_res.output.get_for_llm()[:8000]}"
                                 else:
                                     response = f"Swarm Tool Failed ({tool_name}): {norm_res.output.error or norm_res.output.text}"
                             # =========================================================

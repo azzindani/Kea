@@ -615,8 +615,36 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
             return state
         else:
             logger.warning(f"Keeper: Confidence {confidence_score:.3f} < {current_threshold:.2f} - below standard")
+            
+            # ============================================================
+            # LOW CONFIDENCE REPLAN: When tasks complete but confidence is low
+            # Trigger a replan to generate additional research tasks
+            # ============================================================
+            if progress["completed_tasks"] >= progress["total_tasks"]:
+                replan_count = state.get("replan_count", 0)
+                max_replans = 2  # Prevent infinite replanning
+                
+                if replan_count < max_replans:
+                    logger.warning(f"Keeper: All tasks complete but confidence too low ({confidence_score:.1%})")
+                    logger.info(f"   🔄 Triggering REPLAN to gather more evidence (attempt {replan_count + 1}/{max_replans})")
+                    
+                    # Build error feedback explaining why we need more research
+                    error_feedback = state.get("error_feedback", [])
+                    error_feedback.append({
+                        "issue": "low_confidence",
+                        "message": f"Research confidence is only {confidence_score:.1%}, below threshold of {current_threshold:.0%}. Need to gather more facts.",
+                        "suggestion": "Add additional research tasks to collect more data sources and verify findings."
+                    })
+                    
+                    state["error_feedback"] = error_feedback
+                    state["replan_count"] = replan_count + 1
+                    state["stop_reason"] = "replan"
+                    state["should_continue"] = True  # Will route to planner
+                    return state
+                else:
+                    logger.warning(f"Keeper: Max replans ({max_replans}) reached, proceeding with {confidence_score:.1%} confidence")
         
-        # If all tasks complete, stop regardless (but keep actual confidence score)
+        # If all tasks complete AND we've exhausted replans, stop
         if progress["completed_tasks"] >= progress["total_tasks"]:
             logger.info("Keeper: All execution plan tasks complete")
             logger.info(f"   Final confidence: {confidence_score:.3f} (required: {current_threshold:.2f})")
