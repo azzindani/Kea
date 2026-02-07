@@ -30,63 +30,90 @@ logger = structlog.get_logger()
 mcp = FastMCP("yahooquery_server", dependencies=["yahooquery", "pandas"])
 
 # --- Ticker Search Tool (USE FIRST when unsure of ticker symbol) ---
+# --- Ticker Search Tool (USE FIRST when unsure of ticker symbol) ---
 @mcp.tool()
 async def search_ticker(query: str, limit: int = 5) -> str:
-    """ALWAYS USE THIS FIRST when you don't know the exact stock ticker symbol.
+    """SEARCHES for ticker symbols. [ACTION]
     
-    Searches for stock ticker symbols by company name or keywords.
-    Example: search_ticker("BCA Bank Indonesia") returns "BBCA.JK"
-    
-    Args:
-        query: Company name or keywords (e.g., "BCA Bank", "Bank Central Asia", "Apple")
-        limit: Maximum results to return (default: 5)
-    
-    Returns:
-        Table of matching symbols with name, exchange, and type.
-        Use the symbol from the results in subsequent financial API calls.
+    [RAG Context]
+    ALWAYS USE THIS FIRST when you don't know the exact stock ticker symbol.
+    Searches by company name or keywords (e.g., "BCA Bank" -> "BBCA.JK").
+    Returns table of matching symbols.
     """
     return await ticker.search_ticker_handler(query, limit)
 
 # --- Core Ticker Tools ---
 @mcp.tool()
 async def get_fundamental_snapshot(tickers: str) -> str:
-    """Get Price, Key Stats, and Summary Detail for multiple tickers."""
+    """FETCHES fundamental snapshot. [ACTION]
+    
+    [RAG Context]
+    Get Price, Key Stats, and Summary Detail for multiple tickers.
+    Returns JSON string.
+    """
     return await ticker.get_fundamental_snapshot(tickers)
 
 @mcp.tool()
 async def get_ownership_report(tickers: str) -> str:
-    """Get Major Holders, Insiders, Institutions."""
+    """FETCHES ownership report. [ACTION]
+    
+    [RAG Context]
+    Get Major Holders, Insiders, Institutions.
+    Returns JSON string.
+    """
     return await ticker.get_ownership_report(tickers)
 
 @mcp.tool()
 async def get_earnings_report(tickers: str) -> str:
-    """Get Earnings history, trend, and calendar events."""
+    """FETCHES earnings report. [ACTION]
+    
+    [RAG Context]
+    Get Earnings history, trend, and calendar events.
+    Returns JSON string.
+    """
     return await ticker.get_earnings_report(tickers)
 
 @mcp.tool()
 async def get_technical_snapshot(tickers: str) -> str:
-    """Get Price, Recommendation Trend, and Index Trend."""
+    """FETCHES technical snapshot. [ACTION]
+    
+    [RAG Context]
+    Get Price, Recommendation Trend, and Index Trend.
+    Returns JSON string.
+    """
     return await ticker.get_technical_snapshot(tickers)
 
 @mcp.tool()
 async def get_bulk_financials(tickers: str, module_name: str, frequency: str = "a") -> str:
-    """Get Balance Sheet, Cash Flow, or Income Statement.
+    """FETCHES bulk financials. [ACTION]
+    
+    [RAG Context]
+    Get Balance Sheet, Cash Flow, or Income Statement.
     Args:
         tickers: Space separated symbols
         module_name: balance_sheet, cash_flow, income_statement
         frequency: a (annual) or q (quarterly)
+    Returns JSON string.
     """
     return await ticker.get_bulk_financials_handler(tickers, module_name, frequency)
 
 @mcp.tool()
 async def get_bulk_options(tickers: str) -> str:
-    """Get Option Chain (Limit 100 rows)."""
+    """FETCHES bulk options. [ACTION]
+    
+    [RAG Context]
+    Get Option Chain (Limit 100 rows).
+    Returns JSON string.
+    """
     return await ticker.get_bulk_options_handler(tickers)
 
 # --- Dynamic Ticker Attributes (Unrolled to a single parameterized tool) ---
 @mcp.tool()
 async def get_ticker_attribute_bulk(tickers: str, attribute_name: str) -> str:
-    """Get any specific attribute from yahooquery Ticker object for multiple tickers.
+    """FETCHES specific attribute. [ACTION]
+    
+    [RAG Context]
+    Get any specific attribute from yahooquery Ticker object for multiple tickers.
     Common Attributes:
     - asset_profile, calendar_events, company_officers, corporate_guidance
     - earnings_trend, esg_scores, financial_data, fund_performance
@@ -94,6 +121,7 @@ async def get_ticker_attribute_bulk(tickers: str, attribute_name: str) -> str:
     - key_stats, major_holders, news, page_views, price, quote_type
     - recommendation_trend, sec_filings, share_purchase_activity, summary_detail
     - summary_profile
+    Returns JSON string.
     """
     # Delegate to the generic handler refactored in ticker.py
     return await ticker.generic_ticker_handler(tickers, attribute_name)
@@ -101,43 +129,77 @@ async def get_ticker_attribute_bulk(tickers: str, attribute_name: str) -> str:
 # --- Screener ---
 @mcp.tool()
 async def screen_market(preset: str = "day_gainers", count: int = 100000) -> str:
-    """Get data from predefined screener lists.
+    """SCREENS market using preset. [ACTION]
+    
+    [RAG Context]
+    Get data from predefined screener lists.
     Presets: day_gainers, day_losers, most_actives, cryptocurrencies,
     most_shorted_stocks, undervalued_growth_stocks, growth_technology_stocks, etc.
+    Returns JSON string.
     """
     return await screener.get_screen_data(preset, count)
 
 # --- Analysis & History ---
 @mcp.tool()
 async def get_bulk_history(tickers: str, period: str = "1mo", interval: str = "1d") -> str:
-    """Bulk Download Historical Data (CSV)."""
+    """FETCHES bulk history. [ACTION]
+    
+    [RAG Context]
+    Bulk Download Historical Data (CSV).
+    Returns CSV string.
+    """
     return await analysis.get_history_bulk(tickers, period, interval)
 
 # --- Market Intelligence ---
 @mcp.tool()
 async def get_trending_symbols(country: str = "united states", count: int = 100000) -> str:
-    """Get trending securities for a specific region."""
+    """FETCHES trending symbols. [ACTION]
+    
+    [RAG Context]
+    Get trending securities for a specific region.
+    Returns JSON string.
+    """
     return await market_intelligence.get_market_trending(country, count)
 
 # --- Funds & Discovery ---
 @mcp.tool()
 async def get_fund_holdings(tickers: str) -> str:
-    """Get Table of Top Holdings for ETFs/Mutual Funds."""
+    """FETCHES fund holdings. [ACTION]
+    
+    [RAG Context]
+    Get Table of Top Holdings for ETFs/Mutual Funds.
+    Returns JSON string.
+    """
     return await funds_and_discovery.get_fund_holdings_formatted(tickers)
 
 @mcp.tool()
 async def get_fund_sectors(tickers: str) -> str:
-    """Get Sector Weightings for Funds."""
+    """FETCHES fund sectors. [ACTION]
+    
+    [RAG Context]
+    Get Sector Weightings for Funds.
+    Returns JSON string.
+    """
     return await funds_and_discovery.get_fund_sector_weightings(tickers)
 
 @mcp.tool()
 async def search_instruments(query: str) -> str:
-    """Search for ANY financial instrument (Stocks, Forex, Crypto, Bonds)."""
+    """SEARCHES instruments. [ACTION]
+    
+    [RAG Context]
+    Search for ANY financial instrument (Stocks, Forex, Crypto, Bonds).
+    Returns JSON string.
+    """
     return await funds_and_discovery.search_instruments(query)
 
 @mcp.tool()
 async def get_ticker_news(tickers: str) -> str:
-    """Get News for specific tickers."""
+    """FETCHES ticker news. [ACTION]
+    
+    [RAG Context]
+    Get News for specific tickers.
+    Returns JSON string.
+    """
     return await funds_and_discovery.get_ticker_news(tickers)
 
 if __name__ == "__main__":

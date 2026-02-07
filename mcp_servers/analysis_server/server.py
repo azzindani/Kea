@@ -28,20 +28,23 @@ mcp = FastMCP("analysis_server")
 
 @mcp.tool()
 def meta_analysis(data_points: List[Dict[str, Any]], analysis_type: str = "comparison") -> str:
-    """Perform meta-analysis across multiple data sources.
+    """PERFORMS meta-analysis across sources. [ENTRY]
+    
+    [RAG Context]
+    Aggregates and compares data from multiple inputs.
     Args:
-        data_points: List of data points with source, value, and metadata
-        analysis_type: Type: comparison, consensus, variance, aggregate
+        analysis_type: "comparison", "consensus", "variance", "aggregate".
     """
     return stats_ops.meta_analysis(data_points, analysis_type)
 
 @mcp.tool()
 def trend_detection(data: List[Union[Dict, float, int]], metric_name: str = "Value", detect_anomalies: bool = True) -> str:
-    """Detect trends, patterns, and anomalies in time-series data.
+    """DETECTS trends and anomalies in time-series. [ENTRY]
+    
+    [RAG Context]
     Args:
-        data: Time-series data as [{date, value}] or numeric array
-        metric_name: Name of the metric being analyzed
-        detect_anomalies: Whether to detect anomalies
+        data: List of values or dicts with date/value.
+        detect_anomalies: If True, flags outliers.
     """
     return stats_ops.trend_detection(data, metric_name, detect_anomalies)
 

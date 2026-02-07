@@ -59,9 +59,11 @@ async def screenshot_extract(
     image_base64: str = None, 
     extraction_type: str = "all"
 ) -> str:
-    """
+    """EXTRACTS screenshot text. [ACTION]
+    
+    [RAG Context]
     Extract text, tables, and structured data from a screenshot or image.
-    extraction_type: 'text', 'table', 'structured', 'all' (default: all)
+    Returns extracted content ("text"|"table"|"structured"|"all").
     """
     return await run_op(ocr.screenshot_extract, image_url=image_url, image_base64=image_base64, extraction_type=extraction_type)
 
@@ -71,9 +73,11 @@ async def chart_reader(
     image_base64: str = None, 
     chart_type: str = "unknown"
 ) -> str:
-    """
+    """READS charts. [ACTION]
+    
+    [RAG Context]
     Interpret charts and graphs, extract data points and trends.
-    chart_type: Hint (line, bar, pie, scatter, table)
+    Returns analysis report.
     """
     return await run_op(ocr.chart_reader, image_url=image_url, image_base64=image_base64, chart_type=chart_type)
 

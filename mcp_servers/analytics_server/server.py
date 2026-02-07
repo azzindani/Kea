@@ -63,10 +63,11 @@ async def eda_auto(
     data: Dict[str, Any] = None, 
     target_column: str = None
 ) -> str:
-    """
+    """ANALYZES data (EDA). [ACTION]
+    
+    [RAG Context]
     Perform automatic Exploratory Data Analysis.
-    data_url: URL/path to CSV
-    data: Inline data {columns: [], rows: []}
+    Returns analysis report.
     """
     return await run_op(eda.eda_auto, data_url=data_url, data=data, target_column=target_column)
 
@@ -75,7 +76,12 @@ async def data_profiler(
     data_url: str, 
     minimal: bool = True
 ) -> str:
-    """Generate detailed data profile report."""
+    """PROFILES data. [ACTION]
+    
+    [RAG Context]
+    Generate detailed data profile report.
+    Returns profile string.
+    """
     return await run_op(eda.data_profiler, data_url=data_url, minimal=minimal)
 
 # --- 2. Cleaning & Feature Engineering ---
@@ -86,10 +92,11 @@ async def data_cleaner(
     handle_outliers: str = "none",
     remove_duplicates: bool = False
 ) -> str:
-    """
+    """CLEANS data. [ACTION]
+    
+    [RAG Context]
     Clean dataset: handle missing values, outliers, duplicates.
-    handle_missing: drop, mean, median, mode, ffill
-    handle_outliers: none, clip, drop
+    Returns cleaned data summary.
     """
     return await run_op(cleaning.data_cleaner, data_url=data_url, handle_missing=handle_missing, handle_outliers=handle_outliers, remove_duplicates=remove_duplicates)
 
@@ -98,9 +105,11 @@ async def feature_engineer(
     data_url: str, 
     operations: List[str] = []
 ) -> str:
-    """
+    """ENGINEERS features. [ACTION]
+    
+    [RAG Context]
     Create derived features from existing columns.
-    operations: list of operation strings
+    Returns modified data summary.
     """
     return await run_op(cleaning.feature_engineer, data_url=data_url, operations=operations)
 
@@ -112,9 +121,11 @@ async def correlation_matrix(
     method: str = "pearson", 
     threshold: float = 0.0
 ) -> str:
-    """
+    """CALCULATES correlations. [ACTION]
+    
+    [RAG Context]
     Compute correlation matrix for numeric columns.
-    method: pearson, spearman, kendall
+    Returns correlation table.
     """
     return await run_op(stats.correlation_matrix, data_url=data_url, data=data, method=method, threshold=threshold)
 
@@ -126,11 +137,13 @@ async def statistical_test(
     column2: str = None, 
     group_column: str = None
 ) -> str:
+    """TESTS statistics. [ACTION]
+    
+    [RAG Context]
+    Run statistical tests on data (ttest, anova, chi2).
+    Returns test results.
     """
-    Run statistical tests on data.
-    test_type: ttest, anova, chi2, normality
-    """
-    return await run_op(stats.statistical_test, data_url=data_url, test_type=test_type, column1=column1, column2=column2, group_column=group_col)
+    return await run_op(stats.statistical_test, data_url=data_url, test_type=test_type, column1=column1, column2=column2, group_column=group_column)
 
 if __name__ == "__main__":
     mcp.run()

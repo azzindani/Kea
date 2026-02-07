@@ -24,17 +24,32 @@ mcp = FastMCP("tradingview_server", dependencies=["tradingview_ta", "requests"])
 
 @mcp.tool()
 async def get_ta_summary(symbol: str, market: str = "america", exchange: str = "NASDAQ", interval: str = "1d") -> str:
-    """Get high-level Technical Analysis Summary (Buy/Sell/Hold)."""
+    """FETCHES TA summary. [ACTION]
+    
+    [RAG Context]
+    Get high-level Technical Analysis Summary (Buy/Sell/Hold).
+    Returns JSON summary.
+    """
     return await ta.get_ta_summary(symbol, market, exchange, interval)
 
 @mcp.tool()
 async def get_oscillators_all(symbol: str, market: str = "america", exchange: str = "NASDAQ", interval: str = "1d") -> str:
-    """Get ALL Oscillator values (RSI, MACD, etc)."""
+    """FETCHES all oscillators. [ACTION]
+    
+    [RAG Context]
+    Get ALL Oscillator values (RSI, MACD, etc).
+    Returns JSON string.
+    """
     return await ta.get_oscillators(symbol, market, exchange, interval)
 
 @mcp.tool()
 async def get_ma_all(symbol: str, market: str = "america", exchange: str = "NASDAQ", interval: str = "1d") -> str:
-    """Get ALL Moving Averages (SMA/EMA)."""
+    """FETCHES all moving averages. [ACTION]
+    
+    [RAG Context]
+    Get ALL Moving Averages (SMA/EMA).
+    Returns JSON string.
+    """
     return await ta.get_moving_averages(symbol, market, exchange, interval)
 
 # --- 2. GRANULAR TA (Unrolling for High Definition) ---
@@ -49,9 +64,7 @@ INDICATORS = [
 ]
 
 def register_indicators():
-    for ind in INDICATORS:
-        name = f"get_indicator_{ind.lower().replace('.', '_')}"
-        desc = f"Get only {ind} value."
+    # Loop removed as it was shadowing the loop below
         
     def make_handler(ind_name):
         async def handler(symbol: str, market: str = "america", exchange: str = "NASDAQ", interval: str = "1d") -> str:
@@ -69,7 +82,8 @@ def register_indicators():
 
     for ind in INDICATORS:
         name = f"get_indicator_{ind.lower().replace('.', '_')}"
-        desc = f"Get only {ind} value."
+        # Enhanced Docstring
+        desc = f"FETCHES {ind} value. [ACTION]\n\n[RAG Context]\nGet only {ind} value from TradingView."
         
         mcp.add_tool(
             name=name,
@@ -117,9 +131,7 @@ FUNDAMENTALS = {
 }
 
 def register_fundamentals():
-    for fname, fkey in FUNDAMENTALS.items():
-        tname = f"get_tv_{fname}"
-        tdesc = f"Get {fname.replace('_', ' ').title()} via TradingView."
+    # Loop removed as it was shadowing the loop below
         
     def make_fund_handler(fkey):
         async def fund_handler(ticker: str, market: str = "america") -> str:
@@ -135,10 +147,11 @@ def register_fundamentals():
 
     for fname, fkey in FUNDAMENTALS.items():
         tname = f"get_tv_{fname}"
-        tdesc = f"Get {fname.replace('_', ' ').title()} via TradingView."
+        # Enhanced Docstring
+        tdesc = f"FETCHES {fname.replace('_', ' ').title()}. [ACTION]\n\n[RAG Context]\nGet {fname} fundamental data via TradingView."
         
         mcp.add_tool(name=tname, description=tdesc, fn=make_fund_handler(fkey))
-
+    
 register_fundamentals()
 
 # B. Performance
@@ -161,9 +174,7 @@ PERFORMANCE = {
 }
 
 def register_performance():
-    for pname, pkey in PERFORMANCE.items():
-        tname = f"get_{pname}"
-        tdesc = f"Get {pname.replace('_', ' ').title()}."
+    # Loop removed as it was shadowing the loop below
         
     def make_perf_handler(pkey):
         async def perf_handler(ticker: str, market: str = "america") -> str:
@@ -177,7 +188,8 @@ def register_performance():
 
     for pname, pkey in PERFORMANCE.items():
         tname = f"get_{pname}"
-        tdesc = f"Get {pname.replace('_', ' ').title()}."
+        # Enhanced Docstring
+        tdesc = f"FETCHES {pname.replace('_', ' ').title()}. [ACTION]\n\n[RAG Context]\nGet {pname} performance metric."
         
         mcp.add_tool(name=tname, description=tdesc, fn=make_perf_handler(pkey))
 
@@ -187,12 +199,22 @@ register_performance()
 
 @mcp.tool()
 async def scan_market(market: str = "america", limit: int = 100000, preset: str = "market_cap") -> str:
-    """BULK: Scan market (Top Gainers, Losers, Oversold)."""
+    """SCANS market using preset. [ACTION]
+    
+    [RAG Context]
+    Scan market with presets (Top Gainers, Losers, Oversold).
+    Returns JSON list of tickers.
+    """
     return await screener_module.scan_market(market, limit, preset)
 
 @mcp.tool()
 async def get_bulk_data(tickers: list[str], columns: list[str] = None, market: str = "america") -> str:
-    """MULTI-TALENT: Get custom data columns for list of tickers."""
+    """FETCHES bulk data. [ACTION]
+    
+    [RAG Context]
+    Get custom data columns for list of tickers (Multi-Talent).
+    Returns JSON string of data.
+    """
     return await screener_module.get_bulk_data(tickers, columns, market)
 
 # --- 4. PRESET SCANNERS (Convenience) ---
@@ -200,10 +222,7 @@ PRESETS = ["top_gainers", "top_losers", "most_active", "oversold", "overbought"]
 MARKETS = ["america", "indonesia", "crypto", "forex"]
 
 def register_presets():
-    for m in MARKETS:
-        for p in PRESETS:
-            t_name = f"scan_{m}_{p}"
-            t_desc = f"Quick Scan: {p.replace('_', ' ').title()} in {m.title()}"
+    # Loop removed as it was shadowing the loop below
             
     def make_preset_handler(m_val, p_val):
         async def p_handler(limit: int = 100000) -> str:
@@ -213,7 +232,8 @@ def register_presets():
     for m in MARKETS:
         for p in PRESETS:
             t_name = f"scan_{m}_{p}"
-            t_desc = f"Quick Scan: {p.replace('_', ' ').title()} in {m.title()}"
+            # Enhanced Docstring
+            t_desc = f"SCANS {p.replace('_', ' ').title()} in {m.title()}. [ACTION]\n\n[RAG Context]\nQuick Preset Scan."
              
             mcp.add_tool(name=t_name, description=t_desc, fn=make_preset_handler(m, p))
 

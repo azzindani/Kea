@@ -3,9 +3,12 @@ from mcp_servers.mibian_server.tools.core import MibianCore, dict_to_json
 
 
 async def calculate_implied_volatility(underlying: float, strike: float, interest: float, days: float, call_price: float = None, put_price: float = None, model: str = "BS") -> str:
-    """
-    Calculate IV.
+    """CALCULATES IV. [ACTION]
+    
+    [RAG Context]
+    Calculate Implied Volatility.
     Requires CallPrice OR PutPrice.
+    Returns JSON string.
     """
     try:
         # model = arguments.get("model", "BS")

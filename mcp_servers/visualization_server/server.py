@@ -34,42 +34,41 @@ mcp = FastMCP("visualization_server", dependencies=["plotly", "pandas", "numpy",
 
 @mcp.tool()
 async def create_plotly_chart(data_url: str, chart_type: str, x_column: Optional[str] = None, y_column: Optional[str] = None, color_column: Optional[str] = None, title: Optional[str] = None) -> str:
-    """Create interactive Plotly chart.
-    Args:
-        data_url: URL to CSV data
-        chart_type: Type: line, bar, scatter, histogram, box, pie, heatmap
-        x_column: X-axis column
-        y_column: Y-axis column
-        color_column: Column for color grouping
-        title: Chart title
+    """PLOTS plotly chart. [ACTION]
+    
+    [RAG Context]
+    Create interactive Plotly chart (line, bar, scatter, etc.).
+    Returns chart JSON/HTML.
     """
     return await plotly_chart.plotly_chart(data_url, chart_type, x_column, y_column, color_column, title)
 
 @mcp.tool()
 async def create_correlation_heatmap(data_url: str, title: str = "Correlation Heatmap") -> str:
-    """Create correlation heatmap.
-    Args:
-        data_url: URL to CSV data
-        title: Chart title
+    """PLOTS heatmap. [ACTION]
+    
+    [RAG Context]
+    Create correlation heatmap.
+    Returns chart JSON/HTML.
     """
     return await heatmap.correlation_heatmap(data_url, title)
 
 @mcp.tool()
 async def create_distribution_plot(data_url: str, columns: Optional[List[str]] = None) -> str:
-    """Create distribution/histogram plots.
-    Args:
-        data_url: URL to CSV data
-        columns: Columns to plot (or 'all' numeric)
+    """PLOTS distribution. [ACTION]
+    
+    [RAG Context]
+    Create distribution/histogram plots.
+    Returns chart JSON/HTML.
     """
     return await distribution.distribution_plot(data_url, columns)
 
 @mcp.tool()
 async def create_pairplot(data_url: str, columns: Optional[List[str]] = None, color_column: Optional[str] = None) -> str:
-    """Create pairwise scatter plot matrix.
-    Args:
-        data_url: URL to CSV data
-        columns: Columns to include
-        color_column: Column for color
+    """PLOTS pairplot. [ACTION]
+    
+    [RAG Context]
+    Create pairwise scatter plot matrix.
+    Returns chart JSON/HTML.
     """
     return await pairplot.pairplot(data_url, columns, color_column)
 

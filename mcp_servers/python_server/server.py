@@ -58,7 +58,9 @@ async def execute_code(
     timeout: int = 30,
     dependencies: List[str] = []
 ) -> str:
-    """
+    """EXECUTES python code. [ACTION]
+    
+    [RAG Context]
     Execute Python code in a sandboxed environment.
     Returns stdout, variables, and any errors.
     """
@@ -70,9 +72,11 @@ async def dataframe_ops(
     data: str = None,
     params: Dict[str, Any] = None
 ) -> str:
-    """
-    Perform Pandas DataFrame operations.
-    operation: load_csv, load_json, describe, filter, aggregate, join
+    """MANIPULATES DataFrame. [ACTION]
+    
+    [RAG Context]
+    Perform Pandas DataFrame operations (load, filter, aggregate).
+    Returns result string.
     """
     return await run_op(dataframe_ops_module.dataframe_ops_tool, operation=operation, data=data, params=params)
 
@@ -81,9 +85,11 @@ async def sql_query(
     query: str,
     data_sources: Dict[str, Any] = None
 ) -> str:
-    """
+    """EXECUTES SQL. [ACTION]
+    
+    [RAG Context]
     Execute SQL query on in-memory data using DuckDB.
-    Supports CSV/Parquet/JSON data sources.
+    Returns result table.
     """
     return await run_op(sql_query_module.sql_query_tool, query=query, data_sources=data_sources)
 

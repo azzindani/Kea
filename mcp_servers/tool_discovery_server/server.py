@@ -69,56 +69,106 @@ async def run_op(op_func, diff_args=None, **kwargs):
 # --- SEARCH TOOLS ---
 @mcp.tool()
 async def search_pypi(query: str, max_results: int = 100000) -> str:
-    """Search PyPI for Python packages."""
+    """SEARCHES PyPI. [ACTION]
+    
+    [RAG Context]
+    Search PyPI for Python packages.
+    Returns package list.
+    """
     return await run_op(search.search_pypi, query=query, max_results=max_results)
 
 @mcp.tool()
 async def search_npm(query: str, max_results: int = 100000) -> str:
-    """Search npm for JavaScript/Node packages."""
+    """SEARCHES npm. [ACTION]
+    
+    [RAG Context]
+    Search npm for JavaScript/Node packages.
+    Returns package list.
+    """
     return await run_op(search.search_npm, query=query, max_results=max_results)
 
 # --- INFO TOOLS ---
 @mcp.tool()
 async def package_info(package_name: str, registry: str = "pypi") -> str:
-    """Get detailed information about a specific package."""
+    """FETCHES package info. [ACTION]
+    
+    [RAG Context]
+    Get detailed information about a specific package.
+    Returns package metadata.
+    """
     return await run_op(info.get_package_info, package_name=package_name, registry=registry)
 
 @mcp.tool()
 async def read_package_docs(package_name: str, doc_type: str = "readme") -> str:
-    """Read and summarize package documentation (readme, api, examples)."""
+    """READS package docs. [ACTION]
+    
+    [RAG Context]
+    Read and summarize package documentation (readme, api, examples).
+    Returns summary/text.
+    """
     return await run_op(info.read_package_docs, package_name=package_name, doc_type=doc_type)
 
 # --- ANALYSIS TOOLS ---
 @mcp.tool()
 async def evaluate_package(package_name: str, use_case: str = "") -> str:
-    """Evaluate package for MCP tool integration suitability."""
+    """EVALUATES package. [ACTION]
+    
+    [RAG Context]
+    Evaluate package for MCP tool integration suitability.
+    Returns evaluation report.
+    """
     return await run_op(analysis.evaluate_package, package_name=package_name, use_case=use_case)
 
 @mcp.tool()
 async def check_compatibility(package_name: str, check_deps: bool = True) -> str:
-    """Check if a package is compatible with current system."""
+    """CHECKS compatibility. [ACTION]
+    
+    [RAG Context]
+    Check if a package is compatible with current system.
+    Returns compatibility report.
+    """
     return await run_op(analysis.check_compatibility, package_name=package_name, check_deps=check_deps)
 
 @mcp.tool()
 async def suggest_tools(research_domain: str, task_type: str = "") -> str:
-    """Suggest tools based on research needs (finance, medical, legal, social)."""
+    """SUGGESTS tools. [ACTION]
+    
+    [RAG Context]
+    Suggest tools based on research needs (finance, medical, legal, social).
+    Returns tool suggestions.
+    """
     return await run_op(analysis.suggest_tools, research_domain=research_domain, task_type=task_type)
 
 # --- REGISTRY TOOLS ---
 @mcp.tool()
 async def tool_registry_add(package_name: str, tool_type: str = "general", priority: str = "medium", notes: str = "") -> str:
-    """Add discovered tool to registry for tracking."""
+    """ADDS to registry. [ACTION]
+    
+    [RAG Context]
+    Add discovered tool to registry for tracking.
+    Returns success message.
+    """
     return await run_op(registry.tool_registry_add, package_name=package_name, tool_type=tool_type, priority=priority, notes=notes)
 
 @mcp.tool()
 async def tool_registry_list(status: Optional[str] = None, tool_type: Optional[str] = None) -> str:
-    """List tools in the registry."""
+    """LISTS registry tools. [ACTION]
+    
+    [RAG Context]
+    List tools in the registry.
+    Returns tool list.
+    """
     return await run_op(registry.tool_registry_list, status=status, tool_type=tool_type)
 
 # --- GENERATION TOOLS ---
 @mcp.tool()
 async def generate_mcp_stub(package_name: str, functions: List[str] = None, server_name: Optional[str] = None) -> str:
-    """Generate MCP tool stub code for a package."""
+    """GENERATES MCP stub. [ACTION]
+    
+    [RAG Context]
+    Generate MCP tool stub code for a package.
+    Returns code string.
+    """
     return await run_op(generation.generate_mcp_stub, package_name=package_name, functions=functions, server_name=server_name)
 
 if __name__ == "__main__":

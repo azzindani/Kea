@@ -36,9 +36,12 @@ mcp = FastMCP("pdr_server", dependencies=["pandas_datareader", "pandas"])
 
 @mcp.tool()
 async def get_fama_french_data(dataset_name: str, start_date: str = None, end_date: str = None) -> str:
-    """
+    """FETCHES Fama-French data. [ACTION]
+    
+    [RAG Context]
     ACADEMIC: Get Fama-French Data by Code.
     Common Codes: 'F-F_Research_Data_Factors', 'F-F_Momentum_Factor', '5_Industry_Portfolios'.
+    Returns JSON string.
     """
     return await famafrench.get_fama_french_data(dataset_name, start_date, end_date)
 
@@ -46,63 +49,118 @@ async def get_fama_french_data(dataset_name: str, start_date: str = None, end_da
 
 @mcp.tool()
 async def get_stooq_data(symbols: list[str], start_date: str = None) -> str:
-    """MARKET: Stooq Data (Indices, Bonds, Commodities)."""
+    """FETCHES Stooq data. [ACTION]
+    
+    [RAG Context]
+    MARKET: Stooq Data (Indices, Bonds, Commodities).
+    Returns JSON string.
+    """
     return await market_global.get_stooq_data(symbols, start_date)
 
 @mcp.tool()
 async def get_tsp_fund_data() -> str:
-    """INSTITUTION: Thrift Savings Plan (TSP) Funds."""
+    """FETCHES TSP fund data. [ACTION]
+    
+    [RAG Context]
+    INSTITUTION: Thrift Savings Plan (TSP) Funds.
+    Returns JSON string.
+    """
     return await market_global.get_tsp_fund_data()
 
 @mcp.tool()
 async def get_moex_data(symbols: list[str], start_date: str = None) -> str:
-    """MARKET: Moscow Exchange Data."""
+    """FETCHES Moscow Exchange data. [ACTION]
+    
+    [RAG Context]
+    MARKET: Moscow Exchange Data.
+    Returns JSON string.
+    """
     return await market_global.get_moex_data(symbols, start_date)
 
 # --- 3. DASHBOARDS ---
 
 @mcp.tool()
 async def get_factor_dashboard() -> str:
-    """DASHBOARD: US Factors (5-Factor + Momentum)."""
+    """FETCHES US Factors dashboard. [ACTION]
+    
+    [RAG Context]
+    DASHBOARD: US Factors (5-Factor + Momentum).
+    Returns JSON string.
+    """
     return await dashboards.get_factor_dashboard()
 
 @mcp.tool()
 async def get_global_factors_dashboard() -> str:
-    """DASHBOARD: Global Factors (Regions)."""
+    """FETCHES Global Factors dashboard. [ACTION]
+    
+    [RAG Context]
+    DASHBOARD: Global Factors (Regions).
+    Returns JSON string.
+    """
     return await dashboards.get_global_factors_dashboard()
 
 @mcp.tool()
 async def get_industry_health_dashboard() -> str:
-    """DASHBOARD: 49 Industry Sectors Health."""
+    """FETCHES Industry Health dashboard. [ACTION]
+    
+    [RAG Context]
+    DASHBOARD: 49 Industry Sectors Health.
+    Returns JSON string.
+    """
     return await dashboards.get_industry_health_dashboard()
 
 @mcp.tool()
 async def get_liquidity_dashboard() -> str:
-    """DASHBOARD: Market Liquidity Factors."""
+    """FETCHES Liquidity dashboard. [ACTION]
+    
+    [RAG Context]
+    DASHBOARD: Market Liquidity Factors.
+    Returns JSON string.
+    """
     return await dashboards.get_liquidity_dashboard()
 
 # --- 4. DISCOVERY & CENTRAL BANK ---
 
 @mcp.tool()
 async def get_nasdaq_symbol_list(query: str = None) -> str:
-    """DISCOVERY: Search Nasdaq/NYSE Symbols."""
+    """SEARCHES Nasdaq symbols. [ACTION]
+    
+    [RAG Context]
+    DISCOVERY: Search Nasdaq/NYSE Symbols.
+    Returns JSON string.
+    """
     return await market_symbols.get_nasdaq_symbol_list(query)
 
 @mcp.tool()
 async def get_bank_of_canada_data(symbols: list[str] = None, start_date: str = None) -> str:
-    """MACRO: Bank of Canada Rates/FX."""
+    """FETCHES Bank of Canada data. [ACTION]
+    
+    [RAG Context]
+    MACRO: Bank of Canada Rates/FX.
+    Returns JSON string.
+    """
     return await central_bank.get_bank_of_canada_data(symbols, start_date)
 
 # --- 5. COMMERCIAL ---
 
 @mcp.tool()
 async def get_tiingo_data(symbols: list[str], api_key: str = None, start_date: str = None) -> str:
-    """COMMERCIAL: Tiingo Data (Req API Key)."""
+    """FETCHES Tiingo data. [ACTION]
+    
+    [RAG Context]
+    COMMERCIAL: Tiingo Data (Req API Key).
+    Returns JSON string.
+    """
     return await commercial.get_tiingo_data(symbols, api_key, start_date)
 
 @mcp.tool()
 async def get_alphavantage_data(symbols: list[str], api_key: str = None, start_date: str = None) -> str:
-    """COMMERCIAL: AlphaVantage Data (Req API Key)."""
+    """FETCHES AlphaVantage data. [ACTION]
+    
+    [RAG Context]
+    COMMERCIAL: AlphaVantage Data (Req API Key).
+    Returns JSON string.
+    """
     return await commercial.get_alphavantage_data(symbols, api_key, start_date)
 
 

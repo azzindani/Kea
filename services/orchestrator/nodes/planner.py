@@ -723,7 +723,8 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
                         # Format: "tool_name: {input_schema}" for precise mapping
                         for t in search_results:
                             name = t.get('name', 'N/A')
-                            desc = t.get('description', '')[:200]
+                            # Optimized for Front-Loaded Docstrings: Summary (200 chars) + context (200 chars)
+                            desc = t.get('description', '')[:400]
                             schema = t.get('inputSchema', {})
 
                             # Format schema as JSON for LLM clarity (not Python dict)
@@ -770,7 +771,8 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
                             import json
                             for t in all_tools[:50]:
                                 name = t.get('name', 'N/A')
-                                desc = t.get('description', '')[:200]
+                                # Optimized for Front-Loaded Docstrings
+                                desc = t.get('description', '')[:400]
                                 schema = t.get('inputSchema', {})
 
                                 # Format schema as JSON (not Python dict)

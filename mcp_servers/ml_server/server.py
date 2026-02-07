@@ -33,55 +33,51 @@ mcp = FastMCP("ml_server", dependencies=["scikit-learn", "numpy", "pandas"])
 
 @mcp.tool()
 async def auto_ml(data_url: str, target_column: str, task_type: str = "auto", test_size: float = 0.2) -> str:
-    """Automatically select and train the best ML model.
-    Args:
-        data_url: URL to CSV data
-        target_column: Target variable to predict
-        task_type: Task: classification or regression (default: auto)
-        test_size: Test set proportion (0.1-0.4)
+    """TRAINS AutoML model. [ACTION]
+    
+    [RAG Context]
+    Automatically select and train the best ML model.
+    Returns model metrics and path.
     """
     return await automl.auto_ml(data_url, target_column, task_type, test_size)
 
 @mcp.tool()
 async def feature_importance(data_url: str, target_column: str, method: str = "tree") -> str:
-    """Analyze feature importance for prediction.
-    Args:
-        data_url: URL to CSV data
-        target_column: Target variable
-        method: Method: permutation, shap, tree (default: tree)
+    """ANALYZES feature importance. [ACTION]
+    
+    [RAG Context]
+    Analyze feature importance for prediction.
+    Returns importance scores.
     """
     return await importance.feature_importance(data_url, target_column, method)
 
 @mcp.tool()
 async def convert_clustering(data_url: Optional[str] = None, data: Optional[Union[Dict, List]] = None, n_clusters: Any = 3, method: str = "kmeans") -> str:
-    """Perform unsupervised clustering.
-    Args:
-        data_url: URL to CSV data
-        data: Inline data: {columns: [], rows: []}
-        n_clusters: Number of clusters (or 'auto')
-        method: Method: kmeans, dbscan, hierarchical
+    """CLUSTERS data. [ACTION]
+    
+    [RAG Context]
+    Perform unsupervised clustering (KMeans, DBSCAN, etc).
+    Returns cluster labels.
     """
     return await clustering.clustering(data_url, data, n_clusters, method)
 
 @mcp.tool()
 async def anomaly_detection(data_url: Optional[str] = None, data: Optional[Union[Dict, List]] = None, method: str = "isolation_forest", contamination: float = 0.1) -> str:
-    """Detect anomalies/outliers in data.
-    Args:
-        data_url: URL to CSV data
-        data: Inline data: {columns: [], rows: []}
-        method: Method: isolation_forest, lof, zscore
-        contamination: Expected proportion of outliers
+    """DETECTS anomalies. [ACTION]
+    
+    [RAG Context]
+    Detect anomalies/outliers in data.
+    Returns outlier indices.
     """
     return await anomaly.anomaly_detection(data_url, data, method, contamination)
 
 @mcp.tool()
 async def time_series_forecast(data_url: str, value_column: str, date_column: Optional[str] = None, periods: int = 10) -> str:
-    """Forecast time series data.
-    Args:
-        data_url: URL to CSV data
-        value_column: Value column to forecast
-        date_column: Date column name
-        periods: Number of periods to forecast
+    """FORECASTS time series. [ACTION]
+    
+    [RAG Context]
+    Forecast time series data.
+    Returns forecast values.
     """
     return await forecast.time_series_forecast(data_url, value_column, date_column, periods)
 
