@@ -3,7 +3,7 @@ import httpx
 import io
 import json
 from docx import Document
-from shared.logging import get_logger
+from shared.logging.structured import get_logger
 
 logger = get_logger(__name__)
 

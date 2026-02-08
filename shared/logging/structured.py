@@ -57,10 +57,16 @@ class JSONFormatter(logging.Formatter):
     
     def format(self, record: logging.LogRecord) -> str:
         """Format log record as JSON."""
-        from shared.logging.context import get_context
-        
-        # Get trace context
-        ctx = get_context()
+        try:
+            from shared.logging.context import get_context
+            ctx = get_context()
+        except ImportError:
+            # During shutdown, imports might fail
+            class MockContext:
+                trace_id = None
+                span_id = None
+                request_id = None
+            ctx = MockContext()
         
         log_entry: dict[str, Any] = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -116,17 +122,26 @@ class ConsoleFormatter(logging.Formatter):
     
     def format(self, record: logging.LogRecord) -> str:
         """Format log record with colors."""
-        from shared.logging.context import get_context
-        
-        ctx = get_context()
+        try:
+            from shared.logging.context import get_context
+            ctx = get_context()
+        except ImportError:
+            # During shutdown, imports might fail
+            class MockContext:
+                trace_id = None
+                request_id = None
+            ctx = MockContext()
+            
         color = self.COLORS.get(record.levelname, "")
         
         # Build prefix
         prefix_parts = []
         if ctx.request_id:
             prefix_parts.append(f"[{ctx.request_id[:8]}]")
-        if ctx.trace_id:
-            prefix_parts.append(f"<{ctx.trace_id[:8]}>")
+
+        # Handle trace_id differently based on formatter
+        if hasattr(ctx, 'trace_id') and ctx.trace_id:
+             prefix_parts.append(f"<{ctx.trace_id[:8]}>")
         
         prefix = " ".join(prefix_parts)
         if prefix:

@@ -2,7 +2,8 @@
 import httpx
 import pandas as pd
 import io
-from shared.logging import get_logger
+import json
+from shared.logging.structured import get_logger
 
 logger = get_logger(__name__)
 

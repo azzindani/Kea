@@ -1,8 +1,7 @@
-
 import httpx
-import pymupdf
+import fitz # PyMuPDF
 import json
-from shared.logging import get_logger
+from shared.logging.structured import get_logger
 
 logger = get_logger(__name__)
 
@@ -18,7 +17,7 @@ async def parse_pdf(url: str, pages: str = "all", extract_tables: bool = False) 
             response.raise_for_status()
             pdf_bytes = response.content
             
-        doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         
         output_data = {
             "source": url,

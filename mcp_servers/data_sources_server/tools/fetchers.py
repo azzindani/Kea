@@ -95,6 +95,9 @@ async def fetch_world_bank(indicator: str, country: str = "all", start_year: int
         else:
             data = wb.data.DataFrame(indicator, economy=country, time=time_range, labels=True)
         
+        if data is None or data.empty:
+            return f"No data found for indicator '{indicator}'"
+
         result = f"## World Bank: {indicator}\n\n"
         result += f"Shape: {data.shape}\n\n"
         result += "### Data\n```\n"
@@ -105,6 +108,9 @@ async def fetch_world_bank(indicator: str, country: str = "all", start_year: int
         
     except ImportError:
         return "wbgapi not installed. Run: pip install wbgapi"
+    except TypeError as e:
+        logger.error(f"World Bank type error: {e}")
+        return f"Error: Invalid parameters for World Bank data (indicator: {indicator})"
     except Exception as e:
         logger.error(f"World Bank error: {e}")
         return f"Error: {e}"
