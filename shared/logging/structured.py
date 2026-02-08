@@ -28,7 +28,7 @@ class LogLevel(str, Enum):
 class LogConfig(BaseModel):
     """Logging configuration."""
     level: LogLevel = LogLevel.INFO
-    format: str = "json"  # json or console
+    format: str = "console"  # json or console
     service_name: str = "research-engine"
     include_timestamp: bool = True
     include_trace: bool = True
