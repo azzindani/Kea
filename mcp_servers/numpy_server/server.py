@@ -12,7 +12,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import (
+from mcp_servers.numpy_server.tools import (
     creation_ops, manip_ops, math_ops, logic_ops, 
     linalg_ops, random_ops, fft_ops, super_ops,
     bitwise_ops, string_ops, set_ops, poly_ops, stat_plus_ops

@@ -28,7 +28,7 @@ except ImportError:
 # --------------------------------------------------
 
 # Tools - use aliased imports to avoid naming collisions
-from tools import famafrench, market_global, dashboards, market_symbols, central_bank, commercial
+from mcp_servers.pdr_server.tools import famafrench, market_global, dashboards, market_symbols, central_bank, commercial
 from shared.logging import setup_logging
 setup_logging()
 

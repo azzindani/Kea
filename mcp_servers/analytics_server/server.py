@@ -21,7 +21,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import eda, cleaning, stats
+from mcp_servers.analytics_server.tools import eda, cleaning, stats
 import structlog
 import asyncio
 from typing import Dict, Any, List, Optional

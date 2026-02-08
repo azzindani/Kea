@@ -20,7 +20,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import core_ops, ratio_ops, distance_ops, process_ops, matrix_ops, super_ops
+from mcp_servers.rapidfuzz_server.tools import core_ops, ratio_ops, distance_ops, process_ops, matrix_ops, super_ops
 import structlog
 from typing import List, Dict, Any, Optional, Tuple, Union
 

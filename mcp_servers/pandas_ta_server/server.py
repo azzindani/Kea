@@ -19,7 +19,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import (
+from mcp_servers.pandas_ta_server.tools import (
     bulk, universal, signals, performance, cycles, backtest, alpha, ml, spectral,
     momentum, trend, volatility_volume, candles
 )

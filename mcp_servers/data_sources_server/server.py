@@ -22,7 +22,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import fetchers
+from mcp_servers.data_sources_server.tools import fetchers
 import structlog
 
 logger = structlog.get_logger()

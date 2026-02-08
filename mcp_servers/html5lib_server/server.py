@@ -17,7 +17,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import (
+from mcp_servers.html5lib_server.tools import (
     core_ops, parse_ops, walk_ops, serialize_ops, filter_ops, bulk_ops, super_ops
 )
 import structlog

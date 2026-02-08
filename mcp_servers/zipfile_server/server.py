@@ -18,7 +18,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import (
+from mcp_servers.zipfile_server.tools import (
     core_ops, read_ops, extract_ops, write_ops, bulk_ops, super_ops
 )
 import structlog

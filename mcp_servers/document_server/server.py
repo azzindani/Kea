@@ -22,7 +22,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import pdf, word, excel, html, json_tool
+from mcp_servers.document_server.tools import pdf, word, excel, html, json_tool
 import structlog
 
 logger = structlog.get_logger()

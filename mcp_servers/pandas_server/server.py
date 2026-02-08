@@ -11,7 +11,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import (
+from mcp_servers.pandas_server.tools import (
     io_ops, inspection_ops, core_ops, transform_ops, chain_ops, 
     time_ops, text_ops, stat_ops, struct_ops, ml_ops, logic_ops, 
     window_ops, math_ops, quality_ops, nlp_ops, feature_ops

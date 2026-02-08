@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
 sys.path.append(str(Path(__file__).parents[2]))
-from tools import (
+from mcp_servers.ccxt_server.tools import (
     public, metadata, aggregator, derivatives, historical, account, private, trading, exchange_manager
 )
 import ccxt.async_support as ccxt

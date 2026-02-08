@@ -19,7 +19,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import (
+from mcp_servers.ytdlp_server.tools import (
     core_ops, info_ops, format_ops, download_ops, bulk_ops, super_ops
 )
 import structlog

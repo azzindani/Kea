@@ -19,7 +19,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import (
+from mcp_servers.google_search_server.tools import (
     core_ops, param_ops, dork_ops, intel_ops, news_ops
 )
 import structlog

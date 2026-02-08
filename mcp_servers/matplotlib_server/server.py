@@ -15,7 +15,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import (
+from mcp_servers.matplotlib_server.tools import (
     basic_ops, stats_ops, scientific_ops, three_d_ops, 
     specialty_ops, layout_ops, animation_ops, patch_ops, 
     advanced_ops, super_ops

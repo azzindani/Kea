@@ -19,7 +19,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import security_ops
+from mcp_servers.security_server.tools import security_ops
 import structlog
 
 logger = structlog.get_logger()

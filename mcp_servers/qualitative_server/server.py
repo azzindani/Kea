@@ -18,7 +18,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import coding, entities, graph
+from mcp_servers.qualitative_server.tools import coding, entities, graph
 import structlog
 import asyncio
 from typing import List, Dict, Any, Optional

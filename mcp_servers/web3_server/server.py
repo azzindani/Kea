@@ -12,7 +12,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import (
+from mcp_servers.web3_server.tools import (
     rpc, erc20, erc721, multicall, ens, utils, network,
     staking, stableswap, security, contract_interaction, identity, weth,
     lending, oracle, defi, events, action, wallet, gas

@@ -19,7 +19,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import (
+from mcp_servers.finta_server.tools import (
     bulk, universal, momentum, trend, volatility, volume, 
     exotics, levels, pressure, clouds, advanced_oscillators, 
     volume_flow, weighted, zones, exits_math

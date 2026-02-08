@@ -23,7 +23,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import (
+from mcp_servers.sklearn_server.tools import (
     preprocess_ops, model_selection_ops, classification_ops, 
     regression_ops, clustering_ops, decomposition_ops, 
     ensemble_ops, super_ops, feature_selection_ops,

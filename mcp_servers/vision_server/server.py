@@ -19,7 +19,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import ocr
+from mcp_servers.vision_server.tools import ocr
 import structlog
 import asyncio
 

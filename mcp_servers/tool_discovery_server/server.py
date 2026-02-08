@@ -19,7 +19,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import (
+from mcp_servers.tool_discovery_server.tools import (
     search, info, analysis, registry, generation
 )
 import structlog

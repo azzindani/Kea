@@ -23,7 +23,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import (
+from mcp_servers.xgboost_server.tools import (
     sklearn_ops, native_ops, booster_ops, analysis_ops, super_ops
 )
 import structlog

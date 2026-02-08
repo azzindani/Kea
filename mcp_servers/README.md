@@ -134,17 +134,64 @@ server_name/
 ```
 
 ### 2. Implementation Rules
-- **Framework**: Use `mcp.server.fastmcp.FastMCP`.
-- **Async**: All tools must be `async def`.
-- **Return Types**: Return `str` (typically JSON strings for data, plain text for logs). Use `to_serializable()` helpers for complex objects (SafeNum, etc.).
-- **Dependencies**: 
-  - Must be explicitly defined in `pyproject.toml`.
-  - Use `uv` for management.
-  - Pin versions if breaking changes are known (e.g., `pandas<2.0`).
-- **Error Handling**: 
-  - Wrap external API calls in `try/except`.
-  - Log errors via `structlog`.
-  - Return informative error strings to the LLM, don't crash the server.
+
+#### 2.1 StdIO & Logging (CRITICAL)
+- **Standard Output (`stdout`)**: STRICTLY RESERVED for JSON-RPC communication.
+  - ❌ `print("debug log")` -> Breaks the protocol.
+  - ❌ `logging.info(...)` (default config) -> Breaks the protocol.
+- **Standard Error (`stderr`)**: Use for logs, warnings, and errors.
+  - ✅ `logging.error("API failed")` -> Visible in MCP Inspector / Logs.
+  - ✅ `sys.stderr.write("Starting server...")` -> Safe.
+- **Standard Input (`stdin`)**: Read-only for JSON-RPC messages. Do not block on `input()`.
+
+#### 2.2 Logging Configuration
+You **MUST** use the provided `setup_logging` utility to ensure logs are routed correctly and chatty libraries (httpx, asyncio) are silenced.
+
+```python
+# In server.py
+from shared.logging import setup_logging
+setup_logging()  # <--- CALL THIS IMMEDIATELY
+
+mcp = FastMCP("my_server")
+```
+
+#### 2.3 Dependency Management
+- **Explicit Declaration**: Use the `dependencies` argument in `FastMCP`.
+  ```python
+  mcp = FastMCP("my_server", dependencies=["pandas", "numpy"])
+  ```
+- **Versioning**: Pin versions if known incompatibilities exist.
+
+#### 2.4 The "JIT Import Hack" (CRITICAL)
+To allow the server to find its local `tools/` module when run via `uv`, you **MUST** include this snippet before importing tools:
+
+```python
+import sys
+from pathlib import Path
+# Fix for importing 'tools' module from root when running in JIT mode
+sys.path.append(str(Path(__file__).parent))
+
+from tools import my_feature  # Now works!
+```
+
+#### 2.5 Naming Conventions
+- **Tool Name**: `verb_object` (snake_case).
+  - ✅ `get_price`, `calculate_rsi`
+  - ❌ `PriceGetter`, `rsi`
+- **Docstring Summary**: `VERB Object.` (Uppercase Verb).
+  - ✅ `FETCHES current price.`
+  - ✅ `CALCULATES RSI.`
+  - ❌ `Get price.`
+
+#### 2.6 Error Handling
+- **Graceful Failures**: Never let an unhandled exception crash the server.
+- **Informative Errors**: Return stringified errors to the LLM.
+  ```python
+  try:
+      return do_risky_thing()
+  except Exception as e:
+      return f"Error: Failed to process data ({str(e)})"
+  ```
 
 ### 3. Tool Design Philosophy
 - **"Super Tools"**: Prefer comprehensive tools (e.g., `analyze_stock_full`) over granular ones (`get_price`, `get_volue`).
@@ -156,17 +203,20 @@ server_name/
     ```python
     @mcp.tool()
     async def my_tool(arg: str) -> str:
-        """SHORT SUMMARY (e.g., FETCHES price). [ACTION]
+        """FETCHES current price. [ACTION]
         
         [RAG Context]
-        Detailed explanation (up to 200 chars) to enrich retrieval.
-        Includes keywords, synonyms, and specific use cases.
+        Returns realtime snapshot. Key fields: price, volume, high, low.
+        Use for single-point checks.
         """
     ```
   - **Tags**: 
-    - End the summary line with `[ACTION]` or `[DATA]`.
-    - Use a `[RAG Context]` block for the detailed description.
-  - **Content**: The context block should be rich in keywords to ensure the tool is found by the semantic retriever, but concise (max ~200 chars).
+    - **Summary Line**: Must start with a capitalized verb (FETCHES, CALCULATES, RUNS, ANALYZES) and end with `[ACTION]`.
+    - **Context Block**: `[RAG Context]` is MANDATORY.
+  - **Content Rules**: 
+    - **Length**: ~200 characters max.
+    - **Keywords**: Include synonyms (e.g. "stock" for "ticker", "profit" for "income").
+    - **No Empty Blocks**: Unlike some legacy servers, new servers MUST populate this block.
 - **Auto-Detection**:
   - The `mcp_servers` package uses dynamic discovery.
   - Ensure your server has a `server.py` file in its root directory to be automatically loaded.

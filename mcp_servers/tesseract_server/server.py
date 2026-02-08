@@ -21,7 +21,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import (
+from mcp_servers.tesseract_server.tools import (
     core_ops, text_ops, config_ops, box_ops, data_ops, format_ops,
     preprocess_ops, bulk_ops, super_ops
 )

@@ -18,7 +18,7 @@ os.environ.pop('MPLBACKEND', None)
 sys.path.append(str(Path(__file__).parent))
 
 from mcp.server.fastmcp import FastMCP, Image
-from tools import (
+from mcp_servers.yfinance_server.tools import (
     charts, market, financials, holders, analysis, options, discovery, aggregators
 )
 import structlog

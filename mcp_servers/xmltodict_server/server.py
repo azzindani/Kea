@@ -18,7 +18,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import (
+from mcp_servers.xmltodict_server.tools import (
     core_ops, parse_ops, unparse_ops, file_ops, bulk_ops, super_ops
 )
 import structlog

@@ -15,7 +15,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import (
+from mcp_servers.seaborn_server.tools import (
     relational_ops, distribution_ops, categorical_ops, 
     regression_ops, matrix_ops, multiples_ops, 
     style_ops, super_ops

@@ -15,7 +15,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import (
+from mcp_servers.quantstats_server.tools import (
     core_ops, stats_ops, risk_ops, compare_ops, 
     plot_ops, report_ops, bulk_ops, super_ops
 )

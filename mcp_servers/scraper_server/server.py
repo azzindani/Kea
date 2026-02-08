@@ -11,7 +11,7 @@ from mcp.server.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import fetch_url as fetch_url_module, browser_scrape as browser_scrape_module
+from mcp_servers.scraper_server.tools import fetch_url as fetch_url_module, browser_scrape as browser_scrape_module
 import structlog
 from typing import Optional, Dict
 

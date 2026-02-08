@@ -12,7 +12,7 @@ from soup_manager import SoupManager
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import (
+from mcp_servers.bs4_server.tools import (
     core_ops, nav_ops, search_ops, extract_ops, mod_ops, super_ops,
     convert_ops, sanitize_ops, analyze_ops, fix_ops, logic_ops,
     semantic_ops, feed_ops, diff_ops, visual_ops, export_ops

@@ -22,29 +22,29 @@ import asyncio
 from mcp.server.fastmcp import FastMCP
 
 # Phase 1: Core & Bulk
-from tools import bulk
+from mcp_servers.mibian_server.tools import bulk
 
 # Phase 2: Pricing
-from tools import pricing
+from mcp_servers.mibian_server.tools import pricing
 
 # Phase 3: Greeks
-from tools import greeks
+from mcp_servers.mibian_server.tools import greeks
 
 # Phase 4: Volatility
-from tools import volatility
+from mcp_servers.mibian_server.tools import volatility
 
 # Phase 2 (Expansion)
-from tools import utilities
-from tools import simulation
+from mcp_servers.mibian_server.tools import utilities
+from mcp_servers.mibian_server.tools import simulation
 
 # Phase 3
-from tools import strategies
-from tools import advanced_greeks
-from tools import exotics
+from mcp_servers.mibian_server.tools import strategies
+from mcp_servers.mibian_server.tools import advanced_greeks
+from mcp_servers.mibian_server.tools import exotics
 
 # Phase 4
-from tools import american
-from tools import barriers
+from mcp_servers.mibian_server.tools import american
+from mcp_servers.mibian_server.tools import barriers
 
 from shared.logging import setup_logging
 setup_logging()
