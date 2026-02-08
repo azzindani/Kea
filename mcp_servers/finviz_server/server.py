@@ -301,3 +301,18 @@ async def get_technical_table(limit: int = 100000, signal: str = "") -> str:
 
 if __name__ == "__main__":
     mcp.run()
+
+# ==========================================
+# Compatibility Layer for Tests
+# ==========================================
+class FinvizServer:
+    def __init__(self):
+        # Wrap the FastMCP instance
+        self.mcp = mcp
+
+    def get_tools(self):
+        # Access internal tool manager to get list of tool objects
+        # We need to return objects that have a .name attribute
+        if hasattr(self.mcp, '_tool_manager') and hasattr(self.mcp._tool_manager, '_tools'):
+             return list(self.mcp._tool_manager._tools.values())
+        return []
