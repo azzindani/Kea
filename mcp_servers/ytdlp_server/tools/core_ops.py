@@ -64,6 +64,10 @@ def get_default_options() -> Dict[str, Any]:
         "ignoreerrors": True,
         # Prevent stdout pollution
         "logger": SilentLogger(),
+        # Prevent freeze on existing files or network issues
+        "nooverwrites": True,
+        "noprogress": True,
+        "socket_timeout": 15,
     }
     if CONFIG["cookies_file"]:
         opts["cookiefile"] = CONFIG["cookies_file"]
