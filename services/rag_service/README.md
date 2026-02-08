@@ -38,45 +38,33 @@ graph TD
 
 ## 📁 Codebase Structure
 
-- **`main.py`**: FastAPI entrypoint hosting the facts and datasets API.
+- **`main.py`**: FastAPI entrypoint (v0.2.0) hosting the facts, datasets, and knowledge API.
 - **`core/`**: The implementation of the storage and loading logic.
     - `fact_store.py`: Orchestrates the `AtomicFact` lifecycle across vector and metadata stores.
-    - `artifact_store.py`: Implementation of Local and S3 storage for large research files (Interface to Vault).
+    - `knowledge_store.py`: Semantic search for system-level knowledge (skills, rules, personas).
+    - `artifact_store.py`: Implementation of Local and S3 storage for large research files.
     - `dataset_loader.py`: Integration with Hugging Face `datasets` for streaming ingestion.
-    - `graph_rag.py`: Implements the Knowledge Graph for fact relationships and provenance.
-    - `postgres_artifacts.py`: Database-backed persistence for artifact metadata.
-    - `admin_service.py`: Administrative operations for Knowledge Graph management.
-    - `context_synthesis.py`: Logic for synthesizing retrieved facts into coherent context.
-    - `fact_retrieval.py`: Core logic for searching and retrieving atomic facts.
-    - `ingestion_pipeline.py`: Pipeline for processing and ingesting new data sources.
-- **`schemas/`**: Pydantic models for `AtomicFact`, `Dataset`, and API requests.
 
 ## 🧠 Deep Dive
 
 ### 1. The Atomic Fact Pattern
-Every finding in Kea is normalized into an `AtomicFact`:
-- **Entity**: "Nickel Production"
-- **Attribute**: "Global Volume 2023"
-- **Value**: "3.6 Million Metric Tons"
-- **Context**: Unit, Period, Source URL, Confidence Score.
-
-This normalization allows the Orchestrator's **Consensus Engine** to compare findings from different sources at a granular level, detecting contradictions even when the surrounding text differs.
+Every finding in Kea is normalized into an `AtomicFact` (Entity-Attribute-Value). This normalization allows the Orchestrator's **Consensus Engine** to compare findings from different sources at a granular level.
 
 ### 2. High-Throughput Ingestion
-The `DatasetLoader` is designed for scale. When a Hugging Face dataset is ingested (e.g., via `/datasets/ingest`), the service spawns a background task that streams rows, maps them to the atomic schema using a dynamic field map, and batch-inserts them into the vector store. This enables Kea to "read" thousands of rows of structured data in seconds.
+The `DatasetLoader` streams rows from Hugging Face, maps them to the atomic schema, and batch-inserts them into the vector store.
 
-### 3. GraphRAG & Provenance
-The `GraphRAG` module constructs a live knowledge graph linking Entities -> Facts -> Sources. This allows Kea to answer questions like "What contradicting facts exist for Entity X?" or "Show the provenance chain for this data point," providing explainable AI features critical for enterprise trust.
+### 3. Knowledge Store
+Unlike `FactStore` which manages dynamic research findings, the `KnowledgeStore` indexes static system assets from the `knowledge/` directory. This includes agent "Skills," compliance "Rules," and "Personas."
 
 ## 📚 Reference
 
-### API Interface
+### API Interface (v0.2.0)
 
 | Endpoint | Method | Description |
 |:---------|:-------|:------------|
-| `/facts` | `POST` | Manually add a verified atomic fact. |
 | `/facts/search` | `POST` | Perform semantic and filtered search across facts. |
+| `/knowledge/search` | `POST` | Semantic search for system skills, rules, and personas. |
 | `/datasets/ingest` | `POST` | Trigger background ingestion from Hugging Face. |
-| `/entities` | `GET` | List all unique entities currently known to the system. |
-| `/artifacts` | `GET` | List available research artifacts by job ID. |
+| `/entities` | `GET` | List all unique entities currently known. |
+| `/knowledge/sync` | `POST` | Sync vector index with files in `knowledge/` directory. |
 | `/health` | `GET` | Service status and initialization checks. |

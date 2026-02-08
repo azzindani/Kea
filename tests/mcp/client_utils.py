@@ -30,7 +30,7 @@ def get_server_params(server_name: str, extra_dependencies: list[str] = None):
     if not os.path.exists(server_script):
         raise FileNotFoundError(f"Server script not found at: {server_script}")
         
-    args = ["run"]
+    args = ["run", "--quiet"]
     for dep in deps:
         args.extend(["--with", dep])
         
