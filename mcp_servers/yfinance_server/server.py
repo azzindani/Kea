@@ -17,7 +17,7 @@ os.environ.pop('MPLBACKEND', None)
 # This fixes "ModuleNotFoundError: No module named 'tools'" in some uv environments
 sys.path.append(str(Path(__file__).parent))
 
-from mcp.server.fastmcp import FastMCP, Image
+from shared.mcp.fastmcp import FastMCP, Image
 from mcp_servers.yfinance_server.tools import (
     charts, market, financials, holders, analysis, options, discovery, aggregators
 )

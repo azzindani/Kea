@@ -10,7 +10,7 @@ if root_path not in sys.path:
 # Clear MPLBACKEND before importing matplotlib (Kaggle sets invalid value)
 os.environ.pop('MPLBACKEND', None)
 
-from mcp.server.fastmcp import FastMCP
+from shared.mcp.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))

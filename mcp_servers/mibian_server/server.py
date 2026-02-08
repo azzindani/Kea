@@ -19,7 +19,7 @@ sys.path.append(str(Path(__file__).parent))
 # ]
 # ///
 import asyncio
-from mcp.server.fastmcp import FastMCP
+from shared.mcp.fastmcp import FastMCP
 
 # Phase 1: Core & Bulk
 from mcp_servers.mibian_server.tools import bulk

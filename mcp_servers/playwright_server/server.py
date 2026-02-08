@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
 
-from mcp.server.fastmcp import FastMCP
+from shared.mcp.fastmcp import FastMCP
 from session_manager import BrowserSession
 from mcp_servers.playwright_server.tools import (
     nav_ops, input_ops, dom_ops, network_ops, state_ops, chain_ops, scraper_ops,

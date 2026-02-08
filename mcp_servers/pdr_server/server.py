@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
 import asyncio
-from mcp.server.fastmcp import FastMCP
+from shared.mcp.fastmcp import FastMCP
 
 # --- PATCH: Fix pandas-datareader compatibility ---
 # pandas-datareader uses an old signature for deprecate_kwarg.

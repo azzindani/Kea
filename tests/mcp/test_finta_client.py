@@ -2,7 +2,7 @@ import pytest
 import asyncio
 import sys
 import os
-from mcp import ClientSession, StdioServerParameters
+from tests.mcp.client_utils import SafeClientSession as ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 # Define the server execution command

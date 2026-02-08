@@ -7,7 +7,7 @@ if root_path not in sys.path:
     sys.path.append(root_path)
 
 
-from mcp.server.fastmcp import FastMCP
+from shared.mcp.fastmcp import FastMCP
 from soup_manager import SoupManager
 import sys
 from pathlib import Path

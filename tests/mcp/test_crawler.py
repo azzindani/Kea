@@ -1,6 +1,6 @@
 import pytest
 import asyncio
-from mcp import ClientSession
+from tests.mcp.client_utils import SafeClientSession as ClientSession
 from mcp.client.stdio import stdio_client
 from tests.mcp.client_utils import get_server_params
 

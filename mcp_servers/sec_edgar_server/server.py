@@ -28,7 +28,7 @@ except ImportError:
     pass
 # ------------------------------------
 
-from mcp.server.fastmcp import FastMCP
+from shared.mcp.fastmcp import FastMCP
 from typing import List, Optional
 import structlog
 
