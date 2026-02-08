@@ -210,7 +210,7 @@ class FastMCP(LibFastMCP):
             wrapper.__signature__ = inspect.signature(func)
             
             # Register the WRAPPED function with the parent FastMCP
-            super().tool(name=tool_name, description=tool_desc)(wrapper)
+            LibFastMCP.tool(self, name=tool_name, description=tool_desc)(wrapper)
             
             return wrapper
         return decorator
@@ -238,18 +238,18 @@ class FastMCP(LibFastMCP):
         # We check the base class specifically
         try:
             # Prefer calling the parent implementation
-            return super().run(transport=transport)
+            return LibFastMCP.run(self, transport=transport)
         except (AttributeError, TypeError):
             # Fallback for dummy or if super().run fails (e.g. dummy's pass)
             logger.info("mcp_server_run_called", server=self.server_name, transport=transport)
 
     def resource(self, uri: str, name: str, description: Optional[str] = None, mime_type: Optional[str] = None):
         """Proxy for resource decorator."""
-        return super().resource(uri, name, description, mime_type)
+        return LibFastMCP.resource(self, uri, name, description, mime_type)
 
     def prompt(self, name: Optional[str] = None, description: Optional[str] = None):
         """Proxy for prompt decorator."""
-        return super().prompt(name, description)
+        return LibFastMCP.prompt(self, name, description)
 
     def _format_error(self, code: str, message: str, meta: Dict, details: Optional[Dict] = None) -> str:
         """Constructs the standard error envelope."""
