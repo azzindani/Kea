@@ -25,7 +25,8 @@ def _discover() -> dict:
                         if isinstance(obj, type) or callable(obj):
                             exports[name] = module_path
             except Exception as e:
-                print(f"Failed to import {item.name}: {e}")
+                import logging
+                logging.getLogger(__name__).error(f"Failed to import {item.name}: {e}")
                 import traceback
                 traceback.print_exc()
                 continue
