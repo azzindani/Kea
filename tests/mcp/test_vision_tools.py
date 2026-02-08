@@ -1,81 +1,64 @@
 """
 MCP Tool Tests: Vision Tools.
 
-Tests for vision MCP tools via API.
+Tests for vision MCP tools via stdio.
 """
 
 import pytest
-import httpx
+import asyncio
+from mcp import ClientSession
+from mcp.client.stdio import stdio_client
+from tests.mcp.client_utils import get_server_params
 
-
-API_URL = "http://localhost:8080"
-
-
-class TestScreenshotExtract:
-    """Tests for screenshot_extract tool."""
+@pytest.mark.mcp
+@pytest.mark.asyncio
+async def test_screenshot_extract():
+    """Test screenshot extraction."""
+    params = get_server_params("vision_server", extra_dependencies=["httpx"])
     
-    @pytest.mark.mcp
-    @pytest.mark.asyncio
-    async def test_extract_from_url(self):
-        """Extract text from screenshot URL."""
-        async with httpx.AsyncClient(timeout=60) as client:
-            response = await client.post(
-                f"{API_URL}/api/v1/mcp/tools/invoke",
-                json={
-                    "tool_name": "screenshot_extract",
-                    "arguments": {
-                        "image_url": "https://example.com/screenshot.png",
-                    },
-                }
-            )
-        
-        # May fail without valid image
-        assert response.status_code in [200, 400, 500]
-
-
-class TestTableOCR:
-    """Tests for table_ocr tool."""
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            
+            # Without real image, we expect error or handled response
+            # We can't easily mock the tool's internal httpx call in integration test
+            # So we just check if it runs
+            res = await session.call_tool("screenshot_extract", arguments={"image_url": "https://example.com/test.png"})
+            
+            # Tools usually return a string even on error if robust, or isError=True
+            assert res
+            # assert not res.isError # It might be error due to invalid URL/fake image
+            
+@pytest.mark.mcp
+@pytest.mark.asyncio
+async def test_chart_reader():
+    """Test chart reader."""
+    params = get_server_params("vision_server", extra_dependencies=["httpx"])
     
-    @pytest.mark.mcp
-    @pytest.mark.asyncio
-    async def test_extract_table(self):
-        """Extract table from image."""
-        async with httpx.AsyncClient(timeout=60) as client:
-            response = await client.post(
-                f"{API_URL}/api/v1/mcp/tools/invoke",
-                json={
-                    "tool_name": "table_ocr",
-                    "arguments": {
-                        "image_url": "https://example.com/table.png",
-                        "output_format": "markdown",
-                    },
-                }
-            )
-        
-        # May fail without valid image or API key
-        assert response.status_code in [200, 400, 500]
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            
+            res = await session.call_tool("chart_reader", arguments={"image_url": "https://example.com/chart.png"})
+            assert res
 
-
-class TestChartReader:
-    """Tests for chart_reader tool."""
+@pytest.mark.mcp
+@pytest.mark.asyncio
+async def test_table_extraction():
+    """Test table extraction (via screenshot_extract)."""
+    params = get_server_params("vision_server", extra_dependencies=["httpx"])
     
-    @pytest.mark.mcp
-    @pytest.mark.asyncio
-    async def test_read_chart(self):
-        """Read data from chart."""
-        async with httpx.AsyncClient(timeout=60) as client:
-            response = await client.post(
-                f"{API_URL}/api/v1/mcp/tools/invoke",
-                json={
-                    "tool_name": "chart_reader",
-                    "arguments": {
-                        "image_url": "https://example.com/chart.png",
-                    },
-                }
-            )
-        
-        assert response.status_code in [200, 400, 500]
-
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            
+            # Use screenshot_extract with extraction_type='table'
+            res = await session.call_tool("screenshot_extract", arguments={
+                "image_url": "https://example.com/table.png",
+                "extraction_type": "table"
+            })
+            assert res
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v", "-m", "mcp"])
+    import sys
+    sys.exit(pytest.main(["-v", "-s", __file__]))

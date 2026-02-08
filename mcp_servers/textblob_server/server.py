@@ -82,7 +82,7 @@ def extract_noun_phrases(text: str) -> List[str]:
     Get list of noun phrases.
     Returns list of strings.
     """
-    return blob_ops.extract_noun_phrases(text)
+    return str(blob_ops.extract_noun_phrases(text))
 
 @mcp.tool()
 def tag_pos(text: str) -> List[List[str]]: 
@@ -92,7 +92,7 @@ def tag_pos(text: str) -> List[List[str]]:
     Get Part-of-Speech tags.
     Returns list of [word, tag] lists.
     """
-    return blob_ops.tag_pos(text)
+    return str(blob_ops.tag_pos(text))
 
 @mcp.tool()
 def parse_text(text: str) -> str: 
@@ -112,7 +112,7 @@ def tokenize_words(text: str) -> List[str]:
     Split text into words.
     Returns list of strings.
     """
-    return blob_ops.tokenize_words(text)
+    return str(blob_ops.tokenize_words(text))
 
 @mcp.tool()
 def tokenize_sentences(text: str) -> List[str]: 
@@ -122,7 +122,7 @@ def tokenize_sentences(text: str) -> List[str]:
     Split text into sentences.
     Returns list of strings.
     """
-    return blob_ops.tokenize_sentences(text)
+    return str(blob_ops.tokenize_sentences(text))
 
 @mcp.tool()
 def get_word_counts(text: str) -> Dict[str, int]: 
@@ -142,7 +142,7 @@ def get_ngrams(text: str, n: int = 3) -> List[List[str]]:
     Get list of n-grams (tuples of words).
     Returns list of lists.
     """
-    return blob_ops.get_ngrams(text, n)
+    return str(blob_ops.get_ngrams(text, n))
 
 @mcp.tool()
 def correct_spelling(text: str) -> str: 
@@ -241,7 +241,7 @@ def spellcheck_word(word: str) -> List[List[Any]]:
     Get spelling suggestions for a word.
     Returns list of [word, confidence] lists.
     """
-    return word_ops.spellcheck_word(word)
+    return str(word_ops.spellcheck_word(word))
 
 @mcp.tool()
 def define_word(word: str) -> List[str]: 
@@ -251,7 +251,7 @@ def define_word(word: str) -> List[str]:
     Get definitions for a word (WordNet).
     Returns list of strings.
     """
-    return word_ops.define_word(word)
+    return str(word_ops.define_word(word))
 
 @mcp.tool()
 def get_synsets(word: str) -> List[str]: 
@@ -261,7 +261,7 @@ def get_synsets(word: str) -> List[str]:
     Get WordNet synsets for a word.
     Returns list of strings.
     """
-    return word_ops.get_synsets(word)
+    return str(word_ops.get_synsets(word))
 
 @mcp.tool()
 def get_synonyms(word: str) -> List[str]: 
@@ -271,7 +271,7 @@ def get_synonyms(word: str) -> List[str]:
     Get synonyms for a word.
     Returns list of strings.
     """
-    return word_ops.get_synonyms(word)
+    return str(word_ops.get_synonyms(word))
 
 @mcp.tool()
 def stem_word(word: str) -> str: 

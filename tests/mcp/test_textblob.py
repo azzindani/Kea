@@ -20,7 +20,14 @@ async def test_textblob_real_simulation():
         async with ClientSession(read, write) as session:
             await session.initialize()
             
-            # 1. Sentiment Analysis
+            # 0. Setup
+            print("0. Ensuring Corpora...")
+            res = await session.call_tool("ensure_corpora", arguments={})
+            if res.isError:
+                print(f" \033[91m[FAIL]\033[0m ensure_corpora failed: {res.content[0].text if res.content else 'Unknown error'}")
+            else:
+                print(f" \033[92m[PASS]\033[0m Corpora check: {res.content[0].text if res.content else 'OK'}")
+            
             # 1. Sentiment Analysis
             print(f"1. Analyzing Sentiment: '{text}'...")
             res = await session.call_tool("analyze_sentiment", arguments={"text": text})
@@ -32,27 +39,42 @@ async def test_textblob_real_simulation():
             # 2. Spelling Correction
             print(f"2. Correcting Spelling: '{bad_text}'...")
             res = await session.call_tool("correct_spelling", arguments={"text": bad_text})
-            print(f" \033[92m[PASS]\033[0m Corrected: {res.content[0].text}")
+            if not res.isError and res.content:
+                print(f" \033[92m[PASS]\033[0m Corrected: {res.content[0].text}")
+            else:
+                print(f" \033[91m[FAIL]\033[0m {res.content[0].text if res.content else 'No content'}")
 
             # 3. Detect Language
             print("3. Detecting Language...")
             res = await session.call_tool("detect_language", arguments={"text": "Bonjour tout le monde"})
-            print(f" \033[92m[PASS]\033[0m Language: {res.content[0].text}")
+            if not res.isError and res.content:
+                print(f" \033[92m[PASS]\033[0m Language: {res.content[0].text}")
+            else:
+                print(f" \033[91m[FAIL]\033[0m {res.content[0].text if res.content else 'No content'}")
 
             # 4. Noun Phrases
             print("4. Extracting Noun Phrases...")
             res = await session.call_tool("extract_noun_phrases", arguments={"text": text})
-            print(f" \033[92m[PASS]\033[0m Phrases: {res.content[0].text}")
+            if not res.isError and res.content:
+                print(f" \033[92m[PASS]\033[0m Phrases: {res.content[0].text}")
+            else:
+                print(f" \033[91m[FAIL]\033[0m {res.content[0].text if res.content else 'No content'}")
 
             # 5. Word Definitions
             print("5. Word Definition (Analysis)...")
             res = await session.call_tool("define_word", arguments={"word": "analysis"})
-            print(f" \033[92m[PASS]\033[0m Def: {res.content[0].text[:1000]}...")
+            if not res.isError and res.content:
+                print(f" \033[92m[PASS]\033[0m Def: {res.content[0].text[:1000]}...")
+            else:
+                print(f" \033[91m[FAIL]\033[0m {res.content[0].text if res.content else 'No content'}")
 
             # 6. Full Report
             print("6. Full Text Report...")
             res = await session.call_tool("full_text_report", arguments={"text": text})
-            print(f" \033[92m[PASS]\033[0m Report Generated")
+            if not res.isError and res.content:
+                 print(f" \033[92m[PASS]\033[0m Report Generated")
+            else:
+                print(f" \033[91m[FAIL]\033[0m {res.content[0].text if res.content else 'No content'}")
 
     print("--- TextBlob Simulation Complete ---")
 

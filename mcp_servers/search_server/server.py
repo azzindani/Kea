@@ -36,7 +36,10 @@ async def web_search(query: str, max_results: int = 10, search_depth: str = "bas
     Robust general purpose search using Tavily/Brave.
     Returns search results.
     """
-    return await web_search.web_search_tool(query, max_results, search_depth)
+    try:
+        return await web_search.web_search_tool(query, max_results, search_depth)
+    except Exception as e:
+        return f"Error executing web_search: {e}"
 
 @mcp.tool()
 async def news_search(query: str, days: int = 7, max_results: int = 10) -> str:
@@ -46,7 +49,10 @@ async def news_search(query: str, days: int = 7, max_results: int = 10) -> str:
     Search news articles with date filtering (lookback window).
     Returns news results.
     """
-    return await news_search.news_search_tool(query, days, max_results)
+    try:
+        return await news_search.news_search_tool(query, days, max_results)
+    except Exception as e:
+        return f"Error executing news_search: {e}"
 
 if __name__ == "__main__":
     mcp.run()

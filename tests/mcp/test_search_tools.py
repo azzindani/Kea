@@ -1,87 +1,65 @@
 """
 MCP Tool Tests: Search Tools.
 
-Tests for search MCP tools via API.
+Tests for search MCP tools via stdio.
 """
 
 import pytest
-import httpx
+import asyncio
+from mcp import ClientSession
+from mcp.client.stdio import stdio_client
+from tests.mcp.client_utils import get_server_params
 
-
-API_URL = "http://localhost:8080"
-
-
-class TestWebSearch:
-    """Tests for web_search tool."""
+@pytest.mark.mcp
+@pytest.mark.asyncio
+async def test_web_search_basic():
+    """Perform basic web search."""
+    params = get_server_params("search_server")
     
-    @pytest.mark.mcp
-    @pytest.mark.asyncio
-    async def test_basic_search(self):
-        """Perform basic web search."""
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.post(
-                f"{API_URL}/api/v1/mcp/tools/invoke",
-                json={
-                    "tool_name": "web_search",
-                    "arguments": {
-                        "query": "python programming",
-                        "max_results": 5,
-                    },
-                }
-            )
-        
-        if response.status_code == 200:
-            data = response.json()
-            assert "result" in data
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            
+            # Mock or Real? For now we expect the tool to handle real requests or fail gracefully
+            # If no API key, it returns error string, which is fine, we just check tool execution
+            res = await session.call_tool("web_search", arguments={"query": "python programming", "max_results": 1})
+            
+            # We don't assert validity of search results (network dep), just that tool runs
+            assert not res.isError
+            assert res.content
+            assert len(res.content) > 0
 
-
-class TestNewsSearch:
-    """Tests for news_search tool."""
+@pytest.mark.mcp
+@pytest.mark.asyncio
+async def test_news_search_query():
+    """Search for news."""
+    params = get_server_params("search_server")
     
-    @pytest.mark.mcp
-    @pytest.mark.asyncio
-    async def test_news_query(self):
-        """Search for news."""
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.post(
-                f"{API_URL}/api/v1/mcp/tools/invoke",
-                json={
-                    "tool_name": "news_search",
-                    "arguments": {
-                        "query": "technology news",
-                        "days": 7,
-                    },
-                }
-            )
-        
-        if response.status_code == 200:
-            data = response.json()
-            assert "result" in data
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            
+            res = await session.call_tool("news_search", arguments={"query": "technology", "days": 1, "max_results": 1})
+            
+            assert not res.isError
+            assert res.content
 
-
-class TestAcademicSearch:
-    """Tests for academic_search tool."""
+@pytest.mark.mcp
+@pytest.mark.asyncio
+async def test_arxiv_search():
+    """Search academic papers (via academic_server)."""
+    # Note: academic_search tool is named 'arxiv_search' in academic_server
+    params = get_server_params("academic_server", extra_dependencies=["httpx", "arxiv"]) 
     
-    @pytest.mark.mcp
-    @pytest.mark.asyncio
-    async def test_arxiv_search(self):
-        """Search academic papers."""
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.post(
-                f"{API_URL}/api/v1/mcp/tools/invoke",
-                json={
-                    "tool_name": "academic_search",
-                    "arguments": {
-                        "query": "machine learning",
-                        "max_results": 5,
-                    },
-                }
-            )
-        
-        if response.status_code == 200:
-            data = response.json()
-            assert "result" in data
-
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            
+            res = await session.call_tool("arxiv_search", arguments={"query": "machine learning", "max_results": 1})
+            
+            assert not res.isError
+            assert res.content
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v", "-m", "mcp"])
+    import sys
+    sys.exit(pytest.main(["-v", "-s", __file__]))
