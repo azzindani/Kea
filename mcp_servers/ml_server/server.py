@@ -90,7 +90,7 @@ if __name__ == "__main__":
 # ==========================================
 # Compatibility Layer for Tests
 # ==========================================
-class MlServer:
+class MLServer:
     def __init__(self):
         # Wrap the FastMCP instance
         self.mcp = mcp
