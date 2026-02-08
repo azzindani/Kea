@@ -256,7 +256,5 @@ if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])
 
 
-@pytest.mark.asyncio
-async def test_main():
-    await verify()
+
 

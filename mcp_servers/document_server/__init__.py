@@ -24,7 +24,10 @@ def _discover() -> dict:
                         obj = getattr(module, name, None)
                         if isinstance(obj, type) or callable(obj):
                             exports[name] = module_path
-            except Exception:
+            except Exception as e:
+                print(f"Failed to import {item.name}: {e}")
+                import traceback
+                traceback.print_exc()
                 continue
     _discovered = exports
     return exports
