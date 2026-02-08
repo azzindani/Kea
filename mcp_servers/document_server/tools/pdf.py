@@ -1,5 +1,5 @@
 import httpx
-import fitz # PyMuPDF
+# import fitz # PyMuPDF (deferred)
 import json
 from shared.logging.structured import get_logger
 
@@ -11,6 +11,8 @@ async def parse_pdf(url: str, pages: str = "all", extract_tables: bool = False) 
     pages: 'all', '1-5', '1,3,5'
     """
     try:
+        import fitz # PyMuPDF
+        
         # Download PDF
         async with httpx.AsyncClient(timeout=60) as client:
             response = await client.get(url)
