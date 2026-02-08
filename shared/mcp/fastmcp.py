@@ -14,15 +14,38 @@ except ImportError:
     # Fallback for environments where mcp is not installed
     # This ensures the file is at least importable
     class LibFastMCP:
-        def __init__(self, name: str, **kwargs): pass
+        def __init__(self, name: str, **kwargs):
+            self.name = name
+            # Mock tool manager for testing compatibility
+            class MockToolManager:
+                def __init__(self):
+                    self._tools = {}
+            self._tool_manager = MockToolManager()
+
         def tool(self, name: Optional[str] = None, description: Optional[str] = None): 
-            def decorator(f): return f
+            def decorator(f):
+                tool_name = name or f.__name__
+                # Mock tool object with name attribute
+                f.name = tool_name
+                f.description = description or f.__doc__
+                self._tool_manager._tools[tool_name] = f
+                return f
             return decorator
-        def add_tool(self, fn: Callable, name: Optional[str] = None, description: Optional[str] = None): pass
-        def run(self, transport: str = "stdio"): pass
+
+        def add_tool(self, fn: Callable, name: Optional[str] = None, description: Optional[str] = None):
+            return self.tool(name=name, description=description)(fn)
+
+        def run(self, transport: str = "stdio"):
+            """No-op for dummy but can be made to block if needed."""
+            logger.info("dummy_mcp_run_called", server=self.name)
+            # In dummy mode, we don't want to block forever as there's no real protocol
+            # but we also don't want to exit immediately if tests expect it to run
+            pass
+
         def resource(self, uri: str, name: str, description: Optional[str] = None, mime_type: Optional[str] = None):
             def decorator(f): return f
             return decorator
+
         def prompt(self, name: Optional[str] = None, description: Optional[str] = None):
             def decorator(f): return f
             return decorator
@@ -183,6 +206,13 @@ class FastMCP(LibFastMCP):
                         details={"traceback": traceback.format_exc()}
                     )
 
+            # Preserve signature for FastMCP introspection
+            wrapper.__signature__ = inspect.signature(func)
+            
+            # Register the WRAPPED function with the parent FastMCP
+            super().tool(name=tool_name, description=tool_desc)(wrapper)
+            
+            return wrapper
         return decorator
 
     def add_tool(self, fn: Callable, name: Optional[str] = None, description: Optional[str] = None):
@@ -205,11 +235,13 @@ class FastMCP(LibFastMCP):
         Run the MCP server.
         """
         # If we are using the real LibFastMCP, it will have a run method
-        if hasattr(super(), "run"):
+        # We check the base class specifically
+        try:
+            # Prefer calling the parent implementation
             return super().run(transport=transport)
-        
-        # Fallback/Mock behavior
-        logger.info("mcp_server_run_called", server=self.server_name, transport=transport)
+        except (AttributeError, TypeError):
+            # Fallback for dummy or if super().run fails (e.g. dummy's pass)
+            logger.info("mcp_server_run_called", server=self.server_name, transport=transport)
 
     def resource(self, uri: str, name: str, description: Optional[str] = None, mime_type: Optional[str] = None):
         """Proxy for resource decorator."""
