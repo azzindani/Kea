@@ -41,16 +41,17 @@ except ImportError:
 
         def tool(self, name: Optional[str] = None, description: Optional[str] = None, **kwargs): 
             def decorator(f):
-                tool_name = name or f.__name__
-                # Mock tool object with name attribute
-                f.name = tool_name
-                f.description = description or f.__doc__
-                self._tool_manager._tools[tool_name] = f
+                self.add_tool(f, name=name, description=description, **kwargs)
                 return f
             return decorator
 
         def add_tool(self, fn: Callable, name: Optional[str] = None, description: Optional[str] = None, **kwargs):
-            return self.tool(name=name, description=description, **kwargs)(fn)
+            tool_name = name or (getattr(fn, "__name__", "unknown"))
+            # Mock tool object with name attribute
+            fn.name = tool_name
+            fn.description = description or (getattr(fn, "__doc__", "") or "")
+            self._tool_manager._tools[tool_name] = fn
+            return fn
 
         def run(self, transport: str = "stdio"):
             """No-op for dummy but can be made to block if needed."""
@@ -226,26 +227,27 @@ class FastMCP(LibFastMCP):
             # Preserve signature for FastMCP introspection
             wrapper.__signature__ = inspect.signature(func)
             
-            # Register the WRAPPED function with the parent FastMCP
-            LibFastMCP.tool(self, name=tool_name, description=tool_desc, **kwargs)(wrapper)
+            # --- GUARD AGAINST RECURSION ---
+            # Mark as standardized to avoid double wrapping if called again via inheritance
+            wrapper.__standardized_mcp_wrapper__ = True
+            
+            # Register the WRAPPED function directly with the parent sink to avoid loop
+            LibFastMCP.add_tool(self, wrapper, name=tool_name, description=tool_desc, **kwargs)
             
             return wrapper
         return decorator
 
     def add_tool(self, fn: Callable, name: Optional[str] = None, description: Optional[str] = None, **kwargs):
         """
-        Manually register a tool.
+        Manually register a tool with standardized envelope.
         """
-        # We use our own tool decorator to ensure the wrapper is applied
-        @self.tool(name=name, description=description, **kwargs)
-        @wraps(fn)
-        async def wrapped_fn(*args, **kwargs):
-            if inspect.iscoroutinefunction(fn):
-                return await fn(*args, **kwargs)
-            return fn(*args, **kwargs)
-        
-        # We don't need to do anything else as self.tool() already registered it
-        return wrapped_fn
+        # If already wrapped, just register with base
+        if getattr(fn, "__standardized_mcp_wrapper__", False):
+            return LibFastMCP.add_tool(self, fn, name=name, description=description, **kwargs)
+
+        # Apply our tool decorator logic to get the wrapper
+        decorator = self.tool(name=name, description=description, **kwargs)
+        return decorator(fn)
 
     def run(self, transport: str = "stdio"):
         """
