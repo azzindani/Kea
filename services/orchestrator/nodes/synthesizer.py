@@ -36,35 +36,64 @@ async def synthesizer_node(state: dict[str, Any]) -> dict[str, Any]:
     facts = state.get("facts", [])
     sources = state.get("sources", [])
     generator_output = state.get("generator_output", "")
-    
+
+    # Retrieve domain knowledge for synthesis
+    knowledge_context = ""
+    try:
+        import asyncio
+        from shared.knowledge.retriever import get_knowledge_retriever
+
+        retriever = get_knowledge_retriever()
+        knowledge_context = await asyncio.wait_for(
+            retriever.retrieve_skills(query, limit=2),
+            timeout=3.0,
+        )
+        if knowledge_context:
+            logger.info(
+                f"Synthesizer: Retrieved {len(knowledge_context)} chars of domain knowledge"
+            )
+    except Exception as e:
+        logger.debug(f"Synthesizer: Knowledge retrieval skipped ({e})")
+
     try:
         import os
         if os.getenv("OPENROUTER_API_KEY"):
             from shared.config import get_settings
             config_settings = get_settings()
-            
+
             provider = OpenRouterProvider()
             config = LLMConfig(
                 model=config_settings.models.default_model,
                 temperature=0.5,
                 max_tokens=32768,
             )
-            
+
             # Prepare facts summary
             facts_text = "\n".join([
                 f"- {f.get('text', str(f)) if isinstance(f, dict) else str(f)}"
                 for f in facts  # No limit - use all facts
             ]) if facts else "No facts collected"
-            
+
             sources_text = "\n".join([
                 f"- {s.get('url', str(s)) if isinstance(s, dict) else str(s)}"
                 for s in sources  # No limit - use all sources
             ]) if sources else "No sources"
-            
+
+            # Build knowledge-enhanced system prompt
+            knowledge_section = ""
+            if knowledge_context:
+                knowledge_section = f"""
+
+{knowledge_context}
+
+Apply the above domain expertise when structuring the report.
+Use the reasoning frameworks and output standards to ensure
+domain-appropriate analysis and formatting."""
+
             messages = [
                 LLMMessage(
                     role=LLMRole.SYSTEM,
-                    content="""You are a research report synthesizer. Create concise, well-structured reports.
+                    content=f"""You are a research report synthesizer. Create concise, well-structured reports.
 
 CRITICAL RULES - NEVER VIOLATE THESE:
 1. ONLY use information explicitly provided in "Collected Facts" and "Sources"
@@ -95,7 +124,7 @@ Format:
 [High/Medium/Low with justification - Low if many data gaps]
 
 ## Sources
-[List only actual sources used]"""
+[List only actual sources used]{knowledge_section}"""
                 ),
                 LLMMessage(
                     role=LLMRole.USER,

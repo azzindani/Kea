@@ -55,25 +55,41 @@ EXAMPLE (INCORRECT - NO CITATION):
 
 Every fact, number, or claim MUST be followed by [Source: URL] immediately."""
     
+    async def _get_knowledge_context(self, query: str) -> str:
+        """Retrieve domain-specific knowledge for the query."""
+        try:
+            from shared.knowledge.retriever import get_knowledge_retriever
+
+            retriever = get_knowledge_retriever()
+            import asyncio
+
+            context = await asyncio.wait_for(
+                retriever.retrieve_skills(query, limit=2),
+                timeout=3.0,
+            )
+            return context
+        except Exception:
+            return ""
+
     async def generate(self, query: str, facts: list, sources: list, revision_feedback: str = None) -> str:
         """
         Generate a comprehensive answer from facts.
-        
+
         Args:
             query: Research question
             facts: Collected facts
             sources: Source references
-            
+
         Returns:
             Generated answer text
         """
         logger.info(f"Generator: Processing {len(facts)} facts")
-        
+
         try:
             import os
             if not os.getenv("OPENROUTER_API_KEY"):
                 return self._fallback_generate(query, facts, sources)
-            
+
             provider = OpenRouterProvider()
             from shared.config import get_settings
             config = LLMConfig(
@@ -81,6 +97,13 @@ Every fact, number, or claim MUST be followed by [Source: URL] immediately."""
                 temperature=0.6,
                 max_tokens=32768,
             )
+
+            # Retrieve domain knowledge to enhance generation
+            knowledge_context = await self._get_knowledge_context(query)
+            if knowledge_context:
+                logger.info(
+                    f"Generator: Injecting {len(knowledge_context)} chars of domain knowledge"
+                )
             
             # Format facts with source URLs for citation
             facts_text = ""
@@ -114,8 +137,13 @@ The Critic identified issues with your previous answer. Address these points:
 
 You MUST fix these issues in your revised answer."""
 
+            # Build enhanced system prompt with domain knowledge
+            system_prompt = self.system_prompt
+            if knowledge_context:
+                system_prompt += f"\n\n{knowledge_context}"
+
             messages = [
-                LLMMessage(role=LLMRole.SYSTEM, content=self.system_prompt),
+                LLMMessage(role=LLMRole.SYSTEM, content=system_prompt),
                 LLMMessage(
                     role=LLMRole.USER,
                     content=f"""Research Question: {query}

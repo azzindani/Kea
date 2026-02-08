@@ -35,6 +35,21 @@ Your role:
 
 Be fair and explain your reasoning."""
     
+    async def _get_knowledge_context(self, query: str) -> str:
+        """Retrieve domain-specific knowledge for judgment."""
+        try:
+            from shared.knowledge.retriever import get_knowledge_retriever
+            import asyncio
+
+            retriever = get_knowledge_retriever()
+            context = await asyncio.wait_for(
+                retriever.retrieve_skills(query, limit=2),
+                timeout=3.0,
+            )
+            return context
+        except Exception:
+            return ""
+
     async def judge(
         self,
         query: str,
@@ -59,12 +74,12 @@ Be fair and explain your reasoning."""
         # Calculate fact-based confidence (default if facts provided)
         # CRITICAL: If NO facts collected, confidence should be 0% (not 70%!)
         fact_based_confidence = self._calculate_fact_quality(facts) if facts else 0.0
-        
+
         try:
             import os
             if not os.getenv("OPENROUTER_API_KEY"):
                 return self._fallback_judge(generator_output, critic_feedback)
-            
+
             provider = OpenRouterProvider()
             from shared.config import get_settings
             config = LLMConfig(
@@ -72,9 +87,18 @@ Be fair and explain your reasoning."""
                 temperature=0.3,
                 max_tokens=32768,
             )
-            
+
+            # Retrieve domain knowledge for informed judgment
+            knowledge_context = await self._get_knowledge_context(query)
+            system_prompt = self.system_prompt
+            if knowledge_context:
+                system_prompt += f"\n\n{knowledge_context}"
+                logger.info(
+                    f"Judge: Injecting {len(knowledge_context)} chars of domain knowledge"
+                )
+
             messages = [
-                LLMMessage(role=LLMRole.SYSTEM, content=self.system_prompt),
+                LLMMessage(role=LLMRole.SYSTEM, content=system_prompt),
                 LLMMessage(
                     role=LLMRole.USER,
                     content=f"""Original Question: {query}

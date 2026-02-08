@@ -642,6 +642,32 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
         logger.warning(f"Complexity classification failed: {e}")
         complexity = None
 
+    # ============================================================
+    # KNOWLEDGE CONTEXT RETRIEVAL (Domain Expertise from Knowledge Library)
+    # ============================================================
+    knowledge_context = ""
+    try:
+        from shared.knowledge.retriever import get_knowledge_retriever
+
+        knowledge_retriever = get_knowledge_retriever()
+        knowledge_context = await asyncio.wait_for(
+            knowledge_retriever.retrieve_all(
+                query=query,
+                skill_limit=3,
+                rule_limit=2,
+            ),
+            timeout=5.0,
+        )
+        if knowledge_context:
+            logger.info(
+                f"Planner: Retrieved {len(knowledge_context)} chars of domain knowledge"
+            )
+            state["knowledge_context"] = knowledge_context
+    except asyncio.TimeoutError:
+        logger.warning("Planner: Knowledge retrieval timed out, skipping")
+    except Exception as e:
+        logger.debug(f"Knowledge retrieval skipped: {e}")
+
     # Use LLM to decompose query
     try:
         import os
@@ -839,6 +865,17 @@ QUERY COMPLEXITY: {complexity.tier.value.upper()}
                 error_feedback_section += "- If parameter was missing, ensure you include ALL required parameters from the schema\n"
                 error_feedback_section += "- If tool doesn't exist, use an alternative from the AVAILABLE TOOLS list\n"
 
+            # Build knowledge section for prompt
+            knowledge_section = ""
+            if knowledge_context:
+                knowledge_section = f"""
+
+{knowledge_context}
+
+Use the above domain expertise to inform your planning decisions,
+tool selection, and parameter choices. Follow the reasoning frameworks
+and output standards defined in the retrieved knowledge."""
+
             # JSON Blueprint System Prompt (Level 30 Architect)
             messages = [
                 LLMMessage(
@@ -847,6 +884,7 @@ QUERY COMPLEXITY: {complexity.tier.value.upper()}
 OBJECTIVE: Convert user intent into an executable JSON Blueprint with PRECISE INPUT MAPPING.
 {complexity_guidance}
 {error_feedback_section}
+{knowledge_section}
 
 AVAILABLE TOOLS:
 {tools_context}

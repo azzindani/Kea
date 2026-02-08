@@ -52,14 +52,17 @@ class PromptContext:
     depth: int = 2                  # 1=shallow, 3=deep
     audience: str = "expert"        # "expert", "general", "executive"
     constraints: list[str] = field(default_factory=list)
-    
+
     # Session context
     session_summary: str = ""
     previous_findings: list[str] = field(default_factory=list)
-    
+
     # Output preferences
     output_format: str = "markdown"  # "markdown", "json", "bullet"
     max_length: int = 0              # 0 = no limit
+
+    # Knowledge context (injected by KnowledgeRetriever at runtime)
+    knowledge_context: str = ""
 
 
 @dataclass
@@ -299,7 +302,11 @@ Output: Return response as valid JSON.""")
         elif context.output_format == "bullet":
             parts.append("""
 Output: Use bullet points for clarity.""")
-        
+
+        # Add retrieved knowledge context (domain expertise from knowledge library)
+        if context.knowledge_context:
+            parts.append(context.knowledge_context)
+
         prompt = "\n\n".join(parts)
         
         return GeneratedPrompt(
@@ -319,6 +326,34 @@ Output: Use bullet points for clarity.""")
         self._task_modifiers[task_type] = modifier
         logger.info(f"Registered task modifier: {task_type.value}")
 
+    async def generate_with_knowledge(self, context: PromptContext) -> GeneratedPrompt:
+        """
+        Generate system prompt with dynamic knowledge retrieval.
+
+        Retrieves relevant skills and rules from the knowledge registry
+        and injects them into the prompt context before generation.
+        """
+        try:
+            from shared.knowledge.retriever import get_knowledge_retriever
+
+            retriever = get_knowledge_retriever()
+            knowledge_context = await retriever.retrieve_all(
+                query=context.query,
+                skill_limit=3,
+                rule_limit=2,
+                domain=context.domain.value if context.domain != Domain.GENERAL else None,
+            )
+            if knowledge_context:
+                context.knowledge_context = knowledge_context
+                logger.info(
+                    f"PromptFactory: Injected knowledge context "
+                    f"({len(knowledge_context)} chars) for domain={context.domain.value}"
+                )
+        except Exception as e:
+            logger.debug(f"PromptFactory: Knowledge retrieval skipped ({e})")
+
+        return self.generate(context)
+
 
 # Global instance
 _factory: PromptFactory | None = None
@@ -336,10 +371,22 @@ def generate_prompt(query: str, **kwargs) -> GeneratedPrompt:
     """Convenience function to generate prompt for query."""
     factory = get_prompt_factory()
     context = factory.analyze_query(query)
-    
+
     # Override with kwargs
     for key, value in kwargs.items():
         if hasattr(context, key):
             setattr(context, key, value)
-    
+
     return factory.generate(context)
+
+
+async def generate_prompt_with_knowledge(query: str, **kwargs) -> GeneratedPrompt:
+    """Convenience function to generate prompt with knowledge retrieval."""
+    factory = get_prompt_factory()
+    context = factory.analyze_query(query)
+
+    for key, value in kwargs.items():
+        if hasattr(context, key):
+            setattr(context, key, value)
+
+    return await factory.generate_with_knowledge(context)
