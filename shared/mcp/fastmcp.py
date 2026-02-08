@@ -14,8 +14,16 @@ except ImportError:
     # Fallback for environments where mcp is not installed
     # This ensures the file is at least importable
     class LibFastMCP:
-        def __init__(self, name, **kwargs): pass
-        def tool(self, name=None, description=None): 
+        def __init__(self, name: str, **kwargs): pass
+        def tool(self, name: Optional[str] = None, description: Optional[str] = None): 
+            def decorator(f): return f
+            return decorator
+        def add_tool(self, fn: Callable, name: Optional[str] = None, description: Optional[str] = None): pass
+        def run(self, transport: str = "stdio"): pass
+        def resource(self, uri: str, name: str, description: Optional[str] = None, mime_type: Optional[str] = None):
+            def decorator(f): return f
+            return decorator
+        def prompt(self, name: Optional[str] = None, description: Optional[str] = None):
             def decorator(f): return f
             return decorator
             
@@ -175,13 +183,41 @@ class FastMCP(LibFastMCP):
                         details={"traceback": traceback.format_exc()}
                     )
 
-            # Preserve signature for FastMCP introspection
-            wrapper.__signature__ = inspect.signature(func)
-            
-            # Register the WRAPPED function with the parent FastMCP
-            return LibFastMCP.tool(self, name=tool_name, description=tool_desc)(wrapper)
-            
         return decorator
+
+    def add_tool(self, fn: Callable, name: Optional[str] = None, description: Optional[str] = None):
+        """
+        Manually register a tool.
+        """
+        # We use our own tool decorator to ensure the wrapper is applied
+        @self.tool(name=name, description=description)
+        @wraps(fn)
+        async def wrapped_fn(*args, **kwargs):
+            if inspect.iscoroutinefunction(fn):
+                return await fn(*args, **kwargs)
+            return fn(*args, **kwargs)
+        
+        # We don't need to do anything else as self.tool() already registered it
+        return wrapped_fn
+
+    def run(self, transport: str = "stdio"):
+        """
+        Run the MCP server.
+        """
+        # If we are using the real LibFastMCP, it will have a run method
+        if hasattr(super(), "run"):
+            return super().run(transport=transport)
+        
+        # Fallback/Mock behavior
+        logger.info("mcp_server_run_called", server=self.server_name, transport=transport)
+
+    def resource(self, uri: str, name: str, description: Optional[str] = None, mime_type: Optional[str] = None):
+        """Proxy for resource decorator."""
+        return super().resource(uri, name, description, mime_type)
+
+    def prompt(self, name: Optional[str] = None, description: Optional[str] = None):
+        """Proxy for prompt decorator."""
+        return super().prompt(name, description)
 
     def _format_error(self, code: str, message: str, meta: Dict, details: Optional[Dict] = None) -> str:
         """Constructs the standard error envelope."""
