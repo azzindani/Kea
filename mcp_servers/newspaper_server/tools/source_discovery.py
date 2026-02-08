@@ -40,6 +40,12 @@ async def get_source_articles_list(url: str, limit: int = 100000) -> List[str]:
     """Get list of article URLs found on the source (no download)."""
     try:
         s = NewsClient.build_source(url)
+        
+        # If no articles found, try forcing a fresh build (bypass cache)
+        # This helps if the previous build failed or was empty
+        if not s.articles:
+            s = NewsClient.build_source(url, memoize=False)
+            
         return [a.url for a in s.articles[:limit]]
     except Exception as e:
         return [str(e)]

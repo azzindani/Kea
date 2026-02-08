@@ -1,12 +1,13 @@
 
-from typing import Optional, List, Dict, Any
-import newspaper
-from newspaper import Article, Source
-import nltk
 import warnings
 
 # Suppress "invalid escape sequence" warnings from newspaper3k
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="newspaper")
+
+from typing import Optional, List, Dict, Any
+import newspaper
+from newspaper import Article, Source
+import nltk
 
 # Ensure NLTK data is available
 try:
@@ -23,8 +24,10 @@ class NewsClient:
     def get_config() -> newspaper.Config:
         config = newspaper.Config()
         # Use a specific user agent to avoid being blocked or served mobile versions that break parsing
-        config.browser_user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        # Updated to Chrome 120 (late 2023)
+        config.browser_user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         config.request_timeout = 30 # Increased timeout for slow sites
+        config.number_threads = 3 # Reduce threads to avoid rate limiting
         return config
 
     @staticmethod

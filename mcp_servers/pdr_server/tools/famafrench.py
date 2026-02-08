@@ -34,10 +34,18 @@ async def get_fama_french_data(dataset_name: str = None, start_date: str = None,
             return _original_read_csv(*args, **kwargs)
             
         pd.read_csv = _patched_read_csv
+        
+        # Also patch the module-level import if it exists (common in PDR)
+        _original_ff_read_csv = getattr(ff, 'read_csv', None)
+        if _original_ff_read_csv:
+            setattr(ff, 'read_csv', _patched_read_csv)
+            
         try:
             ds = web.DataReader(name, "famafrench", start=start, end=end_date)
         finally:
             pd.read_csv = _original_read_csv
+            if _original_ff_read_csv:
+                setattr(ff, 'read_csv', _original_ff_read_csv)
         
         if not ds:
             return "No data found."

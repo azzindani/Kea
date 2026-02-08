@@ -1,5 +1,6 @@
 
 import httpx
+import os
 import io
 import json
 # from docx import Document (deferred)
@@ -10,10 +11,16 @@ logger = get_logger(__name__)
 async def parse_docx(url: str) -> str:
     """Parse DOCX file."""
     try:
-        async with httpx.AsyncClient(timeout=60) as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            docx_bytes = response.content
+        if url.startswith(("http://", "https://")):
+            async with httpx.AsyncClient(timeout=60) as client:
+                response = await client.get(url)
+                response.raise_for_status()
+                docx_bytes = response.content
+        else:
+            if not os.path.exists(url):
+                return f"Error: File not found at {url}"
+            with open(url, "rb") as f:
+                docx_bytes = f.read()
         
         try:
             from docx import Document

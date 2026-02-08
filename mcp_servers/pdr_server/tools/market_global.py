@@ -26,6 +26,7 @@ async def get_stooq_data(symbols: list[str], start_date: str = None) -> str:
         df = web.DataReader(symbols, "stooq", start=start) # End default is now
         
         # Clean NaT values which crash to_markdown/strftime
+        df.index = pd.to_datetime(df.index, errors='coerce')
         if isinstance(df.index, pd.DatetimeIndex):
             df = df[df.index.notna()]
         

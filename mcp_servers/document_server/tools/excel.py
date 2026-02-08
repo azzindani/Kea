@@ -1,5 +1,6 @@
 
 import httpx
+import os
 import pandas as pd
 import io
 import json
@@ -10,10 +11,16 @@ logger = get_logger(__name__)
 async def parse_excel(url: str, sheet_name: str = None, preview_rows: int = 10) -> str:
     """Parse Excel file."""
     try:
-        async with httpx.AsyncClient(timeout=60) as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            xlsx_bytes = response.content
+        if url.startswith(("http://", "https://")):
+            async with httpx.AsyncClient(timeout=60) as client:
+                response = await client.get(url)
+                response.raise_for_status()
+                xlsx_bytes = response.content
+        else:
+            if not os.path.exists(url):
+                return f"Error: File not found at {url}"
+            with open(url, "rb") as f:
+                xlsx_bytes = f.read()
         
         excel_file = pd.ExcelFile(io.BytesIO(xlsx_bytes))
         
