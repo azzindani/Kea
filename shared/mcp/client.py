@@ -17,6 +17,10 @@ from shared.mcp.protocol import (
     Tool,
     ToolResult,
     TextContent,
+    ImageContent,
+    FileContent,
+    BinaryContent,
+    JSONContent,
     InitializeRequest,
 )
 from shared.mcp.transport import Transport, StdioTransport
@@ -144,7 +148,101 @@ class MCPClient:
                 isError=True
             )
         
-        return ToolResult(**response.result)
+        # FastMCP Compatibility: Unwrap JSON Envelope if present
+        # The protocol might return a raw string that happens to be JSON, 
+        # but FastMCP guarantees a specific schema: { "status": "...", "data": ..., "meta": ... }
+        
+        result_obj = ToolResult(**response.result)
+        
+        # Check if content is a list containing a single TextContent that is a JSON envelope
+        if (len(result_obj.content) == 1 and 
+            isinstance(result_obj.content[0], TextContent)):
+            
+            raw_text = result_obj.content[0].text
+            try:
+                # Import locally to avoid top-level overhead if not needed
+                import json
+                envelope = json.loads(raw_text)
+                
+                # Check for envelope signature
+                if isinstance(envelope, dict) and "status" in envelope and "data" in envelope:
+                    # Unwrap!
+                    status = envelope.get("status")
+                    data = envelope.get("data")
+                    
+                    # Correct error flag
+                    is_error = (status == "error")
+                    
+                    # 2. Extract Data for Processing/LLM
+                    # FastMCP wrapper might have serialized a ToolResult or individual Content items
+                    # We try to re-hydrate them to native types for the Orchestrator
+                    
+                    # 2. Extract Data for Processing/LLM
+                    # FastMCP wrapper might have serialized a ToolResult or individual Content items
+                    # We try to re-hydrate them to native types for the Orchestrator
+                    
+                    def hydrate_content(item: Any) -> Any:
+                        if not isinstance(item, dict) or "type" not in item:
+                            return None
+                        
+                        ctype = item.get("type")
+                        try:
+                            if ctype == "text": return TextContent(**item)
+                            if ctype == "image": return ImageContent(**item)
+                            if ctype == "file": return FileContent(**item)
+                            if ctype == "json": return JSONContent(**item)
+                            if ctype == "binary": return BinaryContent(**item)
+                        except:
+                            pass
+                        return None
+
+                    # If data is a full ToolResult (dict with "content")
+                    if isinstance(data, dict) and "content" in data and isinstance(data["content"], list):
+                        new_content = []
+                        for item in data["content"]:
+                            hydrated = hydrate_content(item)
+                            if hydrated:
+                                new_content.append(hydrated)
+                        
+                        if new_content:
+                            return ToolResult(
+                                content=new_content,
+                                isError=data.get("isError", is_error)
+                            )
+
+                    # If data is a single Content item
+                    hydrated = hydrate_content(data)
+                    if hydrated:
+                        return ToolResult(
+                            content=[hydrated],
+                            isError=is_error
+                        )
+
+                    # Fallback to Dual Content (Text + JSON) for raw dicts/lists/strings
+                    new_content = []
+                    
+                    # A. Text Content (Always required for LLM/Display)
+                    if isinstance(data, (dict, list)):
+                        data_str = json.dumps(data, indent=2)
+                    else:
+                        data_str = str(data) if data is not None else ""
+                        
+                    new_content.append(TextContent(type="text", text=data_str))
+                    
+                    # B. JSON Content (For structured data processing in Orchestrator)
+                    if isinstance(data, (dict, list)):
+                        new_content.append(JSONContent(type="json", data=data))
+                    
+                    # Reconstruct Result with unwrapped data
+                    return ToolResult(
+                        content=new_content,
+                        isError=is_error or result_obj.isError
+                    )
+            except (json.JSONDecodeError, TypeError):
+                # Not a valid JSON envelope, return as-is
+                pass
+
+        return result_obj
     
     async def ping(self) -> bool:
         """Ping the server to check connectivity."""

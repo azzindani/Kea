@@ -5,7 +5,6 @@ Shared fixtures for all tests.
 """
 
 import pytest
-import asyncio
 import os
 
 

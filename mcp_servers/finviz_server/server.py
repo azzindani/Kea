@@ -8,11 +8,11 @@ if root_path not in sys.path:
 
 
 
-from mcp.server.fastmcp import FastMCP
+from shared.mcp.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import (
+from mcp_servers.finviz_server.tools import (
     screener, quote, groups, insider, global_markets, calendar_news,
     strategy, charts, financials, bulk_ta
 )
@@ -22,13 +22,18 @@ import structlog
 logger = structlog.get_logger()
 
 # Create the FastMCP server
+from shared.logging.structured import setup_logging
+setup_logging()
+
 mcp = FastMCP("finviz_server", dependencies=["finvizfinance", "pandas"])
 
 # --- 1. SCREENER TOOLS ---
 @mcp.tool()
 async def screen_signal(signal: str, limit: int = 100000) -> Any:
-    """
-    SIGNAL: Get stocks matching a specific Finviz Signal.
+    """SCREENS stocks by signal. [ACTION]
+    
+    [RAG Context]
+    Get stocks matching a specific Finviz Signal.
     signal: 'top_gainers', 'new_highs', 'major_news', etc.
     """
     return await screener.get_screener_signal(limit, signal)
@@ -38,140 +43,279 @@ SIGNALS = screener.get_signal_map()
 
 @mcp.tool()
 async def screen_top_gainers(limit: int = 100000) -> Any:
-    """SIGNAL: Top Gainers."""
+    """SCREENS Top Gainers. [ACTION]
+    
+    [RAG Context]
+    Get top gaining stocks.
+    Returns JSON list of stocks.
+    """
     return await screener.get_screener_signal(limit, "top_gainers")
 
 @mcp.tool()
 async def screen_top_losers(limit: int = 100000) -> Any:
-    """SIGNAL: Top Losers."""
+    """SCREENS Top Losers. [ACTION]
+    
+    [RAG Context]
+    Get top losing stocks.
+    Returns JSON list of stocks.
+    """
     return await screener.get_screener_signal(limit, "top_losers")
 
 @mcp.tool()
 async def screen_new_highs(limit: int = 100000) -> Any:
-    """SIGNAL: New Highs."""
+    """SCREENS New Highs. [ACTION]
+    
+    [RAG Context]
+    Get stocks making new highs.
+    Returns JSON list of stocks.
+    """
     return await screener.get_screener_signal(limit, "new_highs")
 
 @mcp.tool()
 async def screen_major_news(limit: int = 100000) -> Any:
-    """SIGNAL: Major News."""
+    """SCREENS Major News. [ACTION]
+    
+    [RAG Context]
+    Get stocks with major news events.
+    Returns JSON list of stocks.
+    """
     return await screener.get_screener_signal(limit, "major_news")
 
 @mcp.tool()
 async def screen_insider_buying(limit: int = 100000) -> Any:
-    """SIGNAL: Insider Buying."""
+    """SCREENS Insider Buying. [ACTION]
+    
+    [RAG Context]
+    Get stocks with recent insider buying.
+    Returns JSON list of stocks.
+    """
     return await screener.get_screener_signal(limit, "insider_buying")
 
 # --- 2. QUOTE TOOLS ---
 @mcp.tool()
 async def get_company_description(ticker: str) -> str:
-    """QUOTE: Get company description."""
+    """FETCHES company description. [ACTION]
+    
+    [RAG Context]
+    Get company profile and description.
+    Returns string.
+    """
     return await quote.get_stock_depth(ticker, "description")
 
 @mcp.tool()
 async def get_analyst_ratings(ticker: str) -> str:
-    """QUOTE: Get analyst ratings."""
+    """FETCHES analyst ratings. [ACTION]
+    
+    [RAG Context]
+    Get analyst ratings and price targets.
+    Returns JSON string.
+    """
     return await quote.get_stock_depth(ticker, "ratings")
 
 @mcp.tool()
 async def get_stock_news(ticker: str) -> str:
-    """QUOTE: Get latest news headlines for ticker."""
+    """FETCHES stock news. [ACTION]
+    
+    [RAG Context]
+    Get latest news headlines for ticker.
+    Returns JSON string.
+    """
     return await quote.get_stock_depth(ticker, "news")
 
 @mcp.tool()
 async def get_insider_trading(ticker: str) -> str:
-    """QUOTE: Get insider trading for this ticker."""
+    """FETCHES insider trading. [ACTION]
+    
+    [RAG Context]
+    Get insider trading history for this ticker.
+    Returns JSON string.
+    """
     return await quote.get_stock_depth(ticker, "insider")
 
 @mcp.tool()
 async def get_fundamental_ratios(ticker: str) -> str:
-    """QUOTE: Get fundamental ratios (P/E, EPS, etc)."""
+    """FETCHES fundamental ratios. [ACTION]
+    
+    [RAG Context]
+    Get fundamental ratios (P/E, EPS, etc).
+    Returns JSON string.
+    """
     return await quote.get_stock_depth(ticker, "fundament")
 
 # --- 3. GROUPS ---
 @mcp.tool()
 async def get_sector_performance() -> str:
-    """GROUP: Sector Performance."""
+    """FETCHES Sector Performance. [ACTION]
+    
+    [RAG Context]
+    Get performance by sector.
+    Returns JSON string.
+    """
     return await groups.get_group_data("performance", "Sector")
 
 @mcp.tool()
 async def get_sector_valuation() -> str:
-    """GROUP: Sector Valuation."""
+    """FETCHES Sector Valuation. [ACTION]
+    
+    [RAG Context]
+    Get valuation metrics by sector.
+    Returns JSON string.
+    """
     return await groups.get_group_data("valuation", "Sector")
 
 @mcp.tool()
 async def get_industry_performance() -> str:
-    """GROUP: Industry Performance."""
+    """FETCHES Industry Performance. [ACTION]
+    
+    [RAG Context]
+    Get performance by industry.
+    Returns JSON string.
+    """
     return await groups.get_group_data("performance", "Industry")
 
 @mcp.tool()
 async def get_country_performance() -> str:
-    """GROUP: Country Performance."""
+    """FETCHES Country Performance. [ACTION]
+    
+    [RAG Context]
+    Get performance by country.
+    Returns JSON string.
+    """
     return await groups.get_group_data("performance", "Country")
 
 # --- 4. INSIDER MARKET ---
 @mcp.tool()
 async def get_latest_insider_buys() -> str:
-    """INSIDER: Latest Buys."""
+    """FETCHES latest insider buys. [ACTION]
+    
+    [RAG Context]
+    Get recent insider buying transactions.
+    Returns JSON string.
+    """
     return await insider.get_insider_market("latest_buys")
 
 @mcp.tool()
 async def get_latest_insider_sales() -> str:
-    """INSIDER: Latest Sales."""
+    """FETCHES latest insider sales. [ACTION]
+    
+    [RAG Context]
+    Get recent insider selling transactions.
+    Returns JSON string.
+    """
     return await insider.get_insider_market("latest_sales")
 
 @mcp.tool()
 async def get_top_insider_buys_week() -> str:
-    """INSIDER: Top Week Buys."""
+    """FETCHES top week buys. [ACTION]
+    
+    [RAG Context]
+    Get top insider buys for the week.
+    Returns JSON string.
+    """
     return await insider.get_insider_market("top_week_buys")
 
 # --- 5. GLOBAL ---
 @mcp.tool()
 async def get_forex_performance() -> str:
-    """GLOBAL: Get Forex performance table."""
+    """FETCHES Forex performance. [ACTION]
+    
+    [RAG Context]
+    Get performance table for Forex pairs.
+    Returns JSON string.
+    """
     return await global_markets.get_global_performance("forex")
 
 @mcp.tool()
 async def get_crypto_performance() -> str:
-    """GLOBAL: Get Crypto performance table."""
+    """FETCHES Crypto performance. [ACTION]
+    
+    [RAG Context]
+    Get performance table for Crypto pairs.
+    Returns JSON string.
+    """
     return await global_markets.get_global_performance("crypto")
 
 # --- 6. CALENDAR ---
 @mcp.tool()
 async def get_earnings_calendar(period: str = "This Week") -> str:
-    """CALENDAR: Get Earnings for 'This Week', 'Next Week', etc."""
+    """FETCHES earnings calendar. [ACTION]
+    
+    [RAG Context]
+    Get Earnings for 'This Week', 'Next Week', etc.
+    Returns JSON string.
+    """
     return await calendar_news.get_earnings_calendar(period)
 
 @mcp.tool()
 async def get_market_news_feed(mode: str = "news") -> str:
-    """NEWS: Get General Market News or Blogs."""
+    """FETCHES market news. [ACTION]
+    
+    [RAG Context]
+    Get General Market News or Blogs.
+    Returns JSON string.
+    """
     return await calendar_news.get_market_news(mode)
 
 # --- 7. STRATEGY ---
 @mcp.tool()
 async def screen_strategy(strategy: str, limit: int = 100000) -> str:
-    """
-    STRATEGY: Run a preset strategy screen.
+    """SCREENS strategy preset. [ACTION]
+    
+    [RAG Context]
+    Run a preset strategy screen.
     strategies: 'value_stocks', 'growth_stocks', 'high_yield_dividend', 
-                'oversold_bounce', 'new_highs_volume', 'short_squeeze_candidate',
-                'undervalued_growth', 'penny_stock_volume'.
+                'oversold_bounce', 'new_highs_volume', 'short_squeeze_candidate'.
     """
     return await strategy.get_strategy_screen(limit, strategy)
 
 # --- 8. ADVANCED ---
 @mcp.tool()
 async def get_chart_url(ticker: str, timeframe: str = "daily", type: str = "candle") -> str:
-    """CHART: Get Finviz Chart image URL."""
+    """FETCHES chart URL. [ACTION]
+    
+    [RAG Context]
+    Get Finviz Chart image URL.
+    Returns URL string.
+    """
     return await charts.get_chart_url(ticker, timeframe, type)
 
 @mcp.tool()
 async def get_finviz_statement(ticker: str, statement: str = "I", timeframe: str = "A") -> str:
-    """FINANCIALS: Get Income(I)/Balance(B)/Cash(C) Flow table."""
+    """FETCHES financials. [ACTION]
+    
+    [RAG Context]
+    Get Income(I)/Balance(B)/Cash(C) Flow table.
+    Returns JSON string.
+    """
     return await financials.get_finviz_statement(ticker, statement, timeframe)
 
 @mcp.tool()
 async def get_technical_table(limit: int = 100000, signal: str = "") -> str:
-    """TA: Get Bulk Technical Indicators (RSI, SMA, ATR)."""
+    """FETCHES technical table. [ACTION]
+    
+    [RAG Context]
+    Get Bulk Technical Indicators (RSI, SMA, ATR).
+    Returns JSON string.
+    """
     return await bulk_ta.get_technical_table(limit, signal)
+
 
 if __name__ == "__main__":
     mcp.run()
+
+# ==========================================
+# Compatibility Layer for Tests
+# ==========================================
+class FinvizServer:
+    def __init__(self):
+        # Wrap the FastMCP instance
+        self.mcp = mcp
+
+    def get_tools(self):
+        # Access internal tool manager to get list of tool objects
+        # We need to return objects that have a .name attribute
+        if hasattr(self.mcp, '_tool_manager') and hasattr(self.mcp._tool_manager, '_tools'):
+            return list(self.mcp._tool_manager._tools.values())
+        return []
+
+

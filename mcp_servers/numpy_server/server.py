@@ -8,11 +8,11 @@ if root_path not in sys.path:
 
 
 
-from mcp.server.fastmcp import FastMCP
+from shared.mcp.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import (
+from mcp_servers.numpy_server.tools import (
     creation_ops, manip_ops, math_ops, logic_ops, 
     linalg_ops, random_ops, fft_ops, super_ops,
     bitwise_ops, string_ops, set_ops, poly_ops, stat_plus_ops
@@ -23,338 +23,1189 @@ from typing import List, Dict, Any, Optional, Union
 logger = structlog.get_logger()
 
 # Create the FastMCP server
+from shared.logging import setup_logging
+setup_logging()
+
 mcp = FastMCP("numpy_server", dependencies=["numpy", "pandas"])
 NumericData = Any 
 
 # ==========================================
 # 1. Creation
 # ==========================================
+# ==========================================
+# 1. Creation
+# ==========================================
 @mcp.tool()
-async def create_array(data: NumericData) -> List[Any]: return await creation_ops.create_array(data)
+async def create_array(data: NumericData) -> List[Any]: 
+    """CREATES a numpy array from data. [ENTRY]
+    
+    [RAG Context]
+    """
+    return await creation_ops.create_array(data)
+
 @mcp.tool()
-async def create_zeros(shape: List[int]) -> List[Any]: return await creation_ops.create_zeros(shape)
+async def create_zeros(shape: List[int]) -> List[Any]: 
+    """CREATES an array of zeros. [ENTRY]
+    
+    [RAG Context]
+    """
+    return await creation_ops.create_zeros(shape)
+
 @mcp.tool()
-async def create_ones(shape: List[int]) -> List[Any]: return await creation_ops.create_ones(shape)
+async def create_ones(shape: List[int]) -> List[Any]: 
+    """CREATES an array of ones. [ENTRY]
+    
+    [RAG Context]
+    """
+    return await creation_ops.create_ones(shape)
+
 @mcp.tool()
-async def create_full(shape: List[int], fill_value: Union[float, int]) -> List[Any]: return await creation_ops.create_full(shape, fill_value)
+async def create_full(shape: List[int], fill_value: Union[float, int]) -> List[Any]: 
+    """CREATES an array filled with value. [ENTRY]
+    
+    [RAG Context]
+    """
+    return await creation_ops.create_full(shape, fill_value)
+
 @mcp.tool()
-async def arange(start: float, stop: float = None, step: float = 1) -> List[float]: return await creation_ops.arange(start, stop, step)
+async def arange(start: float, stop: float = None, step: float = 1) -> List[float]: 
+    """CREATES evenly spaced values (step). [ENTRY]
+    
+    [RAG Context]
+    """
+    return await creation_ops.arange(start, stop, step)
+
 @mcp.tool()
-async def linspace(start: float, stop: float, num: int = 50) -> List[float]: return await creation_ops.linspace(start, stop, num)
+async def linspace(start: float, stop: float, num: int = 50) -> List[float]: 
+    """CREATES evenly spaced values (count). [ENTRY]
+    
+    [RAG Context]
+    """
+    return await creation_ops.linspace(start, stop, num)
+
 @mcp.tool()
-async def logspace(start: float, stop: float, num: int = 50, base: float = 10.0) -> List[float]: return await creation_ops.logspace(start, stop, num, base)
+async def logspace(start: float, stop: float, num: int = 50, base: float = 10.0) -> List[float]: 
+    """CREATES logarithmically spaced values. [ENTRY]
+    
+    [RAG Context]
+    """
+    return await creation_ops.logspace(start, stop, num, base)
+
 @mcp.tool()
-async def geomspace(start: float, stop: float, num: int = 50) -> List[float]: return await creation_ops.geomspace(start, stop, num)
+async def geomspace(start: float, stop: float, num: int = 50) -> List[float]: 
+    """CREATES geometrically spaced values. [ENTRY]
+    
+    [RAG Context]
+    """
+    return await creation_ops.geomspace(start, stop, num)
+
 @mcp.tool()
-async def eye(N: int, M: Optional[int] = None, k: int = 0) -> List[List[float]]: return await creation_ops.eye(N, M, k)
+async def eye(N: int, M: Optional[int] = None, k: int = 0) -> List[List[float]]: 
+    """CREATES a 2D identity matrix. [ENTRY]
+    
+    [RAG Context]
+    """
+    return await creation_ops.eye(N, M, k)
+
 @mcp.tool()
-async def identity(n: int) -> List[List[float]]: return await creation_ops.identity(n)
+async def identity(n: int) -> List[List[float]]: 
+    """CREATES a square identity array. [ENTRY]
+    
+    [RAG Context]
+    """
+    return await creation_ops.identity(n)
+
 @mcp.tool()
-async def diag(v: NumericData, k: int = 0) -> List[Any]: return await creation_ops.diag(v, k)
+async def diag(v: NumericData, k: int = 0) -> List[Any]: 
+    """EXTRACTS or CONSTRUCTS diagonal. [ENTRY]
+    
+    [RAG Context]
+    """
+    return await creation_ops.diag(v, k)
+
 @mcp.tool()
-async def vander(x: List[float], N: Optional[int] = None) -> List[List[float]]: return await creation_ops.vander(x, N)
+async def vander(x: List[float], N: Optional[int] = None) -> List[List[float]]: 
+    """GENERATES a Vandermonde matrix. [ENTRY]
+    
+    [RAG Context]
+    """
+    return await creation_ops.vander(x, N)
 
 # ==========================================
 # 2. Manipulation
 # ==========================================
 @mcp.tool()
-async def reshape(a: NumericData, newshape: List[int]) -> List[Any]: return await manip_ops.reshape(a, newshape)
+async def reshape(a: NumericData, newshape: List[int]) -> List[Any]: 
+    """RESHAPES an array. [ACTION]
+    
+    [RAG Context]
+    """
+    return await manip_ops.reshape(a, newshape)
+
 @mcp.tool()
-async def flatten(a: NumericData) -> List[Any]: return await manip_ops.flatten(a)
+async def flatten(a: NumericData) -> List[Any]: 
+    """FLATTENS array to 1D. [ACTION]
+    
+    [RAG Context]
+    """
+    return await manip_ops.flatten(a)
+
 @mcp.tool()
-async def transpose(a: NumericData, axes: Optional[List[int]] = None) -> List[Any]: return await manip_ops.transpose(a, axes)
+async def transpose(a: NumericData, axes: Optional[List[int]] = None) -> List[Any]: 
+    """PERMUTES dimensions (Transpose). [ACTION]
+    
+    [RAG Context]
+    """
+    return await manip_ops.transpose(a, axes)
+
 @mcp.tool()
-async def flip(m: NumericData, axis: Optional[Union[int, List[int]]] = None) -> List[Any]: return await manip_ops.flip(m, axis)
+async def flip(m: NumericData, axis: Optional[Union[int, List[int]]] = None) -> List[Any]: 
+    """REVERSES order of elements. [ACTION]
+    
+    [RAG Context]
+    """
+    return await manip_ops.flip(m, axis)
+
 @mcp.tool()
-async def roll(a: NumericData, shift: Union[int, List[int]], axis: Optional[Union[int, List[int]]] = None) -> List[Any]: return await manip_ops.roll(a, shift, axis)
+async def roll(a: NumericData, shift: Union[int, List[int]], axis: Optional[Union[int, List[int]]] = None) -> List[Any]: 
+    """ROLLS elements along axis. [ACTION]
+    
+    [RAG Context]
+    """
+    return await manip_ops.roll(a, shift, axis)
+
 @mcp.tool()
-async def concatenate(arrays: List[NumericData], axis: int = 0) -> List[Any]: return await manip_ops.concatenate(arrays, axis)
+async def concatenate(arrays: List[NumericData], axis: int = 0) -> List[Any]: 
+    """JOINS sequence of arrays. [ACTION]
+    
+    [RAG Context]
+    """
+    return await manip_ops.concatenate(arrays, axis)
+
 @mcp.tool()
-async def stack(arrays: List[NumericData], axis: int = 0) -> List[Any]: return await manip_ops.stack(arrays, axis)
+async def stack(arrays: List[NumericData], axis: int = 0) -> List[Any]: 
+    """JOINS arrays along new axis. [ACTION]
+    
+    [RAG Context]
+    """
+    return await manip_ops.stack(arrays, axis)
+
 @mcp.tool()
-async def vstack(tup: List[NumericData]) -> List[Any]: return await manip_ops.vstack(tup)
+async def vstack(tup: List[NumericData]) -> List[Any]: 
+    """STACKS arrays vertically (row-wise). [ACTION]
+    
+    [RAG Context]
+    """
+    return await manip_ops.vstack(tup)
+
 @mcp.tool()
-async def hstack(tup: List[NumericData]) -> List[Any]: return await manip_ops.hstack(tup)
+async def hstack(tup: List[NumericData]) -> List[Any]: 
+    """STACKS arrays horizontally (col-wise). [ACTION]
+    
+    [RAG Context]
+    """
+    return await manip_ops.hstack(tup)
+
 @mcp.tool()
-async def split(ary: NumericData, indices_or_sections: Union[int, List[int]], axis: int = 0) -> List[List[Any]]: return await manip_ops.split(ary, indices_or_sections, axis)
+async def split(ary: NumericData, indices_or_sections: Union[int, List[int]], axis: int = 0) -> List[List[Any]]: 
+    """SPLITS array into sub-arrays. [ACTION]
+    
+    [RAG Context]
+    """
+    return await manip_ops.split(ary, indices_or_sections, axis)
+
 @mcp.tool()
-async def tile(A: NumericData, reps: List[int]) -> List[Any]: return await manip_ops.tile(A, reps)
+async def tile(A: NumericData, reps: List[int]) -> List[Any]: 
+    """CONSTRUCTS array by repeating A. [ACTION]
+    
+    [RAG Context]
+    """
+    return await manip_ops.tile(A, reps)
+
 @mcp.tool()
-async def repeat(a: NumericData, repeats: Union[int, List[int]], axis: Optional[int] = None) -> List[Any]: return await manip_ops.repeat(a, repeats, axis)
+async def repeat(a: NumericData, repeats: Union[int, List[int]], axis: Optional[int] = None) -> List[Any]: 
+    """REPEATS elements of an array. [ACTION]
+    
+    [RAG Context]
+    """
+    return await manip_ops.repeat(a, repeats, axis)
+
 @mcp.tool()
-async def unique(ar: NumericData) -> List[Any]: return await manip_ops.unique(ar)
+async def unique(ar: NumericData) -> List[Any]: 
+    """FINDS unique elements. [DATA]
+    
+    [RAG Context]
+    """
+    return await manip_ops.unique(ar)
+
 @mcp.tool()
-async def trim_zeros(filt: NumericData, trim: str = 'fb') -> List[Any]: return await manip_ops.trim_zeros(filt, trim)
+async def trim_zeros(filt: NumericData, trim: str = 'fb') -> List[Any]: 
+    """TRIMS leading/trailing zeros. [ACTION]
+    
+    [RAG Context]
+    """
+    return await manip_ops.trim_zeros(filt, trim)
+
 @mcp.tool()
-async def pad(array: NumericData, pad_width: List[Any], mode: str = 'constant', constant_values: Any = 0) -> List[Any]: return await manip_ops.pad(array, pad_width, mode, constant_values)
+async def pad(array: NumericData, pad_width: List[Any], mode: str = 'constant', constant_values: Any = 0) -> List[Any]: 
+    """PADS array. [ACTION]
+    
+    [RAG Context]
+    """
+    return await manip_ops.pad(array, pad_width, mode, constant_values)
 
 # ==========================================
 # 3. Math
 # ==========================================
 @mcp.tool()
-async def add(x1: NumericData, x2: NumericData) -> List[Any]: return await math_ops.add(x1, x2)
+async def add(x1: NumericData, x2: NumericData) -> List[Any]: 
+    """ADDS arguments element-wise. [ACTION]
+    
+    [RAG Context]
+    """
+    return await math_ops.add(x1, x2)
+
 @mcp.tool()
-async def subtract(x1: NumericData, x2: NumericData) -> List[Any]: return await math_ops.subtract(x1, x2)
+async def subtract(x1: NumericData, x2: NumericData) -> List[Any]: 
+    """SUBTRACTS arguments element-wise. [ACTION]
+    
+    [RAG Context]
+    """
+    return await math_ops.subtract(x1, x2)
+
 @mcp.tool()
-async def multiply(x1: NumericData, x2: NumericData) -> List[Any]: return await math_ops.multiply(x1, x2)
+async def multiply(x1: NumericData, x2: NumericData) -> List[Any]: 
+    """MULTIPLIES arguments element-wise. [ACTION]
+    
+    [RAG Context]
+    """
+    return await math_ops.multiply(x1, x2)
+
 @mcp.tool()
-async def divide(x1: NumericData, x2: NumericData) -> List[Any]: return await math_ops.divide(x1, x2)
+async def divide(x1: NumericData, x2: NumericData) -> List[Any]: 
+    """DIVIDES arguments element-wise. [ACTION]
+    
+    [RAG Context]
+    """
+    return await math_ops.divide(x1, x2)
+
 @mcp.tool()
-async def power(x1: NumericData, x2: NumericData) -> List[Any]: return await math_ops.power(x1, x2)
+async def power(x1: NumericData, x2: NumericData) -> List[Any]: 
+    """RAISES x1 to power x2. [ACTION]
+    
+    [RAG Context]
+    """
+    return await math_ops.power(x1, x2)
+
 @mcp.tool()
-async def mod(x1: NumericData, x2: NumericData) -> List[Any]: return await math_ops.mod(x1, x2)
+async def mod(x1: NumericData, x2: NumericData) -> List[Any]: 
+    """RETURNS element-wise remainder. [ACTION]
+    
+    [RAG Context]
+    """
+    return await math_ops.mod(x1, x2)
+
 # Functions
 @mcp.tool()
-async def abs_val(x: NumericData) -> List[Any]: return await math_ops.abs_val(x)
+async def abs_val(x: NumericData) -> List[Any]: 
+    """CALCULATES absolute value. [ACTION]
+    
+    [RAG Context]
+    """
+    return await math_ops.abs_val(x)
+
 @mcp.tool()
-async def sign(x: NumericData) -> List[Any]: return await math_ops.sign(x)
+async def sign(x: NumericData) -> List[Any]: 
+    """RETURNS sign of number. [ACTION]
+    
+    [RAG Context]
+    """
+    return await math_ops.sign(x)
+
 @mcp.tool()
-async def exp(x: NumericData) -> List[Any]: return await math_ops.exp(x)
+async def exp(x: NumericData) -> List[Any]: 
+    """CALCULATES exponential. [ACTION]
+    
+    [RAG Context]
+    """
+    return await math_ops.exp(x)
+
 @mcp.tool()
-async def log(x: NumericData) -> List[Any]: return await math_ops.log(x)
+async def log(x: NumericData) -> List[Any]: 
+    """CALCULATES natural logarithm. [ACTION]
+    
+    [RAG Context]
+    """
+    return await math_ops.log(x)
+
 @mcp.tool()
-async def log10(x: NumericData) -> List[Any]: return await math_ops.log10(x)
+async def log10(x: NumericData) -> List[Any]: 
+    """CALCULATES base-10 logarithm. [ACTION]
+    
+    [RAG Context]
+    """
+    return await math_ops.log10(x)
+
 @mcp.tool()
-async def sqrt(x: NumericData) -> List[Any]: return await math_ops.sqrt(x)
+async def sqrt(x: NumericData) -> List[Any]: 
+    """CALCULATES square root. [ACTION]
+    
+    [RAG Context]
+    """
+    return await math_ops.sqrt(x)
+
 @mcp.tool()
-async def sin(x: NumericData) -> List[Any]: return await math_ops.sin(x)
+async def sin(x: NumericData) -> List[Any]: 
+    """CALCULATES sine. [ACTION]
+    
+    [RAG Context]
+    """
+    return await math_ops.sin(x)
+
 @mcp.tool()
-async def cos(x: NumericData) -> List[Any]: return await math_ops.cos(x)
+async def cos(x: NumericData) -> List[Any]: 
+    """CALCULATES cosine. [ACTION]
+    
+    [RAG Context]
+    """
+    return await math_ops.cos(x)
+
 @mcp.tool()
-async def tan(x: NumericData) -> List[Any]: return await math_ops.tan(x)
+async def tan(x: NumericData) -> List[Any]: 
+    """CALCULATES tangent. [ACTION]
+    
+    [RAG Context]
+    """
+    return await math_ops.tan(x)
+
 @mcp.tool()
-async def rad2deg(x: NumericData) -> List[Any]: return await math_ops.rad2deg(x)
+async def rad2deg(x: NumericData) -> List[Any]: 
+    """CONVERTS radians to degrees. [ACTION]
+    
+    [RAG Context]
+    """
+    return await math_ops.rad2deg(x)
+
 @mcp.tool()
-async def deg2rad(x: NumericData) -> List[Any]: return await math_ops.deg2rad(x)
+async def deg2rad(x: NumericData) -> List[Any]: 
+    """CONVERTS degrees to radians. [ACTION]
+    
+    [RAG Context]
+    """
+    return await math_ops.deg2rad(x)
+
 @mcp.tool()
-async def clip(a: NumericData, a_min: float, a_max: float) -> List[Any]: return await math_ops.clip(a, a_min, a_max)
+async def clip(a: NumericData, a_min: float, a_max: float) -> List[Any]: 
+    """CLIPS values to interval. [ACTION]
+    
+    [RAG Context]
+    """
+    return await math_ops.clip(a, a_min, a_max)
+
 @mcp.tool()
-async def round_val(a: NumericData, decimals: int = 0) -> List[Any]: return await math_ops.round_val(a, decimals)
+async def round_val(a: NumericData, decimals: int = 0) -> List[Any]: 
+    """ROUNDS to decimals. [ACTION]
+    
+    [RAG Context]
+    """
+    return await math_ops.round_val(a, decimals)
+
 # Aggregations
 @mcp.tool()
-async def sum_val(a: NumericData, axis: Optional[int] = None) -> Union[float, List[Any]]: return await math_ops.sum_val(a, axis)
+async def sum_val(a: NumericData, axis: Optional[int] = None) -> Union[float, List[Any]]: 
+    """SUMS array elements. [Data]
+    
+    [RAG Context]
+    """
+    return await math_ops.sum_val(a, axis)
+
 @mcp.tool()
-async def prod(a: NumericData, axis: Optional[int] = None) -> Union[float, List[Any]]: return await math_ops.prod(a, axis)
+async def prod(a: NumericData, axis: Optional[int] = None) -> Union[float, List[Any]]: 
+    """MULTIPLIES array elements. [Data]
+    
+    [RAG Context]
+    """
+    return await math_ops.prod(a, axis)
+
 @mcp.tool()
-async def cumsum(a: NumericData, axis: Optional[int] = None) -> List[Any]: return await math_ops.cumsum(a, axis)
+async def cumsum(a: NumericData, axis: Optional[int] = None) -> List[Any]: 
+    """CALCULATES cumulative sum. [Data]
+    
+    [RAG Context]
+    """
+    return await math_ops.cumsum(a, axis)
+
 @mcp.tool()
-async def cumprod(a: NumericData, axis: Optional[int] = None) -> List[Any]: return await math_ops.cumprod(a, axis)
+async def cumprod(a: NumericData, axis: Optional[int] = None) -> List[Any]: 
+    """CALCULATES cumulative product. [Data]
+    
+    [RAG Context]
+    """
+    return await math_ops.cumprod(a, axis)
+
 @mcp.tool()
-async def diff(a: NumericData, n: int = 1, axis: int = -1) -> List[Any]: return await math_ops.diff(a, n, axis)
+async def diff(a: NumericData, n: int = 1, axis: int = -1) -> List[Any]: 
+    """CALCULATES n-th discrete difference. [Data]
+    
+    [RAG Context]
+    """
+    return await math_ops.diff(a, n, axis)
+
 @mcp.tool()
-async def gradient(f: NumericData) -> List[Any]: return await math_ops.gradient(f)
+async def gradient(f: NumericData) -> List[Any]: 
+    """CALCULATES gradient. [Data]
+    
+    [RAG Context]
+    """
+    return await math_ops.gradient(f)
+
 @mcp.tool()
-async def cross(a: NumericData, b: NumericData) -> List[Any]: return await math_ops.cross(a, b)
+async def cross(a: NumericData, b: NumericData) -> List[Any]: 
+    """CALCULATES cross product. [Data]
+    
+    [RAG Context]
+    """
+    return await math_ops.cross(a, b)
 
 # ==========================================
 # 4. Logic
 # ==========================================
+# ==========================================
+# 4. Logic
+# ==========================================
 @mcp.tool()
-async def greater(x1: NumericData, x2: NumericData) -> List[Any]: return await logic_ops.greater(x1, x2)
+async def greater(x1: NumericData, x2: NumericData) -> List[Any]: 
+    """CHECKS if x1 > x2. [ACTION]
+    
+    [RAG Context]
+    """
+    return await logic_ops.greater(x1, x2)
+
 @mcp.tool()
-async def less(x1: NumericData, x2: NumericData) -> List[Any]: return await logic_ops.less(x1, x2)
+async def less(x1: NumericData, x2: NumericData) -> List[Any]: 
+    """CHECKS if x1 < x2. [ACTION]
+    
+    [RAG Context]
+    """
+    return await logic_ops.less(x1, x2)
+
 @mcp.tool()
-async def equal(x1: NumericData, x2: NumericData) -> List[Any]: return await logic_ops.equal(x1, x2)
+async def equal(x1: NumericData, x2: NumericData) -> List[Any]: 
+    """CHECKS if x1 == x2. [ACTION]
+    
+    [RAG Context]
+    """
+    return await logic_ops.equal(x1, x2)
+
 @mcp.tool()
-async def not_equal(x1: NumericData, x2: NumericData) -> List[Any]: return await logic_ops.not_equal(x1, x2)
+async def not_equal(x1: NumericData, x2: NumericData) -> List[Any]: 
+    """CHECKS if x1 != x2. [ACTION]
+    
+    [RAG Context]
+    """
+    return await logic_ops.not_equal(x1, x2)
+
 @mcp.tool()
-async def logical_and(x1: NumericData, x2: NumericData) -> List[Any]: return await logic_ops.logical_and(x1, x2)
+async def logical_and(x1: NumericData, x2: NumericData) -> List[Any]: 
+    """COMPUTES element-wise AND. [ACTION]
+    
+    [RAG Context]
+    """
+    return await logic_ops.logical_and(x1, x2)
+
 @mcp.tool()
-async def logical_or(x1: NumericData, x2: NumericData) -> List[Any]: return await logic_ops.logical_or(x1, x2)
+async def logical_or(x1: NumericData, x2: NumericData) -> List[Any]: 
+    """COMPUTES element-wise OR. [ACTION]
+    
+    [RAG Context]
+    """
+    return await logic_ops.logical_or(x1, x2)
+
 @mcp.tool()
-async def logical_not(x: NumericData) -> List[Any]: return await logic_ops.logical_not(x)
+async def logical_not(x: NumericData) -> List[Any]: 
+    """COMPUTES element-wise NOT. [ACTION]
+    
+    [RAG Context]
+    """
+    return await logic_ops.logical_not(x)
+
 @mcp.tool()
-async def all_true(a: NumericData, axis: Optional[int] = None) -> Union[bool, List[bool]]: return await logic_ops.all_true(a, axis)
+async def all_true(a: NumericData, axis: Optional[int] = None) -> Union[bool, List[bool]]: 
+    """CHECKS if all elements are True. [ACTION]
+    
+    [RAG Context]
+    """
+    return await logic_ops.all_true(a, axis)
+
 @mcp.tool()
-async def any_true(a: NumericData, axis: Optional[int] = None) -> Union[bool, List[bool]]: return await logic_ops.any_true(a, axis)
+async def any_true(a: NumericData, axis: Optional[int] = None) -> Union[bool, List[bool]]: 
+    """CHECKS if any element is True. [ACTION]
+    
+    [RAG Context]
+    """
+    return await logic_ops.any_true(a, axis)
+
 @mcp.tool()
-async def where(condition: NumericData, x: Optional[NumericData] = None, y: Optional[NumericData] = None) -> List[Any]: return await logic_ops.where(condition, x, y)
+async def where(condition: NumericData, x: Optional[NumericData] = None, y: Optional[NumericData] = None) -> List[Any]: 
+    """SELECTS elements depending on condition. [ACTION]
+    
+    [RAG Context]
+    """
+    return await logic_ops.where(condition, x, y)
+
 @mcp.tool()
-async def argmax(a: NumericData, axis: Optional[int] = None) -> Union[int, List[int]]: return await logic_ops.argmax(a, axis)
+async def argmax(a: NumericData, axis: Optional[int] = None) -> Union[int, List[int]]: 
+    """RETURNS indices of max values. [DATA]
+    
+    [RAG Context]
+    """
+    return await logic_ops.argmax(a, axis)
+
 @mcp.tool()
-async def argmin(a: NumericData, axis: Optional[int] = None) -> Union[int, List[int]]: return await logic_ops.argmin(a, axis)
+async def argmin(a: NumericData, axis: Optional[int] = None) -> Union[int, List[int]]: 
+    """RETURNS indices of min values. [DATA]
+    
+    [RAG Context]
+    """
+    return await logic_ops.argmin(a, axis)
+
 @mcp.tool()
-async def argsort(a: NumericData, axis: int = -1) -> List[Any]: return await logic_ops.argsort(a, axis)
+async def argsort(a: NumericData, axis: int = -1) -> List[Any]: 
+    """RETURNS indices that would sort array. [ACTION]
+    
+    [RAG Context]
+    """
+    return await logic_ops.argsort(a, axis)
+
 @mcp.tool()
-async def sort(a: NumericData, axis: int = -1) -> List[Any]: return await logic_ops.sort(a, axis)
+async def sort(a: NumericData, axis: int = -1) -> List[Any]: 
+    """SORTS an array. [ACTION]
+    
+    [RAG Context]
+    """
+    return await logic_ops.sort(a, axis)
+
 @mcp.tool()
-async def searchsorted(a: NumericData, v: NumericData, side: str = 'left') -> List[Any]: return await logic_ops.searchsorted(a, v, side)
+async def searchsorted(a: NumericData, v: NumericData, side: str = 'left') -> List[Any]: 
+    """FINDS indices to insert elements. [ACTION]
+    
+    [RAG Context]
+    Maintains order.
+    """
+    return await logic_ops.searchsorted(a, v, side)
 
 # ==========================================
 # 5. Linalg
 # ==========================================
 @mcp.tool()
-async def dot(a: NumericData, b: NumericData) -> List[Any]: return await linalg_ops.dot(a, b)
+async def dot(a: NumericData, b: NumericData) -> List[Any]: 
+    """COMPUTES dot product. [ACTION]
+    
+    [RAG Context]
+    """
+    return await linalg_ops.dot(a, b)
+
 @mcp.tool()
-async def matmul(x1: NumericData, x2: NumericData) -> List[Any]: return await linalg_ops.matmul(x1, x2)
+async def matmul(x1: NumericData, x2: NumericData) -> List[Any]: 
+    """COMPUTES matrix product. [ACTION]
+    
+    [RAG Context]
+    """
+    return await linalg_ops.matmul(x1, x2)
+
 @mcp.tool()
-async def inner(a: NumericData, b: NumericData) -> List[Any]: return await linalg_ops.inner(a, b)
+async def inner(a: NumericData, b: NumericData) -> List[Any]: 
+    """COMPUTES inner product. [ACTION]
+    
+    [RAG Context]
+    """
+    return await linalg_ops.inner(a, b)
+
 @mcp.tool()
-async def outer(a: NumericData, b: NumericData) -> List[Any]: return await linalg_ops.outer(a, b)
+async def outer(a: NumericData, b: NumericData) -> List[Any]: 
+    """COMPUTES outer product. [ACTION]
+    
+    [RAG Context]
+    """
+    return await linalg_ops.outer(a, b)
+
 @mcp.tool()
-async def kron(a: NumericData, b: NumericData) -> List[Any]: return await linalg_ops.kron(a, b)
+async def kron(a: NumericData, b: NumericData) -> List[Any]: 
+    """COMPUTES Kronecker product. [ACTION]
+    
+    [RAG Context]
+    """
+    return await linalg_ops.kron(a, b)
+
 @mcp.tool()
-async def matrix_power(a: NumericData, n: int) -> List[Any]: return await linalg_ops.matrix_power(a, n)
+async def matrix_power(a: NumericData, n: int) -> List[Any]: 
+    """RAISES square matrix to power n. [ACTION]
+    
+    [RAG Context]
+    """
+    return await linalg_ops.matrix_power(a, n)
+
 @mcp.tool()
-async def cholesky(a: NumericData) -> List[Any]: return await linalg_ops.cholesky(a)
+async def cholesky(a: NumericData) -> List[Any]: 
+    """COMPUTES Cholesky decomposition. [ACTION]
+    
+    [RAG Context]
+    """
+    return await linalg_ops.cholesky(a)
+
 @mcp.tool()
-async def qr_decomp(a: NumericData, mode: str = 'reduced') -> Dict[str, Any]: return await linalg_ops.qr_decomp(a, mode)
+async def qr_decomp(a: NumericData, mode: str = 'reduced') -> Dict[str, Any]: 
+    """COMPUTES QR decomposition. [ACTION]
+    
+    [RAG Context]
+    """
+    return await linalg_ops.qr_decomp(a, mode)
+
 @mcp.tool()
-async def svd_decomp(a: NumericData, full_matrices: bool = True) -> Dict[str, Any]: return await linalg_ops.svd_decomp(a, full_matrices)
+async def svd_decomp(a: NumericData, full_matrices: bool = True) -> Dict[str, Any]: 
+    """COMPUTES Singular Value Decomposition. [ACTION]
+    
+    [RAG Context]
+    """
+    return await linalg_ops.svd_decomp(a, full_matrices)
+
 @mcp.tool()
-async def eig(a: NumericData) -> Dict[str, Any]: return await linalg_ops.eig(a)
+async def eig(a: NumericData) -> Dict[str, Any]: 
+    """COMPUTES eigenvalues and eigenvectors. [ACTION]
+    
+    [RAG Context]
+    """
+    return await linalg_ops.eig(a)
+
 @mcp.tool()
-async def norm(x: NumericData, ord: Any = None, axis: Any = None) -> float: return await linalg_ops.norm(x, ord, axis)
+async def norm(x: NumericData, ord: Any = None, axis: Any = None) -> float: 
+    """CALCULATES matrix or vector norm. [DATA]
+    
+    [RAG Context]
+    """
+    return await linalg_ops.norm(x, ord, axis)
+
 @mcp.tool()
-async def cond(x: NumericData, p: Any = None) -> float: return await linalg_ops.cond(x, p)
+async def cond(x: NumericData, p: Any = None) -> float: 
+    """CALCULATES condition number. [DATA]
+    
+    [RAG Context]
+    """
+    return await linalg_ops.cond(x, p)
+
 @mcp.tool()
-async def det(a: NumericData) -> float: return await linalg_ops.det(a)
+async def det(a: NumericData) -> float: 
+    """CALCULATES determinant. [DATA]
+    
+    [RAG Context]
+    """
+    return await linalg_ops.det(a)
+
 @mcp.tool()
-async def matrix_rank(M: NumericData) -> int: return await linalg_ops.matrix_rank(M)
+async def matrix_rank(M: NumericData) -> int: 
+    """CALCULATES matrix rank. [DATA]
+    
+    [RAG Context]
+    Using SVD.
+    """
+    return await linalg_ops.matrix_rank(M)
+
 @mcp.tool()
-async def solve(a: NumericData, b: NumericData) -> List[Any]: return await linalg_ops.solve(a, b)
+async def solve(a: NumericData, b: NumericData) -> List[Any]: 
+    """SOLVES linear matrix equation. [ACTION]
+    
+    [RAG Context]
+    """
+    return await linalg_ops.solve(a, b)
+
 @mcp.tool()
-async def inv(a: NumericData) -> List[Any]: return await linalg_ops.inv(a)
+async def inv(a: NumericData) -> List[Any]: 
+    """CALCULATES multiplicative inverse. [ACTION]
+    
+    [RAG Context]
+    """
+    return await linalg_ops.inv(a)
+
 @mcp.tool()
-async def pinv(a: NumericData) -> List[Any]: return await linalg_ops.pinv(a)
+async def pinv(a: NumericData) -> List[Any]: 
+    """CALCULATES Moore-Penrose pseudo-inverse. [ACTION]
+    
+    [RAG Context]
+    """
+    return await linalg_ops.pinv(a)
+
 @mcp.tool()
-async def lstsq(a: NumericData, b: NumericData, rcond: str = 'warn') -> Dict[str, Any]: return await linalg_ops.lstsq(a, b, rcond)
+async def lstsq(a: NumericData, b: NumericData, rcond: str = 'warn') -> Dict[str, Any]: 
+    """SOLVES least-squares problem. [ACTION]
+    
+    [RAG Context]
+    """
+    return await linalg_ops.lstsq(a, b, rcond)
 
 # ==========================================
 # 6. Random
 # ==========================================
 @mcp.tool()
-async def rand_float(size: Optional[List[int]] = None) -> List[Any]: return await random_ops.rand_float(size)
+async def rand_float(size: Optional[List[int]] = None) -> List[Any]: 
+    """GENERATES random floats [0.0, 1.0). [ENTRY]
+    
+    [RAG Context]
+    """
+    return await random_ops.rand_float(size)
+
 @mcp.tool()
-async def rand_int(low: int, high: Optional[int] = None, size: Optional[List[int]] = None) -> List[Any]: return await random_ops.rand_int(low, high, size)
+async def rand_int(low: int, high: Optional[int] = None, size: Optional[List[int]] = None) -> List[Any]: 
+    """GENERATES random integers. [ENTRY]
+    
+    [RAG Context]
+    """
+    return await random_ops.rand_int(low, high, size)
+
 @mcp.tool()
-async def rand_normal(loc: float = 0.0, scale: float = 1.0, size: Optional[List[int]] = None) -> List[Any]: return await random_ops.rand_normal(loc, scale, size)
+async def rand_normal(loc: float = 0.0, scale: float = 1.0, size: Optional[List[int]] = None) -> List[Any]: 
+    """GENERATES random samples (Normal/Gaussian). [ENTRY]
+    
+    [RAG Context]
+    """
+    return await random_ops.rand_normal(loc, scale, size)
+
 @mcp.tool()
-async def rand_uniform(low: float = 0.0, high: float = 1.0, size: Optional[List[int]] = None) -> List[Any]: return await random_ops.rand_uniform(low, high, size)
+async def rand_uniform(low: float = 0.0, high: float = 1.0, size: Optional[List[int]] = None) -> List[Any]: 
+    """GENERATES random samples (Uniform). [ENTRY]
+    
+    [RAG Context]
+    """
+    return await random_ops.rand_uniform(low, high, size)
+
 @mcp.tool()
-async def rand_choice(a: NumericData, size: Optional[List[int]] = None, replace: bool = True, p: Optional[NumericData] = None) -> List[Any]: return await random_ops.rand_choice(a, size, replace, p)
+async def rand_choice(a: NumericData, size: Optional[List[int]] = None, replace: bool = True, p: Optional[NumericData] = None) -> List[Any]: 
+    """GENERATES random sample from 1-D array. [ENTRY]
+    
+    [RAG Context]
+    """
+    return await random_ops.rand_choice(a, size, replace, p)
+
 @mcp.tool()
-async def shuffle(x: NumericData) -> List[Any]: return await random_ops.shuffle(x)
+async def shuffle(x: NumericData) -> List[Any]: 
+    """SHUFFLES array in-place. [ACTION]
+    
+    [RAG Context]
+    """
+    return await random_ops.shuffle(x)
+
 @mcp.tool()
-async def permutation(x: Union[int, NumericData]) -> List[Any]: return await random_ops.permutation(x)
+async def permutation(x: Union[int, NumericData]) -> List[Any]: 
+    """PERMUTES sequence randomly. [ACTION]
+    
+    [RAG Context]
+    """
+    return await random_ops.permutation(x)
+
 # Dist
 @mcp.tool()
-async def rand_beta(a: float, b: float, size: Optional[List[int]] = None) -> List[Any]: return await random_ops.rand_beta(a, b, size)
+async def rand_beta(a: float, b: float, size: Optional[List[int]] = None) -> List[Any]: 
+    """GENERATES random samples (Beta). [ENTRY]
+    
+    [RAG Context]
+    """
+    return await random_ops.rand_beta(a, b, size)
+
 @mcp.tool()
-async def rand_binomial(n: int, p: float, size: Optional[List[int]] = None) -> List[Any]: return await random_ops.rand_binomial(n, p, size)
+async def rand_binomial(n: int, p: float, size: Optional[List[int]] = None) -> List[Any]: 
+    """GENERATES random samples (Binomial). [ENTRY]
+    
+    [RAG Context]
+    """
+    return await random_ops.rand_binomial(n, p, size)
+
 @mcp.tool()
-async def rand_chisquare(df: float, size: Optional[List[int]] = None) -> List[Any]: return await random_ops.rand_chisquare(df, size)
+async def rand_chisquare(df: float, size: Optional[List[int]] = None) -> List[Any]: 
+    """GENERATES random samples (Chi-Square). [ENTRY]
+    
+    [RAG Context]
+    """
+    return await random_ops.rand_chisquare(df, size)
+
 @mcp.tool()
-async def rand_gamma(shape: float, scale: float = 1.0, size: Optional[List[int]] = None) -> List[Any]: return await random_ops.rand_gamma(shape, scale, size)
+async def rand_gamma(shape: float, scale: float = 1.0, size: Optional[List[int]] = None) -> List[Any]: 
+    """GENERATES random samples (Gamma). [ENTRY]
+    
+    [RAG Context]
+    """
+    return await random_ops.rand_gamma(shape, scale, size)
+
 @mcp.tool()
-async def rand_poisson(lam: float = 1.0, size: Optional[List[int]] = None) -> List[Any]: return await random_ops.rand_poisson(lam, size)
+async def rand_poisson(lam: float = 1.0, size: Optional[List[int]] = None) -> List[Any]: 
+    """GENERATES random samples (Poisson). [ENTRY]
+    
+    [RAG Context]
+    """
+    return await random_ops.rand_poisson(lam, size)
+
 @mcp.tool()
-async def rand_exponential(scale: float = 1.0, size: Optional[List[int]] = None) -> List[Any]: return await random_ops.rand_exponential(scale, size)
+async def rand_exponential(scale: float = 1.0, size: Optional[List[int]] = None) -> List[Any]: 
+    """GENERATES random samples (Exponential). [ENTRY]
+    
+    [RAG Context]
+    """
+    return await random_ops.rand_exponential(scale, size)
 
 # ==========================================
 # 7. FFT & Super
 # ==========================================
 @mcp.tool()
-async def fft(a: NumericData, n: Optional[int] = None, axis: int = -1) -> Dict[str, Any]: return await fft_ops.fft(a, n, axis)
+async def fft(a: NumericData, n: Optional[int] = None, axis: int = -1) -> Dict[str, Any]: 
+    """COMPUTES 1-D Discrete Fourier Transform. [ACTION]
+    
+    [RAG Context]
+    """
+    return await fft_ops.fft(a, n, axis)
+
 @mcp.tool()
-async def ifft(a_real: NumericData, a_imag: Optional[NumericData] = None, n: Optional[int] = None, axis: int = -1) -> List[Any]: return await fft_ops.ifft(a_real, a_imag, n, axis)
+async def ifft(a_real: NumericData, a_imag: Optional[NumericData] = None, n: Optional[int] = None, axis: int = -1) -> List[Any]: 
+    """COMPUTES Inverse 1-D DFT. [ACTION]
+    
+    [RAG Context]
+    """
+    return await fft_ops.ifft(a_real, a_imag, n, axis)
+
 @mcp.tool()
-async def fft2(a: NumericData, s: Optional[List[int]] = None) -> Dict[str, Any]: return await fft_ops.fft2(a, s)
+async def fft2(a: NumericData, s: Optional[List[int]] = None) -> Dict[str, Any]: 
+    """COMPUTES 2-D Discrete Fourier Transform. [ACTION]
+    
+    [RAG Context]
+    """
+    return await fft_ops.fft2(a, s)
+
 @mcp.tool()
-async def fftfreq(n: int, d: float = 1.0) -> List[float]: return await fft_ops.fftfreq(n, d)
+async def fftfreq(n: int, d: float = 1.0) -> List[float]: 
+    """RETURNS DFT sample frequencies. [DATA]
+    
+    [RAG Context]
+    """
+    return await fft_ops.fftfreq(n, d)
+
 @mcp.tool()
-async def analyze_array(data: NumericData) -> Dict[str, Any]: return await super_ops.analyze_array(data)
+async def analyze_array(data: NumericData) -> Dict[str, Any]: 
+    """PERFORMS comprehensive array analysis. [ENTRY]
+    
+    [RAG Context]
+    Stats, histogram, check for NaNs/Inf.
+    """
+    return await super_ops.analyze_array(data)
+
 @mcp.tool()
-async def matrix_dashboard(data: NumericData) -> Dict[str, Any]: return await super_ops.matrix_dashboard(data)
+async def matrix_dashboard(data: NumericData) -> Dict[str, Any]: 
+    """GENERATES matrix health dashboard. [ENTRY]
+    
+    [RAG Context]
+    Condition number, rank, sparsity, eigenvalues.
+    """
+    return await super_ops.matrix_dashboard(data)
+
 @mcp.tool()
-async def compare_arrays(a: NumericData, b: NumericData) -> Dict[str, Any]: return await super_ops.compare_arrays(a, b)
+async def compare_arrays(a: NumericData, b: NumericData) -> Dict[str, Any]: 
+    """COMPARES two arrays (MSE, Max Diff). [ENTRY]
+    
+    [RAG Context]
+    """
+    return await super_ops.compare_arrays(a, b)
 
 # ==========================================
 # 8. Bitwise (Ultimate)
 # ==========================================
 @mcp.tool()
-async def bitwise_and(x1: NumericData, x2: NumericData) -> List[Any]: return await bitwise_ops.bitwise_and(x1, x2)
+async def bitwise_and(x1: NumericData, x2: NumericData) -> List[Any]: 
+    """COMPUTES bitwise AND. [ACTION]
+    
+    [RAG Context]
+    """
+    return await bitwise_ops.bitwise_and(x1, x2)
+
 @mcp.tool()
-async def bitwise_or(x1: NumericData, x2: NumericData) -> List[Any]: return await bitwise_ops.bitwise_or(x1, x2)
+async def bitwise_or(x1: NumericData, x2: NumericData) -> List[Any]: 
+    """COMPUTES bitwise OR. [ACTION]
+    
+    [RAG Context]
+    """
+    return await bitwise_ops.bitwise_or(x1, x2)
+
 @mcp.tool()
-async def bitwise_xor(x1: NumericData, x2: NumericData) -> List[Any]: return await bitwise_ops.bitwise_xor(x1, x2)
+async def bitwise_xor(x1: NumericData, x2: NumericData) -> List[Any]: 
+    """COMPUTES bitwise XOR. [ACTION]
+    
+    [RAG Context]
+    """
+    return await bitwise_ops.bitwise_xor(x1, x2)
+
 @mcp.tool()
-async def bitwise_not(x: NumericData) -> List[Any]: return await bitwise_ops.bitwise_not(x)
+async def bitwise_not(x: NumericData) -> List[Any]: 
+    """COMPUTES bitwise inversion (NOT). [ACTION]
+    
+    [RAG Context]
+    """
+    return await bitwise_ops.bitwise_not(x)
+
 @mcp.tool()
-async def left_shift(x1: NumericData, x2: NumericData) -> List[Any]: return await bitwise_ops.left_shift(x1, x2)
+async def left_shift(x1: NumericData, x2: NumericData) -> List[Any]: 
+    """SHIFTS bits to the left. [ACTION]
+    
+    [RAG Context]
+    """
+    return await bitwise_ops.left_shift(x1, x2)
+
 @mcp.tool()
-async def right_shift(x1: NumericData, x2: NumericData) -> List[Any]: return await bitwise_ops.right_shift(x1, x2)
+async def right_shift(x1: NumericData, x2: NumericData) -> List[Any]: 
+    """SHIFTS bits to the right. [ACTION]
+    
+    [RAG Context]
+    """
+    return await bitwise_ops.right_shift(x1, x2)
+
 @mcp.tool()
-async def binary_repr(num: int, width: Optional[int] = None) -> str: return await bitwise_ops.binary_repr(num, width)
+async def binary_repr(num: int, width: Optional[int] = None) -> str: 
+    """RETURNS binary representation string. [DATA]
+    
+    [RAG Context]
+    """
+    return await bitwise_ops.binary_repr(num, width)
 
 # ==========================================
 # 9. Strings (Ultimate)
 # ==========================================
 @mcp.tool()
-async def char_add(x1: Union[List[str], str], x2: Union[List[str], str]) -> List[str]: return await string_ops.char_add(x1, x2)
+async def char_add(x1: Union[List[str], str], x2: Union[List[str], str]) -> List[str]: 
+    """CONCATENATES strings element-wise. [ACTION]
+    
+    [RAG Context]
+    """
+    return await string_ops.char_add(x1, x2)
+
 @mcp.tool()
-async def char_multiply(a: Union[List[str], str], i: int) -> List[str]: return await string_ops.char_multiply(a, i)
+async def char_multiply(a: Union[List[str], str], i: int) -> List[str]: 
+    """REPEATS strings element-wise. [ACTION]
+    
+    [RAG Context]
+    """
+    return await string_ops.char_multiply(a, i)
+
 @mcp.tool()
-async def char_upper(a: Union[List[str], str]) -> List[str]: return await string_ops.char_upper(a)
+async def char_upper(a: Union[List[str], str]) -> List[str]: 
+    """CONVERTS strings to uppercase. [ACTION]
+    
+    [RAG Context]
+    """
+    return await string_ops.char_upper(a)
+
 @mcp.tool()
-async def char_lower(a: Union[List[str], str]) -> List[str]: return await string_ops.char_lower(a)
+async def char_lower(a: Union[List[str], str]) -> List[str]: 
+    """CONVERTS strings to lowercase. [ACTION]
+    
+    [RAG Context]
+    """
+    return await string_ops.char_lower(a)
+
 @mcp.tool()
-async def char_replace(a: Union[List[str], str], old: str, new: str, count: Optional[int] = None) -> List[str]: return await string_ops.char_replace(a, old, new, count)
+async def char_replace(a: Union[List[str], str], old: str, new: str, count: Optional[int] = None) -> List[str]: 
+    """REPLACES substrings. [ACTION]
+    
+    [RAG Context]
+    """
+    return await string_ops.char_replace(a, old, new, count)
+
 @mcp.tool()
-async def char_compare_equal(x1: Union[List[str], str], x2: Union[List[str], str]) -> List[bool]: return await string_ops.char_compare_equal(x1, x2)
+async def char_compare_equal(x1: Union[List[str], str], x2: Union[List[str], str]) -> List[bool]: 
+    """CHECKS for string equality. [ACTION]
+    
+    [RAG Context]
+    """
+    return await string_ops.char_compare_equal(x1, x2)
+
 @mcp.tool()
-async def char_count(a: Union[List[str], str], sub: str, start: int = 0, end: Optional[int] = None) -> List[int]: return await string_ops.char_count(a, sub, start, end)
+async def char_count(a: Union[List[str], str], sub: str, start: int = 0, end: Optional[int] = None) -> List[int]: 
+    """COUNTS substring occurrences. [DATA]
+    
+    [RAG Context]
+    """
+    return await string_ops.char_count(a, sub, start, end)
+
 @mcp.tool()
-async def char_find(a: Union[List[str], str], sub: str, start: int = 0, end: Optional[int] = None) -> List[int]: return await string_ops.char_find(a, sub, start, end)
+async def char_find(a: Union[List[str], str], sub: str, start: int = 0, end: Optional[int] = None) -> List[int]: 
+    """FINDS lowest index of substring. [DATA]
+    
+    [RAG Context]
+    """
+    return await string_ops.char_find(a, sub, start, end)
 
 # ==========================================
 # 10. Sets (Ultimate)
 # ==========================================
 @mcp.tool()
-async def unique_counts(ar: NumericData) -> Dict[str, Any]: return await set_ops.unique_counts(ar)
+async def unique_counts(ar: NumericData) -> Dict[str, Any]: 
+    """RETURNS unique elements and counts. [DATA]
+    
+    [RAG Context]
+    """
+    return await set_ops.unique_counts(ar)
+
 @mcp.tool()
-async def union1d(ar1: NumericData, ar2: NumericData) -> List[Any]: return await set_ops.union1d(ar1, ar2)
+async def union1d(ar1: NumericData, ar2: NumericData) -> List[Any]: 
+    """FINDS union of two arrays. [DATA]
+    
+    [RAG Context]
+    """
+    return await set_ops.union1d(ar1, ar2)
+
 @mcp.tool()
-async def intersect1d(ar1: NumericData, ar2: NumericData) -> List[Any]: return await set_ops.intersect1d(ar1, ar2)
+async def intersect1d(ar1: NumericData, ar2: NumericData) -> List[Any]: 
+    """FINDS intersection of two arrays. [DATA]
+    
+    [RAG Context]
+    """
+    return await set_ops.intersect1d(ar1, ar2)
+
 @mcp.tool()
-async def setdiff1d(ar1: NumericData, ar2: NumericData) -> List[Any]: return await set_ops.setdiff1d(ar1, ar2)
+async def setdiff1d(ar1: NumericData, ar2: NumericData) -> List[Any]: 
+    """FINDS set difference of two arrays. [DATA]
+    
+    [RAG Context]
+    """
+    return await set_ops.setdiff1d(ar1, ar2)
+
 @mcp.tool()
-async def setxor1d(ar1: NumericData, ar2: NumericData) -> List[Any]: return await set_ops.setxor1d(ar1, ar2)
+async def setxor1d(ar1: NumericData, ar2: NumericData) -> List[Any]: 
+    """FINDS set exclusive-or of two arrays. [DATA]
+    
+    [RAG Context]
+    """
+    return await set_ops.setxor1d(ar1, ar2)
+
 @mcp.tool()
-async def isin(element: NumericData, test_elements: NumericData) -> List[bool]: return await set_ops.isin(element, test_elements)
+async def isin(element: NumericData, test_elements: NumericData) -> List[bool]: 
+    """TESTS whether elements are in test set. [DATA]
+    
+    [RAG Context]
+    """
+    return await set_ops.isin(element, test_elements)
 
 # ==========================================
 # 11. Polynomials (Ultimate)
 # ==========================================
 @mcp.tool()
-async def poly_fit(x: NumericData, y: NumericData, deg: int) -> Dict[str, Any]: return await poly_ops.poly_fit(x, y, deg)
+async def poly_fit(x: NumericData, y: NumericData, deg: int) -> Dict[str, Any]: 
+    """FITS a polynomial. [ACTION]
+    
+    [RAG Context]
+    Returns coeffs and stats.
+    """
+    return await poly_ops.poly_fit(x, y, deg)
+
 @mcp.tool()
-async def poly_val(coef: List[float], x: NumericData) -> List[float]: return await poly_ops.poly_val(coef, x)
+async def poly_val(coef: List[float], x: NumericData) -> List[float]: 
+    """EVALUATES a polynomial at x. [ACTION]
+    
+    [RAG Context]
+    """
+    return await poly_ops.poly_val(coef, x)
+
 @mcp.tool()
-async def poly_roots(coef: List[float]) -> List[Any]: return await poly_ops.poly_roots(coef)
+async def poly_roots(coef: List[float]) -> List[Any]: 
+    """FINDS roots of a polynomial. [DATA]
+    
+    [RAG Context]
+    """
+    return await poly_ops.poly_roots(coef)
+
 @mcp.tool()
-async def poly_from_roots(roots: List[float]) -> List[float]: return await poly_ops.poly_from_roots(roots)
+async def poly_from_roots(roots: List[float]) -> List[float]: 
+    """GENERATES polynomial from roots. [ACTION]
+    
+    [RAG Context]
+    """
+    return await poly_ops.poly_from_roots(roots)
+
 @mcp.tool()
-async def poly_derivative(coef: List[float], m: int = 1) -> List[float]: return await poly_ops.poly_derivative(coef, m)
+async def poly_derivative(coef: List[float], m: int = 1) -> List[float]: 
+    """DIFFERENTIATES a polynomial. [ACTION]
+    
+    [RAG Context]
+    """
+    return await poly_ops.poly_derivative(coef, m)
+
 @mcp.tool()
-async def poly_integrate(coef: List[float], m: int = 1) -> List[float]: return await poly_ops.poly_integrate(coef, m)
+async def poly_integrate(coef: List[float], m: int = 1) -> List[float]: 
+    """INTEGRATES a polynomial. [ACTION]
+    
+    [RAG Context]
+    """
+    return await poly_ops.poly_integrate(coef, m)
 
 # ==========================================
 # 12. Stats Plus (Ultimate)
 # ==========================================
 @mcp.tool()
-async def histogram(a: NumericData, bins: Union[int, str] = 10, range: Optional[List[float]] = None) -> Dict[str, Any]: return await stat_plus_ops.histogram(a, bins, range)
+async def histogram(a: NumericData, bins: Union[int, str] = 10, range: Optional[List[float]] = None) -> Dict[str, Any]: 
+    """COMPUTES histogram of a set of data. [DATA]
+    
+    [RAG Context]
+    """
+    return await stat_plus_ops.histogram(a, bins, range)
+
 @mcp.tool()
-async def bincount(x: NumericData, minlength: int = 0) -> List[int]: return await stat_plus_ops.bincount(x, minlength)
+async def bincount(x: NumericData, minlength: int = 0) -> List[int]: 
+    """COUNTS occurrences of non-negative ints. [DATA]
+    
+    [RAG Context]
+    """
+    return await stat_plus_ops.bincount(x, minlength)
+
 @mcp.tool()
-async def digitize(x: NumericData, bins: List[float], right: bool = False) -> List[int]: return await stat_plus_ops.digitize(x, bins, right)
+async def digitize(x: NumericData, bins: List[float], right: bool = False) -> List[int]: 
+    """RETURNS indices of bins for values. [DATA]
+    
+    [RAG Context]
+    """
+    return await stat_plus_ops.digitize(x, bins, right)
+
 @mcp.tool()
-async def correlate(a: NumericData, v: NumericData, mode: str = 'valid') -> List[float]: return await stat_plus_ops.correlate(a, v, mode)
+async def correlate(a: NumericData, v: NumericData, mode: str = 'valid') -> List[float]: 
+    """COMPUTES cross-correlation. [ACTION]
+    
+    [RAG Context]
+    """
+    return await stat_plus_ops.correlate(a, v, mode)
+
 @mcp.tool()
-async def convolve(a: NumericData, v: NumericData, mode: str = 'full') -> List[float]: return await stat_plus_ops.convolve(a, v, mode)
+async def convolve(a: NumericData, v: NumericData, mode: str = 'full') -> List[float]: 
+    """COMPUTES convolution. [ACTION]
+    
+    [RAG Context]
+    """
+    return await stat_plus_ops.convolve(a, v, mode)
+
 @mcp.tool()
-async def cov(m: NumericData) -> List[List[float]]: return await stat_plus_ops.cov(m)
+async def cov(m: NumericData) -> List[List[float]]: 
+    """ESTIMATES covariance matrix. [DATA]
+    
+    [RAG Context]
+    """
+    return await stat_plus_ops.cov(m)
 
 
 if __name__ == "__main__":
     mcp.run()
+
+# ==========================================
+# Compatibility Layer for Tests
+# ==========================================
+class NumpyServer:
+    def __init__(self):
+        # Wrap the FastMCP instance
+        self.mcp = mcp
+
+    def get_tools(self):
+        # Access internal tool manager to get list of tool objects
+        # We need to return objects that have a .name attribute
+        if hasattr(self.mcp, '_tool_manager') and hasattr(self.mcp._tool_manager, '_tools'):
+             return list(self.mcp._tool_manager._tools.values())
+        return []

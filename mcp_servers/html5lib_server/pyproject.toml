@@ -3,7 +3,7 @@ name = "html5lib_server"
 version = "0.1.0"
 description = "MCP Server for html5lib_server"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
     "html5lib",
     "lxml",

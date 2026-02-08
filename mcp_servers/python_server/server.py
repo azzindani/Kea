@@ -14,11 +14,11 @@ if root_path not in sys.path:
 # ///
 
 
-from mcp.server.fastmcp import FastMCP
+from shared.mcp.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import execute_code as execute_code_module, dataframe_ops as dataframe_ops_module, sql_query as sql_query_module
+from mcp_servers.python_server.tools import execute_code as execute_code_module, dataframe_ops as dataframe_ops_module, sql_query as sql_query_module
 import structlog
 import asyncio
 from typing import Dict, Any, List, Optional
@@ -26,6 +26,9 @@ from typing import Dict, Any, List, Optional
 logger = structlog.get_logger()
 
 # Create the FastMCP server
+from shared.logging import setup_logging
+setup_logging()
+
 mcp = FastMCP("python_server")
 
 async def run_op(op_func, diff_args=None, **kwargs):
@@ -58,7 +61,9 @@ async def execute_code(
     timeout: int = 30,
     dependencies: List[str] = []
 ) -> str:
-    """
+    """EXECUTES python code. [ACTION]
+    
+    [RAG Context]
     Execute Python code in a sandboxed environment.
     Returns stdout, variables, and any errors.
     """
@@ -70,9 +75,11 @@ async def dataframe_ops(
     data: str = None,
     params: Dict[str, Any] = None
 ) -> str:
-    """
-    Perform Pandas DataFrame operations.
-    operation: load_csv, load_json, describe, filter, aggregate, join
+    """MANIPULATES DataFrame. [ACTION]
+    
+    [RAG Context]
+    Perform Pandas DataFrame operations (load, filter, aggregate).
+    Returns result string.
     """
     return await run_op(dataframe_ops_module.dataframe_ops_tool, operation=operation, data=data, params=params)
 
@@ -81,11 +88,28 @@ async def sql_query(
     query: str,
     data_sources: Dict[str, Any] = None
 ) -> str:
-    """
+    """EXECUTES SQL. [ACTION]
+    
+    [RAG Context]
     Execute SQL query on in-memory data using DuckDB.
-    Supports CSV/Parquet/JSON data sources.
+    Returns result table.
     """
     return await run_op(sql_query_module.sql_query_tool, query=query, data_sources=data_sources)
 
 if __name__ == "__main__":
     mcp.run()
+
+# ==========================================
+# Compatibility Layer for Tests
+# ==========================================
+class PythonServer:
+    def __init__(self):
+        # Wrap the FastMCP instance
+        self.mcp = mcp
+
+    def get_tools(self):
+        # Access internal tool manager to get list of tool objects
+        # We need to return objects that have a .name attribute
+        if hasattr(self.mcp, '_tool_manager') and hasattr(self.mcp._tool_manager, '_tools'):
+             return list(self.mcp._tool_manager._tools.values())
+        return []

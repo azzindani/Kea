@@ -53,6 +53,13 @@ graph TD
     - `modality.py`: Manages multi-modal inputs/outputs within the research graph.
     - `organization.py`: Implements "Fractal Corp" departments and domain rules.
     - `prompt_factory.py`: Generates context-aware prompts for agents.
+    - `microplanner.py`: Reasoning logic for breaking down high-level queries.
+    - `complexity.py`: Logic for estimating task complexity and resource requirements.
+    - `curiosity.py`: Implements "Active Curiosity" - asking questions to fill knowledge gaps.
+    - `auto_wiring.py`: Automatic connection of DAG nodes based on data dependencies.
+    - `dag_executor.py`: Engine for executing the Directed Acyclic Graph of research tasks.
+    - `recovery.py`: Error handling and recovery strategies for failed nodes.
+    - `query_classifier.py`: Classification logic for incoming user queries.
 - **`nodes/`**: Individual LangGraph node implementations.
     - `planner.py`: Reasoning logic for sub-query decomposition.
     - `keeper.py`: Context filtering and contradiction detection.

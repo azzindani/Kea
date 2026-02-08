@@ -65,67 +65,15 @@ class QueryClassifier:
     # Pattern Definitions (Lightweight, no ML required)
     # ========================================================================
     
-    CASUAL_PATTERNS = [
-        # Greetings
-        "hello", "hi ", "hi!", "hey ", "hey!", "howdy", "greetings",
-        "good morning", "good afternoon", "good evening", "good night",
-        # Farewells
-        "bye", "goodbye", "see you", "take care", "later",
-        # Thanks
-        "thank", "thanks", "thx", "appreciate",
-        # Acknowledgments
-        "ok", "okay", "got it", "understood", "sure", "alright", "yes", "no",
-        # Chitchat
-        "how are you", "what's up", "how's it going", "nice to meet",
-    ]
+    # Patterns are loaded from config/vocab/query_classifier.yaml
     
-    UTILITY_PATTERNS = [
-        # Translation
-        "translate", "in english", "in indonesian", "to english", "to indonesian",
-        "what does .* mean", "how do you say",
-        # Summarization
-        "summarize", "summary", "tldr", "tl;dr", "in brief", "briefly",
-        "give me the gist", "key points", "main points",
-        # Formatting
-        "format", "reformat", "convert to", "make it", "rewrite",
-        "bullet points", "numbered list", "as a table",
-        # Explanation
-        "explain", "what is", "what are", "define", "meaning of",
-        "eli5", "explain like", "simple terms",
-    ]
-    
-    KNOWLEDGE_PATTERNS = [
-        # Simple facts
-        "who is", "who was", "when was", "when did", "where is", "where was",
-        "how many", "how much", "how old", "how long", "how far",
-        "capital of", "population of", "founder of", "ceo of",
-    ]
-    
-    RESEARCH_PATTERNS = [
-        # Research keywords
-        "research", "analyze", "investigate", "deep dive", "comprehensive",
-        "compare", "contrast", "evaluate", "assess", "review",
-        # Data-oriented
-        "financial", "earnings", "revenue", "market", "stock",
-        "statistics", "data on", "trends", "forecast", "predict",
-        # Multi-source
-        "sources", "evidence", "studies", "papers", "reports",
-        "verify", "validate", "fact check", "cross-reference",
-    ]
-    
-    UNSAFE_PATTERNS = [
-        # Harmful content
-        "how to hack", "how to steal", "how to kill", "how to hurt",
-        "illegal", "malware", "exploit", "bypass security",
-        # PII extraction attempts
-        "social security", "credit card", "password", "ssn",
-    ]
-    
-    SYSTEM_PATTERNS = [
-        "settings", "configure", "config", "preferences",
-        "help", "commands", "what can you do",
-        "clear history", "reset", "start over",
-    ]
+    # Defaults (empty lists) - populated in __init__
+    CASUAL_PATTERNS = []
+    UTILITY_PATTERNS = []
+    KNOWLEDGE_PATTERNS = []
+    RESEARCH_PATTERNS = []
+    UNSAFE_PATTERNS = []
+    SYSTEM_PATTERNS = []
     
     # URL pattern for multimodal detection
     URL_PATTERN = r'https?://[^\s<>"{}|\\^`\[\]]+'
@@ -133,8 +81,22 @@ class QueryClassifier:
     def __init__(self):
         """Initialize classifier."""
         import re
+        from shared.vocab import load_vocab
+        
         self._url_regex = re.compile(self.URL_PATTERN)
-        logger.debug("QueryClassifier initialized")
+        
+        # Load vocab patterns
+        vocab = load_vocab("query_classifier")
+        patterns = vocab.get("patterns", {})
+        
+        self.CASUAL_PATTERNS = patterns.get("casual", [])
+        self.UTILITY_PATTERNS = patterns.get("utility", [])
+        self.KNOWLEDGE_PATTERNS = patterns.get("knowledge", [])
+        self.RESEARCH_PATTERNS = patterns.get("research", [])
+        self.UNSAFE_PATTERNS = patterns.get("unsafe", [])
+        self.SYSTEM_PATTERNS = patterns.get("system", [])
+        
+        logger.debug("QueryClassifier initialized with vocab patterns")
     
     def classify(
         self, 
@@ -292,35 +254,33 @@ class BaseHandler:
 class CasualHandler(BaseHandler):
     """Handle casual conversation directly."""
     
-    GREETINGS = [
-        "Hello! How can I help you today?",
-        "Hi there! What would you like to know?",
-        "Hey! Ready to help with your questions.",
-    ]
-    
-    FAREWELLS = [
-        "Goodbye! Feel free to come back anytime.",
-        "Take care! Let me know if you need anything else.",
-    ]
-    
-    THANKS = [
-        "You're welcome! Is there anything else I can help with?",
-        "Happy to help! Let me know if you have more questions.",
-    ]
-    
+    def __init__(self):
+        from shared.vocab import load_vocab
+        vocab = load_vocab("query_classifier")
+        handler_config = vocab.get("casual_handler", {})
+        self.triggers = handler_config.get("triggers", {})
+        self.responses = handler_config.get("responses", {})
+
     async def handle(self, query: str, context: dict = None) -> str:
         """Generate casual response."""
         query_lower = query.lower()
         
         import random
         
-        if any(p in query_lower for p in ["bye", "goodbye", "see you"]):
-            return random.choice(self.FAREWELLS)
+        farewell_triggers = self.triggers.get("farewell", ["bye", "goodbye"])
+        thanks_triggers = self.triggers.get("thanks", ["thank", "thanks"])
         
-        if any(p in query_lower for p in ["thank", "thanks", "appreciate"]):
-            return random.choice(self.THANKS)
+        farewell_responses = self.responses.get("farewells", ["Goodbye!"])
+        thanks_responses = self.responses.get("thanks", ["You're welcome!"])
+        greeting_responses = self.responses.get("greetings", ["Hello!"])
         
-        return random.choice(self.GREETINGS)
+        if any(p in query_lower for p in farewell_triggers):
+            return random.choice(farewell_responses)
+        
+        if any(p in query_lower for p in thanks_triggers):
+            return random.choice(thanks_responses)
+        
+        return random.choice(greeting_responses)
 
 
 class UtilityHandler(BaseHandler):
@@ -347,7 +307,7 @@ class UtilityHandler(BaseHandler):
                 config = LLMConfig(
                     model=get_settings().models.default_model,
                     temperature=0.3,
-                    max_tokens=2000,
+                    max_tokens=32768,
                 )
                 
                 messages = [
@@ -363,7 +323,10 @@ class UtilityHandler(BaseHandler):
         except Exception as e:
             logger.error(f"Utility handler error: {e}")
         
-        return "I'll help you with that request."
+        from shared.vocab import load_vocab
+        vocab = load_vocab("query_classifier")
+        fallback = vocab.get("utility_handler", {}).get("fallback_response", "I'll help you with that request.")
+        return fallback
 
 
 class UnsafeHandler(BaseHandler):
@@ -371,10 +334,10 @@ class UnsafeHandler(BaseHandler):
     
     async def handle(self, query: str, context: dict = None) -> str:
         """Return safe rejection message."""
-        return (
-            "I can't help with that request. "
-            "If you have other questions, I'm happy to assist."
-        )
+        from shared.vocab import load_vocab
+        vocab = load_vocab("query_classifier")
+        response = vocab.get("unsafe_handler", {}).get("response", "I can't help with that request.")
+        return response
 
 
 # ============================================================================

@@ -1,0 +1,137 @@
+domains:
+  finance:
+    - stock
+    - revenue
+    - profit
+    - market cap
+    - p/e
+    - earnings
+    - investment
+    - dividend
+    - financial
+    - trading
+    - valuation
+    - sec filing
+    - 10-k
+    - 10-q
+    - balance sheet
+    - cash flow
+
+  medical:
+    - disease
+    - treatment
+    - drug
+    - clinical
+    - patient
+    - symptom
+    - diagnosis
+    - therapy
+    - medical
+    - health
+    - pharma
+    - fda
+    - trial
+    - efficacy
+    - side effect
+    - dosage
+
+  legal:
+    - law
+    - legal
+    - regulation
+    - statute
+    - court
+    - case
+    - contract
+    - compliance
+    - liability
+    - rights
+    - patent
+    - trademark
+    - litigation
+    - sue
+    - judgment
+
+  engineering:
+    - code
+    - software
+    - system
+    - architecture
+    - api
+    - database
+    - performance
+    - scalability
+    - infrastructure
+    - deploy
+    - algorithm
+    - optimize
+    - technical
+    - engineering
+
+  academic:
+    - research
+    - study
+    - paper
+    - journal
+    - peer-review
+    - methodology
+    - hypothesis
+    - experiment
+    - thesis
+    - publication
+    - citation
+    - academic
+
+  data:
+    - data
+    - dataset
+    - analysis
+    - statistics
+    - correlation
+    - trend
+    - visualization
+    - etl
+    - pipeline
+    - query
+
+task_types:
+  compare:
+    - compare
+    - versus
+    - vs
+    - difference
+
+  summarize:
+    - summarize
+    - summary
+    - brief
+    - overview
+
+  extract:
+    - extract
+    - get
+    - list all
+    - find all
+
+  validate:
+    - verify
+    - check
+    - validate
+    - is it true
+
+  forecast:
+    - predict
+    - forecast
+    - future
+    - will
+
+  explain:
+    - explain
+    - why
+    - how does
+    - what is
+
+  analysis:
+    - analyze
+    - analysis
+    - examine

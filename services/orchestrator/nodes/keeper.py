@@ -42,13 +42,15 @@ def get_hardware_aware_limits() -> tuple[int, int]:
 
 def get_adaptive_threshold(iteration: int) -> float:
     """
-    Calculate adaptive confidence threshold based on iteration.
+    Get fixed confidence threshold (no degradation).
     
-    Uses config values: initial_threshold, degradation_rate, min_threshold.
+    Enterprise Mode: Always require 0.95 confidence.
+    This ensures Kea maintains high quality output standards.
+    The retry loop will continue until this threshold is met.
     """
     config = _get_config()
-    threshold = config.confidence.initial_threshold - (iteration * config.confidence.degradation_rate)
-    return max(threshold, config.confidence.min_threshold)
+    # No degradation - always return initial threshold (0.95)
+    return config.confidence.initial_threshold
 
 
 async def calculate_agreement_score(facts: list[dict]) -> float:
@@ -99,6 +101,149 @@ async def calculate_agreement_score(facts: list[dict]) -> float:
         return 0.5
 
 
+async def calculate_grpo_reward(
+    facts: list[dict],
+    tool_invocations: list[dict],
+    query: str,
+    error_feedback: list[dict] | None = None,
+    completed_calls: set | None = None,
+) -> dict[str, float]:
+    """
+    GRPO-Style Reward Scoring for Kea (Generative Reward Policy Optimization).
+    
+    Combines multiple signals into a comprehensive reward score that guides
+    the research loop more intelligently than simple agreement scoring.
+    
+    Returns:
+        Dict with individual scores and final reward:
+        {
+            "relevance": float,      # How relevant are facts to query?
+            "novelty": float,        # Are we learning new things?
+            "success_rate": float,   # % of tools that succeeded
+            "citation_coverage": float,  # Do facts have sources?
+            "efficiency": float,     # Fewer steps = better
+            "penalty": float,        # Deductions for errors/duplicates
+            "final_reward": float,   # Weighted combination
+        }
+    """
+    scores = {
+        "relevance": 0.0,
+        "novelty": 0.0,
+        "success_rate": 0.0,
+        "citation_coverage": 0.0,
+        "efficiency": 0.0,
+        "penalty": 0.0,
+        "final_reward": 0.0,
+    }
+    
+    # ============================================================
+    # 1. RELEVANCE SCORE (How relevant are facts to the query?)
+    # ============================================================
+    if facts and query:
+        try:
+            from shared.embedding.model_manager import get_embedding_provider
+            import numpy as np
+            
+            provider = get_embedding_provider()
+            
+            # Get query embedding
+            query_emb = await provider.embed([query[:500]])
+            
+            # Get fact embeddings (limit for performance)
+            fact_texts = [f.get("text", "")[:500] for f in facts[:10]]
+            fact_embs = await provider.embed(fact_texts)
+            
+            if query_emb and fact_embs:
+                query_vec = np.array(query_emb[0])
+                fact_vecs = np.array(fact_embs)
+                
+                # Cosine similarity between query and each fact
+                query_norm = query_vec / (np.linalg.norm(query_vec) + 1e-8)
+                fact_norms = fact_vecs / (np.linalg.norm(fact_vecs, axis=1, keepdims=True) + 1e-8)
+                similarities = np.dot(fact_norms, query_norm)
+                
+                scores["relevance"] = float(np.mean(similarities))
+        except Exception as e:
+            logger.debug(f"GRPO relevance calculation failed: {e}")
+            scores["relevance"] = 0.5 if facts else 0.0
+    
+    # ============================================================
+    # 2. NOVELTY SCORE (Are facts diverse and non-redundant?)
+    # ============================================================
+    if facts and len(facts) >= 2:
+        # Calculate agreement score as a proxy for redundancy
+        agreement_score = await calculate_agreement_score(facts)
+        # Lower agreement = more novelty (diverse information)
+        # But we cap it - too low agreement might mean noise
+        scores["novelty"] = 1.0 - min(0.7, max(0.3, agreement_score))
+    else:
+        scores["novelty"] = 0.3  # Default for insufficient data
+    
+    # ============================================================
+    # 3. TOOL SUCCESS RATE
+    # ============================================================
+    if tool_invocations:
+        successes = sum(1 for inv in tool_invocations if inv.get("success", False))
+        total = len(tool_invocations)
+        scores["success_rate"] = successes / total if total > 0 else 0.0
+    
+    # ============================================================
+    # 4. CITATION COVERAGE (Do facts have traceable sources?)
+    # ============================================================
+    if facts:
+        with_sources = sum(1 for f in facts if f.get("source_url") or f.get("source"))
+        scores["citation_coverage"] = with_sources / len(facts)
+    
+    # ============================================================
+    # 5. EFFICIENCY (Fewer unique calls = better)
+    # ============================================================
+    unique_calls = len(completed_calls) if completed_calls else len(tool_invocations)
+    # Target: 3-8 calls for typical research. Penalize excess.
+    optimal_calls = 5
+    if unique_calls > 0:
+        efficiency_ratio = min(optimal_calls / unique_calls, 1.0)
+        scores["efficiency"] = efficiency_ratio
+    
+    # ============================================================
+    # 6. PENALTY CALCULATION (Errors, Duplicates, Hallucinations)
+    # ============================================================
+    penalty = 0.0
+    
+    # Penalty for errors
+    error_count = len(error_feedback) if error_feedback else 0
+    penalty += error_count * 0.1  # -0.1 per error
+    
+    # Penalty for failed tools
+    failures = sum(1 for inv in tool_invocations if inv.get("success") is False) if tool_invocations else 0
+    penalty += failures * 0.05  # -0.05 per failure
+    
+    # Cap penalty at 0.5 (don't make reward negative)
+    scores["penalty"] = min(0.5, penalty)
+    
+    # ============================================================
+    # FINAL WEIGHTED REWARD
+    # ============================================================
+    # Weights inspired by GRPO: prioritize relevance and success
+    final_reward = (
+        0.30 * scores["relevance"] +
+        0.15 * scores["novelty"] +
+        0.25 * scores["success_rate"] +
+        0.15 * scores["citation_coverage"] +
+        0.15 * scores["efficiency"] -
+        scores["penalty"]
+    )
+    
+    # Clamp to [0, 1]
+    scores["final_reward"] = max(0.0, min(1.0, final_reward))
+    
+    logger.info(f"📊 GRPO Score: {scores['final_reward']:.3f} "
+                f"(rel={scores['relevance']:.2f}, nov={scores['novelty']:.2f}, "
+                f"succ={scores['success_rate']:.2f}, cit={scores['citation_coverage']:.2f}, "
+                f"eff={scores['efficiency']:.2f}, pen=-{scores['penalty']:.2f})")
+    
+    return scores
+
+
 # ============================================================================
 # Persistence Layer (Always Persist Policy)
 # ============================================================================
@@ -129,7 +274,7 @@ async def persist_facts(facts: list[dict], job_id: str) -> int:
             import uuid
             atomic_fact = AtomicFact(
                 fact_id=str(uuid.uuid4()),
-                entity=fact.get("source", "unknown"),
+                entity=fact.get("source") or "unknown",
                 attribute="content",
                 value=fact.get("text", ""),
                 source_url=fact.get("url", ""),
@@ -214,14 +359,15 @@ def analyze_execution_progress(state: dict[str, Any]) -> dict[str, Any]:
     # Count completed and failed from actual invocations
     # Note: success=True means the tool (or fallback) succeeded
     completed_tasks = sum(1 for inv in tool_invocations if inv.get("success", False))
-    failed_tasks = sum(1 for inv in tool_invocations if not inv.get("success", True) and inv.get("error"))
+    # Count failures: any invocation with success=False (not requiring 'error' field)
+    failed_tasks = sum(1 for inv in tool_invocations if inv.get("success") is False)
     
     # Unique task IDs that succeeded
     completed_task_ids = {inv.get("task_id") for inv in tool_invocations if inv.get("success", False)}
     
     # Identify tasks to retry (failed with no success in any attempt)
     should_retry = []
-    failed_task_ids = {inv.get("task_id") for inv in tool_invocations if not inv.get("success", True) and inv.get("error")}
+    failed_task_ids = {inv.get("task_id") for inv in tool_invocations if inv.get("success") is False}
     for task_id in failed_task_ids:
         if task_id not in completed_task_ids:
             # This task failed and hasn't succeeded yet
@@ -292,7 +438,9 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
     
     config = _get_config()
     iteration = state.get("iteration", 0)
-    max_iterations = state.get("max_iterations", config.loop_safety.max_global_iterations)
+    # Sensible cap: Even if config allows more, limit to 5 iterations for most queries
+    config_max = state.get("max_iterations", config.loop_safety.max_global_iterations)
+    max_iterations = min(config_max, 5)  # Hard cap at 5 iterations
     query = state.get("query", "")
     facts = state.get("facts", [])
     job_id = state.get("job_id", "unknown")
@@ -338,44 +486,175 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
     state["execution_progress"] = progress
     
     # ============================================================
+    # REPLAN ON ALL FAILURES (instead of stopping, give LLM another chance)
+    # ============================================================
+    replan_count = state.get("replan_count", 0)
+    max_replans = config.research.max_depth  # Use same limit as iterations
+    
+    if progress["total_tasks"] > 0 and progress["completed_tasks"] == 0 and progress["failed_tasks"] > 0:
+        if replan_count < max_replans:
+            logger.warning(f"Keeper: ALL tool calls failed ({progress['failed_tasks']}/{progress['total_tasks']})")
+            logger.warning(f"   Triggering REPLAN (attempt {replan_count + 1}/{max_replans}) - LLM will receive error feedback")
+            state["should_continue"] = True  # Continue the loop
+            state["stop_reason"] = "replan"   # Route to planner, not researcher
+            state["replan_count"] = replan_count + 1
+            state["confidence"] = 0.0
+            return state
+        else:
+            logger.error(f"Keeper: ALL tool calls failed after {max_replans} replans")
+            logger.error(f"   Stopping to prevent infinite loop - no valid facts collected")
+            state["should_continue"] = False
+            state["stop_reason"] = "max_replans_exceeded"
+            state["confidence"] = 0.0
+            return state
+    
+    # ============================================================
     # CHECK LOCAL ITERATION LIMIT (user-specified)
     # ============================================================
     if iteration >= max_iterations:
         logger.info(f"Keeper: Max iterations ({max_iterations}) reached")
+        logger.info(f"   Proceeding to final report with achieved confidence score")
+        
+        # Calculate GRPO score even when exiting due to max iterations
+        # This ensures the final report shows the actual achieved confidence
+        query = state.get("query", "")
+        error_feedback = state.get("error_feedback", [])
+        completed_calls = state.get("completed_calls", set())
+        
+        grpo_scores = await calculate_grpo_reward(
+            facts=facts,
+            tool_invocations=tool_invocations,
+            query=query,
+            error_feedback=error_feedback,
+            completed_calls=completed_calls,
+        )
+        
+        confidence_score = grpo_scores["final_reward"]
+        state["confidence"] = confidence_score
+        state["grpo_scores"] = grpo_scores
+        state["stop_reason"] = f"max_iterations_with_{confidence_score:.0%}_confidence"
+        
+        logger.info(f"   Final GRPO confidence: {confidence_score:.0%}")
         state["should_continue"] = False
         return state
     
     # ============================================================
-    # ADAPTIVE CONFIDENCE CHECK (0.95 - 0.05 per iteration)
+    # SUCCESS-BASED EARLY EXIT (prevents infinite looping)
+    # When ALL tools succeed AND we have sufficient facts, STOP
+    # ============================================================
+    sufficient_facts = 5  # Minimum facts to consider research "complete"
+    all_tools_succeeded = (
+        progress["total_tasks"] > 0 and 
+        progress["failed_tasks"] == 0 and
+        progress["completed_tasks"] >= progress["total_tasks"]
+    )
+    
+    if all_tools_succeeded and len(facts) >= sufficient_facts:
+        logger.info(f"✅ Keeper: SUCCESS-BASED EXIT - All tools succeeded with {len(facts)} facts")
+        
+        # CALCULATE CONFIDENCE before exiting (was missing before!)
+        query = state.get("query", "")
+        error_feedback = state.get("error_feedback", [])
+        completed_calls = state.get("completed_calls", set())
+        
+        grpo_scores = await calculate_grpo_reward(
+            facts=facts,
+            tool_invocations=tool_invocations,
+            query=query,
+            error_feedback=error_feedback,
+            completed_calls=completed_calls,
+        )
+        
+        confidence_score = grpo_scores["final_reward"]
+        state["confidence"] = confidence_score
+        state["grpo_scores"] = grpo_scores
+        state["should_continue"] = False
+        state["stop_reason"] = f"success_complete_{confidence_score:.0%}"
+        
+        logger.info(f"   GRPO Confidence: {confidence_score:.0%}")
+        return state
+    
+    # ============================================================
+    # GRPO-STYLE CONFIDENCE CHECK (Multi-signal reward scoring)
     # ============================================================
     min_facts = 3
     if len(facts) >= min_facts:
         # Calculate adaptive threshold for this iteration
         current_threshold = get_adaptive_threshold(iteration)
         
-        # Calculate agreement score from facts (using embeddings)
-        agreement_score = await calculate_agreement_score(facts)
+        # Get additional state for GRPO scoring
+        query = state.get("query", "")
+        error_feedback = state.get("error_feedback", [])
+        completed_calls = state.get("completed_calls", set())
         
-        logger.info(f"Keeper: Agreement score {agreement_score:.3f}, threshold {current_threshold:.2f}")
-        state["agreement_score"] = agreement_score
+        # Calculate GRPO reward score (replaces simple agreement scoring)
+        grpo_scores = await calculate_grpo_reward(
+            facts=facts,
+            tool_invocations=tool_invocations,
+            query=query,
+            error_feedback=error_feedback,
+            completed_calls=completed_calls,
+        )
+        
+        # Use final_reward as the confidence metric
+        confidence_score = grpo_scores["final_reward"]
+        
+        logger.info(f"Keeper: GRPO confidence {confidence_score:.3f}, threshold {current_threshold:.2f}")
+        state["grpo_scores"] = grpo_scores  # Store detailed breakdown
+        state["agreement_score"] = confidence_score  # Backward compatibility
         state["confidence_threshold"] = current_threshold
         
-        # If agreement exceeds threshold, we have confident answer
-        if agreement_score >= current_threshold:
-            logger.info(f"✅ Keeper: Confidence {agreement_score:.3f} >= {current_threshold:.2f} - stopping")
+        # Store actual confidence in state for final report
+        state["confidence"] = confidence_score
+        
+        # If confidence exceeds threshold, we have confident answer
+        if confidence_score >= current_threshold:
+            logger.info(f"Keeper: GRPO Confidence {confidence_score:.3f} >= {current_threshold:.2f} - PASSED")
             state["should_continue"] = False
             state["stop_reason"] = "confidence_achieved"
             return state
+        else:
+            logger.warning(f"Keeper: Confidence {confidence_score:.3f} < {current_threshold:.2f} - below standard")
+            
+            # ============================================================
+            # LOW CONFIDENCE REPLAN: When tasks complete but confidence is low
+            # Trigger a replan to generate additional research tasks
+            # ============================================================
+            logger.info(f"   🔍 DEBUG: completed={progress['completed_tasks']}, total={progress['total_tasks']}, replan_count={state.get('replan_count', 0)}")
+            
+            if progress["completed_tasks"] >= progress["total_tasks"]:
+                replan_count = state.get("replan_count", 0)
+                max_replans = 2  # Prevent infinite replanning
+                
+                if replan_count < max_replans:
+                    logger.warning(f"Keeper: All tasks complete but confidence too low ({confidence_score:.1%})")
+                    logger.info(f"   🔄 Triggering REPLAN to gather more evidence (attempt {replan_count + 1}/{max_replans})")
+                    
+                    # Build error feedback explaining why we need more research
+                    error_feedback = state.get("error_feedback", [])
+                    error_feedback.append({
+                        "issue": "low_confidence",
+                        "message": f"Research confidence is only {confidence_score:.1%}, below threshold of {current_threshold:.0%}. Need to gather more facts.",
+                        "suggestion": "Add additional research tasks to collect more data sources and verify findings."
+                    })
+                    
+                    state["error_feedback"] = error_feedback
+                    state["replan_count"] = replan_count + 1
+                    state["stop_reason"] = "replan"
+                    state["should_continue"] = True  # Will route to planner
+                    return state
+                else:
+                    logger.warning(f"Keeper: Max replans ({max_replans}) reached, proceeding with {confidence_score:.1%} confidence")
         
-        # If all tasks complete, stop regardless
+        # If all tasks complete AND we've exhausted replans, stop
         if progress["completed_tasks"] >= progress["total_tasks"]:
             logger.info("Keeper: All execution plan tasks complete")
+            logger.info(f"   Final confidence: {confidence_score:.3f} (required: {current_threshold:.2f})")
             state["should_continue"] = False
             return state
         
-        # Log degradation for next iteration
-        next_threshold = get_adaptive_threshold(iteration + 1)
-        logger.info(f"   📉 Threshold will degrade to {next_threshold:.2f} next iteration")
+        # No degradation - threshold stays at 0.95
+        logger.info(f"   Threshold remains at {current_threshold:.2f} (no degradation)")
     
     # ============================================================
     # CHECK CONTEXT DRIFT

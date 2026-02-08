@@ -12,6 +12,7 @@ dependencies = [
     "pydantic",
     "python-dotenv",
     "structlog",
+    "tabulate",
     "wrapt",
 ]
 

@@ -2,7 +2,7 @@
 import httpx
 import json
 import pandas as pd
-from shared.logging import get_logger
+from shared.logging.structured import get_logger
 
 logger = get_logger(__name__)
 
@@ -38,7 +38,7 @@ async def parse_json(url: str, flatten: bool = False, path: str = None) -> str:
             except Exception:
                 output_data["data"] = data
         else:
-             output_data["data"] = data
+            output_data["data"] = data
         
         return json.dumps(output_data, indent=2, default=str)
     except Exception as e:

@@ -35,13 +35,66 @@ async def _calc_greek(arguments: dict, model: str, greek: str) -> str:
 # Wrappers
 
 # Wrappers
-async def calculate_bs_delta(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str: return await _calc_greek({"underlying": underlying, "strike": strike, "interest": interest, "days": days, "volatility": volatility}, "BS", "delta")
-async def calculate_bs_theta(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str: return await _calc_greek({"underlying": underlying, "strike": strike, "interest": interest, "days": days, "volatility": volatility}, "BS", "theta")
-async def calculate_bs_gamma(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str: return await _calc_greek({"underlying": underlying, "strike": strike, "interest": interest, "days": days, "volatility": volatility}, "BS", "gamma")
-async def calculate_bs_vega(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str: return await _calc_greek({"underlying": underlying, "strike": strike, "interest": interest, "days": days, "volatility": volatility}, "BS", "vega")
-async def calculate_bs_rho(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str: return await _calc_greek({"underlying": underlying, "strike": strike, "interest": interest, "days": days, "volatility": volatility}, "BS", "rho")
+async def calculate_bs_delta(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str:
+    """CALCULATES BS Delta. [ACTION]
+    
+    [RAG Context]
+    Black-Scholes Delta (Call & Put).
+    Returns JSON string.
+    """
+    return await _calc_greek({"underlying": underlying, "strike": strike, "interest": interest, "days": days, "volatility": volatility}, "BS", "delta")
 
-async def calculate_gk_delta(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str: return await _calc_greek({"underlying": underlying, "strike": strike, "interest": interest, "days": days, "volatility": volatility}, "GK", "delta")
-async def calculate_gk_theta(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str: return await _calc_greek({"underlying": underlying, "strike": strike, "interest": interest, "days": days, "volatility": volatility}, "GK", "theta")
-# ... Add others as needed
+async def calculate_bs_theta(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str:
+    """CALCULATES BS Theta. [ACTION]
+    
+    [RAG Context]
+    Black-Scholes Theta (Call & Put).
+    Returns JSON string.
+    """
+    return await _calc_greek({"underlying": underlying, "strike": strike, "interest": interest, "days": days, "volatility": volatility}, "BS", "theta")
+
+async def calculate_bs_gamma(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str:
+    """CALCULATES BS Gamma. [ACTION]
+    
+    [RAG Context]
+    Black-Scholes Gamma (Call & Put).
+    Returns JSON string.
+    """
+    return await _calc_greek({"underlying": underlying, "strike": strike, "interest": interest, "days": days, "volatility": volatility}, "BS", "gamma")
+
+async def calculate_bs_vega(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str:
+    """CALCULATES BS Vega. [ACTION]
+    
+    [RAG Context]
+    Black-Scholes Vega (Call & Put).
+    Returns JSON string.
+    """
+    return await _calc_greek({"underlying": underlying, "strike": strike, "interest": interest, "days": days, "volatility": volatility}, "BS", "vega")
+
+async def calculate_bs_rho(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str:
+    """CALCULATES BS Rho. [ACTION]
+    
+    [RAG Context]
+    Black-Scholes Rho (Call & Put).
+    Returns JSON string.
+    """
+    return await _calc_greek({"underlying": underlying, "strike": strike, "interest": interest, "days": days, "volatility": volatility}, "BS", "rho")
+
+async def calculate_gk_delta(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str:
+    """CALCULATES GK Delta. [ACTION]
+    
+    [RAG Context]
+    Garman-Kohlhagen Delta (Currencies).
+    Returns JSON string.
+    """
+    return await _calc_greek({"underlying": underlying, "strike": strike, "interest": interest, "days": days, "volatility": volatility}, "GK", "delta")
+
+async def calculate_gk_theta(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str:
+    """CALCULATES GK Theta. [ACTION]
+    
+    [RAG Context]
+    Garman-Kohlhagen Theta (Currencies).
+    Returns JSON string.
+    """
+    return await _calc_greek({"underlying": underlying, "strike": strike, "interest": interest, "days": days, "volatility": volatility}, "GK", "theta")
 

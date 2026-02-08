@@ -52,14 +52,17 @@ class PromptContext:
     depth: int = 2                  # 1=shallow, 3=deep
     audience: str = "expert"        # "expert", "general", "executive"
     constraints: list[str] = field(default_factory=list)
-    
+
     # Session context
     session_summary: str = ""
     previous_findings: list[str] = field(default_factory=list)
-    
+
     # Output preferences
     output_format: str = "markdown"  # "markdown", "json", "bullet"
     max_length: int = 0              # 0 = no limit
+
+    # Knowledge context (injected by KnowledgeRetriever at runtime)
+    knowledge_context: str = ""
 
 
 @dataclass
@@ -180,58 +183,26 @@ class PromptFactory:
         self._domain_templates.update(domains)
         self._task_modifiers.update(tasks)
         
+        # Load detection vocab
+        from shared.vocab import load_vocab
+        vocab = load_vocab("classification")
+        self.domain_keywords = vocab.get("domains", {})
+        self.task_keywords = vocab.get("task_types", {})
+        
         logger.info(f"PromptFactory initialized with {len(self._domain_templates)} domains and {len(self._task_modifiers)} task modifiers")
     
     def detect_domain(self, query: str) -> Domain:
         """Detect domain from query text."""
         query_lower = query.lower()
         
-        # Finance indicators
-        if any(kw in query_lower for kw in [
-            "stock", "revenue", "profit", "market cap", "p/e", "earnings",
-            "investment", "dividend", "financial", "trading", "valuation",
-            "sec filing", "10-k", "10-q", "balance sheet", "cash flow"
-        ]):
-            return Domain.FINANCE
-        
-        # Medical indicators
-        if any(kw in query_lower for kw in [
-            "disease", "treatment", "drug", "clinical", "patient", "symptom",
-            "diagnosis", "therapy", "medical", "health", "pharma", "fda",
-            "trial", "efficacy", "side effect", "dosage"
-        ]):
-            return Domain.MEDICAL
-        
-        # Legal indicators
-        if any(kw in query_lower for kw in [
-            "law", "legal", "regulation", "statute", "court", "case",
-            "contract", "compliance", "liability", "rights", "patent",
-            "trademark", "litigation", "sue", "judgment"
-        ]):
-            return Domain.LEGAL
-        
-        # Engineering indicators
-        if any(kw in query_lower for kw in [
-            "code", "software", "system", "architecture", "api", "database",
-            "performance", "scalability", "infrastructure", "deploy",
-            "algorithm", "optimize", "technical", "engineering"
-        ]):
-            return Domain.ENGINEERING
-        
-        # Academic indicators
-        if any(kw in query_lower for kw in [
-            "research", "study", "paper", "journal", "peer-review",
-            "methodology", "hypothesis", "experiment", "thesis",
-            "publication", "citation", "academic"
-        ]):
-            return Domain.ACADEMIC
-        
-        # Data indicators
-        if any(kw in query_lower for kw in [
-            "data", "dataset", "analysis", "statistics", "correlation",
-            "trend", "visualization", "etl", "pipeline", "query"
-        ]):
-            return Domain.DATA
+        # Check against loaded keywords
+        for domain_name, keywords in self.domain_keywords.items():
+            if any(kw in query_lower for kw in keywords):
+                try:
+                    # Finds matching enum by value
+                    return Domain(domain_name)
+                except ValueError:
+                    pass
         
         return Domain.GENERAL
     
@@ -239,26 +210,13 @@ class PromptFactory:
         """Detect task type from query."""
         query_lower = query.lower()
         
-        if any(kw in query_lower for kw in ["compare", "versus", "vs", "difference"]):
-            return TaskType.COMPARE
-        
-        if any(kw in query_lower for kw in ["summarize", "summary", "brief", "overview"]):
-            return TaskType.SUMMARIZE
-        
-        if any(kw in query_lower for kw in ["extract", "get", "list all", "find all"]):
-            return TaskType.EXTRACT
-        
-        if any(kw in query_lower for kw in ["verify", "check", "validate", "is it true"]):
-            return TaskType.VALIDATE
-        
-        if any(kw in query_lower for kw in ["predict", "forecast", "future", "will"]):
-            return TaskType.FORECAST
-        
-        if any(kw in query_lower for kw in ["explain", "why", "how does", "what is"]):
-            return TaskType.EXPLAIN
-        
-        if any(kw in query_lower for kw in ["analyze", "analysis", "examine"]):
-            return TaskType.ANALYSIS
+        # Check against loaded keywords
+        for task_name, keywords in self.task_keywords.items():
+            if any(kw in query_lower for kw in keywords):
+                try:
+                    return TaskType(task_name)
+                except ValueError:
+                    pass
         
         return TaskType.RESEARCH
     
@@ -344,7 +302,11 @@ Output: Return response as valid JSON.""")
         elif context.output_format == "bullet":
             parts.append("""
 Output: Use bullet points for clarity.""")
-        
+
+        # Add retrieved knowledge context (domain expertise from knowledge library)
+        if context.knowledge_context:
+            parts.append(context.knowledge_context)
+
         prompt = "\n\n".join(parts)
         
         return GeneratedPrompt(
@@ -364,6 +326,34 @@ Output: Use bullet points for clarity.""")
         self._task_modifiers[task_type] = modifier
         logger.info(f"Registered task modifier: {task_type.value}")
 
+    async def generate_with_knowledge(self, context: PromptContext) -> GeneratedPrompt:
+        """
+        Generate system prompt with dynamic knowledge retrieval.
+
+        Retrieves relevant skills and rules from the knowledge registry
+        and injects them into the prompt context before generation.
+        """
+        try:
+            from shared.knowledge.retriever import get_knowledge_retriever
+
+            retriever = get_knowledge_retriever()
+            knowledge_context = await retriever.retrieve_all(
+                query=context.query,
+                skill_limit=3,
+                rule_limit=2,
+                domain=context.domain.value if context.domain != Domain.GENERAL else None,
+            )
+            if knowledge_context:
+                context.knowledge_context = knowledge_context
+                logger.info(
+                    f"PromptFactory: Injected knowledge context "
+                    f"({len(knowledge_context)} chars) for domain={context.domain.value}"
+                )
+        except Exception as e:
+            logger.debug(f"PromptFactory: Knowledge retrieval skipped ({e})")
+
+        return self.generate(context)
+
 
 # Global instance
 _factory: PromptFactory | None = None
@@ -381,10 +371,22 @@ def generate_prompt(query: str, **kwargs) -> GeneratedPrompt:
     """Convenience function to generate prompt for query."""
     factory = get_prompt_factory()
     context = factory.analyze_query(query)
-    
+
     # Override with kwargs
     for key, value in kwargs.items():
         if hasattr(context, key):
             setattr(context, key, value)
-    
+
     return factory.generate(context)
+
+
+async def generate_prompt_with_knowledge(query: str, **kwargs) -> GeneratedPrompt:
+    """Convenience function to generate prompt with knowledge retrieval."""
+    factory = get_prompt_factory()
+    context = factory.analyze_query(query)
+
+    for key, value in kwargs.items():
+        if hasattr(context, key):
+            setattr(context, key, value)
+
+    return await factory.generate_with_knowledge(context)

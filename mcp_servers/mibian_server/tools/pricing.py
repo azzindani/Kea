@@ -3,10 +3,11 @@ from mcp_servers.mibian_server.tools.core import MibianCore, dict_to_json
 
 
 async def calculate_bs_price(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str:
-    """
-    Calculate Black-Scholes Option Price (Call & Put).
-    Args:
-        underlying, strike, interest, days, volatility.
+    """CALCULATES BS Price. [ACTION]
+    
+    [RAG Context]
+    Black-Scholes Option Price (Call & Put).
+    Returns JSON string.
     """
     try:
         # u = arguments['underlying']
@@ -25,7 +26,12 @@ async def calculate_bs_price(underlying: float, strike: float, interest: float, 
         return f"Error: {str(e)}"
 
 async def calculate_gk_price(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str:
-    """Garman-Kohlhagen (Currencies) Price."""
+    """CALCULATES GK Price. [ACTION]
+    
+    [RAG Context]
+    Garman-Kohlhagen (Currencies) Option Price.
+    Returns JSON string.
+    """
     try:
         args = [underlying, strike, interest, days]
         res = MibianCore.calculate("GK", args, volatility=volatility)
@@ -34,7 +40,12 @@ async def calculate_gk_price(underlying: float, strike: float, interest: float, 
         return f"Error: {str(e)}"
 
 async def calculate_me_price(underlying: float, strike: float, interest: float, days: float, volatility: float) -> str:
-    """Merton (Dividends) Price."""
+    """CALCULATES Merton Price. [ACTION]
+    
+    [RAG Context]
+    Merton (Dividends) Option Price.
+    Returns JSON string.
+    """
     try:
         args = [underlying, strike, interest, days]
         res = MibianCore.calculate("Me", args, volatility=volatility)

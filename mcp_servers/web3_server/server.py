@@ -8,11 +8,11 @@ if root_path not in sys.path:
 
 
 
-from mcp.server.fastmcp import FastMCP
+from shared.mcp.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import (
+from mcp_servers.web3_server.tools import (
     rpc, erc20, erc721, multicall, ens, utils, network,
     staking, stableswap, security, contract_interaction, identity, weth,
     lending, oracle, defi, events, action, wallet, gas
@@ -23,6 +23,9 @@ import asyncio
 logger = structlog.get_logger()
 
 # Create the FastMCP server
+from shared.logging import setup_logging
+setup_logging()
+
 mcp = FastMCP("web3_server", dependencies=["web3"])
 
 async def run_op(op_func, diff_args=None, **kwargs):
@@ -57,194 +60,360 @@ async def run_op(op_func, diff_args=None, **kwargs):
 # 1. CORE RPC
 @mcp.tool()
 async def get_block(block_id: str = "latest", full_transactions: bool = False, rpc_url: str = None) -> str:
-    """RPC: Get Block Info (Hash/Number)."""
+    """RETRIEVES block details. [ACTION]
+    
+    [RAG Context]
+    Returns block details including timestamp, miner, and transaction count.
+    Args:
+        block_id: "latest", "earliest", "pending", or block number/hash.
+    """
     return await run_op(rpc.get_block, block_id=block_id, full_transactions=full_transactions, rpc_url=rpc_url)
 
 @mcp.tool()
 async def get_transaction(tx_hash: str, rpc_url: str = None) -> str:
-    """RPC: Get Tx Details."""
+    """RETRIEVES transaction details. [ACTION]
+    
+    [RAG Context]
+    Returns sender, receiver, value, gas used, and status.
+    Args:
+        tx_hash: 0x... hash string.
+    """
     return await run_op(rpc.get_transaction, tx_hash=tx_hash, rpc_url=rpc_url)
 
 @mcp.tool()
 async def get_balance(address: str, block_id: str = "latest", rpc_url: str = None) -> str:
-    """RPC: Get Native Balance."""
+    """FETCHES ETH balance. [ACTION]
+    
+    [RAG Context]
+    Returns balance in Wei (use from_wei to convert to ETH).
+    Args:
+        address: 0x... wallet or contract address.
+    """
     return await run_op(rpc.get_balance, address=address, block_id=block_id, rpc_url=rpc_url)
 
 @mcp.tool()
 async def get_gas_price(rpc_url: str = None) -> str:
-    """RPC: Get Gas Prices."""
+    """FETCHES gas prices. [ACTION]
+    
+    [RAG Context]
+    Essential for estimating transaction costs.
+    Returns values in Wei.
+    """
     return await run_op(rpc.get_gas_price, rpc_url=rpc_url)
 
 @mcp.tool()
 async def get_block_number(rpc_url: str = None) -> str:
-    """RPC: Get Current Height."""
+    """FETCHES current block number. [ACTION]
+    
+    [RAG Context]
+    Returns the number of the most recent block.
+    """
     return await run_op(rpc.get_block_number, rpc_url=rpc_url)
 
 @mcp.tool()
 async def get_transaction_count(address: str, rpc_url: str = None) -> str:
-    """RPC: Get Nonce."""
+    """FETCHES transaction count (Nonce). [ACTION]
+    
+    [RAG Context]
+    Required for constructing new transactions (to determine nonce).
+    """
     return await run_op(rpc.get_transaction_count, address=address, rpc_url=rpc_url)
 
 @mcp.tool()
 async def get_chain_id(rpc_url: str = None) -> str:
-    """RPC: Get Chain ID."""
+    """FETCHES Chain ID. [ACTION]
+    
+    [RAG Context]
+    E.g., 1 (Mainnet), 137 (Polygon), 42161 (Arbitrum).
+    """
     return await run_op(rpc.get_chain_id, rpc_url=rpc_url)
 
 @mcp.tool()
 async def get_code(address: str, rpc_url: str = None) -> str:
-    """RPC: Get Contract Code."""
+    """FETCHES contract bytecode. [ACTION]
+    
+    [RAG Context]
+    Returns "0x" if address is an EOA (User Wallet).
+    Returns bytecode if address is a Contract.
+    """
     return await run_op(rpc.get_code, address=address, rpc_url=rpc_url)
 
 @mcp.tool()
 async def switch_chain(chain: str) -> str:
-    """NET: Switch Default Chain (ethereum, arbitrum, optimism, polygon, bsc, base)."""
+    """SWITCHES default network. [ACTION]
+    
+    [RAG Context]
+    Args:
+        chain: "ethereum", "arbitrum", "optimism", "polygon", "bsc", "base".
+    
+    CRITICAL: Call this BEFORE any other tool if target is not Ethereum Mainnet.
+    """
     return await run_op(network.switch_chain, chain=chain)
 
 # 2. MARKETS (ERC20/721)
 @mcp.tool()
 async def get_token_balance(token_address: str, wallet_address: str, rpc_url: str = None) -> str:
-    """ERC20: Get Token Balance."""
+    """FETCHES ERC20 token balance. [ACTION]
+    
+    [RAG Context]
+    Args:
+        token_address: Contract address of the token (e.g. USDT)
+        wallet_address: User's address
+    """
     return await run_op(erc20.get_token_balance, token_address=token_address, wallet_address=wallet_address, rpc_url=rpc_url)
 
 @mcp.tool()
 async def get_token_metadata(token_address: str, rpc_url: str = None) -> str:
-    """ERC20: Get Metadata."""
+    """FETCHES ERC20 metadata. [ACTION]
+    
+    [RAG Context]
+    Use to verify if a contract address is actually the token you think it is.
+    """
     return await run_op(erc20.get_token_metadata, token_address=token_address, rpc_url=rpc_url)
 
 @mcp.tool()
 async def get_token_allowance(token_address: str, owner_address: str, spender_address: str) -> str:
-    """ERC20: Get Allowance."""
+    """FETCHES token allowance. [ACTION]
+    
+    [RAG Context]
+    Checks ERC20 approval status.
+    """
     return await run_op(erc20.get_token_allowance, token_address=token_address, owner_address=owner_address, spender_address=spender_address)
 
 @mcp.tool()
 async def get_token_total_supply(token_address: str) -> str:
-    """ERC20: Get Total Supply."""
+    """FETCHES token total supply. [ACTION]
+    
+    [RAG Context]
+    """
     return await run_op(erc20.get_token_total_supply, token_address=token_address)
 
 @mcp.tool()
 async def get_nft_owner(token_address: str, token_id: str, rpc_url: str = None) -> str:
-    """ERC721: Get Owner."""
+    """FETCHES NFT owner. [ACTION]
+    
+    [RAG Context]
+    Returns 0x address of the current owner.
+    """
     return await run_op(erc721.get_nft_owner, token_address=token_address, token_id=token_id, rpc_url=rpc_url)
 
 @mcp.tool()
 async def get_nft_metadata_uri(token_address: str, token_id: str, rpc_url: str = None) -> str:
-    """ERC721: Get Metadata URI."""
+    """FETCHES NFT Metadata URI. [ACTION]
+    
+    [RAG Context]
+    Target URL often contains the JSON metadata (image, attributes).
+    """
     return await run_op(erc721.get_nft_metadata_uri, token_address=token_address, token_id=token_id, rpc_url=rpc_url)
 
 # 3. MULTICALL (BULK)
 @mcp.tool()
 async def get_bulk_balances(addresses: list[str], rpc_url: str = None) -> str:
-    """MULTICALL: Get ETH Balances for Multiple Addresses."""
+    """FETCHES ETH balances for multiple addresses. [ACTION]
+    
+    [RAG Context]
+    Efficient batch retrieval.
+    """
     return await run_op(multicall.get_bulk_balances, addresses=addresses, rpc_url=rpc_url)
 
 @mcp.tool()
 async def get_bulk_token_balances(wallet_address: str, token_addresses: list[str], rpc_url: str = None) -> str:
-    """MULTICALL: Get Balances for 1 Wallet across Tokens."""
+    """FETCHES multiple token balances. [ACTION]
+    
+    [RAG Context]
+    Args:
+        wallet_address: User to check
+        token_addresses: List of ERC20 contract addresses
+    """
     return await run_op(multicall.get_bulk_token_balances, wallet_address=wallet_address, token_addresses=token_addresses, rpc_url=rpc_url)
 
 # 4. UTILS/ENS
 @mcp.tool()
 async def resolve_ens(name: str, rpc_url: str = None) -> str:
-    """ENS: Resolve Name (Mainnet)."""
+    """RESOLVES ENS name. [ACTION]
+    
+    [RAG Context]
+    Example:
+    - resolve_ens("vitalik.eth") -> "0xd8dA6BF..."
+    """
     return await run_op(ens.resolve_ens, name=name, rpc_url=rpc_url)
 
 @mcp.tool()
 async def to_wei(amount: float, unit: str) -> str:
-    """UTIL: Convert to Wei."""
+    """CONVERTS to Wei. [ACTION]
+    
+    [RAG Context]
+    Example: to_wei(1.5, "ether")
+    """
     return await run_op(utils.to_wei, amount=amount, unit=unit)
 
 @mcp.tool()
 async def from_wei(amount: float, unit: str) -> str:
-    """UTIL: Convert from Wei."""
+    """CONVERTS from Wei. [ACTION]
+    
+    [RAG Context]
+    Example: from_wei(1000000000000000000, "ether") -> "1.0"
+    """
     return await run_op(utils.from_wei, amount=amount, unit=unit)
 
 # 6. PHASE 3: DEFI, EVENTS, ACTION
 @mcp.tool()
 async def get_uniswap_price(token_in: str, token_out: str, amount_in: float, fee: int, rpc_url: str = None) -> str:
-    """DEFI: Get Token Price (Uniswap V3)."""
+    """FETCHES Uniswap V3 price quote. [ACTION]
+    
+    [RAG Context]
+    Args:
+        fee: Pool fee tier (500, 3000, 10000)
+    """
     return await run_op(defi.get_uniswap_price, token_in=token_in, token_out=token_out, amount_in=amount_in, fee=fee, rpc_url=rpc_url)
 
 @mcp.tool()
 async def get_contract_events(address: str, from_block: str, topics: list, rpc_url: str = None) -> str:
-    """EVENTS: Get Contract Logs."""
+    """SEARCHES contract events. [ACTION]
+    
+    [RAG Context]
+    Advanced tool for indexing historical activity.
+    """
     return await run_op(events.get_contract_events, address=address, from_block=from_block, topics=topics, rpc_url=rpc_url)
 
 @mcp.tool()
 async def send_eth(to_address: str, amount: float, private_key: str, rpc_url: str = None) -> str:
-    """ACTION: Send ETH (Native)."""
+    """SENDS native ETH. [ACTION]
+    
+    [RAG Context]
+    Requires Private Key.
+    """
     return await run_op(action.send_eth, to_address=to_address, amount=amount, private_key=private_key, rpc_url=rpc_url)
 
 @mcp.tool()
 async def approve_token(token_address: str, spender_address: str, amount: float, private_key: str, rpc_url: str = None) -> str:
-    """ACTION: Approve Token Spender."""
+    """APPROVES token spender. [ACTION]
+    
+    [RAG Context]
+    Standard ERC20 'approve' call.
+    """
     return await run_op(action.approve_token, token_address=token_address, spender_address=spender_address, amount=amount, private_key=private_key, rpc_url=rpc_url)
 
 @mcp.tool()
 async def generate_wallet() -> str:
-    """WALLET: Generate New Wallet."""
+    """CREATES new wallet. [ACTION]
+    
+    [RAG Context]
+    Returns Address and Private Key.
+    SECURITY WARNING: Keys are generated locally.
+    """
     return await run_op(wallet.generate_wallet)
 
 @mcp.tool()
 async def estimate_gas(to_address: str, data: str, value: float, rpc_url: str = None) -> str:
-    """GAS: Estimate Transaction Gas."""
+    """ESTIMATES gas units. [ACTION]
+    
+    [RAG Context]
+    Use before sending to prevent out-of-gas errors.
+    """
     return await run_op(gas.estimate_gas, to_address=to_address, data=data, value=value, rpc_url=rpc_url)
 
 # 7. PHASE 4: LENDING & ORACLES
 @mcp.tool()
 async def get_aave_reserve_data(asset: str, rpc_url: str = None) -> str:
-    """LENDING: Aave V3 APY Data."""
+    """FETCHES Aave V3 reserve data. [ACTION]
+    
+    [RAG Context]
+    Returns Supply APY, Borrow APY, Total Liquidity.
+    """
     return await run_op(lending.get_aave_reserve_data, asset=asset, rpc_url=rpc_url)
 
 @mcp.tool()
 async def get_aave_user_account_data(user_address: str, rpc_url: str = None) -> str:
-    """LENDING: Aave User Health."""
+    """FETCHES Aave user data. [ACTION]
+    
+    [RAG Context]
+    Checks if a user is close to liquidation.
+    """
     return await run_op(lending.get_aave_user_account_data, user_address=user_address, rpc_url=rpc_url)
 
 @mcp.tool()
 async def get_chainlink_price(feed_address: str, rpc_url: str = None) -> str:
-    """ORACLE: Chainlink Feed Price."""
+    """FETCHES Chainlink price. [ACTION]
+    
+    [RAG Context]
+    Most reliable source for on-chain asset prices.
+    """
     return await run_op(oracle.get_chainlink_price, feed_address=feed_address, rpc_url=rpc_url)
 
 # 8. PHASE 5: UNIVERSAL & IDENTITY
 @mcp.tool()
 async def read_contract(address: str, function_signature: str, args: list, arg_types: list, return_types: list, rpc_url: str = None) -> str:
-    """UNIVERSAL: Call Any Contract View Function."""
+    """CALLS contract function (Read). [ACTION]
+    
+    [RAG Context]
+    Universal tool for interacting with arbitrary contracts.
+    Args:
+        function_signature: e.g. "balanceOf(address)"
+    """
     return await run_op(contract_interaction.read_contract, address=address, function_signature=function_signature, args=args, arg_types=arg_types, return_types=return_types, rpc_url=rpc_url)
 
 @mcp.tool()
 async def decode_transaction(tx_hash: str, abi: str, rpc_url: str = None) -> str:
-    """UNIVERSAL: Decode Input Data."""
+    """DECODES transaction data. [ACTION]
+    
+    [RAG Context]
+    """
     return await run_op(contract_interaction.decode_transaction, tx_hash=tx_hash, abi=abi, rpc_url=rpc_url)
 
 @mcp.tool()
 async def get_ens_reverse_record(address: str, rpc_url: str = None) -> str:
-    """IDENTITY: Address to Name."""
+    """RESOLVES address to ENS. [ACTION]
+    
+    [RAG Context]
+    Reverse lookup.
+    """
     return await run_op(identity.get_ens_reverse_record, address=address, rpc_url=rpc_url)
 
 @mcp.tool()
 async def wrap_eth(amount: float, private_key: str, rpc_url: str = None) -> str:
-    """WETH: Wrap ETH."""
+    """WRAPS ETH to WETH. [ACTION]
+    
+    [RAG Context]
+    Mints WETH 1:1.
+    """
     return await run_op(weth.wrap_eth, amount=amount, private_key=private_key, rpc_url=rpc_url)
 
 @mcp.tool()
 async def unwrap_eth(amount: float, private_key: str, rpc_url: str = None) -> str:
-    """WETH: Unwrap WETH."""
+    """UNWRAPS WETH to ETH. [ACTION]
+    
+    [RAG Context]
+    Burns WETH.
+    """
     return await run_op(weth.unwrap_eth, amount=amount, private_key=private_key, rpc_url=rpc_url)
 
 # 9. PHASE 6: YIELD & SAFETY
 @mcp.tool()
 async def stake_eth_lido(amount: float, private_key: str, rpc_url: str = None) -> str:
-    """YIELD: Stake ETH on Lido."""
+    """STAKES ETH (Lido). [ACTION]
+    
+    [RAG Context]
+    Liquid staking.
+    """
     return await run_op(staking.stake_eth_lido, amount=amount, private_key=private_key, rpc_url=rpc_url)
 
 @mcp.tool()
 async def get_curve_quote(token_in: str, token_out: str, amount_in: float, rpc_url: str = None) -> str:
-    """YIELD: Curve Stable Quote."""
+    """FETCHES Curve swap quote. [ACTION]
+    
+    [RAG Context]
+    Best for stablecoin swaps.
+    """
     return await run_op(stableswap.get_curve_quote, token_in=token_in, token_out=token_out, amount_in=amount_in, rpc_url=rpc_url)
 
 @mcp.tool()
 async def simulate_transaction(to_address: str, value: float, data: str, from_address: str, rpc_url: str = None) -> str:
-    """SAFETY: Simulate Tx (Dry Run)."""
+    """SIMULATES transaction. [ACTION]
+    
+    [RAG Context]
+    Dry-run execution.
+    """
     return await run_op(security.simulate_transaction, to_address=to_address, value=value, data=data, from_address=from_address, rpc_url=rpc_url)
 
 # --- DYNAMIC TOKEN SHORTCUTS ---
@@ -268,17 +437,17 @@ tokens = {
 # Chainlink Shortcuts
 @mcp.tool()
 async def get_chainlink_eth_usd() -> str:
-    """SHORTCUT: Chainlink ETH/USD."""
+    """FETCHES ETH/USD price. [ACTION]"""
     return await run_op(oracle.get_chainlink_price, feed_address="0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419")
 
 @mcp.tool()
 async def get_chainlink_btc_usd() -> str:
-    """SHORTCUT: Chainlink BTC/USD."""
+    """FETCHES BTC/USD price. [ACTION]"""
     return await run_op(oracle.get_chainlink_price, feed_address="0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c")
 
 @mcp.tool()
 async def get_chainlink_usdc_usd() -> str:
-    """SHORTCUT: Chainlink USDC/USD."""
+    """FETCHES USDC/USD price. [ACTION]"""
     return await run_op(oracle.get_chainlink_price, feed_address="0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6")
 
 # Register dynamic shortcuts
@@ -321,3 +490,18 @@ for sym, addr in tokens.items():
 
 if __name__ == "__main__":
     mcp.run()
+
+# ==========================================
+# Compatibility Layer for Tests
+# ==========================================
+class Web3Server:
+    def __init__(self):
+        # Wrap the FastMCP instance
+        self.mcp = mcp
+
+    def get_tools(self):
+        # Access internal tool manager to get list of tool objects
+        # We need to return objects that have a .name attribute
+        if hasattr(self.mcp, '_tool_manager') and hasattr(self.mcp._tool_manager, '_tools'):
+             return list(self.mcp._tool_manager._tools.values())
+        return []

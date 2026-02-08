@@ -72,8 +72,8 @@ async def execute_code_tool(arguments: dict) -> ToolResult:
             f.write(code)
             
         # 2. Build 'uv' command
-        # uv run --with dep1 --with dep2 python script.py
-        cmd = ["uv", "run"]
+        # uv run --quiet --with dep1 --with dep2 python script.py
+        cmd = ["uv", "run", "--quiet"]
         
         # Ensure dependencies are unique
         deps_set = set(dependencies)

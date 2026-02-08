@@ -11,6 +11,20 @@ The `mcp_servers/` directory contains the **Model Context Protocol (MCP)** compl
 - **Stealth Browsing & Extraction**: High-fidelity scraping via Playwright with built-in anti-bot evasion and automatic markdown conversion.
 - **Zero-Trust Tooling**: Every tool execution is logged, audited, and resource-gated by the Swarm Manager.
 
+## ✅ Verification
+
+To verify that all MCP servers are correctly installed and can register their tools, run the connectivity test suite:
+
+```bash
+uv run pytest tests/mcp/test_server_connectivity.py -v -s
+```
+
+This command will:
+1.  **Discover** all servers in this directory.
+2.  **Spawn** each server using `uv` (installing dependencies JIT).
+3.  **Verify** that tools can be listed via the MCP protocol.
+
+
 ---
 
 ## 📐 Architecture
@@ -87,13 +101,18 @@ Kea includes a multi-layered financial stack:
 ### Tool Development Pattern
 
 ```python
+# In server.py
 @mcp.tool()
 async def my_new_tool(query: str) -> str:
     """
     Clear docstring for the LLM to understand utility.
+    
+    [RAG Context]
+    Hidden context for the retriever to find this tool.
+    "keyword1", "keyword2", "synonym"
     """
-    # implementation logic
-    return "Result"
+    # implementation logic (delegated to tools/my_feature.py)
+    return await my_feature.logic(query)
 ```
 
 ---
@@ -115,22 +134,99 @@ server_name/
 ```
 
 ### 2. Implementation Rules
-- **Framework**: Use `mcp.server.fastmcp.FastMCP`.
-- **Async**: All tools must be `async def`.
-- **Return Types**: Return `str` (typically JSON strings for data, plain text for logs). Use `to_serializable()` helpers for complex objects (SafeNum, etc.).
-- **Dependencies**: 
-  - Must be explicitly defined in `pyproject.toml`.
-  - Use `uv` for management.
-  - Pin versions if breaking changes are known (e.g., `pandas<2.0`).
-- **Error Handling**: 
-  - Wrap external API calls in `try/except`.
-  - Log errors via `structlog`.
-  - Return informative error strings to the LLM, don't crash the server.
+
+#### 2.1 StdIO & Logging (CRITICAL)
+- **Standard Output (`stdout`)**: STRICTLY RESERVED for JSON-RPC communication.
+  - ❌ `print("debug log")` -> Breaks the protocol.
+  - ❌ `logging.info(...)` (default config) -> Breaks the protocol.
+- **Standard Error (`stderr`)**: Use for logs, warnings, and errors.
+  - ✅ `logging.error("API failed")` -> Visible in MCP Inspector / Logs.
+  - ✅ `sys.stderr.write("Starting server...")` -> Safe.
+- **Standard Input (`stdin`)**: Read-only for JSON-RPC messages. Do not block on `input()`.
+
+#### 2.2 Logging Configuration
+You **MUST** use the provided `setup_logging` utility to ensure logs are routed correctly and chatty libraries (httpx, asyncio) are silenced.
+
+```python
+# In server.py
+from shared.logging import setup_logging
+setup_logging()  # <--- CALL THIS IMMEDIATELY
+
+mcp = FastMCP("my_server")
+```
+
+#### 2.3 Dependency Management
+- **Explicit Declaration**: Use the `dependencies` argument in `FastMCP`.
+  ```python
+  mcp = FastMCP("my_server", dependencies=["pandas", "numpy"])
+  ```
+- **Versioning**: Pin versions if known incompatibilities exist.
+
+#### 2.4 The "JIT Import Hack" (CRITICAL)
+To allow the server to find its local `tools/` module when run via `uv`, you **MUST** include this snippet before importing tools:
+
+```python
+import sys
+from pathlib import Path
+# Fix for importing 'tools' module from root when running in JIT mode
+sys.path.append(str(Path(__file__).parent))
+
+from tools import my_feature  # Now works!
+```
+
+#### 2.5 Naming Conventions
+- **Tool Name**: `verb_object` (snake_case).
+  - ✅ `get_price`, `calculate_rsi`
+  - ❌ `PriceGetter`, `rsi`
+- **Docstring Summary**: `VERB Object.` (Uppercase Verb).
+  - ✅ `FETCHES current price.`
+  - ✅ `CALCULATES RSI.`
+  - ❌ `Get price.`
+
+#### 2.6 Error Handling
+- **Graceful Failures**: Never let an unhandled exception crash the server.
+- **Informative Errors**: Return stringified errors to the LLM.
+  ```python
+  try:
+      return do_risky_thing()
+  except Exception as e:
+      return f"Error: Failed to process data ({str(e)})"
+  ```
+
+#### 2.7 Testing Standards (MANDATORY)
+Every new MCP server **MUST** include a dedicated test file to simulate real-world usage conditions.
+- **Location**: `tests/mcp/test_<server_name>.py`
+- **Purpose**: Verify that the server's tools function correctly with real inputs and external APIs (if applicable).
+- **Format**: Standard `pytest` compatible test file.
+- **Requirement**: The test must cover the server's core functionality and be strictly separate from the server code itself.
 
 ### 3. Tool Design Philosophy
 - **"Super Tools"**: Prefer comprehensive tools (e.g., `analyze_stock_full`) over granular ones (`get_price`, `get_volue`).
 - **Bulk Operations**: Always implement bulk retrieval (e.g., `get_prices(symbols: List[str])`) to minimize round-trips.
 - **Self-Contained**: Tools should manage their own state or be stateless.
+- **RAG-Optimized Docstrings**:
+  - **Location**: Must be placed in `server.py` on the `@mcp.tool()` decorated functions.
+  - **Format**:
+    ```python
+    @mcp.tool()
+    async def my_tool(arg: str) -> str:
+        """FETCHES current price. [ACTION]
+        
+        [RAG Context]
+        Returns realtime snapshot. Key fields: price, volume, high, low.
+        Use for single-point checks.
+        """
+    ```
+  - **Tags**: 
+    - **Summary Line**: Must start with a capitalized verb (FETCHES, CALCULATES, RUNS, ANALYZES) and end with `[ACTION]`.
+    - **Context Block**: `[RAG Context]` is MANDATORY.
+  - **Content Rules**: 
+    - **Length**: ~200 characters max.
+    - **Keywords**: Include synonyms (e.g. "stock" for "ticker", "profit" for "income").
+    - **No Empty Blocks**: Unlike some legacy servers, new servers MUST populate this block.
+- **Auto-Detection**:
+  - The `mcp_servers` package uses dynamic discovery.
+  - Ensure your server has a `server.py` file in its root directory to be automatically loaded.
 
 ---
 
@@ -159,6 +255,7 @@ Create a plan that prioritizes:
 ### Phase 4: Verification
 1.  **Dependency Check**: Run `uv sync`.
 2.  **Connectivity Test**: Run `pytest tests/mcp/test_server_connectivity.py` to ensure the server works within the Kea ecosystem.
+3.  **Real-World Simulation**: Create and run `pytest tests/mcp/test_<server_name>.py` to validate functionality under real conditions.
 
 ---
 
@@ -181,3 +278,5 @@ Use this prompt to instruct an agent to build a new server:
 > 4.  **Refine**:
 >     - Update `mcp_servers/README.md` with the new server details.
 >     - Ensure code is robust (try/except blocks).
+> 5.  **Verify**:
+>     - Create a real-world test in `tests/mcp/test_{server_name}.py`.

@@ -1,8 +1,7 @@
-
 import httpx
-import pymupdf
+# import fitz # PyMuPDF (deferred)
 import json
-from shared.logging import get_logger
+from shared.logging.structured import get_logger
 
 logger = get_logger(__name__)
 
@@ -12,13 +11,20 @@ async def parse_pdf(url: str, pages: str = "all", extract_tables: bool = False) 
     pages: 'all', '1-5', '1,3,5'
     """
     try:
+        import fitz # PyMuPDF
+        
         # Download PDF
-        async with httpx.AsyncClient(timeout=60) as client:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/pdf,application/x-pdf,text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5"
+        }
+        async with httpx.AsyncClient(timeout=60, follow_redirects=True, headers=headers) as client:
             response = await client.get(url)
             response.raise_for_status()
             pdf_bytes = response.content
             
-        doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         
         output_data = {
             "source": url,

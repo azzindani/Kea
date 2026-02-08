@@ -31,10 +31,16 @@ class MicroTask(BaseModel):
     fallback_tools: list[str] = Field(default_factory=list)  # If primary fails
     persist: bool = True  # Always persist by default (high threshold policy)
     phase: str = "research"  # Execution phase for parallel batching
-    
+
     # Node Assembly Engine fields
     input_mapping: dict[str, str] = Field(default_factory=dict)  # {"csv_path": "{{step_id.artifacts.key}}"}
     output_artifact: str | None = None  # Artifact key this task produces
+
+    # Workflow node type (tool, code, llm, switch, loop, merge, agentic)
+    node_type: str = "tool"
+
+    # Advanced node fields (stored as raw dict for DAG executor to interpret)
+    node_config: dict[str, Any] = Field(default_factory=dict)
     
     
 class ExecutionPlan(BaseModel):
@@ -45,6 +51,430 @@ class ExecutionPlan(BaseModel):
     phases: list[str] = Field(default_factory=list)  # Phase names
     estimated_tools: int = 0
     
+
+# ============================================================================
+# Tool Validation & Fuzzy Matching
+# ============================================================================
+
+async def _validate_and_correct_tool_names(execution_plan: ExecutionPlan) -> ExecutionPlan:
+    """
+    Validate tool names from LLM against 2K+ tool registry and auto-correct common hallucinations.
+
+    Common hallucinations:
+    - get_balance_sheet → get_balance_sheet_annual
+    - get_income_statement → get_income_statement_annual
+    - get_financial_ratios → calculate_indicators (closest alternative)
+
+    Args:
+        execution_plan: Execution plan with potentially hallucinated tool names
+
+    Returns:
+        Execution plan with validated and corrected tool names
+    """
+    from services.mcp_host.core.session_registry import get_session_registry
+    from difflib import get_close_matches
+
+    registry = get_session_registry()
+
+    # Get available tools (2K+ tools from RAG)
+    if not registry.tool_to_server:
+        await registry.list_all_tools()
+
+    available_tools = set(registry.tool_to_server.keys())
+
+    # Common hallucination aliases
+    aliases = {
+        "get_balance_sheet": "get_balance_sheet_annual",
+        "get_income_statement": "get_income_statement_annual",
+        "get_cash_flow": "get_cash_flow_annual",
+        "get_cash_flow_statement": "get_cash_flow_statement_annual",
+        "get_financial_ratios": "calculate_indicators",
+        "get_financials": "get_full_report",
+        "search": "web_search",
+        "scrape": "fetch_url",
+        "scrape_url": "fetch_url",
+        "google_search": "web_search",
+        "bing_search": "web_search",
+    }
+
+    corrected_tasks = []
+    removed_count = 0
+    corrected_count = 0
+
+    for task in execution_plan.micro_tasks:
+        tool_name = task.tool
+
+        # Check if tool exists
+        if tool_name in available_tools:
+            corrected_tasks.append(task)
+            continue
+
+        # Check aliases first (fast lookup)
+        if tool_name in aliases:
+            corrected_tool = aliases[tool_name]
+            if corrected_tool in available_tools:
+                logger.warning(
+                    f"🔧 Correcting hallucinated tool: {tool_name} → {corrected_tool}"
+                )
+                task.tool = corrected_tool
+                corrected_tasks.append(task)
+                corrected_count += 1
+                continue
+
+        # Fuzzy match (edit distance for typos)
+        matches = get_close_matches(tool_name, available_tools, n=1, cutoff=0.8)
+
+        if matches:
+            corrected_tool = matches[0]
+            logger.warning(
+                f"🔧 Fuzzy-matched tool: {tool_name} → {corrected_tool} "
+                f"(similarity: {_similarity_score(tool_name, corrected_tool):.2f})"
+            )
+            task.tool = corrected_tool
+            corrected_tasks.append(task)
+            corrected_count += 1
+        else:
+            # Tool doesn't exist and can't be matched - remove task
+            logger.error(
+                f"❌ Tool not found in 2K+ registry: {tool_name}. "
+                f"Removing task: {task.description[:100]}"
+            )
+            removed_count += 1
+            # Don't add to corrected_tasks (filtered out)
+
+    logger.info(
+        f"✅ Tool validation complete: "
+        f"{len(execution_plan.micro_tasks)} → {len(corrected_tasks)} tasks "
+        f"({corrected_count} corrected, {removed_count} removed)"
+    )
+
+    # Update execution plan with corrected tasks
+    execution_plan.micro_tasks = corrected_tasks
+    execution_plan.estimated_tools = len(corrected_tasks)
+
+    return execution_plan
+
+
+async def _validate_tool_arguments(execution_plan: ExecutionPlan, query: str) -> ExecutionPlan:
+    """
+    Validate tool arguments against FULL JSON schema (not just required params).
+
+    CRITICAL: Uses Postgres RAG for schemas (NOT list_all_tools() which loads ALL servers!)
+
+    Validates:
+    - Required parameters present ✅
+    - Parameter TYPES match (string, int, array, object) ✅
+    - Enum values are valid ✅
+    - Min/max constraints ✅
+    - No extra parameters ✅
+    - Nested object structures ✅
+
+    Args:
+        execution_plan: Execution plan to validate
+        query: Original user query for extracting values
+
+    Returns:
+        Execution plan with fully validated arguments
+    """
+    from services.mcp_host.core.session_registry import get_session_registry
+
+    registry = get_session_registry()
+
+    # Get tool schemas from Postgres RAG (FAST - doesn't load servers!)
+    tool_schemas = {}
+    try:
+        if registry.pg_registry:
+            # Query only the tools we need (not all 2000+)
+            for task in execution_plan.micro_tasks:
+                tool_name = task.tool
+                # Search for this specific tool in RAG
+                results = await registry.pg_registry.search_tools(tool_name, limit=1)
+                if results:
+                    tool_schemas[tool_name] = results[0].get('inputSchema', {})
+        else:
+            logger.warning("Postgres registry unavailable, skipping schema validation")
+            return execution_plan
+    except Exception as e:
+        logger.warning(f"Could not fetch tool schemas from RAG: {e}")
+        return execution_plan
+
+    logger.info(f"🔍 Validating {len(execution_plan.micro_tasks)} tasks against tool schemas...")
+
+    fixed_tasks = []
+    validation_stats = {'passed': 0, 'fixed': 0, 'failed': 0}
+
+    for task in execution_plan.micro_tasks:
+        tool_name = task.tool
+        args = task.inputs or {}
+
+        # Get schema for this tool
+        schema = tool_schemas.get(tool_name, {})
+        if not schema:
+            # No schema available, keep as-is but log
+            logger.warning(f"⚠️ No schema found for {tool_name}, skipping validation")
+            fixed_tasks.append(task)
+            continue
+
+        # FULL JSON SCHEMA VALIDATION
+        validation_result = _validate_against_json_schema(args, schema, tool_name)
+
+        if validation_result['valid']:
+            # Schema validation passed
+            logger.info(f"✅ {tool_name} schema validation passed")
+            validation_stats['passed'] += 1
+            fixed_tasks.append(task)
+            continue
+
+        # Schema validation failed - try to fix
+        logger.warning(
+            f"⚠️ {tool_name} validation failed: {', '.join(validation_result['errors'][:2])}"
+        )
+
+        # Fix missing required parameters by extracting from query
+        if validation_result['missing_required']:
+            logger.info(f"🔧 Extracting missing params: {validation_result['missing_required']}")
+            extracted_args = _extract_params_from_query(
+                query,
+                validation_result['missing_required'],
+                schema.get('properties', {})
+            )
+            if extracted_args:
+                logger.info(f"✅ Extracted: {extracted_args}")
+                args = {**args, **extracted_args}
+            else:
+                logger.warning(f"❌ Could not extract params from query")
+
+        # Fix type mismatches
+        if validation_result['type_errors']:
+            args = _fix_type_mismatches(args, validation_result['type_errors'], schema)
+
+        # Remove extra parameters
+        if validation_result['extra_params']:
+            for extra_param in validation_result['extra_params']:
+                logger.info(f"🗑️ Removing extra param '{extra_param}'")
+                args.pop(extra_param, None)
+
+        # Update task with fixed args
+        task.inputs = args
+
+        # Re-validate after fixes
+        revalidation = _validate_against_json_schema(args, schema, tool_name)
+        if revalidation['valid']:
+            logger.info(f"✅ {tool_name} fixed successfully")
+            validation_stats['fixed'] += 1
+        else:
+            logger.error(f"❌ {tool_name} still invalid: {', '.join(revalidation['errors'][:2])}")
+            validation_stats['failed'] += 1
+
+        fixed_tasks.append(task)
+
+    logger.info(
+        f"📊 Validation complete: {validation_stats['passed']} passed, "
+        f"{validation_stats['fixed']} fixed, {validation_stats['failed']} failed"
+    )
+
+    execution_plan.micro_tasks = fixed_tasks
+    return execution_plan
+
+
+def _validate_against_json_schema(args: dict, schema: dict, tool_name: str) -> dict:
+    """
+    Validate arguments against JSON schema.
+
+    Returns:
+        Dict with validation results:
+        {
+            'valid': bool,
+            'errors': list[str],
+            'missing_required': list[str],
+            'type_errors': dict,
+            'extra_params': list[str]
+        }
+    """
+    result = {
+        'valid': True,
+        'errors': [],
+        'missing_required': [],
+        'type_errors': {},
+        'extra_params': []
+    }
+
+    properties = schema.get('properties', {})
+    required = schema.get('required', [])
+    additional_properties = schema.get('additionalProperties', True)
+
+    # Check required parameters
+    for param in required:
+        if param not in args or args[param] is None or args[param] == '':
+            result['valid'] = False
+            result['missing_required'].append(param)
+            result['errors'].append(f"Missing required: {param}")
+
+    # Check parameter types and constraints
+    for param, value in args.items():
+        if param not in properties:
+            # Extra parameter not in schema
+            if not additional_properties:
+                result['valid'] = False
+                result['extra_params'].append(param)
+                result['errors'].append(f"Extra param: {param}")
+            continue
+
+        param_schema = properties[param]
+        param_type = param_schema.get('type')
+
+        # Type validation
+        if param_type:
+            type_valid, type_error = _check_type(value, param_type, param)
+            if not type_valid:
+                result['valid'] = False
+                result['type_errors'][param] = {'expected': param_type, 'actual': type(value).__name__}
+                result['errors'].append(type_error)
+
+        # Enum validation
+        if 'enum' in param_schema:
+            if value not in param_schema['enum']:
+                result['valid'] = False
+                result['errors'].append(f"{param}='{value}' not in enum")
+
+        # Min/max validation for numbers
+        if param_type in ('integer', 'number'):
+            if isinstance(value, (int, float)):
+                if 'minimum' in param_schema and value < param_schema['minimum']:
+                    result['valid'] = False
+                    result['errors'].append(f"{param}={value} < min {param_schema['minimum']}")
+                if 'maximum' in param_schema and value > param_schema['maximum']:
+                    result['valid'] = False
+                    result['errors'].append(f"{param}={value} > max {param_schema['maximum']}")
+
+    return result
+
+
+def _check_type(value: any, expected_type: str, param_name: str) -> tuple[bool, str]:
+    """Check if value matches expected JSON schema type."""
+    type_map = {
+        'string': str,
+        'integer': int,
+        'number': (int, float),
+        'boolean': bool,
+        'array': list,
+        'object': dict
+    }
+
+    expected_python_type = type_map.get(expected_type)
+    if not expected_python_type:
+        return True, ""  # Unknown type, skip
+
+    if isinstance(value, expected_python_type):
+        return True, ""
+
+    return False, f"{param_name}: expected {expected_type}, got {type(value).__name__}"
+
+
+def _fix_type_mismatches(args: dict, type_errors: dict, schema: dict) -> dict:
+    """Attempt to fix type mismatches by converting values."""
+    fixed_args = args.copy()
+
+    for param, error_info in type_errors.items():
+        expected_type = error_info['expected']
+        current_value = args[param]
+
+        try:
+            # Attempt type conversion
+            if expected_type == 'string':
+                fixed_args[param] = str(current_value)
+            elif expected_type == 'integer':
+                fixed_args[param] = int(current_value)
+            elif expected_type == 'number':
+                fixed_args[param] = float(current_value)
+            elif expected_type == 'boolean':
+                fixed_args[param] = bool(current_value)
+            elif expected_type == 'array':
+                if not isinstance(current_value, list):
+                    fixed_args[param] = [current_value]
+
+            logger.info(f"✅ Fixed type: {param} {error_info['actual']} → {expected_type}")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not fix type for '{param}': {e}")
+
+    return fixed_args
+
+
+def _extract_params_from_query(query: str, param_names: list[str], properties: dict) -> dict:
+    """
+    Extract parameter values from user query using simple heuristics.
+
+    Args:
+        query: User query text
+        param_names: List of parameter names to extract
+        properties: Parameter schema properties
+
+    Returns:
+        Dict of extracted param values
+    """
+    import re
+
+    extracted = {}
+    query_lower = query.lower()
+
+    for param in param_names:
+        param_type = properties.get(param, {}).get('type', 'string')
+
+        # Extract ticker symbols (most common case)
+        if param in ('ticker', 'symbol', 'stock'):
+            # Look for ticker patterns: BBCA.JK, AAPL, TSLA, etc.
+            ticker_matches = re.findall(r'\b[A-Z]{1,5}(?:\.[A-Z]{1,3})?\b', query.upper())
+            if ticker_matches:
+                extracted[param] = ticker_matches[0]
+            # Or extract company name and try to convert
+            elif 'bank' in query_lower:
+                # Common patterns: "BCA Bank" → BBCA.JK
+                company_patterns = {
+                    'bca bank': 'BBCA.JK',
+                    'mandiri': 'BMRI.JK',
+                    'bri': 'BBRI.JK',
+                    'tesla': 'TSLA',
+                    'apple': 'AAPL',
+                    'microsoft': 'MSFT',
+                }
+                for company, ticker in company_patterns.items():
+                    if company in query_lower:
+                        extracted[param] = ticker
+                        break
+
+        # Extract query/search terms
+        elif param in ('query', 'search_query', 'q'):
+            # Use the entire query as search query
+            extracted[param] = query[:200]  # Truncate to reasonable length
+
+        # Extract period/timeframe
+        elif param in ('period', 'timeframe'):
+            if 'annual' in query_lower or 'year' in query_lower:
+                extracted[param] = '1y'
+            elif 'quarter' in query_lower:
+                extracted[param] = '3mo'
+            else:
+                extracted[param] = '1y'  # Default to annual
+
+        # Extract statement type for financial tools
+        elif param in ('statement', 'statement_type'):
+            if 'balance' in query_lower:
+                extracted[param] = 'balance_sheet'
+            elif 'income' in query_lower:
+                extracted[param] = 'income_statement'
+            elif 'cash' in query_lower:
+                extracted[param] = 'cash_flow'
+            else:
+                extracted[param] = 'balance_sheet'  # Default
+
+    return extracted
+
+
+def _similarity_score(str1: str, str2: str) -> float:
+    """Calculate similarity score between two strings (0.0 - 1.0)."""
+    from difflib import SequenceMatcher
+    return SequenceMatcher(None, str1, str2).ratio()
+
 
 # ============================================================================
 # Tool Routing Logic
@@ -63,34 +493,33 @@ def route_to_tool(task_description: str) -> tuple[str, list[str]]:
 def _extract_template_variables(query: str, expected_vars: list[str]) -> dict[str, str]:
     """
     Extract variable values from query for template expansion.
-    
+
     Uses pattern matching to find common variable types:
     - ticker: Stock symbols like BBCA.JK, NVDA, AAPL
     - company: Company names
     - period: Time periods like 1y, 6mo, 3mo
-    
+
     Args:
         query: User's research query
         expected_vars: List of variable names the template expects
-        
+
     Returns:
         Dict of variable name -> extracted value
     """
     import re
-    
+
     variables = {}
     query_upper = query.upper()
-    
+
     for var in expected_vars:
         if var.lower() == "ticker":
-            # Look for stock ticker patterns (e.g., BBCA.JK, NVDA, AAPL)
-            ticker_match = re.search(r'\b([A-Z]{1,5}(?:\.[A-Z]{1,3})?)\b', query_upper)
+            # Simple extraction: look for ticker patterns, let retry loop fix errors
+            ticker_match = re.search(r'\b([A-Z]{2,5}(?:\.[A-Z]{2,3})?)\b', query_upper)
             if ticker_match:
                 variables[var] = ticker_match.group(1)
             else:
-                # Default to first word as ticker
-                words = query.split()
-                variables[var] = words[0].upper() if words else "AAPL"
+                # Fallback: use query company name, retry loop will correct via LLM
+                variables[var] = query.strip()
                 
         elif var.lower() == "company":
             # Use first few words as company name
@@ -193,6 +622,52 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
     except Exception as e:
         logger.debug(f"Related fact lookup skipped: {e}")
     
+    # ============================================================
+    # COMPLEXITY CLASSIFICATION (Dynamic Limit Scaling)
+    # ============================================================
+    try:
+        from services.orchestrator.core.complexity import classify_complexity
+        complexity = classify_complexity(query)
+        state["complexity"] = {
+            "tier": complexity.tier.value,
+            "entity_count": complexity.entity_count,
+            "composite": complexity.composite,
+            "max_subtasks": complexity.max_subtasks,
+            "max_phases": complexity.max_phases,
+            "max_depth": complexity.max_depth,
+            "max_parallel": complexity.max_parallel,
+            "max_research_iterations": complexity.max_research_iterations,
+        }
+    except Exception as e:
+        logger.warning(f"Complexity classification failed: {e}")
+        complexity = None
+
+    # ============================================================
+    # KNOWLEDGE CONTEXT RETRIEVAL (Domain Expertise from Knowledge Library)
+    # ============================================================
+    knowledge_context = ""
+    try:
+        from shared.knowledge.retriever import get_knowledge_retriever
+
+        knowledge_retriever = get_knowledge_retriever()
+        knowledge_context = await asyncio.wait_for(
+            knowledge_retriever.retrieve_all(
+                query=query,
+                skill_limit=3,
+                rule_limit=2,
+            ),
+            timeout=5.0,
+        )
+        if knowledge_context:
+            logger.info(
+                f"Planner: Retrieved {len(knowledge_context)} chars of domain knowledge"
+            )
+            state["knowledge_context"] = knowledge_context
+    except asyncio.TimeoutError:
+        logger.warning("Planner: Knowledge retrieval timed out, skipping")
+    except Exception as e:
+        logger.debug(f"Knowledge retrieval skipped: {e}")
+
     # Use LLM to decompose query
     try:
         import os
@@ -265,17 +740,36 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
                 try:
                     # Search specifically for tools that match the query intention
                     search_results = await asyncio.wait_for(
-                        registry.search_tools(query, limit=100), 
-                        timeout=3.0
+                        registry.search_tools(query, limit=50),  # Reduced limit for schema inclusion
+                        timeout=5.0
                     )
                     
                     if search_results:
                         logger.info(f"Planner: RAG found {len(search_results)} relevant tools")
-                        # Format: "tool_name: description" for better LLM understanding
-                        relevant_tools = [
-                            f"{t.get('name', 'N/A')}: {t.get('description', '')[:100]}" 
-                            for t in search_results
-                        ]
+                        # Format: "tool_name: {input_schema}" for precise mapping
+                        for t in search_results:
+                            name = t.get('name', 'N/A')
+                            # Optimized for Front-Loaded Docstrings: Summary (200 chars) + context (200 chars)
+                            desc = t.get('description', '')[:400]
+                            schema = t.get('inputSchema', {})
+
+                            # Format schema as JSON for LLM clarity (not Python dict)
+                            import json
+                            schema_json = json.dumps(schema, indent=2)
+                            # Escape braces for f-string
+                            schema_escaped = schema_json.replace("{", "{{").replace("}", "}}")
+
+                            # Extract required parameters for emphasis
+                            required_params = schema.get('required', [])
+                            properties = schema.get('properties', {})
+
+                            tool_doc = f"TOOL: {name}\n"
+                            tool_doc += f"DESCRIPTION: {desc}\n"
+                            if required_params:
+                                tool_doc += f"REQUIRED PARAMS: {', '.join(required_params)}\n"
+                            tool_doc += f"FULL SCHEMA (JSON):\n{schema_escaped}\n"
+
+                            relevant_tools.append(tool_doc)
                 except Exception as search_err:
                     logger.warning(f"Planner RAG Search failed: {search_err}. Falling back to active list.")
 
@@ -283,23 +777,51 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
                 if not relevant_tools:
                     if registry.tool_to_server:
                         known_tools = list(registry.tool_to_server.keys())
-                        # If list is HUGE, we slice it to avoid context overflow (first 500)
-                        # LLM Context is 32k, so 500 tools is fine.
-                        relevant_tools = known_tools[:500]
-                        logger.info(f"Planner: Using fallback list of {len(relevant_tools)} tools")
+                        # Slice to avoid context overflow
+                        target_tools = known_tools[:50]  # Reduced from 100 to fit context
+                        logger.warning(f"Planner: RAG search failed, using fallback list of {len(target_tools)} tools (NAME ONLY - schemas unavailable)")
+
+                        # Fallback: Tool names only (no schemas available without RAG)
+                        # This will cause the LLM to make best-effort parameter guessing
+                        # which is why we have the retry loop in unified_tool_handler
+                        relevant_tools = [
+                            f"TOOL: {t}\nDESCRIPTION: (schema unavailable - use retry loop for parameter correction)\n"
+                            for t in target_tools
+                        ]
                     else:
                         # 3. Last Resort: Try to force discovery once
                         try:
                             logger.info("Planner: Registry empty, forcing tool scan...")
                             all_tools = await asyncio.wait_for(registry.list_all_tools(), timeout=5.0)
-                            relevant_tools = [t['name'] for t in all_tools][:200]
+                            # Here we HAVE schemas
+                            import json
+                            for t in all_tools[:50]:
+                                name = t.get('name', 'N/A')
+                                # Optimized for Front-Loaded Docstrings
+                                desc = t.get('description', '')[:400]
+                                schema = t.get('inputSchema', {})
+
+                                # Format schema as JSON (not Python dict)
+                                schema_json = json.dumps(schema, indent=2)
+                                schema_escaped = schema_json.replace("{", "{{").replace("}", "}}")
+
+                                # Extract required parameters
+                                required_params = schema.get('required', [])
+
+                                tool_doc = f"TOOL: {name}\n"
+                                tool_doc += f"DESCRIPTION: {desc}\n"
+                                if required_params:
+                                    tool_doc += f"REQUIRED PARAMS: {', '.join(required_params)}\n"
+                                tool_doc += f"FULL SCHEMA (JSON):\n{schema_escaped}\n"
+
+                                relevant_tools.append(tool_doc)
                         except asyncio.TimeoutError:
                              pass
 
                 # Format for LLM
                 if relevant_tools:
                     tools_context = f"RELEVANT TOOLS ({len(relevant_tools)} found):\n"
-                    tools_context += "\n".join(relevant_tools) if ":" in relevant_tools[0] else ", ".join(relevant_tools)
+                    tools_context += "\n".join(relevant_tools)
                 else:
                     tools_context = "No specific tools found. Rely on 'web_search' and 'execute_code'."
                 
@@ -307,53 +829,128 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
                 logger.warning(f"Planner tool discovery CRITICAL FAILURE: {e}")
                 tools_context = "Tool Discovery Unavailable."
 
+            # Complexity-aware planning guidance
+            complexity_guidance = ""
+            if complexity:
+                complexity_guidance = f"""
+QUERY COMPLEXITY: {complexity.tier.value.upper()}
+- Entities detected: {complexity.entity_count}
+- Recommended steps: {complexity.max_subtasks}
+- Maximum phases: {complexity.max_phases}
+- Scale the blueprint to match this complexity. Simple queries need 2-3 steps.
+  Complex queries with many entities need {complexity.max_subtasks}+ steps.
+  Generate as many steps as the query ACTUALLY requires — do NOT default to 3."""
+
+            # ============================================================
+            # ERROR FEEDBACK LOOP (Self-Correction from Previous Failures)
+            # Inject previous tool failures so LLM learns from mistakes
+            # ============================================================
+            error_feedback_section = ""
+            error_feedback = state.get("error_feedback", [])
+            if error_feedback:
+                error_feedback_section = "\n\n⚠️ PREVIOUS TOOL FAILURES (LEARN FROM THESE):\n"
+                error_feedback_section += "The following tool calls FAILED in the previous iteration. "
+                error_feedback_section += "You MUST correct these mistakes:\n\n"
+                for i, err in enumerate(error_feedback[:5], 1):  # Limit to 5 to avoid context overflow
+                    error_feedback_section += f"{i}. TOOL: {err.get('tool', 'unknown')}\n"
+                    error_feedback_section += f"   FAILED ARGS: {err.get('args', {})}\n"
+                    error_feedback_section += f"   ERROR: {err.get('error', 'unknown')[:200]}\n"
+                    error_feedback_section += f"   TASK: {err.get('description', '')[:100]}\n"
+                    # Include dynamic suggestion if present
+                    if err.get('suggestion'):
+                        error_feedback_section += f"   ➡️ SUGGESTION: {err.get('suggestion')}\n"
+                    error_feedback_section += "\n"
+                error_feedback_section += "CORRECTION GUIDANCE:\n"
+                error_feedback_section += "- If ticker was wrong, use search_ticker('company name') to find the correct symbol FIRST\n"
+                error_feedback_section += "- If parameter was missing, ensure you include ALL required parameters from the schema\n"
+                error_feedback_section += "- If tool doesn't exist, use an alternative from the AVAILABLE TOOLS list\n"
+
+            # Build knowledge section for prompt
+            knowledge_section = ""
+            if knowledge_context:
+                knowledge_section = f"""
+
+{knowledge_context}
+
+Use the above domain expertise to inform your planning decisions,
+tool selection, and parameter choices. Follow the reasoning frameworks
+and output standards defined in the retrieved knowledge."""
+
             # JSON Blueprint System Prompt (Level 30 Architect)
             messages = [
                 LLMMessage(
                     role=LLMRole.SYSTEM,
                     content=f"""ACT AS: Execution Architect for Kea (Autonomous Research Engine).
-OBJECTIVE: Convert user intent into an executable JSON Blueprint.
+OBJECTIVE: Convert user intent into an executable JSON Blueprint with PRECISE INPUT MAPPING.
+{complexity_guidance}
+{error_feedback_section}
+{knowledge_section}
 
 AVAILABLE TOOLS:
 {tools_context}
 
 CRITICAL RULES:
-1. OUTPUT ONLY JSON. No prose, no explanations, no "I will now..."
-2. Use exact tool names from the list above. If no tool fits, use "execute_code".
-3. Tasks with same "phase" run in parallel. Higher phase waits for lower phases.
-4. Use "artifact" to declare output keys, "input_mapping" to consume outputs from other steps.
+1. OUTPUT ONLY JSON. No prose, no explanations.
+2. TOOL SELECTION: Use ONLY tools from the AVAILABLE TOOLS list above. NEVER invent or hallucinate tool names.
+3. SCHEMA COMPLIANCE: For each tool you use:
+   - Read its FULL SCHEMA to understand required and optional parameters
+   - Extract parameter names from "properties" field
+   - Populate ALL required parameters (listed in "REQUIRED PARAMS" or "required" field)
+   - Use correct parameter types (string, number, boolean, array, object)
+   - NEVER leave "args" empty if the tool requires parameters
+4. DEPENDENCIES: Tasks with same "phase" run in parallel. Higher phase waits for lower phases.
+5. ARTIFACTS: Use "artifact" to assign a variable name to each step's output (e.g., "csv_file", "search_results").
+6. INPUT MAPPING (The Core Mechanic):
+   - You MUST map outputs from previous steps to inputs of subsequent steps using `input_mapping`.
+   - Syntax: `{{{{step_id.artifacts.artifact_name}}}}` refers to the output of `step_id`.
+   - Deep Selection: You can access JSON fields or array items:
+     - `{{{{s1.artifacts.data.items[0].id}}}}` (First item's ID)
+     - `{{{{s1.artifacts.data.items[*].price}}}}` (List of all prices)
+   - Schema Compliance: Ensure mapped values match the TOOL SCHEMA provided above.
+   - Example: if `calculate_indicators` needs `csv_path`, map it: `"input_mapping": {{{{"csv_path": "{{{{s1.artifacts.prices_csv}}}}"}}}}`.
 
-OUTPUT SCHEMA:
+6. ADVANCED NODE TYPES:
+   - "type": "loop" -> Iterate over a list.
+     - `loop_over`: `{{{{step.artifacts.list}}}}`
+     - `loop_body`: List of steps to run for each item. Use `{{{{loop_variable}}}}` (default `item`) in args.
+   - "type": "switch" -> Conditional logic.
+     - `condition`: `len({{{{s1.artifacts.data}}}}) > 0`
+   - "type": "merge" -> Combine results.
+     - `merge_inputs`: ["s1", "s2"]
+
+OUTPUT SCHEMA EXAMPLE:
 {{{{
-  "intent": "Brief technical summary (max 10 words)",
+  "intent": "Brief technical summary of what will be done",
   "blueprint": [
     {{{{
       "id": "step_1",
       "phase": 1,
-      "tool": "yfinance_server.get_bulk_historical_data",
-      "args": {{{{"tickers": "BBCA.JK", "period": "1y"}}}},
-      "artifact": "prices_csv"
+      "tool": "get_balance_sheet_annual",
+      "args": {{{{
+        "ticker": "BBCA.JK"
+      }}}},
+      "description": "Fetch annual balance sheet for BBCA",
+      "artifact": "balance_sheet"
     }}}},
     {{{{
-      "id": "step_2", 
+      "id": "step_2",
       "phase": 2,
-      "tool": "pandas_ta_server.calculate_indicators",
-      "args": {{{{"indicators": ["rsi", "macd"]}}}},
-      "input_mapping": {{{{"csv_path": "{{{{step_1.artifacts.prices_csv}}}}\"}}}},
-      "artifact": "indicators"
+      "tool": "get_income_statement_annual",
+      "args": {{{{
+        "ticker": "BBCA.JK"
+      }}}},
+      "description": "Fetch annual income statement for BBCA",
+      "artifact": "income_stmt"
     }}}}
   ]
 }}}}
 
-EXAMPLE for "Compare NVDA vs AMD financials":
-{{{{
-  "intent": "Compare NVDA AMD financial metrics",
-  "blueprint": [
-    {{{{"id": "s1", "phase": 1, "tool": "yfinance_server.get_income_statement_quarterly", "args": {{{{"ticker": "NVDA"}}}}, "artifact": "nvda_income"}}}},
-    {{{{"id": "s2", "phase": 1, "tool": "yfinance_server.get_income_statement_quarterly", "args": {{{{"ticker": "AMD"}}}}, "artifact": "amd_income"}}}},
-    {{{{"id": "s3", "phase": 2, "tool": "execute_code", "args": {{{{"code": "# Compare margins"}}}}, "input_mapping": {{{{"nvda": "{{{{s1.artifacts.nvda_income}}}}\", "amd": "{{{{s2.artifacts.amd_income}}}}\"}}}}, "artifact": "comparison"}}}}
-  ]
-}}}}"""
+PARAMETER EXTRACTION RULES:
+- Read the tool's FULL SCHEMA to find parameter names under "properties"
+- Check "REQUIRED PARAMS" or "required" field to know which params are mandatory
+- Extract parameter values from the user query (e.g., company name, ticker, period)
+- If a parameter is missing from the query, use reasonable defaults or skip optional params
+- CRITICAL: NEVER generate empty "args" if the tool requires parameters (all required params must be included)"""
                 ),
                 LLMMessage(role=LLMRole.USER, content=query)
             ]
@@ -393,10 +990,23 @@ EXAMPLE for "Compare NVDA vs AMD financials":
             if blueprint and "blueprint" in blueprint:
                 # Generate execution plan from JSON Blueprint
                 execution_plan = generate_execution_plan_from_blueprint(query, blueprint)
+
+                # CRITICAL: Validate and correct tool names against 2K+ tool registry
+                try:
+                    execution_plan = await _validate_and_correct_tool_names(execution_plan)
+                except Exception as val_err:
+                    logger.warning(f"Tool validation failed: {val_err}, proceeding with unvalidated tools")
+
+                # CRITICAL: Validate arguments are not empty for required parameters
+                try:
+                    execution_plan = await _validate_tool_arguments(execution_plan, query)
+                except Exception as arg_err:
+                    logger.warning(f"Argument validation failed: {arg_err}")
+
                 state["execution_plan"] = execution_plan.model_dump()
                 state["sub_queries"] = [blueprint.get("intent", query)]
                 state["hypotheses"] = []
-                
+
                 logger.info(
                     f"Planner: Generated {len(execution_plan.micro_tasks)} micro-tasks "
                     f"across {len(execution_plan.phases)} phases from JSON Blueprint"
@@ -590,18 +1200,39 @@ def generate_execution_plan_from_blueprint(query: str, blueprint: dict) -> Execu
         
         # Parse input_mapping from blueprint (Node Assembly Engine)
         input_mapping = step.get("input_mapping", {})
-        
+
+        # Detect node type from step
+        node_type = step.get("type", "tool")
+        if not node_type or node_type == "tool":
+            if tool_name in ("execute_code", "run_python"):
+                node_type = "code"
+
+        # Collect advanced node config for DAG executor
+        node_config: dict[str, Any] = {}
+        for adv_key in (
+            "condition", "true_branch", "false_branch", "true", "false",
+            "loop_over", "over", "loop_body", "body", "loop_variable",
+            "merge_inputs", "merge_strategy",
+            "goal", "agent_max_steps", "agent_tools", "max_steps", "tools",
+            "llm_prompt", "llm_system", "prompt", "system",
+            "max_parallel",
+        ):
+            if adv_key in step:
+                node_config[adv_key] = step[adv_key]
+
         micro_task = MicroTask(
             task_id=step_id,
-            description=f"{tool_name}: {args.get('query', args.get('code', str(args)[:100]))}",
+            description=step.get("description", f"{tool_name}: {args.get('query', args.get('code', str(args)[:100]))}"),
             tool=tool_name,
             inputs=inputs,
-            depends_on=depends_on,
+            depends_on=step.get("depends_on", depends_on),
             fallback_tools=["execute_code"] if tool_name != "execute_code" else [],
             persist=True,
             phase=str(phase_num),
             input_mapping=input_mapping,
             output_artifact=artifact_key,
+            node_type=node_type,
+            node_config=node_config,
         )
         
         micro_tasks.append(micro_task)

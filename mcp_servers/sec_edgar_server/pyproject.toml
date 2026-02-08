@@ -3,7 +3,7 @@ name = "sec_edgar_server"
 version = "0.1.0"
 description = "MCP Server for SEC Edgar"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
     "beautifulsoup4",
     "httpx",
@@ -15,6 +15,7 @@ dependencies = [
     "python-dotenv",
     "sec-edgar-downloader>=5.0.3",
     "structlog",
+    "tabulate",
     "textblob",
     "wrapt",
 ]

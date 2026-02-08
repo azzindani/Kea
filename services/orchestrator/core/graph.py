@@ -34,7 +34,7 @@ from services.orchestrator.agents.code_generator import generate_fallback_code, 
 from shared.data_pool import get_data_pool
 
 # Node Assembly Engine for n8n-style node wiring
-from services.orchestrator.core.assembler import ArtifactStore, NodeAssembler, create_assembler
+from services.orchestrator.core.assembler import ArtifactStore, create_assembler
 
 
 
@@ -80,6 +80,10 @@ class GraphState(TypedDict, total=False):
     artifacts: list[str]
     tool_invocations: list[dict]  # Record of tool calls
     
+    # Error Feedback Loop (Self-Correction)
+    # Stores errors from failed tool calls to inject into LLM for learning
+    error_feedback: list[dict]  # [{"tool": str, "error": str, "args": dict, "suggestion": str}]
+    
     # Consensus
     generator_output: str
     critic_feedback: str
@@ -94,10 +98,17 @@ class GraphState(TypedDict, total=False):
     max_iterations: int
     should_continue: bool
     error: str | None
+    stop_reason: str  # Reason for stopping (confidence_achieved, all_tools_failed, etc.)
     
     # Revision loop control (for Judge -> Generator retry)
     revision_count: int
     max_revisions: int
+    
+    # Replan loop control (for Keeper -> Planner retry when all tools fail)
+    replan_count: int
+    
+    # Deduplication (skip repeated tool calls)
+    completed_calls: set  # Set of call hashes: hash(tool_name + json(args))
 
 
 # ============================================================================
@@ -202,6 +213,173 @@ async def planner_node(state: GraphState) -> GraphState:
     return {**state, **updated_state}
 
 @audited(AuditEventType.TOOL_CALLED, "Researcher Node executed iteration")
+async def _llm_correct_tool_parameters(
+    query: str,
+    task_description: str,
+    tool_name: str,
+    failed_arguments: dict,
+    error_message: str
+) -> dict | None:
+    """
+    Use LLM to intelligently correct tool parameters after failure.
+
+    Args:
+        query: Original user query
+        task_description: Specific task description
+        tool_name: Tool that failed
+        failed_arguments: Arguments that caused failure
+        error_message: Error message from failed execution
+
+    Returns:
+        Corrected arguments dict, or None if can't correct
+    """
+    try:
+        import os
+        if not os.getenv("OPENROUTER_API_KEY"):
+            return None
+
+        from shared.llm import OpenRouterProvider, LLMConfig
+        from shared.llm.provider import LLMMessage, LLMRole
+        from shared.config import get_settings
+        import json
+
+        provider = OpenRouterProvider()
+        config = LLMConfig(
+            model=get_settings().models.planner_model,
+            temperature=0.3,
+            max_tokens=32768,  # Max out for comprehensive parameter correction
+        )
+
+        # Get tool schema for intelligent correction
+        tool_schema_info = ""
+        try:
+            from services.mcp_host.core.session_registry import get_session_registry
+            registry = get_session_registry()
+            all_tools = await registry.list_all_tools()
+
+            # Find this tool's schema
+            for tool in all_tools:
+                if tool.get("name") == tool_name:
+                    schema = tool.get("inputSchema", {})
+                    if schema:
+                        tool_schema_info = f"\n**Tool Schema:** {json.dumps(schema, indent=2)}"
+                    break
+        except:
+            pass
+
+        messages = [
+            LLMMessage(
+                role=LLMRole.SYSTEM,
+                content="""You are an intelligent parameter correction AI. When a tool execution fails, you analyze the error and suggest corrected parameters.
+
+YOUR TASK:
+- Read the error message carefully
+- Understand what went wrong (wrong format, missing data, incorrect value, etc.)
+- Extract the correct parameter values from the user's query
+- Return ONLY valid JSON with the corrected parameters
+
+RULES:
+1. Output ONLY JSON - no explanations, no markdown
+2. Preserve parameter names from failed arguments
+3. Fix values based on error message + user intent
+4. If you can't determine the fix, return empty dict: {}
+5. Be domain-agnostic - works for financial, web scraping, data analysis, any tool
+
+EXAMPLES:
+- Stock ticker error → extract correct ticker from company name
+- URL error → fix malformed URL or extract from query
+- Date format error → convert to expected format
+- Missing required param → extract from query context"""
+            ),
+            LLMMessage(
+                role=LLMRole.USER,
+                content=f"""A tool execution failed. Analyze and suggest parameter corrections:
+
+**User Query:** {query}
+**Task Description:** {task_description}
+**Tool Name:** {tool_name}
+**Arguments That Failed:** {json.dumps(failed_arguments, indent=2)}
+**Error Message:** {error_message}{tool_schema_info}
+
+Based on the error, what are the CORRECT parameters?
+Return JSON only, matching the parameter names from failed arguments."""
+            )
+        ]
+
+        response = await provider.complete(messages, config)
+        content = response.content.strip()
+
+        # Extract JSON from response
+        import re
+        json_match = re.search(r'\{[^}]+\}', content)
+        if json_match:
+            corrected = json.loads(json_match.group(0))
+            if corrected:  # Non-empty dict
+                return corrected
+
+        return None
+
+    except Exception as e:
+        logger.error(f"LLM parameter correction failed: {e}")
+        return None
+
+
+def _generate_source_url(tool_name: str, arguments: dict, output_text: str) -> str:
+    """
+    Generate source URL for fact citation based on tool and arguments.
+
+    Args:
+        tool_name: Name of the tool that generated the fact
+        arguments: Tool arguments used
+        output_text: Tool output text
+
+    Returns:
+        Source URL for citation
+    """
+    # Financial data tools
+    if "yfinance" in tool_name or "yahooquery" in tool_name:
+        ticker = arguments.get("ticker") or arguments.get("symbol") or arguments.get("tickers", "").split(",")[0]
+        if ticker:
+            return f"https://finance.yahoo.com/quote/{ticker.strip()}"
+        return "https://finance.yahoo.com"
+
+    # Crypto tools
+    if "ccxt" in tool_name:
+        symbol = arguments.get("symbol", "BTC/USDT")
+        exchange = arguments.get("exchange", "binance")
+        return f"https://{exchange}.com/trade/{symbol.replace('/', '_')}"
+
+    # Web search
+    if "search" in tool_name.lower():
+        query = arguments.get("query", "")
+        return f"https://duckduckgo.com/?q={query.replace(' ', '+')}" if query else "https://duckduckgo.com"
+
+    # Web scraping
+    if "fetch_url" in tool_name or "scrape" in tool_name:
+        url = arguments.get("url")
+        if url and isinstance(url, str) and url.startswith("http"):
+            return url
+        return "web_scrape"
+
+    # SEC/EDGAR
+    if "sec" in tool_name or "edgar" in tool_name:
+        cik = arguments.get("cik") or arguments.get("ticker")
+        if cik:
+            return f"https://www.sec.gov/cgi-bin/browse-edgar?CIK={cik}"
+        return "https://www.sec.gov"
+
+    # Code execution - no external URL
+    if "execute_code" in tool_name or "python" in tool_name:
+        return "internal_computation"
+
+    # Database queries
+    if "duckdb" in tool_name or "sql" in tool_name:
+        return "internal_database"
+
+    # Default: tool name as source
+    return f"tool:{tool_name}"
+
+
 async def researcher_node(state: GraphState) -> GraphState:
     """Execute research using execution plan with dynamic tool routing and PARALLEL execution."""
     iteration = state.get("iteration", 1)
@@ -217,6 +395,8 @@ async def researcher_node(state: GraphState) -> GraphState:
     facts = state.get("facts", [])
     sources = state.get("sources", [])
     tool_invocations = state.get("tool_invocations", [])
+    error_feedback = state.get("error_feedback", [])  # Error feedback for LLM self-correction
+    completed_calls = state.get("completed_calls", set())  # Deduplication: skip repeated calls
     
     # Reset context pool for new research iteration
     if iteration == 1:
@@ -230,16 +410,18 @@ async def researcher_node(state: GraphState) -> GraphState:
     if not micro_tasks:
         logger.info("No execution plan, falling back to sub-query based web search")
         micro_tasks = [
-            {"task_id": f"task_{i+1}", "description": sq, "tool": "web_search", 
-             "inputs": {"query": sq}, "fallback_tools": ["news_search"], "persist": True}
+            {"task_id": f"task_{i+1}", "description": sq, "tool": "web_search",
+             "inputs": {"query": sq}, "fallback_tools": ["news_search"], "persist": True,
+             "output_artifact": f"search_result_{i+1}"}
             for i, sq in enumerate(sub_queries or [query])
         ]
     
     # =========================================================================
-    # Phase 3: Fractal Spawning (High Complexity)
+    # DAG Executor: Dependency-Driven Parallel Execution with Microplanner
     # =========================================================================
-    # =========================================================================
-    # Phase 3: Phased Fractal Spawning (Sequential Phases, Parallel within Phase)
+    # Replaces the old phase-based loop. Tasks now fire as soon as their
+    # specific dependencies are satisfied, not when their entire phase completes.
+    # The microplanner inspects results after each node and can inject new tasks.
     # =========================================================================
     if len(micro_tasks) >= 1:
         try:
@@ -250,498 +432,697 @@ async def researcher_node(state: GraphState) -> GraphState:
             from services.orchestrator.core.prompt_factory import (
                 PromptFactory, PromptContext
             )
+            from services.orchestrator.core.workflow_nodes import (
+                WorkflowNode, NodeType, NodeStatus, NodeResult,
+                parse_blueprint,
+            )
+            from services.orchestrator.core.dag_executor import DAGExecutor
+            from services.orchestrator.core.microplanner import Microplanner
 
-            spawner = get_spawner()
+            # Build an LLM callback so spawner + microplanner can call the LLM
+            async def _llm_callback(system_prompt: str, user_message: str) -> str:
+                """LLM callback for agent spawner and microplanner."""
+                try:
+                    import os
+                    if not os.getenv("OPENROUTER_API_KEY"):
+                        return ""
+                    from shared.llm import OpenRouterProvider, LLMConfig
+                    from shared.llm.provider import LLMMessage, LLMRole
+                    from shared.config import get_settings
+                    app_cfg = get_settings()
+                    provider = OpenRouterProvider()
+                    cfg = LLMConfig(
+                        model=app_cfg.models.planner_model,
+                        temperature=0.3,
+                        max_tokens=32768,
+                    )
+                    msgs = [
+                        LLMMessage(role=LLMRole.SYSTEM, content=system_prompt),
+                        LLMMessage(role=LLMRole.USER, content=user_message),
+                    ]
+                    resp = await provider.complete(msgs, cfg)
+                    return resp.content
+                except Exception as e:
+                    logger.warning(f"LLM callback failed: {e}")
+                    return ""
+
+            spawner = get_spawner(llm_callback=_llm_callback)
             prompt_factory = PromptFactory()
 
-            # 1. GROUP TASKS BY PHASE
-            # We assume micro_tasks are already sorted by phase/dependency order from Planner
-            # We will chunk them into phases based on dependency logic or simple batching
-            phases = []
-            current_phase = []
-            
-            # Simple heuristic: Group by explicit 'phase' field if present, or chunk by dependencies
-            # Since dependencies are hard to parse perfectly, we'll use a safer approach:
-            # If a task depends on a previous task, it breaks the phase.
-            
-            completed_in_plan = set()
-            
-            # Simple sequential chunking for now (Phase N tasks depend on Phase N-1)
-            # We look at the 'id' to guess phase if not explicit
-            # For this fix, we will assume the input list is TOPOLOGICALLY SORTED.
-            # We will look for explicit "PHASE" markers or breakpoints.
-            
-            # Better approach: Group by first digit of task_id if relevant? No.
-            # Let's rely on the Planner's "Phases" output if available, mapped to tasks.
-            # Fallback: Treat all tasks as ONE phase (OLD BEHAVIOR) unless we see explicit distinct phases.
-            
-            # BUT: We know the bug is that "Discovery" (Task 1) and "Collection" (Task 2) ran together.
-            # We need to force a break between them.
-            
-            # Let's implement a "Break on Dependency" logic
-            # If Task B depends on Task A, and Task A is in the current batch, we must start a new batch.
-            
-            pending_tasks = list(micro_tasks) # Copy
-            
-            while pending_tasks:
-                batch = []
-                batch_ids = set()
-                
-                # Iterate through pending tasks and pick those whose dependencies are MET
-                # (i.e. not in pending_tasks, meaning they are either done or in previous batches)
-                
-                # Note: Swarm tasks are "independent" within a swarm.
-                # If Task B depends on Task A, Task A must be in a PREVIOUS swarm.
-                
-                tasks_to_remove = []
-                
-                for task in pending_tasks:
-                    deps = task.get("depends_on", [])
-                    # Check if all deps are satisfied (i.e. NOT in pending_tasks AND NOT in current batch)
-                    # Actually, for the first pass, "satisfied" means "not waiting for anything currently pending"
-                    
-                    # If we don't have explicit deps, we default to "Tasks 1-N are Phase 1"? 
-                    # No, the Planner often dumps strictly parallel tasks in a block.
-                    
-                    # Heuristic: If we lack explicit dependencies, we group by "Action Verbs" or just respect order?
-                    # The safest fix for the "Ticker" issue is to checking if task refers to "filtered list" or "output of previous".
-                    
-                    # Let's use the explicit 'depends_on' if valid.
-                    # If empty, we might fall back to the old behavior (big bang).
-                    # BUT the planner usually outputted: "Task 2 depends on Task 1".
-                    
-                    can_run_now = True
-                    for d in deps:
-                        if d not in completed_in_plan:
-                            can_run_now = False
-                            break
-                            
-                    if can_run_now:
-                        batch.append(task)
-                        batch_ids.add(task.get("task_id"))
-                        tasks_to_remove.append(task)
-                
-                # If no tasks can run (circular dependency or missing), force the first available one to break deadlock
-                if not batch and pending_tasks:
-                    logger.warning("⚠️ Dependency deadlock or missing dependencies detected. Forcing execution of first pending task.")
-                    forced_task = pending_tasks[0]
-                    batch.append(forced_task)
-                    batch_ids.add(forced_task.get("task_id"))
-                    tasks_to_remove.append(forced_task)
-                
-                # Update pending and completed
-                for t in tasks_to_remove:
-                    pending_tasks.remove(t)
-                
-                phases.append(batch)
-                
-                # Mark these as 'complete' for the NEXT batch's dependency check
-                for tid in batch_ids:
-                    completed_in_plan.add(tid)
+            # Get complexity-aware limits
+            complexity_info = state.get("complexity", {})
+            max_parallel = complexity_info.get("max_parallel", 6)
 
-            logger.info(f"🧩 Execution divided into {len(phases)} sequential phases based on dependencies.")
+            # Convert micro_tasks (dicts) into WorkflowNodes
+            workflow_nodes = parse_blueprint(micro_tasks)
 
-            # 2. EXECUTE PHASES SEQUENTIALLY
-            total_success = 0
-            total_failed = 0
-            
-            for i, phase_tasks in enumerate(phases, 1):
-                logger.info(f"\n🌊 STARTING PHASE {i}/{len(phases)} ({len(phase_tasks)} tasks) 🌊")
-                
-                # Resolve inputs for this phase using artifacts from previous phases
-                for t in phase_tasks:
-                    input_mapping = t.get("input_mapping", {})
-                    if input_mapping:
-                        resolved = assembler.resolve_task_inputs(type('Task', (), t)())  # Quick wrapper
-                        # Merge resolved inputs into task inputs
-                        if resolved:
-                            current_inputs = t.get("inputs", {})
-                            current_inputs.update(resolved)
-                            t["inputs"] = current_inputs
-                            logger.info(f"🔗 Resolved inputs for {t.get('task_id')}: {list(resolved.keys())}")
-                
-                subtasks = []
-                for t in phase_tasks:
-                    subtasks.append(SubTask(
-                        subtask_id=t.get("task_id"),
-                        query=t.get("description"),
-                        domain=Domain.RESEARCH, 
-                        task_type=TaskType.RESEARCH,
-                        preferred_tool=t.get("tool"),
-                        arguments=t.get("inputs", {})
-                    ))
-                
-                # Generate prompts for this phase
-                # FETCH GLOBAL CONTEXT for Prompt Engineering
+            logger.info(
+                f"🧩 DAG Executor: {len(workflow_nodes)} nodes, "
+                f"max_parallel={max_parallel}"
+            )
+
+            # Create node executor that bridges WorkflowNode → AgentSpawner
+            async def execute_workflow_node(
+                node: WorkflowNode,
+                args: dict,
+            ) -> NodeResult:
+                """Execute a single workflow node via the agent spawner."""
+                subtask = SubTask(
+                    subtask_id=node.id,
+                    query=node.description or f"{node.tool}: {str(args)[:100]}",
+                    domain=Domain.RESEARCH,
+                    task_type=TaskType.RESEARCH,
+                    preferred_tool=node.tool,
+                    arguments=args,
+                )
+
+                # Generate prompt with global context
                 try:
-                    ctx = get_context_pool()
-                    global_facts = [f.get("text", "") for f in ctx.fact_pool]
-                except Exception as e:
-                    logger.warning(f"Failed to fetch global context for prompts: {e}")
+                    ctx_pool = get_context_pool()
+                    global_facts = [f.get("text", "") for f in ctx_pool.fact_pool]
+                except Exception:
                     global_facts = []
 
-                prompts = []
-                for subtask in subtasks:
-                    context = PromptContext(
-                        query=subtask.query,
-                        domain=subtask.domain,
-                        task_type=subtask.task_type,
-                        previous_findings=global_facts  # Inject global context here!
-                    )
-                    prompts.append(prompt_factory.generate(context))
-                    
-                phase_plan = SpawnPlan(
-                    task_id=f"{state.get('job_id', 'swarm')}_p{i}",
-                    subtasks=subtasks,
-                    prompts=prompts,
-                    max_parallel=len(phase_tasks)
+                prompt_ctx = PromptContext(
+                    query=subtask.query,
+                    domain=subtask.domain,
+                    task_type=subtask.task_type,
+                    previous_findings=global_facts,
                 )
-                
-                # Execute Swarm for this phase
-                logger.info(f"💥 Executing Phase {i} Swarm...")
-                swarm_result = await spawner.execute_swarm(phase_plan)
-                
-                total_success += swarm_result.successful
-                total_failed += swarm_result.failed
-                
-                # Capture results immediately so they are available for next phase
-                for res in swarm_result.agent_results:
-                    if res.status == "completed":
+                prompt = prompt_factory.generate(prompt_ctx)
+
+                plan = SpawnPlan(
+                    task_id=f"{state.get('job_id', 'node')}_{node.id}",
+                    subtasks=[subtask],
+                    prompts=[prompt],
+                    max_parallel=1,
+                )
+
+                swarm_result = await spawner.execute_swarm(plan)
+
+                # Convert SwarmResult → NodeResult
+                if swarm_result.successful > 0:
+                    agent_res = next(
+                        (r for r in swarm_result.agent_results
+                         if r.status == "completed"),
+                        None,
+                    )
+                    output = agent_res.result if agent_res else None
+
+                    # Store in context pool for downstream nodes
+                    try:
+                        ctx_pool = get_context_pool()
+                        ctx_pool.store_data(
+                            key=f"task_output_{node.id}",
+                            data=str(output),
+                            description=f"Output from node {node.id}",
+                        )
+                        ctx_pool.add_fact(
+                            text=str(output),
+                            source=f"task_{node.id}",
+                            task_id=node.id,
+                        )
+                    except Exception as e:
+                        logger.warning(f"Context pool update failed: {e}")
+
+                    return NodeResult(
+                        node_id=node.id,
+                        status=NodeStatus.COMPLETED,
+                        output=output,
+                        artifacts={node.output_artifact: str(output)} if node.output_artifact else {},
+                        metadata={
+                            "source": agent_res.source if agent_res else None,
+                            "prompt": agent_res.prompt_used[:200] if agent_res else "",
+                        },
+                    )
+                else:
+                    error_msg = "; ".join(
+                        r.error or "unknown"
+                        for r in swarm_result.agent_results
+                        if r.status != "completed"
+                    )
+                    return NodeResult(
+                        node_id=node.id,
+                        status=NodeStatus.FAILED,
+                        error=error_msg or "All agents failed",
+                    )
+
+            # Initialize microplanner for reactive replanning
+            microplanner = Microplanner(
+                query=query,
+                llm_callback=spawner.llm_callback,
+                max_replans=complexity_info.get("max_research_iterations", 3),
+            )
+
+            # Create and run DAG executor
+            dag_executor = DAGExecutor(
+                store=assembler.store,
+                node_executor=execute_workflow_node,
+                max_parallel=max_parallel,
+                microplanner=microplanner.checkpoint,
+            )
+
+            dag_result = await dag_executor.execute(workflow_nodes)
+
+            # Harvest results into facts/sources/tool_invocations
+            # CRITICAL: Filter out error outputs to prevent "error as fact" problem
+            for node_id, node_result in dag_result.node_results.items():
+                if node_result.status == NodeStatus.COMPLETED and node_result.output:
+                    output_text = str(node_result.output)
+
+                    # Strict Error Filtering (same as legacy executor)
+                    is_error = False
+                    error_keywords = [
+                        "tool not found",
+                        "not found in registry",
+                        "error:",
+                        "exception",
+                        "failed:",
+                        "schema not found",
+                    ]
+
+                    for keyword in error_keywords:
+                        if keyword in output_text.lower():
+                            is_error = True
+                            logger.warning(
+                                f"⚠️ Keeper: Filtering error output from {node_id}: "
+                                f"{output_text[:100]}"
+                            )
+                            break
+
+                    # Also skip empty or very short outputs
+                    if len(output_text.strip()) < 5:
+                        is_error = True
+
+                    # Only add valid facts
+                    if not is_error:
+                        # CRITICAL: Add source_url for citation tracking
+                        metadata = node_result.metadata or {}
+                        tool_name = metadata.get("source") or metadata.get("tool") or "dag_executor"
+                        arguments = metadata.get("arguments") or metadata.get("args") or {}
+
+                        # Ensure tool_name is string, not None
+                        if not isinstance(tool_name, str):
+                            tool_name = "unknown_tool"
+
+                        source_url = _generate_source_url(
+                            tool_name,
+                            arguments,
+                            output_text
+                        )
+
                         facts.append({
-                            "text": str(res.result),
-                            "query": f"Swarm Agent {res.agent_id}: {res.prompt_used}",
-                            "source": res.source if res.source else "fractal_swarm",
-                            "task_id": res.subtask_id,
-                            "persist": True
+                            "text": output_text,
+                            "query": f"DAG Node {node_id}",
+                            "source": tool_name,
+                            "source_url": source_url,  # Add URL for citations
+                            "task_id": node_id,
+                            "persist": True,
                         })
+
+                        # Track unique sources
+                        if source_url and source_url not in sources:
+                            sources.append({
+                                "url": source_url,
+                                "title": f"DAG Node {node_id}",
+                                "tool": tool_name,
+                                "task_id": node_id
+                            })
+                    else:
+                        logger.debug(f"Keeper: Skipped error fact from {node_id}")
+
+                tool_invocations.append({
+                    "task_id": node_id,
+                    "tool": "dag_executor",
+                    "success": node_result.status == NodeStatus.COMPLETED,
+                    "persist": True,
+                })
+                
+                # ERROR FEEDBACK LOOP: Capture failed nodes for LLM self-correction
+                if node_result.status == NodeStatus.FAILED:
+                    # Get workflow node to extract tool name and args
+                    workflow_node = next(
+                        (n for n in workflow_nodes if n.id == node_id),
+                        None
+                    )
+                    if workflow_node:
+                        error_str = str(node_result.error or node_result.output or "Unknown error")[:500]
                         
-                        # Store in Context Pool for next phase!
-                        try:
-                            ctx = get_context_pool()
-                            
-                            # 1. Store as structured data (for code agents)
-                            ctx.store_data(
-                                key=f"task_output_{res.subtask_id}",
-                                data=str(res.result),
-                                description=f"Output from task {res.subtask_id} (Phase {i})"
+                        # Detect ticker-related failures and add suggestions
+                        suggestion = ""
+                        error_lower = error_str.lower()
+                        ticker_error_patterns = [
+                            "data unavailable",
+                            "symbol not found", 
+                            "no data returned",
+                            "invalid ticker",
+                            "not found",
+                        ]
+                        if any(pattern in error_lower for pattern in ticker_error_patterns):
+                            # Extract ticker from args if present
+                            args = workflow_node.args or {}
+                            ticker_used = args.get("tickers") or args.get("ticker") or args.get("symbol") or ""
+                            suggestion = (
+                                f"TICKER ERROR: '{ticker_used}' may be incorrect. "
+                                f"Use search_ticker('{ticker_used}') to find the correct symbol. "
+                                f"For Indonesian stocks, use .JK suffix (e.g., BBCA.JK not BCA.JK)."
                             )
-                            
-                            # 2. Store as fact (for semantic search/prompts)
-                            ctx.add_fact(
-                                text=str(res.result),
-                                source=f"task_{res.subtask_id}",
-                                task_id=res.subtask_id
-                            )
-                            
-                            # 3. Store artifact via Node Assembly Engine
-                            # Find the original task to get output_artifact
-                            original_task = next((t for t in phase_tasks if t.get("task_id") == res.subtask_id), None)
-                            if original_task:
-                                output_artifact = original_task.get("output_artifact")
-                                if output_artifact:
-                                    assembler.store.store(res.subtask_id, output_artifact, str(res.result))
-                            
-                        except Exception as e:
-                            logger.warning(f"Failed to update context pool: {e}")
+                        
+                        error_feedback.append({
+                            "tool": workflow_node.tool or "unknown",
+                            "task_id": node_id,
+                            "error": error_str,
+                            "args": workflow_node.args or {},
+                            "description": workflow_node.description or "",
+                            "suggestion": suggestion,  # Dynamic suggestion for self-correction
+                        })
+                        logger.warning(
+                            f"📝 Captured error for LLM feedback: {workflow_node.tool} - "
+                            f"{str(node_result.error or 'Unknown')[:100]}"
+                        )
+                    else:
+                        # Fallback if workflow node not found
+                        error_feedback.append({
+                            "tool": "unknown",
+                            "task_id": node_id,
+                            "error": str(node_result.error or node_result.output or "Unknown error")[:500],
+                            "args": {},
+                            "description": "",
+                        })
+                        logger.warning(
+                            f"📝 Captured error for LLM feedback: {node_id} - "
+                            f"{str(node_result.error or 'Unknown')[:100]}"
+                        )
 
-                if swarm_result.failed > 0:
-                    logger.warning(f"⚠️ Phase {i} had failures. Depending tasks in Phase {i+1} might fail.")
-            
-            # Log total success
-            logger.info(f"✅ All Phases Complete: {total_success} successful, {total_failed} failed")
-            
-            # Add dummy tool invocations for all processed tasks to skip standard loop
-            # (We iterate over what we PLANNED, assuming they ran)
-            for phase in phases:
-                for task in phase:
-                    tool_invocations.append({
-                        "task_id": task.get("task_id"),
-                        "tool": "swarm_agent_phased",
-                        "success": True, # Broad assumption, but we logged errors above
-                        "persist": True
-                    })
-            
-            logger.info("⚡ Skipping standard execution loop (Swarm handled all phases)")
-            micro_tasks = [] # Clear standard loop queue
+            logger.info(
+                f"✅ DAG complete: {dag_result.completed} ok, "
+                f"{dag_result.failed} failed, {dag_result.skipped} skipped, "
+                f"{dag_result.replans_triggered} replans"
+            )
+            micro_tasks = []  # Clear so legacy loop is skipped
 
-        except ImportError:
-            pass
-            
-    # =========================================================================
-
-    # 1. Hardware-Aware Scaling
-    from shared.hardware.detector import detect_hardware
-    from services.mcp_host.core.parallel_executor import ParallelExecutor, ToolCall
-    from services.mcp_host.core.session_registry import get_session_registry
-    
-    hw_profile = detect_hardware()
-    max_workers = hw_profile.optimal_workers()
-    logger.info(f"🚀 Hardware-Aware Dispatcher: Using {max_workers} parallel workers (RAM: {hw_profile.ram_available_gb:.1f}GB)")
-    
-    executor = ParallelExecutor(max_concurrent=max_workers)
-    registry = get_session_registry()
-    
-    # Tool registry for dynamic routing
-    # NOTE: We have removed direct imports to enforce "Pure MCP" architecture.
-    # All tools are now discovered dynamically via SessionRegistry.
-    
-    from services.orchestrator.core.utils import build_tool_inputs
-
-
-    # 2. Unified Tool Handler (INTELLIGENCE INJECTED)
-    async def unified_tool_handler(name: str, args: dict) -> Any:
-        # Resolve target server dynamically
-        server_name = registry.get_server_for_tool(name)
-        
-        if not server_name:
-            # Fallback Mapping (Legacy Support)
-            legacy_map = {
-                "run_python": "execute_code",
-                "fetch_page": "fetch_url"
-            }
-            mapped = legacy_map.get(name)
-            if mapped:
-                server_name = registry.get_server_for_tool(mapped)
-                if server_name:
-                    logger.info(f"🔄 Mapped {name} -> {mapped} on {server_name}")
-                    name = mapped # Switch to actual tool name
-            
-        if not server_name:
-             # Try JIT Discovery
-             await registry.list_all_tools()
-             server_name = registry.get_server_for_tool(name)
-        
-        if not server_name:
-             raise ValueError(f"Tool {name} not found in SessionRegistry.")
-            
-        # Execute
-        try:
-            session = await registry.get_session(server_name)
-            result = await session.call_tool(name, args)
-        except Exception as e:
-            logger.error(f"Tool execution failed: {e}")
-            raise ValueError(f"Tool {name} failed: {e}")
-
-        # =========================================================================
-        # AUTONOMIC MEMORY INTERCEPTOR (The Wiring Fix)
-        # =========================================================================
-        try:
-            from services.orchestrator.core.interceptor import MemoryInterceptor
-            job_id = state.get("job_id", "unknown_trace")
-            
-            # Fire-and-forget storage to Postgres
-            await MemoryInterceptor.intercept(
-                trace_id=job_id,
-                source_node=name,
-                result=result,
-                inputs=args
+        except ImportError as e:
+            logger.warning(
+                f"⚠️ DAG Executor unavailable ({e}), falling back to legacy "
+                f"phase-based executor"
             )
         except Exception as e:
-            logger.warning(f"Interceptor failed (non-blocking): {e}")
-        # =========================================================================
+            logger.error(
+                f"❌ DAG Executor failed ({e}), falling back to legacy executor"
+            )
 
-        return result
+    # =========================================================================
+    # Legacy Phase-Based Executor (fallback when DAG executor is unavailable)
+    # Only runs if micro_tasks is non-empty (DAG executor clears it on success)
+    # =========================================================================
+    if micro_tasks:
+        # 1. Hardware-Aware Scaling
+        from shared.hardware.detector import detect_hardware
+        from services.mcp_host.core.parallel_executor import ParallelExecutor, ToolCall
+        from services.mcp_host.core.session_registry import get_session_registry
 
-    # 3. Parallel Execution Loop
-    completed = {inv["task_id"] for inv in tool_invocations if inv.get("success")}
-    processed_this_run = set()
-    
-    while True:
-        # Find ready tasks
-        ready_tasks = []
-        for task in micro_tasks:
-            t_id = task.get("task_id")
-            if t_id in completed or t_id in processed_this_run:
-                continue
-                
-            # Check dependencies
-            deps = task.get("depends_on", [])
-            if all(d in completed for d in deps):
-                ready_tasks.append(task)
-        
-        if not ready_tasks:
-            break
-            
-        # Batch execute
-        batch = ready_tasks[:max_workers * 2] # Allow slight over-subscription for IO wait
-        processed_this_run.update(t.get("task_id") for t in batch)
-        
-        logger.info(f"\n⚡ Batching {len(batch)} tasks...")
-        
-        # Prepare calls
-        calls = []
-        task_map = {} # index -> task
-        
-        for idx, task in enumerate(batch):
-            t_name = task.get("tool", "web_search")
-            t_desc = task.get("description", "")
-            t_inputs = task.get("inputs", {})
-            t_id = task.get("task_id")
-            
-            # SMART CODE GENERATION INTERCEPTOR
-            if t_name in ["run_python", "execute_code", "parse_document"] and "code" not in t_inputs:
-                try:
-                    from services.orchestrator.agents.code_generator import generate_python_code
-                    ctx = get_context_pool()
-                    files = ctx.list_files()
-                    
-                    logger.info(f"   🤖 Generating Smart Code for '{t_desc}' (Context: {len(facts)} facts, {len(files)} files)")
-                    generated_code = await generate_python_code(t_desc, facts, file_artifacts=files)
-                    
-                    if generated_code:
-                        t_inputs["code"] = generated_code
-                        # Skip standard build_tool_inputs since we handled it
-                        final_inputs = t_inputs
-                    else:
-                        final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
-                except Exception as e:
-                    logger.warning(f"Smart Code Generation failed: {e}, falling back")
-                    final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
-            else:
-                final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
-            
-            # Handle input build failure (fallback immediately or skip)
-            if final_inputs is None:
-                # Try fallback
-                fallback_tools = task.get("fallback_tools") or ["web_search"]
-                t_name = fallback_tools[0]
-                
-                # Attempt to build inputs for fallback tool
-                final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
-                
-                if final_inputs is None:
-                    # Ultimate fallback to web_search with hardware-aware limit
-                    from shared.hardware.detector import detect_hardware
-                    t_name = "web_search"
-                    final_inputs = {"query": t_desc, "max_results": detect_hardware().optimal_search_limit()}
-            
-            calls.append(ToolCall(tool_name=t_name, arguments=final_inputs))
-            task_map[idx] = task
-            
-        # EXECUTE BATCH
-        results = await executor.execute_batch(calls, unified_tool_handler)
-        
-        # Process results
-        for idx, res in enumerate(results):
-            task = task_map[idx]
-            t_id = task.get("task_id")
-            t_persist = task.get("persist", True)
-            
-            success = res.success
-            error_msg = None
-            content_text = ""
-            
-            if success and res.result and hasattr(res.result, "content"):
-                for c in res.result.content:
-                    if hasattr(c, "text"):
-                        content_text += c.text
-                
-                # Strict Error Filtering (Prevent "Error is a Fact")
-                if "tool not found" in content_text.lower() or "error:" in content_text.lower() or "exception" in content_text.lower():
-                    success = False # Mark as failed logically even if technically successful execution
-                    error_msg = content_text
-                elif len(content_text) < 5:
-                    success = False
-                    error_msg = "Content too short"
+        hw_profile = detect_hardware()
+        max_workers = hw_profile.optimal_workers()
+        logger.info(f"🚀 Legacy Executor: Using {max_workers} parallel workers (RAM: {hw_profile.ram_available_gb:.1f}GB)")
 
-            if success:
-                # Extract Facts
-                fact = {
-                    "text": content_text,  # No truncation - store full content
-                    "query": task.get("description", ""),  # No truncation
-                    "source": calls[idx].tool_name,
-                    "task_id": t_id,
-                    "persist": t_persist
+        executor = ParallelExecutor(max_concurrent=max_workers)
+        registry = get_session_registry()
+
+        from services.orchestrator.core.utils import build_tool_inputs
+
+        # 2. Unified Tool Handler with Intelligent Retry (INTELLIGENCE INJECTED)
+        async def unified_tool_handler(name: str, args: dict) -> Any:
+            """
+            Execute tool with intelligent retry on parameter errors.
+            Used by both DAG executor and legacy executor.
+            """
+            nonlocal completed_calls  # Access outer variable
+            
+            # ============================================================
+            # DEDUPLICATION: Skip repeated tool calls with same args
+            # ============================================================
+            import hashlib
+            import json as json_mod
+            
+            # Create deterministic hash of tool call
+            args_str = json_mod.dumps(args, sort_keys=True, default=str)
+            call_hash = hashlib.md5(f"{name}:{args_str}".encode()).hexdigest()
+            
+            if call_hash in completed_calls:
+                logger.info(f"⏭️ DEDUP: Skipping duplicate call: {name}({list(args.keys())})")
+                # Return cached result from context pool if available
+                cached_key = f"cache_{name}_{call_hash[:8]}"
+                cached_result = ctx.get_data(cached_key)
+                if cached_result:
+                    logger.info(f"   📦 Using cached result from {cached_key}")
+                    return cached_result
+                # If no cache, still skip but return a marker
+                return f"[Duplicate call skipped: {name}]"
+            
+            # Mark as in-progress (add to set)
+            completed_calls.add(call_hash)
+            
+            # Resolve target server dynamically
+            server_name = registry.get_server_for_tool(name)
+
+            if not server_name:
+                # Fallback Mapping (Legacy Support)
+                legacy_map = {
+                    "run_python": "execute_code",
+                    "fetch_page": "fetch_url"
                 }
-                facts.append(fact)
-                
-                # Extract Sources
-                ctx = get_context_pool()
-                extracted_urls = ctx.extract_urls_from_text(content_text)
-                
-                # FALLBACK: If no URLs found in text, check input arguments!
-                if not extracted_urls and "url" in calls[idx].arguments:
-                    url_arg = calls[idx].arguments["url"]
-                    if isinstance(url_arg, str) and url_arg.startswith("http"):
-                        extracted_urls.append(url_arg)
-                        
-                for url in extracted_urls:  # No limit - extract all URLs
-                    sources.append({
-                        "url": url,
-                        "title": task.get("description", ""),  # No truncation
-                        "tool": calls[idx].tool_name,
-                        "task_id": t_id
-                    })
-                
-                # Store in DataPool for bucket pattern
-                try:
-                    data_pool = get_data_pool()
-                    await data_pool.create_pool_item(
-                        pool_id=state.get("job_id", "default"),
-                        metadata={
-                            "fact_text": content_text[:5000],  # Summary for metadata
-                            "source": calls[idx].tool_name,
-                            "task_id": t_id,
-                            "query": task.get("description", ""),
-                        },
-                        status="raw"
-                    )
-                except Exception as e:
-                    logger.debug(f"DataPool storage skipped: {e}")
+                mapped = legacy_map.get(name)
+                if mapped:
+                    server_name = registry.get_server_for_tool(mapped)
+                    if server_name:
+                        logger.info(f"🔄 Mapped {name} -> {mapped} on {server_name}")
+                        name = mapped  # Switch to actual tool name
 
-                # ARTIFACT HARVESTING (NEW): Scan for file paths
-                import re
-                file_matches = re.findall(r'[\w\-\._\/]+\.(?:csv|parquet|xlsx|json)', content_text)
-                for fpath in file_matches:
-                    fpath = fpath.strip()
-                    if len(fpath) > 4: 
-                         ctx.store_file(t_id, fpath)
-                         logger.info(f"   📂 Harvested artifact: {fpath}")
-                
-                completed.add(t_id)
-                logger.info(f"   ✅ Task {t_id} completed via {calls[idx].tool_name}")
-                
-                # VERBOSE CODE OUTPUT
-                if calls[idx].tool_name in ["execute_code", "run_python"]:
-                     logger.info(f"   🐍 EXECUTION OUTPUT:\n{'-'*60}\n{content_text.strip()}\n{'-'*60}")
-            else:
-                # Handle hard failure - extract clean error message
-                tool_name = calls[idx].tool_name
-                error_text = "Unknown error"
-                
-                # Extract error text from result
-                if res.result and hasattr(res.result, "content"):
+            if not server_name:
+                # Try JIT Discovery
+                await registry.list_all_tools()
+                server_name = registry.get_server_for_tool(name)
+
+            if not server_name:
+                raise ValueError(f"Tool {name} not found in SessionRegistry.")
+
+            # Execute with intelligent retry loop
+            result = None
+            retry_count = 0
+
+            # Hardware-aware retry limit (more retries for free APIs with high quotas)
+            # Free tier: 1000/day = plenty of budget for retries
+            # With 4+ cores, can handle 5-8 retries efficiently
+            try:
+                from shared.hardware.detector import detect_hardware
+                hw = detect_hardware()
+                # Scale retries with CPU cores: more cores = can handle more retries in parallel
+                max_retries = min(8, max(3, hw.cpu_count // 2))  # 3-8 retries based on CPU
+            except Exception:
+                max_retries = 5  # Default to 5 retries (was 2)
+
+            current_args = args.copy()
+
+            while retry_count <= max_retries:
+                try:
+                    session = await registry.get_session(server_name)
+                    result = await session.call_tool(name, current_args)
+
+                    # Generic error detection (works for any tool/domain)
+                    error_detected = False
+                    if result and hasattr(result, "content"):
+                        content_text = ""
+                        for c in result.content:
+                            if hasattr(c, "text"):
+                                content_text += c.text
+
+                        # Generic error indicators (not domain-specific)
+                        generic_errors = [
+                            "error", "exception", "failed", "invalid",
+                            "not found", "unavailable", "unable to",
+                            "could not", "cannot", "no data", "no results"
+                        ]
+
+                        # Check if output looks like an error
+                        lower_text = content_text.lower()
+                        for error_term in generic_errors:
+                            if error_term in lower_text:
+                                # Additional check: Is this a substantial error or just mention?
+                                # Real errors are usually short and contain error term early
+                                if len(content_text.strip()) < 200 or lower_text.find(error_term) < 100:
+                                    error_detected = True
+                                    break
+
+                        # If error and we have retries left, attempt correction
+                        if error_detected and retry_count < max_retries:
+                            retry_count += 1
+                            logger.warning(
+                                f"🔄 Tool {name} returned error. "
+                                f"Attempting LLM correction (retry {retry_count}/{max_retries})"
+                            )
+
+                            # Use LLM to correct parameters
+                            corrected_args = await _llm_correct_tool_parameters(
+                                query=state.get("query", ""),
+                                task_description=f"Execute {name}",
+                                tool_name=name,
+                                failed_arguments=current_args,
+                                error_message=content_text[:500]
+                            )
+
+                            if corrected_args:
+                                logger.info(f"✅ LLM corrected arguments: {corrected_args}")
+                                current_args = corrected_args
+                                # Loop will retry with corrected args
+                            else:
+                                logger.warning(f"⚠️ LLM couldn't suggest correction, returning error result")
+                                break  # No correction possible, return error result
+                        else:
+                            # No error or no retries left
+                            break
+                    else:
+                        # No content to check, return as-is
+                        break
+
+                except Exception as e:
+                    logger.error(f"Tool execution failed: {e}")
+                    if retry_count < max_retries:
+                        retry_count += 1
+                        logger.warning(f"⚠️ Retrying after exception (retry {retry_count}/{max_retries})")
+                    else:
+                        raise ValueError(f"Tool {name} failed after {max_retries} retries: {e}")
+
+            # AUTONOMIC MEMORY INTERCEPTOR
+            try:
+                from services.orchestrator.core.interceptor import MemoryInterceptor
+                job_id = state.get("job_id", "unknown_trace")
+                await MemoryInterceptor.intercept(
+                    trace_id=job_id,
+                    source_node=name,
+                    result=result,
+                    inputs=current_args  # Use final args (may be corrected)
+                )
+            except Exception as e:
+                logger.warning(f"Interceptor failed (non-blocking): {e}")
+
+            return result
+
+        # 3. Parallel Execution Loop
+        completed = {inv["task_id"] for inv in tool_invocations if inv.get("success")}
+        processed_this_run = set()
+
+        while True:
+            # Find ready tasks
+            ready_tasks = []
+            for task in micro_tasks:
+                t_id = task.get("task_id")
+                if t_id in completed or t_id in processed_this_run:
+                    continue
+
+                # Check dependencies
+                deps = task.get("depends_on", [])
+                if all(d in completed for d in deps):
+                    ready_tasks.append(task)
+
+            if not ready_tasks:
+                break
+
+            # Batch execute
+            batch = ready_tasks[:max_workers * 2]
+            processed_this_run.update(t.get("task_id") for t in batch)
+
+            logger.info(f"\n⚡ Batching {len(batch)} tasks...")
+
+            # Prepare calls
+            calls = []
+            task_map = {}  # index -> task
+
+            for idx, task in enumerate(batch):
+                t_name = task.get("tool", "web_search")
+                t_desc = task.get("description", "")
+                t_inputs = task.get("inputs", {})
+                t_id = task.get("task_id")
+
+                # SMART CODE GENERATION INTERCEPTOR
+                if t_name in ["run_python", "execute_code", "parse_document"] and "code" not in t_inputs:
+                    try:
+                        from services.orchestrator.agents.code_generator import generate_python_code
+                        ctx = get_context_pool()
+                        files = ctx.list_files()
+
+                        logger.info(f"   🤖 Generating Smart Code for '{t_desc}' (Context: {len(facts)} facts, {len(files)} files)")
+                        generated_code = await generate_python_code(t_desc, facts, file_artifacts=files)
+
+                        if generated_code:
+                            t_inputs["code"] = generated_code
+                            final_inputs = t_inputs
+                        else:
+                            final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
+                    except Exception as e:
+                        logger.warning(f"Smart Code Generation failed: {e}, falling back")
+                        final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
+                else:
+                    final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
+
+                # Handle input build failure (fallback immediately or skip)
+                if final_inputs is None:
+                    fallback_tools = task.get("fallback_tools") or ["web_search"]
+                    t_name = fallback_tools[0]
+                    final_inputs = build_tool_inputs(t_name, t_desc, t_inputs, facts)
+
+                    if final_inputs is None:
+                        from shared.hardware.detector import detect_hardware
+                        t_name = "web_search"
+                        final_inputs = {"query": t_desc, "max_results": detect_hardware().optimal_search_limit()}
+
+                calls.append(ToolCall(tool_name=t_name, arguments=final_inputs))
+                task_map[idx] = task
+
+            # EXECUTE BATCH
+            results = await executor.execute_batch(calls, unified_tool_handler)
+
+            # Process results
+            for idx, res in enumerate(results):
+                task = task_map[idx]
+                t_id = task.get("task_id")
+                t_persist = task.get("persist", True)
+
+                success = res.success
+                content_text = ""
+
+                if success and res.result and hasattr(res.result, "content"):
                     for c in res.result.content:
                         if hasattr(c, "text"):
-                            error_text = c.text
+                            content_text += c.text
+
+                    # Strict Error Filtering (Prevent "Error is a Fact")
+                    # Note: Retry logic is now in unified_tool_handler, not here
+                    error_keywords = ["tool not found", "error:", "exception"]
+                    for keyword in error_keywords:
+                        if keyword in content_text.lower():
+                            success = False
                             break
-                elif res.result:
-                    error_text = str(res.result)
-                
-                # Clean up common error patterns for readability
-                if "Tool execution error:" in error_text:
-                    error_text = error_text.replace("Tool execution error:", "Missing parameter:")
-                
-                logger.warning(f"   ❌ Task {t_id} ({tool_name}) FAILED: {error_text}")
-                
-                # We do NOT add to completed, so it won't satisfy dependencies. 
-                # Ideally we should try fallbacks here, but for now we mark failed to avoid infinite loop
+
+                    if len(content_text) < 5:
+                        success = False
+
+                if success:
+                    # Generate source URL for citation
+                    tool_name = calls[idx].tool_name or "unknown_tool"
+                    arguments = calls[idx].arguments or {}
+
+                    source_url = _generate_source_url(
+                        tool_name,
+                        arguments,
+                        content_text
+                    )
+
+                    fact = {
+                        "text": content_text,
+                        "query": task.get("description", ""),
+                        "source": tool_name,
+                        "source_url": source_url,  # Add URL for citations
+                        "task_id": t_id,
+                        "persist": t_persist
+                    }
+                    facts.append(fact)
+
+                    ctx = get_context_pool()
+                    extracted_urls = ctx.extract_urls_from_text(content_text)
+
+                    if not extracted_urls and "url" in calls[idx].arguments:
+                        url_arg = calls[idx].arguments["url"]
+                        if isinstance(url_arg, str) and url_arg.startswith("http"):
+                            extracted_urls.append(url_arg)
+
+                    # Always include the generated source_url as a source
+                    if source_url and source_url.startswith("http"):
+                        if source_url not in [s.get("url") for s in sources]:
+                            sources.append({
+                                "url": source_url,
+                                "title": task.get("description", ""),
+                                "tool": calls[idx].tool_name,
+                                "task_id": t_id
+                            })
+
+                    # Add any URLs extracted from content
+                    for url in extracted_urls:
+                        if url not in [s.get("url") for s in sources]:
+                            sources.append({
+                                "url": url,
+                                "title": task.get("description", ""),
+                                "tool": calls[idx].tool_name,
+                                "task_id": t_id
+                            })
+
+                    # Store in DataPool for bucket pattern
+                    try:
+                        data_pool = get_data_pool()
+                        await data_pool.create_pool_item(
+                            pool_id=state.get("job_id", "default"),
+                            metadata={
+                                "fact_text": content_text[:5000],
+                                "source": calls[idx].tool_name,
+                                "task_id": t_id,
+                                "query": task.get("description", ""),
+                            },
+                            status="raw"
+                        )
+                    except Exception as e:
+                        logger.debug(f"DataPool storage skipped: {e}")
+
+                    # ARTIFACT HARVESTING: Scan for file paths
+                    import re
+                    file_matches = re.findall(r'[\w\-\._\/]+\.(?:csv|parquet|xlsx|json)', content_text)
+                    for fpath in file_matches:
+                        fpath = fpath.strip()
+                        if len(fpath) > 4:
+                            ctx.store_file(t_id, fpath)
+                            logger.info(f"   📂 Harvested artifact: {fpath}")
+
+                    completed.add(t_id)
+                    logger.info(f"   ✅ Task {t_id} completed via {calls[idx].tool_name}")
+
+                    if calls[idx].tool_name in ["execute_code", "run_python"]:
+                        logger.info(f"   🐍 EXECUTION OUTPUT:\n{'-'*60}\n{content_text.strip()}\n{'-'*60}")
+                else:
+                    # Handle hard failure
+                    tool_name = calls[idx].tool_name
+                    error_text = "Unknown error"
+
+                    if res.result and hasattr(res.result, "content"):
+                        for c in res.result.content:
+                            if hasattr(c, "text"):
+                                error_text = c.text
+                                break
+                    elif res.result:
+                        error_text = str(res.result)
+
+                    if "Tool execution error:" in error_text:
+                        error_text = error_text.replace("Tool execution error:", "Missing parameter:")
+
+                    logger.warning(f"   ❌ Task {t_id} ({tool_name}) FAILED: {error_text}")
+                    
+                    # ERROR FEEDBACK LOOP: Capture error for LLM self-correction
+                    # This allows the planner to learn from mistakes on retry
+                    error_feedback.append({
+                        "tool": tool_name,
+                        "task_id": t_id,
+                        "error": error_text[:500],  # Truncate for context window
+                        "args": calls[idx].arguments,
+                        "description": task.get("description", ""),
+                    })
+                    
+                    # Prevent re-execution to avoid infinite loop
+                    completed.add(t_id)
+
+                # Log invocation (single entry per task, no duplicates)
                 tool_invocations.append({
                     "task_id": t_id,
-                    "tool": tool_name,
-                    "success": False,
-                    "error": error_text
+                    "tool": calls[idx].tool_name,
+                    "success": success,
+                    "persist": t_persist
                 })
-                # Prevent re-execution to avoid infinite loop
-                completed.add(t_id) 
-
-            # Log invocation
-            tool_invocations.append({
-                 "task_id": t_id,
-                 "tool": calls[idx].tool_name,
-                 "success": success,
-                 "persist": t_persist
-            })
 
     # Summary Logging
     logger.info(f"\n📊 Parallel Research Summary:")
@@ -770,8 +1151,8 @@ async def researcher_node(state: GraphState) -> GraphState:
             except ImportError:
                 pass
             
-            # Extract text from facts for reranking
-            fact_texts = [f.get("text", "")[:2000] for f in facts]
+            # Extract text from facts for reranking (increased limit for financial tables)
+            fact_texts = [f.get("text", "")[:8000] for f in facts]
             
             # Use top_k from config
             # (Previously was hardware aware, now config driven, which can be hardware aware if we tune defaults)
@@ -858,6 +1239,8 @@ async def researcher_node(state: GraphState) -> GraphState:
         "facts": facts,
         "sources": sources,
         "tool_invocations": tool_invocations,
+        "error_feedback": error_feedback,  # Pass errors to LLM for self-correction on retry
+        "completed_calls": completed_calls,  # Persist deduplication cache
     }
 
 
@@ -906,14 +1289,18 @@ async def generator_node(state: GraphState) -> GraphState:
     facts = state.get("facts", [])
     sources = state.get("sources", [])
     query = state.get("query", "")
-    
+    critic_feedback = state.get("critic_feedback", None)  # For revisions
+    revision_count = state.get("revision_count", 0)
+
     logger.info(f"Query: {query[:100]}...")
     logger.info(f"Facts available: {len(facts)}")
+    if revision_count > 0:
+        logger.info(f"⚠️ REVISION ATTEMPT #{revision_count}")
     logger.info("-"*70)
     logger.info("Calling LLM to generate comprehensive answer...")
-    
+
     generator = GeneratorAgent()
-    output = await generator.generate(query, facts, sources)
+    output = await generator.generate(query, facts, sources, revision_feedback=critic_feedback)
     
     logger.info(f"\n✅ Generator Output ({len(output)} chars):")
     logger.info("-"*70)
@@ -967,13 +1354,14 @@ async def judge_node(state: GraphState) -> GraphState:
     query = state.get("query", "")
     generator_output = state.get("generator_output", "")
     critic_feedback = state.get("critic_feedback", "")
-    
+    facts = state.get("atomic_facts", [])  # Get facts for quality-based confidence
+
     logger.info(f"Evaluating: Generator ({len(generator_output)} chars) vs Critic ({len(critic_feedback)} chars)")
     logger.info("-"*70)
     logger.info("Calling LLM to make final judgment...")
-    
+
     judge = JudgeAgent()
-    result = await judge.judge(query, generator_output, critic_feedback)
+    result = await judge.judge(query, generator_output, critic_feedback, facts=facts)
     
     verdict = result.get("verdict", "Accept")
     confidence = result.get("confidence", 0.5)
@@ -993,10 +1381,23 @@ async def judge_node(state: GraphState) -> GraphState:
         revision_count += 1
         logger.info(f"🔄 Revision requested. Count: {revision_count}")
     
+    # IMPORTANT: Preserve reward confidence from Keeper, store judge's confidence separately
+    # The reward score is calculated based on research quality metrics (facts, tools, errors)
+    # The judge's confidence is a quality assessment of the generated answer
+    reward_confidence = state.get("confidence", 0.0)
+    if reward_confidence > 0:
+        # Reward confidence was calculated by Keeper - preserve it
+        final_confidence = reward_confidence
+        logger.info(f"📊 Preserving reward confidence: {reward_confidence:.0%} (Judge suggested: {confidence:.0%})")
+    else:
+        # No reward score yet, fallback to judge's assessment
+        final_confidence = confidence
+    
     return {
         **state,
         "judge_verdict": verdict,
-        "confidence": confidence,
+        "judge_confidence": confidence,  # Judge's assessment (for logging/debug)
+        "confidence": final_confidence,   # Actual confidence (GRPO or fallback)
         "revision_count": revision_count,
     }
 
@@ -1061,8 +1462,15 @@ async def synthesizer_node(state: GraphState) -> GraphState:
 # Routing Functions
 # ============================================================================
 
-def should_continue_research(state: GraphState) -> Literal["researcher", "generator"]:
-    """Decide whether to continue research or move to synthesis."""
+def should_continue_research(state: GraphState) -> Literal["researcher", "generator", "planner"]:
+    """Decide whether to continue research, replan, or move to synthesis."""
+    # REPLAN PATH: When all tools failed with errors, go back to planner
+    # This allows the LLM to receive error_feedback and correct tool calls
+    stop_reason = state.get("stop_reason", "")
+    if stop_reason == "replan":
+        logger.info("🔄 Replanning: Routing back to planner with error feedback")
+        return "planner"
+    
     if state.get("should_continue", False):
         return "researcher"
     return "generator"
@@ -1121,12 +1529,13 @@ def build_research_graph() -> StateGraph:
     graph.add_edge(NodeName.PLANNER.value, NodeName.RESEARCHER.value)
     graph.add_edge(NodeName.RESEARCHER.value, NodeName.KEEPER.value)
     
-    # Conditional edge: continue research or synthesize
+    # Conditional edge: continue research, replan, or synthesize
     graph.add_conditional_edges(
         NodeName.KEEPER.value,
         should_continue_research,
         {
             "researcher": NodeName.RESEARCHER.value,
+            "planner": NodeName.PLANNER.value,  # Replan path for error correction
             "generator": NodeName.GENERATOR.value,
         }
     )
@@ -1157,23 +1566,33 @@ def compile_research_graph():
 
 
 async def smart_fetch_data(args: dict) -> Any:
-    # JIT-Enabled Data Fetcher
+    """JIT-Enabled Data Fetcher using MCP session registry."""
+    from services.mcp_host.core.session_registry import get_session_registry
+
+    registry = get_session_registry()
     query = args.get("query", "")
-    
+
+    async def _call_tool(tool_name: str, tool_args: dict) -> Any:
+        """Resolve tool via registry and call it."""
+        server_name = registry.get_server_for_tool(tool_name)
+        if not server_name:
+            await registry.list_all_tools()
+            server_name = registry.get_server_for_tool(tool_name)
+        if not server_name:
+            raise ValueError(f"Tool {tool_name} not found in SessionRegistry.")
+        session = await registry.get_session(server_name)
+        return await session.call_tool(tool_name, tool_args)
+
     # 1. AUTONOMOUS SEARCH: Find the data source URL first
-    # We define a search query to find a list of companies
     discovery_query = f"list of companies listed on {query} stock exchange wikipedia"
     logger.info(f"🔍 Web Search for Data Source: '{discovery_query}'")
-    
-    wiki_url = "https://en.wikipedia.org/wiki/LQ45" # Default fallback
+
+    wiki_url = "https://en.wikipedia.org/wiki/LQ45"  # Default fallback
     try:
         from shared.hardware.detector import detect_hardware
         search_args = {"query": discovery_query, "max_results": detect_hardware().optimal_search_limit()}
-        # Use MCP Client for search
-        mcp_client = get_mcp_orchestrator()
-        search_results = await mcp_client.call_tool("web_search", search_args)
-        
-        # Simple heuristic to find a Wikipedia URL
+        search_results = await _call_tool("web_search", search_args)
+
         search_text = str(search_results)
         import re
         match = re.search(r'(https://[a-z]+\.wikipedia\.org/wiki/[^\s\)\"]+)', search_text)
@@ -1181,12 +1600,11 @@ async def smart_fetch_data(args: dict) -> Any:
             wiki_url = match.group(0)
             logger.info(f"✅ Discovered Data Source: {wiki_url}")
         else:
-            logger.warning(f"⚠️ Could not extract Wiki URL from search. Defaulting manually to LQ45 one.")
+            logger.warning("⚠️ Could not extract Wiki URL from search. Using LQ45 default.")
     except Exception as e:
         logger.error(f"❌ Discovery Search Failed: {e}")
 
     # 2. Dynamic Script Generation with DISCOVERED URL
-    # NOTE: We use raw imports because we are running in a JIT 'uv' environment
     code = f"""
 import pandas as pd
 import yfinance as yf
@@ -1196,33 +1614,26 @@ def get_tickers():
     source_url = "{wiki_url}"
     print(f"🔍 Scraping tickers from discovered source: {{source_url}}")
     tickers = []
-    
+
     try:
-        # Robust Scrape
-        import html5lib 
+        import html5lib
         tables = pd.read_html(source_url)
-        
-        # Smart Column Detection
+
         for df in tables:
-            # Normalize cols
-            cols = [str(c).upper() for c in df.columns]
-            
             target_col = None
             for c in df.columns:
                 c_up = str(c).upper()
                 if "CODE" in c_up or "SYMBOL" in c_up or "TICKER" in c_up:
                     target_col = c
                     break
-            
+
             if target_col:
-                # Valid table found
                 raw_tickers = df[target_col].tolist()
                 suffix = ".JK" if "Indonesia" in "{query}" or "IDX" in "{query}" or "LQ45" in source_url else ""
-                
                 tickers = [f"{{str(t).strip()}}{{suffix}}" for t in raw_tickers if isinstance(t, str)]
                 print(f"   ✅ Found {{len(tickers)}} tickers in table columns: {{df.columns.tolist()}}")
                 break
-                
+
         if not tickers:
             print("   ⚠️ No ticker column found in any table.")
             try:
@@ -1233,23 +1644,21 @@ def get_tickers():
                 print(f"   ✅ Discovered {{len(tickers)}} tickers from GitHub Fallback")
             except:
                 pass
-            
+
     except Exception as e:
         print(f"Discovery error: {{e}}")
         tickers = []
-        
+
     return tickers
 
-# Main Execution
 try:
     targets = get_tickers()
     if not targets:
         print("No tickers found from source.")
     else:
         print(f"📊 Fetching data for {{len(targets)}} companies...")
-        
         results = []
-        for t in targets[:20]: 
+        for t in targets[:20]:
             try:
                 stock = yf.Ticker(t)
                 info = stock.info
@@ -1264,23 +1673,18 @@ try:
                 print(f"   ✅ Fetched {{t}}")
             except Exception as e:
                 print(f"   ❌ Failed {{t}}: {{e}}")
-                
+
         df = pd.DataFrame(results)
         print("\\nDATA_START")
         print(df.to_markdown(index=False))
         print("DATA_END")
-        
+
 except Exception as e:
     print(f"Script Error: {{e}}")
 """
 
-    # Call execute_code_tool with JIT dependencies via MCP Client
-    mcp_client = get_mcp_orchestrator()
-    if not mcp_client:
-        raise ValueError("MCP/Orchestrator not initialized")
-        
-    return await mcp_client.call_tool("execute_code", {
-        "code": code, 
+    return await _call_tool("execute_code", {
+        "code": code,
         "dependencies": ["yfinance", "pandas", "requests", "html5lib", "lxml", "tabulate"]
     })
 

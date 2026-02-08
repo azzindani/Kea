@@ -19,11 +19,11 @@ if root_path not in sys.path:
 # ]
 # ///
 
-from mcp.server.fastmcp import FastMCP
+from shared.mcp.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import (
+from mcp_servers.xgboost_server.tools import (
     sklearn_ops, native_ops, booster_ops, analysis_ops, super_ops
 )
 import structlog
@@ -32,6 +32,9 @@ from typing import List, Dict, Any, Optional, Union
 logger = structlog.get_logger()
 
 # Create the FastMCP server
+from shared.logging import setup_logging
+setup_logging()
+
 mcp = FastMCP("xgboost_server", dependencies=["xgboost", "scikit-learn", "numpy", "pandas", "joblib", "scipy"])
 DataInput = Union[List[List[Any]], List[Dict[str, Any]], str, Dict[str, Any]]
 VectorInput = Union[List[Any], str]
@@ -86,3 +89,18 @@ async def auto_xgboost_reg(X: DataInput, y: VectorInput, n_iter: int = 10, cv: i
 
 if __name__ == "__main__":
     mcp.run()
+
+# ==========================================
+# Compatibility Layer for Tests
+# ==========================================
+class XgboostServer:
+    def __init__(self):
+        # Wrap the FastMCP instance
+        self.mcp = mcp
+
+    def get_tools(self):
+        # Access internal tool manager to get list of tool objects
+        # We need to return objects that have a .name attribute
+        if hasattr(self.mcp, '_tool_manager') and hasattr(self.mcp._tool_manager, '_tools'):
+             return list(self.mcp._tool_manager._tools.values())
+        return []

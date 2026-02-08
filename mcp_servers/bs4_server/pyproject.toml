@@ -3,7 +3,7 @@ name = "bs4_server"
 version = "0.1.0"
 description = "MCP Server for bs4_server"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
     "beautifulsoup4",
     "html5lib",

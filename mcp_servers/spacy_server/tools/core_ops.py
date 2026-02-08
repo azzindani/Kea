@@ -7,16 +7,31 @@ logger = structlog.get_logger()
 # Global cache to avoid reloading heavy models
 LOADED_MODELS: Dict[str, spacy.language.Language] = {}
 
+import contextlib
+import io
+
 def get_nlp(model_name: str = "en_core_web_sm") -> spacy.language.Language:
     """Get or load a spacy model."""
     if model_name not in LOADED_MODELS:
         try:
-            logger.info("loading_spacy_model", model=model_name)
-            LOADED_MODELS[model_name] = spacy.load(model_name)
+            # logger.info("loading_spacy_model", model=model_name)
+            # Suppress output during load too
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                LOADED_MODELS[model_name] = spacy.load(model_name)
         except OSError:
-            logger.info("downloading_spacy_model", model=model_name)
-            spacy.cli.download(model_name)
-            LOADED_MODELS[model_name] = spacy.load(model_name)
+            # logger.info("downloading_spacy_model", model=model_name)
+            # Suppress stdout/stderr to protect JSON-RPC
+            try:
+                with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                    try:
+                        spacy.cli.download(model_name)
+                    except SystemExit:
+                        raise OSError(f"Failed to download model '{model_name}': pip might be missing or permission denied.")
+                    
+                    LOADED_MODELS[model_name] = spacy.load(model_name)
+            except Exception:
+                # logger.error("failed_download_spacy_model", error=str(e))
+                raise
     return LOADED_MODELS[model_name]
 
 def load_model(model_name: str = "en_core_web_sm") -> str:

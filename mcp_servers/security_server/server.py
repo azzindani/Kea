@@ -15,47 +15,95 @@ if root_path not in sys.path:
 # ///
 
 
-from mcp.server.fastmcp import FastMCP
+from shared.mcp.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import security_ops
+from mcp_servers.security_server.tools import security_ops
 import structlog
 
 logger = structlog.get_logger()
 
 # Create the FastMCP server
+from shared.logging import setup_logging
+setup_logging()
+
 mcp = FastMCP("security_server", dependencies=["httpx"])
 
 @mcp.tool()
 async def url_scanner(url: str, deep_scan: bool = False) -> str:
-    """Check URL for potential security threats."""
+    """SCANS URL. [ACTION]
+    
+    [RAG Context]
+    Check URL for potential security threats.
+    Returns scan report.
+    """
     return await security_ops.url_scanner(url, deep_scan)
 
 @mcp.tool()
 async def content_sanitizer(content: str, allow_html: bool = False) -> str:
-    """Sanitize HTML/text content to remove malicious elements."""
+    """SANITIZES content. [ACTION]
+    
+    [RAG Context]
+    Sanitize HTML/text content to remove malicious elements.
+    Returns cleaned content.
+    """
     return await security_ops.content_sanitizer(content, allow_html)
 
 @mcp.tool()
 async def file_hash_check(file_path: str = None, content: str = "", algorithm: str = "sha256") -> str:
-    """Calculate file hash and check against known threats."""
+    """CHECKS file hash. [ACTION]
+    
+    [RAG Context]
+    Calculate file hash and check against known threats.
+    Returns report string.
+    """
     return await security_ops.file_hash_check(file_path, content, algorithm)
 
 @mcp.tool()
 async def domain_reputation(domain: str) -> str:
-    """Check domain reputation and safety."""
+    """CHECKS reputation. [ACTION]
+    
+    [RAG Context]
+    Check domain reputation and safety.
+    Returns report string.
+    """
     return await security_ops.domain_reputation(domain)
 
 @mcp.tool()
 async def safe_download(url: str, max_size_mb: int = 10, allowed_types: list = None) -> str:
-    """Download file with safety checks."""
+    """DOWNLOADS safely. [ACTION]
+    
+    [RAG Context]
+    Download file with safety checks (size, type).
+    Returns output path.
+    """
     return await security_ops.safe_download(url, max_size_mb, allowed_types)
 
 @mcp.tool()
 async def code_safety_check(code: str, language: str = "python") -> str:
-    """Check code for potentially dangerous operations."""
+    """CHECKS code safety. [ACTION]
+    
+    [RAG Context]
+    Check code for potentially dangerous operations.
+    Returns analysis report.
+    """
     return await security_ops.code_safety_check(code, language)
 
 if __name__ == "__main__":
     mcp.run()
+
+# ==========================================
+# Compatibility Layer for Tests
+# ==========================================
+class SecurityServer:
+    def __init__(self):
+        # Wrap the FastMCP instance
+        self.mcp = mcp
+
+    def get_tools(self):
+        # Access internal tool manager to get list of tool objects
+        # We need to return objects that have a .name attribute
+        if hasattr(self.mcp, '_tool_manager') and hasattr(self.mcp._tool_manager, '_tools'):
+             return list(self.mcp._tool_manager._tools.values())
+        return []

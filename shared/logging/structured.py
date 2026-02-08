@@ -28,7 +28,7 @@ class LogLevel(str, Enum):
 class LogConfig(BaseModel):
     """Logging configuration."""
     level: LogLevel = LogLevel.INFO
-    format: str = "json"  # json or console
+    format: str = "console"  # json or console
     service_name: str = "research-engine"
     include_timestamp: bool = True
     include_trace: bool = True
@@ -57,18 +57,30 @@ class JSONFormatter(logging.Formatter):
     
     def format(self, record: logging.LogRecord) -> str:
         """Format log record as JSON."""
-        from shared.logging.context import get_context
-        
-        # Get trace context
-        ctx = get_context()
+        try:
+            from shared.logging.context import get_context
+            ctx = get_context()
+        except ImportError:
+            # During shutdown, imports might fail
+            class MockContext:
+                trace_id = None
+                span_id = None
+                request_id = None
+            ctx = MockContext()
         
         log_entry: dict[str, Any] = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": record.levelname,
             "service": self.service_name,
             "logger": record.name,
-            "message": record.getMessage(),
+            "logger": record.name,
+            # "message": record.getMessage(),
         }
+        
+        try:
+            log_entry["message"] = record.getMessage()
+        except Exception:
+             log_entry["message"] = str(record.msg) + (f" {record.args}" if record.args else "")
         
         # Add trace context if available
         if ctx.trace_id:
@@ -116,27 +128,48 @@ class ConsoleFormatter(logging.Formatter):
     
     def format(self, record: logging.LogRecord) -> str:
         """Format log record with colors."""
-        from shared.logging.context import get_context
-        
-        ctx = get_context()
+        try:
+            from shared.logging.context import get_context
+            ctx = get_context()
+        except ImportError:
+            # During shutdown, imports might fail
+            class MockContext:
+                trace_id = None
+                request_id = None
+            ctx = MockContext()
+            
         color = self.COLORS.get(record.levelname, "")
         
         # Build prefix
         prefix_parts = []
         if ctx.request_id:
             prefix_parts.append(f"[{ctx.request_id[:8]}]")
-        if ctx.trace_id:
-            prefix_parts.append(f"<{ctx.trace_id[:8]}>")
+
+        # Handle trace_id differently based on formatter
+        if hasattr(ctx, 'trace_id') and ctx.trace_id:
+             prefix_parts.append(f"<{ctx.trace_id[:8]}>")
         
         prefix = " ".join(prefix_parts)
         if prefix:
             prefix = f"{prefix} "
         
-        timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        # Check if python is shutting down
+        if not sys or not datetime:
+            return f"{prefix}{record.name}: {record.getMessage()}"
+
+        try:
+            timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        except (ImportError, TypeError, AttributeError):
+            timestamp = "SHUTDOWN"
         
+        try:
+            message = record.getMessage()
+        except Exception:
+            message = str(record.msg) + (f" {record.args}" if record.args else "")
+
         return (
             f"{color}[{timestamp}] {record.levelname:8}{self.RESET} "
-            f"{prefix}{record.name}: {record.getMessage()}"
+            f"{prefix}{record.name}: {message}"
         )
 
 
@@ -180,6 +213,27 @@ def setup_logging(config: LogConfig | None = None) -> None:
     logging.getLogger("filelock").setLevel(logging.WARNING)
     logging.getLogger("multipart").setLevel(logging.WARNING)
     logging.getLogger("passlib").setLevel(logging.WARNING)
+    
+    # Configure structlog to output to stderr
+    try:
+        import structlog
+        structlog.configure(
+            processors=[
+                structlog.contextvars.merge_contextvars,
+                structlog.processors.add_log_level,
+                structlog.processors.StackInfoRenderer(),
+                structlog.dev.set_exc_info,
+                structlog.processors.TimeStamper(fmt="iso"),
+                structlog.dev.ConsoleRenderer(colors=config.format == "console")
+                if config.format == "console"
+                else structlog.processors.JSONRenderer(),
+            ],
+            logger_factory=structlog.PrintLoggerFactory(file=sys.stderr),
+            wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+            cache_logger_on_first_use=True,
+        )
+    except ImportError:
+        pass
 
 
 def get_logger(name: str) -> logging.Logger:

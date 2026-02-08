@@ -16,11 +16,11 @@ if root_path not in sys.path:
 # ]
 # ///
 
-from mcp.server.fastmcp import FastMCP
+from shared.mcp.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from tools import (
+from mcp_servers.textblob_server.tools import (
     core_ops, blob_ops, lang_ops, word_ops, 
     classifier_ops, bulk_ops, super_ops
 )
@@ -30,121 +30,491 @@ from typing import List, Dict, Any, Optional, Tuple, Union
 logger = structlog.get_logger()
 
 # Create the FastMCP server
+from shared.logging import setup_logging
+setup_logging()
+
 mcp = FastMCP("textblob_server", dependencies=["textblob", "pandas", "nltk"])
 
 # ==========================================
 # 1. Core
 # ==========================================
+# ==========================================
+# 1. Core
+# ==========================================
 @mcp.tool()
-def ensure_corpora() -> str: return core_ops.ensure_corpora()
+def ensure_corpora() -> str: 
+    """CHECKS NLTK corpora. [ACTION]
+    
+    [RAG Context]
+    Download necessary NLTK data.
+    Returns status string.
+    """
+    return core_ops.ensure_corpora()
+
 @mcp.tool()
-def blob_properties_full(text: str) -> Dict[str, Any]: return core_ops.blob_properties_full(text)
+def blob_properties_full(text: str) -> Dict[str, Any]: 
+    """ANALYZES blob properties. [ACTION]
+    
+    [RAG Context]
+    Get full properties of TextBlob object.
+    Returns JSON dict.
+    """
+    return core_ops.blob_properties_full(text)
 
 # ==========================================
 # 2. Blob Operations
 # ==========================================
 @mcp.tool()
-def analyze_sentiment(text: str) -> Dict[str, float]: return blob_ops.analyze_sentiment(text)
+def analyze_sentiment(text: str) -> Dict[str, float]: 
+    """ANALYZES sentiment. [ACTION]
+    
+    [RAG Context]
+    Get polarity and subjectivity scores.
+    Returns JSON dict.
+    """
+    return blob_ops.analyze_sentiment(text)
+
 @mcp.tool()
-def extract_noun_phrases(text: str) -> List[str]: return blob_ops.extract_noun_phrases(text)
+def extract_noun_phrases(text: str) -> List[str]: 
+    """EXTRACTS noun phrases. [ACTION]
+    
+    [RAG Context]
+    Get list of noun phrases.
+    Returns list of strings.
+    """
+    return str(blob_ops.extract_noun_phrases(text))
+
 @mcp.tool()
-def tag_pos(text: str) -> List[List[str]]: return blob_ops.tag_pos(text)
+def tag_pos(text: str) -> List[List[str]]: 
+    """EXTRACTS POS tags. [ACTION]
+    
+    [RAG Context]
+    Get Part-of-Speech tags.
+    Returns list of [word, tag] lists.
+    """
+    return str(blob_ops.tag_pos(text))
+
 @mcp.tool()
-def parse_text(text: str) -> str: return blob_ops.parse_text(text)
+def parse_text(text: str) -> str: 
+    """PARSES text structure. [ACTION]
+    
+    [RAG Context]
+    Parse text into structure string.
+    Returns formatted string.
+    """
+    return blob_ops.parse_text(text)
+
 @mcp.tool()
-def tokenize_words(text: str) -> List[str]: return blob_ops.tokenize_words(text)
+def tokenize_words(text: str) -> List[str]: 
+    """TOKENIZES words. [ACTION]
+    
+    [RAG Context]
+    Split text into words.
+    Returns list of strings.
+    """
+    return str(blob_ops.tokenize_words(text))
+
 @mcp.tool()
-def tokenize_sentences(text: str) -> List[str]: return blob_ops.tokenize_sentences(text)
+def tokenize_sentences(text: str) -> List[str]: 
+    """TOKENIZES sentences. [ACTION]
+    
+    [RAG Context]
+    Split text into sentences.
+    Returns list of strings.
+    """
+    return str(blob_ops.tokenize_sentences(text))
+
 @mcp.tool()
-def get_word_counts(text: str) -> Dict[str, int]: return blob_ops.get_word_counts(text)
+def get_word_counts(text: str) -> Dict[str, int]: 
+    """COUNTS words. [ACTION]
+    
+    [RAG Context]
+    Get frequency count of each word.
+    Returns JSON dict.
+    """
+    return blob_ops.get_word_counts(text)
+
 @mcp.tool()
-def get_ngrams(text: str, n: int = 3) -> List[List[str]]: return blob_ops.get_ngrams(text, n)
+def get_ngrams(text: str, n: int = 3) -> List[List[str]]: 
+    """EXTRACTS n-grams. [ACTION]
+    
+    [RAG Context]
+    Get list of n-grams (tuples of words).
+    Returns list of lists.
+    """
+    return str(blob_ops.get_ngrams(text, n))
+
 @mcp.tool()
-def correct_spelling(text: str) -> str: return blob_ops.correct_spelling(text)
+def correct_spelling(text: str) -> str: 
+    """CORRECTS spelling. [ACTION]
+    
+    [RAG Context]
+    Corrects spelling errors in text.
+    Returns corrected string.
+    """
+    return blob_ops.correct_spelling(text)
+
 @mcp.tool()
-def get_sentences_sentiment(text: str) -> List[Dict[str, Any]]: return blob_ops.get_sentences_sentiment(text)
+def get_sentences_sentiment(text: str) -> List[Dict[str, Any]]: 
+    """ANALYZES sentence sentiment. [ACTION]
+    
+    [RAG Context]
+    Get sentiment for each sentence.
+    Returns list of dicts.
+    """
+    return blob_ops.get_sentences_sentiment(text)
 
 # ==========================================
 # 3. Language
 # ==========================================
+# ==========================================
+# 3. Language
+# ==========================================
 @mcp.tool()
-def detect_language(text: str) -> str: return lang_ops.detect_language(text)
+def detect_language(text: str) -> str: 
+    """DETECTS language. [ACTION]
+    
+    [RAG Context]
+    Detect language code (e.g., 'en', 'fr').
+    Returns string code.
+    """
+    return lang_ops.detect_language(text)
+
 @mcp.tool()
-def translate_text(text: str, to_lang: str = "en", from_lang: Optional[str] = None) -> str: return lang_ops.translate_text(text, to_lang, from_lang)
+def translate_text(text: str, to_lang: str = "en", from_lang: Optional[str] = None) -> str: 
+    """TRANSLATES text. [ACTION]
+    
+    [RAG Context]
+    Translate text to target language.
+    Returns translated string.
+    """
+    return lang_ops.translate_text(text, to_lang, from_lang)
+
 @mcp.tool()
-def get_languages_list() -> List[str]: return lang_ops.get_languages_list()
+def get_languages_list() -> List[str]: 
+    """FETCHES language codes. [ACTION]
+    
+    [RAG Context]
+    Get list of supported language codes.
+    Returns list of strings.
+    """
+    return lang_ops.get_languages_list()
 
 # ==========================================
 # 4. Word Operations
 # ==========================================
 @mcp.tool()
-def lemmatize_word(word: str, pos: str = "n") -> str: return word_ops.lemmatize_word(word, pos)
+def lemmatize_word(word: str, pos: str = "n") -> str: 
+    """LEMMATIZES word. [ACTION]
+    
+    [RAG Context]
+    Get base form of a word.
+    Returns string.
+    """
+    return word_ops.lemmatize_word(word, pos)
+
 @mcp.tool()
-def singularize_word(word: str) -> str: return word_ops.singularize_word(word)
+def singularize_word(word: str) -> str: 
+    """SINGULARIZES word. [ACTION]
+    
+    [RAG Context]
+    Convert plural word to singular.
+    Returns string.
+    """
+    return word_ops.singularize_word(word)
+
 @mcp.tool()
-def pluralize_word(word: str) -> str: return word_ops.pluralize_word(word)
+def pluralize_word(word: str) -> str: 
+    """PLURALIZES word. [ACTION]
+    
+    [RAG Context]
+    Convert singular word to plural.
+    Returns string.
+    """
+    return word_ops.pluralize_word(word)
+
 @mcp.tool()
-def spellcheck_word(word: str) -> List[List[Any]]: return word_ops.spellcheck_word(word)
+def spellcheck_word(word: str) -> List[List[Any]]: 
+    """CHECKS spelling (word). [ACTION]
+    
+    [RAG Context]
+    Get spelling suggestions for a word.
+    Returns list of [word, confidence] lists.
+    """
+    return str(word_ops.spellcheck_word(word))
+
 @mcp.tool()
-def define_word(word: str) -> List[str]: return word_ops.define_word(word)
+def define_word(word: str) -> List[str]: 
+    """DEFINES word. [ACTION]
+    
+    [RAG Context]
+    Get definitions for a word (WordNet).
+    Returns list of strings.
+    """
+    return str(word_ops.define_word(word))
+
 @mcp.tool()
-def get_synsets(word: str) -> List[str]: return word_ops.get_synsets(word)
+def get_synsets(word: str) -> List[str]: 
+    """FETCHES synsets. [ACTION]
+    
+    [RAG Context]
+    Get WordNet synsets for a word.
+    Returns list of strings.
+    """
+    return str(word_ops.get_synsets(word))
+
 @mcp.tool()
-def get_synonyms(word: str) -> List[str]: return word_ops.get_synonyms(word)
+def get_synonyms(word: str) -> List[str]: 
+    """FETCHES synonyms. [ACTION]
+    
+    [RAG Context]
+    Get synonyms for a word.
+    Returns list of strings.
+    """
+    return str(word_ops.get_synonyms(word))
+
 @mcp.tool()
-def stem_word(word: str) -> str: return word_ops.stem_word(word)
+def stem_word(word: str) -> str: 
+    """STEMS word. [ACTION]
+    
+    [RAG Context]
+    Get stem of a word (Porter).
+    Returns string.
+    """
+    return word_ops.stem_word(word)
 
 # ==========================================
 # 5. Classification
 # ==========================================
+# ==========================================
+# 5. Classification
+# ==========================================
 @mcp.tool()
-def classify_text(text: str, classifier_type: str = "simple") -> Dict[str, Any]: return classifier_ops.classify_text(text, classifier_type)
+def classify_text(text: str, classifier_type: str = "simple") -> Dict[str, Any]: 
+    """CLASSIFIES text. [ACTION]
+    
+    [RAG Context]
+    Classify text using Naive Bayes or Decision Tree.
+    Returns JSON dict.
+    """
+    return classifier_ops.classify_text(text, classifier_type)
+
 @mcp.tool()
-def train_simple_classifier(training_data: List[Dict[str, str]], model_name: str = "custom_nb") -> str: return classifier_ops.train_simple_classifier(training_data, model_name)
+def train_simple_classifier(training_data: List[Dict[str, str]], model_name: str = "custom_nb") -> str: 
+    """TRAINS classifier. [ACTION]
+    
+    [RAG Context]
+    Train a simple Naive Bayes classifier.
+    Returns status string.
+    """
+    return classifier_ops.train_simple_classifier(training_data, model_name)
+
 @mcp.tool()
-def evaluate_classifier(model_name: str, validation_data: List[Dict[str, str]]) -> Dict[str, float]: return classifier_ops.evaluate_classifier(model_name, validation_data)
+def evaluate_classifier(model_name: str, validation_data: List[Dict[str, str]]) -> Dict[str, float]: 
+    """EVALUATES classifier. [ACTION]
+    
+    [RAG Context]
+    Evaluate a trained classifier accuracy.
+    Returns JSON dict.
+    """
+    return classifier_ops.evaluate_classifier(model_name, validation_data)
+
 @mcp.tool()
-def classify_bulk(texts: List[str], model_name: str) -> List[Dict[str, Any]]: return classifier_ops.classify_bulk(texts, model_name)
+def classify_bulk(texts: List[str], model_name: str) -> List[Dict[str, Any]]: 
+    """CLASSIFIES bulk texts. [ACTION]
+    
+    [RAG Context]
+    Classify multiple texts using trained model.
+    Returns list of results.
+    """
+    return classifier_ops.classify_bulk(texts, model_name)
 
 # ==========================================
 # 6. Bulk Operations
 # ==========================================
+# ==========================================
+# 6. Bulk Operations
+# ==========================================
 @mcp.tool()
-def bulk_analyze_sentiment(texts: List[str]) -> List[Dict[str, Any]]: return bulk_ops.bulk_analyze_sentiment(texts)
+def bulk_analyze_sentiment(texts: List[str]) -> List[Dict[str, Any]]: 
+    """ANALYZES bulk sentiment. [ACTION]
+    
+    [RAG Context]
+    Analyze sentiment for multiple texts.
+    Returns list of dicts.
+    """
+    return bulk_ops.bulk_analyze_sentiment(texts)
+
 @mcp.tool()
-def bulk_extract_noun_phrases(texts: List[str]) -> List[List[str]]: return bulk_ops.bulk_extract_noun_phrases(texts)
+def bulk_extract_noun_phrases(texts: List[str]) -> List[List[str]]: 
+    """EXTRACTS bulk noun phrases. [ACTION]
+    
+    [RAG Context]
+    Get noun phrases for multiple texts.
+    Returns list of lists.
+    """
+    return bulk_ops.bulk_extract_noun_phrases(texts)
+
 @mcp.tool()
-def bulk_tag_pos(texts: List[str]) -> List[List[List[str]]]: return bulk_ops.bulk_tag_pos(texts)
+def bulk_tag_pos(texts: List[str]) -> List[List[List[str]]]: 
+    """EXTRACTS bulk POS. [ACTION]
+    
+    [RAG Context]
+    Get POS tags for multiple texts.
+    Returns nested list of tags.
+    """
+    return bulk_ops.bulk_tag_pos(texts)
+
 @mcp.tool()
-def bulk_correct_spelling(texts: List[str]) -> List[str]: return bulk_ops.bulk_correct_spelling(texts)
+def bulk_correct_spelling(texts: List[str]) -> List[str]: 
+    """CORRECTS bulk spelling. [ACTION]
+    
+    [RAG Context]
+    Correct spelling for multiple texts.
+    Returns list of strings.
+    """
+    return bulk_ops.bulk_correct_spelling(texts)
+
 @mcp.tool()
-def bulk_detect_language(texts: List[str]) -> List[str]: return bulk_ops.bulk_detect_language(texts)
+def bulk_detect_language(texts: List[str]) -> List[str]: 
+    """DETECTS bulk language. [ACTION]
+    
+    [RAG Context]
+    Detect language for multiple texts.
+    Returns list of codes.
+    """
+    return bulk_ops.bulk_detect_language(texts)
+
 @mcp.tool()
-def bulk_translate(texts: List[str], to_lang: str = "en") -> List[str]: return bulk_ops.bulk_translate(texts, to_lang)
+def bulk_translate(texts: List[str], to_lang: str = "en") -> List[str]: 
+    """TRANSLATES bulk text. [ACTION]
+    
+    [RAG Context]
+    Translate multiple texts.
+    Returns list of strings.
+    """
+    return bulk_ops.bulk_translate(texts, to_lang)
+
 @mcp.tool()
-def bulk_ngrams(texts: List[str], n: int = 3) -> List[List[List[str]]]: return bulk_ops.bulk_ngrams(texts, n)
+def bulk_ngrams(texts: List[str], n: int = 3) -> List[List[List[str]]]: 
+    """EXTRACTS bulk n-grams. [ACTION]
+    
+    [RAG Context]
+    Get n-grams for multiple texts.
+    Returns list of list of lists.
+    """
+    return bulk_ops.bulk_ngrams(texts, n)
 
 # ==========================================
 # 7. Super Tools
 # ==========================================
+# ==========================================
+# 7. Super Tools
+# ==========================================
 @mcp.tool()
-def full_text_report(text: str) -> Dict[str, Any]: return super_ops.full_text_report(text)
+def full_text_report(text: str) -> Dict[str, Any]: 
+    """GENERATES full report. [ACTION]
+    
+    [RAG Context]
+    Comprehensive analysis (sentiment, noun phrases, etc).
+    Returns JSON dict.
+    """
+    return super_ops.full_text_report(text)
+
 @mcp.tool()
-def summarize_content(text: str, top_n: int = 3) -> List[str]: return super_ops.summarize_content(text, top_n)
+def summarize_content(text: str, top_n: int = 3) -> List[str]: 
+    """SUMMARIZES content. [ACTION]
+    
+    [RAG Context]
+    Extract key sentences to summarize text.
+    Returns list of strings.
+    """
+    return super_ops.summarize_content(text, top_n)
+
 @mcp.tool()
-def compare_sentiments(text1: str, text2: str) -> Dict[str, Any]: return super_ops.compare_sentiments(text1, text2)
+def compare_sentiments(text1: str, text2: str) -> Dict[str, Any]: 
+    """COMPARES sentiments. [ACTION]
+    
+    [RAG Context]
+    Compare sentiment of two texts.
+    Returns JSON dict.
+    """
+    return super_ops.compare_sentiments(text1, text2)
+
 @mcp.tool()
-def build_frequency_distribution(texts: List[str], top_n: int = 10) -> Dict[str, int]: return super_ops.build_frequency_distribution(texts, top_n)
+def build_frequency_distribution(texts: List[str], top_n: int = 10) -> Dict[str, int]: 
+    """BUILDS freq dist. [ACTION]
+    
+    [RAG Context]
+    Get most frequent words across texts.
+    Returns JSON dict.
+    """
+    return super_ops.build_frequency_distribution(texts, top_n)
+
 @mcp.tool()
-def extract_key_sentences(text: str, keyword: str) -> List[str]: return super_ops.extract_key_sentences(text, keyword)
+def extract_key_sentences(text: str, keyword: str) -> List[str]: 
+    """EXTRACTS key sentences. [ACTION]
+    
+    [RAG Context]
+    Get sentences containing a specific keyword.
+    Returns list of strings.
+    """
+    return super_ops.extract_key_sentences(text, keyword)
+
 @mcp.tool()
-def categorize_by_sentiment(texts: List[str]) -> Dict[str, List[str]]: return super_ops.categorize_by_sentiment(texts)
+def categorize_by_sentiment(texts: List[str]) -> Dict[str, List[str]]: 
+    """CATEGORIZES by sentiment. [ACTION]
+    
+    [RAG Context]
+    Group texts by sentiment (pos/neg/neu).
+    Returns JSON dict.
+    """
+    return super_ops.categorize_by_sentiment(texts)
+
 @mcp.tool()
-def mixed_sentiment_analysis(texts: List[str]) -> List[Dict[str, Any]]: return super_ops.mixed_sentiment_analysis(texts)
+def mixed_sentiment_analysis(texts: List[str]) -> List[Dict[str, Any]]: 
+    """ANALYZES mixed sentiment. [ACTION]
+    
+    [RAG Context]
+     detailed sentiment analysis for multiple texts.
+    Returns list of dicts.
+    """
+    return super_ops.mixed_sentiment_analysis(texts)
+
 @mcp.tool()
-def clean_and_analyze(text: str) -> Dict[str, Any]: return super_ops.clean_and_analyze(text)
+def clean_and_analyze(text: str) -> Dict[str, Any]: 
+    """CLEANS and analyzes. [ACTION]
+    
+    [RAG Context]
+    Preprocess text then analyze sentiment.
+    Returns JSON dict.
+    """
+    return super_ops.clean_and_analyze(text)
+
 @mcp.tool()
-def find_similar_spelling(target: str, text: str) -> List[str]: return super_ops.find_similar_spelling(target, text)
+def find_similar_spelling(target: str, text: str) -> List[str]: 
+    """FINDS similar spelling. [ACTION]
+    
+    [RAG Context]
+    Find words with similar spelling to target.
+    Returns list of strings.
+    """
+    return super_ops.find_similar_spelling(target, text)
 
 if __name__ == "__main__":
     mcp.run()
+
+# ==========================================
+# Compatibility Layer for Tests
+# ==========================================
+class TextblobServer:
+    def __init__(self):
+        # Wrap the FastMCP instance
+        self.mcp = mcp
+
+    def get_tools(self):
+        # Access internal tool manager to get list of tool objects
+        # We need to return objects that have a .name attribute
+        if hasattr(self.mcp, '_tool_manager') and hasattr(self.mcp._tool_manager, '_tools'):
+             return list(self.mcp._tool_manager._tools.values())
+        return []

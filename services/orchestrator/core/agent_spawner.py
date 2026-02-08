@@ -115,10 +115,10 @@ class TaskDecomposer:
     def decompose(
         self,
         query: str,
-        max_subtasks: int = 5,
+        max_subtasks: int = 20,
         strategy: str = "auto",
     ) -> list[SubTask]:
-        """Decompose query into subtasks."""
+        """Decompose query into subtasks. Limit is now dynamic via complexity classifier."""
         query_lower = query.lower()
         
         # Detect entities (e.g., "Compare A vs B vs C")
@@ -333,8 +333,8 @@ class AgentSpawner:
                 elif "10k" in query_lower or "10,000" in query_lower: factor = 10
                 elif "50k" in query_lower: factor = 15
                 
-                # Cap at reasonable max parallel
-                factor = min(factor, plan.max_parallel or 10)
+                # Cap at plan's max_parallel (now set dynamically by complexity classifier)
+                factor = min(factor, plan.max_parallel or 15)
                 
                 logger.info(f"💥 Expanding massive task '{task.query[:30]}...' into {factor} parallel shards")
                 
@@ -566,7 +566,6 @@ class AgentSpawner:
                             # =========================================================
                             if tool_name in ["execute_code", "run_python"]:
                                 from services.orchestrator.agents.code_generator import generate_python_code
-                                from services.orchestrator.agents.code_generator import generate_python_code
 
                                 
                                 attempt = 0
@@ -608,7 +607,7 @@ class AgentSpawner:
                                     
                                     if not norm_res.is_error:
                                         # Success!
-                                        response = f"Swarm Tool Result (execute_code):\n {norm_res.output.get_for_llm()[:2000]}"
+                                        response = f"Swarm Tool Result (execute_code):\n {norm_res.output.get_for_llm()[:8000]}"
                                         
                                         logger.info(f"   ✅ EXECUTION SUCCESS:\n{norm_res.output.text[:1000]}...")
                                         break
@@ -694,7 +693,7 @@ CRITICAL: Return ONLY valid JSON for the tool arguments. No markdown, no explana
                                 norm_res = ToolResponse.from_mcp_result(tool_name, tool_res)
                                 
                                 if not norm_res.is_error:
-                                    response = f"Swarm Tool Result ({tool_name}):\n {norm_res.output.get_for_llm()[:2000]}"
+                                    response = f"Swarm Tool Result ({tool_name}):\n {norm_res.output.get_for_llm()[:8000]}"
                                 else:
                                     response = f"Swarm Tool Failed ({tool_name}): {norm_res.output.error or norm_res.output.text}"
                             # =========================================================
@@ -754,9 +753,30 @@ CRITICAL: Return ONLY valid JSON for the tool arguments. No markdown, no explana
             # Extract source metadata if available (provenance tracking)
             if response:
                 result.source = extract_url_from_text(str(response))
-            
-            result.status = AgentStatus.COMPLETED
-            logger.info(f"✅ Agent {agent_id} completed.")
+
+            # Determine agent status based on result quality
+            # If tool execution failed, mark agent as FAILED (not COMPLETED)
+            if response and isinstance(response, str):
+                error_indicators = [
+                    "Swarm Tool Failed",
+                    "Swarm Tool Exception",
+                    "Tool reported an error",
+                    "Exec failed:",
+                    "LLM Failure"
+                ]
+
+                has_error = any(indicator in response for indicator in error_indicators)
+
+                if has_error:
+                    result.status = AgentStatus.FAILED
+                    result.error = response[:200]  # Store error message
+                    logger.warning(f"⚠️ Agent {agent_id} completed with tool failure.")
+                else:
+                    result.status = AgentStatus.COMPLETED
+                    logger.info(f"✅ Agent {agent_id} completed.")
+            else:
+                result.status = AgentStatus.COMPLETED
+                logger.info(f"✅ Agent {agent_id} completed.")
             
         except Exception as e:
             result.status = AgentStatus.FAILED
@@ -814,8 +834,15 @@ _spawner: AgentSpawner | None = None
 
 
 def get_spawner(llm_callback: Callable | None = None) -> AgentSpawner:
-    """Get or create global agent spawner."""
+    """Get or create global agent spawner.
+
+    If an llm_callback is provided and the spawner already exists but has no
+    callback, the callback is hot-wired onto the existing instance so that
+    the microplanner and agentic nodes can use LLM replanning.
+    """
     global _spawner
     if _spawner is None:
         _spawner = AgentSpawner(llm_callback=llm_callback)
+    elif llm_callback is not None and _spawner.llm_callback is None:
+        _spawner.llm_callback = llm_callback
     return _spawner

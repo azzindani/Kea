@@ -2,7 +2,7 @@
 import httpx
 import json
 from bs4 import BeautifulSoup
-from shared.logging import get_logger
+from shared.logging.structured import get_logger
 
 logger = get_logger(__name__)
 
@@ -12,7 +12,12 @@ async def parse_html(url: str, extract: str = "text", selector: str = None) -> s
     extract: 'text', 'links', 'tables', 'images'
     """
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5"
+        }
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True, headers=headers) as client:
             response = await client.get(url)
             response.raise_for_status()
             html = response.text
@@ -32,7 +37,7 @@ async def parse_html(url: str, extract: str = "text", selector: str = None) -> s
         }
         
         if extract == "text":
-             output_data["content"] = soup.get_text(separator="\n", strip=True)[:100000]
+            output_data["content"] = soup.get_text(separator="\n", strip=True)[:100000]
             
         elif extract == "links":
             for a in soup.find_all("a", href=True)[:1000]: # Increased limit
@@ -52,8 +57,8 @@ async def parse_html(url: str, extract: str = "text", selector: str = None) -> s
                 
         elif extract == "images":
             for img in soup.find_all("img", src=True)[:100]:
-                 img_data = {"alt": img.get("alt", "No alt"), "src": img['src']}
-                 output_data["content"].append(img_data)
+                img_data = {"alt": img.get("alt", "No alt"), "src": img['src']}
+                output_data["content"].append(img_data)
         
         return json.dumps(output_data, indent=2)
     except Exception as e:

@@ -5,94 +5,67 @@ Tests for scraper MCP tools via API.
 """
 
 import pytest
-import httpx
+import asyncio
+from mcp import ClientSession
+from mcp.client.stdio import stdio_client
+from tests.mcp.client_utils import get_server_params
 
-
-API_URL = "http://localhost:8080"
-
-
-class TestFetchUrl:
-    """Tests for fetch_url tool."""
+@pytest.mark.asyncio
+async def test_fetch_example_com():
+    """Fetch example.com using stdio_client."""
+    params = get_server_params("scraper_server", extra_dependencies=["playwright", "beautifulsoup4"])
     
-    @pytest.mark.mcp
-    @pytest.mark.asyncio
-    async def test_fetch_example_com(self):
-        """Fetch example.com."""
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.post(
-                f"{API_URL}/api/v1/mcp/tools/invoke",
-                json={
-                    "tool_name": "fetch_url",
-                    "arguments": {"url": "https://example.com"},
-                }
-            )
-        
-        assert response.status_code == 200, f"Expected 200, got {response.status_code}"
-        data = response.json()
-        
-        # Check response structure
-        assert "content" in data or "result" in data, f"Response missing content: {data}"
-        assert data.get("is_error") == False, f"Tool returned error: {data}"
-        
-        # Check for actual content from example.com
-        content_str = str(data.get("content", data.get("result", "")))
-        assert "Example Domain" in content_str or "example" in content_str.lower(), \
-            f"Expected example.com content, got: {content_str[:200]}"
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            
+            # Verify tool exists
+            tools_res = await session.list_tools()
+            tool_names = [t.name for t in tools_res.tools]
+            assert "fetch_url" in tool_names
+            
+            # Call tool
+            res = await session.call_tool("fetch_url", arguments={"url": "https://example.com"})
+            
+            assert not res.isError
+            content_str = res.content[0].text
+            assert "Example Domain" in content_str or "example" in content_str.lower(), \
+                f"Expected example.com content, got: {content_str[:1000]}"
+
+@pytest.mark.asyncio
+async def test_fetch_with_timeout():
+    """Fetch with custom timeout."""
+    params = get_server_params("scraper_server", extra_dependencies=["playwright", "beautifulsoup4"])
     
-    @pytest.mark.mcp
-    @pytest.mark.asyncio
-    async def test_fetch_with_timeout(self):
-        """Fetch with custom timeout."""
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.post(
-                f"{API_URL}/api/v1/mcp/tools/invoke",
-                json={
-                    "tool_name": "fetch_url",
-                    "arguments": {
-                        "url": "https://example.com",
-                        "timeout": 10,
-                    },
-                }
-            )
-        
-        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            
+            res = await session.call_tool("fetch_url", arguments={"url": "https://example.com", "timeout": 10})
+            
+            assert not res.isError
+            content_str = res.content[0].text
+            assert "Example Domain" in content_str
 
-
-class TestBatchScrape:
-    """Tests for batch_scrape tool."""
+@pytest.mark.asyncio
+async def test_batch_multiple_urls():
+    """Scrape multiple URLs."""
+    params = get_server_params("scraper_server", extra_dependencies=["playwright", "beautifulsoup4"])
     
-    @pytest.mark.mcp
-    @pytest.mark.asyncio
-    async def test_batch_multiple_urls(self):
-        """Scrape multiple URLs."""
-        async with httpx.AsyncClient(timeout=60) as client:
-            response = await client.post(
-                f"{API_URL}/api/v1/mcp/tools/invoke",
-                json={
-                    "tool_name": "batch_scrape",
-                    "arguments": {
-                        "urls": [
-                            "https://example.com",
-                            "https://example.org",
-                        ],
-                        "max_concurrent": 2,
-                    },
-                }
-            )
-        
-        assert response.status_code == 200, f"Expected 200, got {response.status_code}"
-        data = response.json()
-        
-        # Check response structure
-        assert "content" in data or "result" in data, f"Response missing content: {data}"
-        assert data.get("is_error") == False, f"Tool returned error: {data}"
-        
-        # Check for batch scrape results
-        content_str = str(data.get("content", data.get("result", "")))
-        assert "Batch" in content_str or "example" in content_str.lower(), \
-            f"Expected batch results, got: {content_str[:200]}"
-
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            
+            urls = ["https://example.com", "https://example.org"]
+            # batch_scrape might return text directly strictly or a JSON string, let's check implementation behavior through test
+            # Assuming it returns a list of results in some format
+            res = await session.call_tool("batch_scrape", arguments={"urls": urls, "max_concurrent": 2})
+            
+            assert not res.isError
+            content_str = res.content[0].text
+            # It likely returns a JSON string or a summary
+            assert "example" in content_str.lower()
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v", "-m", "mcp"])
-
+    import sys
+    sys.exit(pytest.main(["-v", "-s", __file__]))

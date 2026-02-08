@@ -36,12 +36,33 @@ async def launch_browser(browser_type: str = "chromium", headless: bool = True) 
     playwright = await async_playwright().start()
     BrowserSession._playwright = playwright
     
-    if browser_type == "firefox":
-        browser = await playwright.firefox.launch(headless=headless)
-    elif browser_type == "webkit":
-        browser = await playwright.webkit.launch(headless=headless)
-    else:
-        browser = await playwright.chromium.launch(headless=headless, args=["--no-sandbox"])
+    import sys
+    import asyncio
+    
+    try:
+        if browser_type == "firefox":
+            browser = await playwright.firefox.launch(headless=headless)
+        elif browser_type == "webkit":
+            browser = await playwright.webkit.launch(headless=headless)
+        else:
+            browser = await playwright.chromium.launch(headless=headless, args=["--no-sandbox"])
+    except Exception as e:
+        if "Executable doesn't exist" in str(e):
+            logger.info("Browser executable missing, installing...", browser=browser_type)
+            # Install specific browser to save time/space
+            cmd = [sys.executable, "-m", "playwright", "install", browser_type]
+            proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            await proc.communicate()
+            
+            # Retry launch
+            if browser_type == "firefox":
+                browser = await playwright.firefox.launch(headless=headless)
+            elif browser_type == "webkit":
+                browser = await playwright.webkit.launch(headless=headless)
+            else:
+                browser = await playwright.chromium.launch(headless=headless, args=["--no-sandbox"])
+        else:
+            raise e
         
     BrowserSession._browser = browser
     BrowserSession._context = await browser.new_context(viewport={"width": 1280, "height": 720})

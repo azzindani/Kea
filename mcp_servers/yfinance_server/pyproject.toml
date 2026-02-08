@@ -2,7 +2,7 @@
 name = "yfinance-server"
 version = "0.1.0"
 description = "MCP Server for Yahoo Finance"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
     "matplotlib",
     "mcp",
@@ -14,3 +14,6 @@ dependencies = [
     "wrapt",
     "yfinance",
 ]
+
+[tool.uv]
+dev-dependencies = []
