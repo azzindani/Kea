@@ -8,7 +8,7 @@ from typing import Any, Callable, Dict, Optional, Union, List
 
 import structlog
 try:
-    from mcp.server.fastmcp import FastMCP as LibFastMCP
+    from mcp.server.fastmcp import FastMCP as LibFastMCP, Image, Text, Resource
     from pydantic import ValidationError
 except ImportError:
     # Fallback for environments where mcp is not installed
@@ -18,6 +18,23 @@ except ImportError:
         def tool(self, name=None, description=None): 
             def decorator(f): return f
             return decorator
+            
+    class Image:
+        def __init__(self, data: bytes, format: str): 
+            self.data = data
+            self.format = format
+
+    class Text:
+        def __init__(self, text: str): 
+            self.text = text
+
+    class Resource:
+        def __init__(self, uri: str, name: str, description: Optional[str] = None, mime_type: Optional[str] = None):
+            self.uri = uri
+            self.name = name
+            self.description = description
+            self.mime_type = mime_type
+
     class ValidationError(Exception): pass
 
 logger = structlog.get_logger()
