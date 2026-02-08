@@ -8,11 +8,26 @@ from typing import Any, Callable, Dict, Optional, Union, List
 
 import structlog
 try:
-    from mcp.server.fastmcp import FastMCP as LibFastMCP, Image, Text, Resource
+    from mcp.server.fastmcp import FastMCP as LibFastMCP, Image
+    # Text and Resource are not always exported at the top level in all versions
+    try:
+        from mcp.server.fastmcp import Text
+    except ImportError:
+        class Text:
+            def __init__(self, text: str): self.text = text
+            
+    try:
+        from mcp.server.fastmcp import Resource
+    except ImportError:
+        class Resource:
+            def __init__(self, uri: str, name: str, description: Optional[str] = None, mime_type: Optional[str] = None):
+                self.uri = uri
+                self.name = name
+                self.description = description
+                self.mime_type = mime_type
+                
     from pydantic import ValidationError
-except ImportError as e:
-    import sys
-    print(f"DEBUG: Failed to import MCP dependencies: {e}", file=sys.stderr)
+except ImportError:
     # Fallback for environments where mcp is not installed
     # This ensures the file is at least importable
     class LibFastMCP:
