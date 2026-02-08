@@ -193,6 +193,13 @@ from tools import my_feature  # Now works!
       return f"Error: Failed to process data ({str(e)})"
   ```
 
+#### 2.7 Testing Standards (MANDATORY)
+Every new MCP server **MUST** include a dedicated test file to simulate real-world usage conditions.
+- **Location**: `tests/mcp/test_<server_name>.py`
+- **Purpose**: Verify that the server's tools function correctly with real inputs and external APIs (if applicable).
+- **Format**: Standard `pytest` compatible test file.
+- **Requirement**: The test must cover the server's core functionality and be strictly separate from the server code itself.
+
 ### 3. Tool Design Philosophy
 - **"Super Tools"**: Prefer comprehensive tools (e.g., `analyze_stock_full`) over granular ones (`get_price`, `get_volue`).
 - **Bulk Operations**: Always implement bulk retrieval (e.g., `get_prices(symbols: List[str])`) to minimize round-trips.
@@ -248,6 +255,7 @@ Create a plan that prioritizes:
 ### Phase 4: Verification
 1.  **Dependency Check**: Run `uv sync`.
 2.  **Connectivity Test**: Run `pytest tests/mcp/test_server_connectivity.py` to ensure the server works within the Kea ecosystem.
+3.  **Real-World Simulation**: Create and run `pytest tests/mcp/test_<server_name>.py` to validate functionality under real conditions.
 
 ---
 
@@ -270,3 +278,5 @@ Use this prompt to instruct an agent to build a new server:
 > 4.  **Refine**:
 >     - Update `mcp_servers/README.md` with the new server details.
 >     - Ensure code is robust (try/except blocks).
+> 5.  **Verify**:
+>     - Create a real-world test in `tests/mcp/test_{server_name}.py`.

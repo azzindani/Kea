@@ -27,7 +27,11 @@ class ExchangeManager:
                 'enableRateLimit': True,
                 # 'verbose': True
             })
-            
+        except Exception as e:
+            logger.error(f"Failed to create exchange instance {exchange_id}: {e}")
+            raise
+
+        try:
             # Load markets immediately? Or lazy load?
             # Better to load once.
             logger.info(f"Loading markets for {exchange_id}...")
@@ -37,6 +41,7 @@ class ExchangeManager:
             return exchange
         except Exception as e:
             logger.error(f"Failed to init {exchange_id}: {e}")
+            await exchange.close()
             raise
 
     @classmethod

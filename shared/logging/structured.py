@@ -180,6 +180,27 @@ def setup_logging(config: LogConfig | None = None) -> None:
     logging.getLogger("filelock").setLevel(logging.WARNING)
     logging.getLogger("multipart").setLevel(logging.WARNING)
     logging.getLogger("passlib").setLevel(logging.WARNING)
+    
+    # Configure structlog to output to stderr
+    try:
+        import structlog
+        structlog.configure(
+            processors=[
+                structlog.contextvars.merge_contextvars,
+                structlog.processors.add_log_level,
+                structlog.processors.StackInfoRenderer(),
+                structlog.dev.set_exc_info,
+                structlog.processors.TimeStamper(fmt="iso"),
+                structlog.dev.ConsoleRenderer(colors=config.format == "console")
+                if config.format == "console"
+                else structlog.processors.JSONRenderer(),
+            ],
+            logger_factory=structlog.PrintLoggerFactory(file=sys.stderr),
+            wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+            cache_logger_on_first_use=True,
+        )
+    except ImportError:
+        pass
 
 
 def get_logger(name: str) -> logging.Logger:
