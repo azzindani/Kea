@@ -24,7 +24,7 @@ from typing import List, Dict, Any, Union
 logger = structlog.get_logger()
 
 # Create the FastMCP server
-from shared.logging import setup_logging
+from shared.logging.structured import setup_logging
 setup_logging()
 
 mcp = FastMCP("analysis_server")
@@ -66,5 +66,5 @@ class AnalysisServer:
         # Access internal tool manager to get list of tool objects
         # We need to return objects that have a .name attribute
         if hasattr(self.mcp, '_tool_manager') and hasattr(self.mcp._tool_manager, '_tools'):
-             return list(self.mcp._tool_manager._tools.values())
+            return list(self.mcp._tool_manager._tools.values())
         return []

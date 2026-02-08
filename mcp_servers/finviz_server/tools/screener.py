@@ -5,10 +5,12 @@ except ImportError:
     Overview = None # Fallback or handle graceful failure if install failed
     
 
-from shared.logging import get_logger
+
+from shared.logging.structured import get_logger
 from shared.mcp.protocol import ToolResult, JSONContent, TextContent
 import pandas as pd
 import json
+import asyncio
 
 logger = get_logger(__name__)
 
@@ -27,22 +29,25 @@ async def get_screener_signal(limit: int = 100000, signal: str = None) -> ToolRe
         if Overview is None:
             return ToolResult(content=[TextContent(text="finvizfinance not installed")])
 
-        foverview = Overview()
-        
-        # Translate slug to real signal if needed
-        # e.g. "top_gainers" -> "Top Gainers"
-        real_signal = signal
-        if signal in SIGNALS:
-            real_signal = SIGNALS[signal]
-        
-        # Set the signal
-        foverview.set_filter(signal=real_signal)
-        
-        # Get dataframe (limit isn't natively supported well in all library versions, 
-        # so we fetch and head)
+        def fetch_overview():
+            foverview = Overview()
+            
+            nonlocal signal
+            real_signal = signal
+            if signal in SIGNALS:
+                real_signal = SIGNALS[signal]
+            
+            # Set the signal
+            foverview.set_filter(signal=real_signal)
+            
+            # Get dataframe (limit isn't natively supported well in all library versions, 
+            # so we fetch and head)
+            # IMPORTANT: Pass limit to screener_view to avoid scraping 9000 stocks!
+            return foverview.screener_view(limit=limit)
+
         from shared.stdout_suppression import suppress_stdout
         with suppress_stdout():
-            df = foverview.screener_view()
+             df = await asyncio.to_thread(fetch_overview)
         
         if df is None or df.empty:
             return ToolResult(content=[TextContent(text="No results found.")])
@@ -57,7 +62,7 @@ async def get_screener_signal(limit: int = 100000, signal: str = None) -> ToolRe
         
         # Return Structured + Text
         return ToolResult(content=[
-            TextContent(text=f"### Signal: {real_signal}\n\n{df_lite.to_markdown(index=False)}"),
+            TextContent(text=f"### Signal: {signal}\n\n{df_lite.to_markdown(index=False)}"),
             JSONContent(data=df_lite.to_dict(orient="records"))
         ])
         

@@ -48,7 +48,12 @@ class ExchangeManager:
             except Exception as e:
                 logger.error(f"Failed to init {exchange_id}: {e}")
                 # Ensure we close if validation fails
-                await exchange.close()
+                try:
+                    await exchange.close()
+                    # Allow run loop to cleanup underlying connections
+                    await asyncio.sleep(0.01)
+                except Exception as close_error:
+                    logger.error(f"Failed to close exchange {exchange_id}: {close_error}")
                 raise
 
     @classmethod

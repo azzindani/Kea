@@ -1,7 +1,8 @@
 
+import asyncio
 from finvizfinance.screener.technical import Technical
 
-from shared.logging import get_logger
+from shared.logging.structured import get_logger
 
 logger = get_logger(__name__)
 
@@ -14,12 +15,17 @@ async def get_technical_table(limit: int = 100000, signal: str = "") -> str:
     # limit = arguments.get("limit", 50)
     
     try:
-        tech = Technical()
-        if signal:
-            tech.set_filter(signal=signal)
-            
-        # screener_view defaults to Technical columns [Ticker, ..., RSI, SMA20, SMA50, SMA200, 52W High, ...]
-        df = tech.screener_view()
+        def fetch_tech():
+            tech = Technical()
+            if signal:
+                tech.set_filter(signal=signal)
+            # Use limit to avoid scraping everything if possible
+            # finvizfinance supports limit but sometimes retrieves more if filters are loose.
+            # Passing limit=limit ensures we don't fetch 9000 pages.
+            return tech.screener_view(limit=limit)
+
+        # Run blocking call in thread
+        df = await asyncio.to_thread(fetch_tech)
         
         return f"### Bulk Technicals (Top {limit})\n\n{df.head(limit).to_markdown(index=False)}"
         

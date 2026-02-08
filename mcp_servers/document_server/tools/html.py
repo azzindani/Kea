@@ -2,7 +2,7 @@
 import httpx
 import json
 from bs4 import BeautifulSoup
-from shared.logging import get_logger
+from shared.logging.structured import get_logger
 
 logger = get_logger(__name__)
 
@@ -32,7 +32,7 @@ async def parse_html(url: str, extract: str = "text", selector: str = None) -> s
         }
         
         if extract == "text":
-             output_data["content"] = soup.get_text(separator="\n", strip=True)[:100000]
+            output_data["content"] = soup.get_text(separator="\n", strip=True)[:100000]
             
         elif extract == "links":
             for a in soup.find_all("a", href=True)[:1000]: # Increased limit
@@ -52,8 +52,8 @@ async def parse_html(url: str, extract: str = "text", selector: str = None) -> s
                 
         elif extract == "images":
             for img in soup.find_all("img", src=True)[:100]:
-                 img_data = {"alt": img.get("alt", "No alt"), "src": img['src']}
-                 output_data["content"].append(img_data)
+                img_data = {"alt": img.get("alt", "No alt"), "src": img['src']}
+                output_data["content"].append(img_data)
         
         return json.dumps(output_data, indent=2)
     except Exception as e:
