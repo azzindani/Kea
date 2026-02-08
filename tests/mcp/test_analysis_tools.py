@@ -36,9 +36,9 @@ async def test_analysis_real_simulation():
                 res = await session.call_tool("trend_detection", arguments={"data": data, "metric_name": "Growth"})
                 
                 if res.isError:
-                     print(f" [FAIL] {res.content[0].text}")
+                     print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
                 else:
-                     print(f" [PASS] Result: {res.content[0].text}")
+                     print(f" \033[92m[PASS]\033[0m Result: {res.content[0].text}")
                      # assert "increasing" in res.content[0].text.lower()
             
             # 3. Meta Analysis (Comparison)
@@ -51,9 +51,9 @@ async def test_analysis_real_simulation():
                 ]
                 res = await session.call_tool("meta_analysis", arguments={"data_points": points, "analysis_type": "comparison"})
                 if not res.isError:
-                     print(f" [PASS] {res.content[0].text[:100]}...")
+                     print(f" \033[92m[PASS]\033[0m {res.content[0].text[:100]}...")
                 else:
-                     print(f" [FAIL] {res.content[0].text}")
+                     print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
             print("--- Analysis Simulation Complete ---")
 

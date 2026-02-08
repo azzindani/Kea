@@ -22,17 +22,17 @@ async def test_qualitative_real_simulation():
             # 1. Text Coding
             print("1. Coding Text...")
             res = await session.call_tool("text_coding", arguments={"text": text, "codes": ["Positive", "Negative", "Suggestion"]})
-            print(f" [PASS] Coded: {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m Coded: {res.content[0].text}")
 
             # 2. Sentiment
             print("2. Sentiment Analysis...")
             res = await session.call_tool("sentiment_analysis", arguments={"text": text})
-            print(f" [PASS] Sentiment: {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m Sentiment: {res.content[0].text}")
 
             # 3. Entity Extraction
             print("3. Entity Extraction...")
             res = await session.call_tool("entity_extractor", arguments={"text": "Apple released the iPhone in 2007."})
-            print(f" [PASS] Entities: {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m Entities: {res.content[0].text}")
 
             # 4. Themes & Connections
             print("4. Themes & Connections...")

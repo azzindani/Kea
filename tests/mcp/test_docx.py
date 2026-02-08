@@ -40,31 +40,31 @@ async def test_docx_real_simulation():
             print("4. Verifying Content...")
             res = await session.call_tool("read_paragraphs", arguments={"path": doc_path})
             if not res.isError:
-                print(f" [PASS] Paragraphs (Raw): {res.content[0].text}")
+                print(f" \033[92m[PASS]\033[0m Paragraphs (Raw): {res.content[0].text}")
                 # Try simple parsing if it looks like a list
                 try:
                     import ast
                     paras = ast.literal_eval(res.content[0].text)
-                    print(f" [PASS] Paragraph count: {len(paras)}")
+                    print(f" \033[92m[PASS]\033[0m Paragraph count: {len(paras)}")
                 except:
                     print(" [WARN] Could not parse paragraph list")
             else:
-                print(f" [FAIL] {res.content[0].text}")
+                print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
                 
             res = await session.call_tool("read_table", arguments={"path": doc_path, "table_index": 0})
             if not res.isError:
-                print(f" [PASS] Table Data: {res.content[0].text}")
+                print(f" \033[92m[PASS]\033[0m Table Data: {res.content[0].text}")
                 
             # 5. Metadata
             print("5. Setting Metadata...")
             await session.call_tool("set_document_properties", arguments={"path": doc_path, "author": "Kea Agent", "title": "Test Doc"})
             res = await session.call_tool("get_document_properties", arguments={"path": doc_path})
-            print(f" [PASS] Props: {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m Props: {res.content[0].text}")
 
     # Cleanup
     if os.path.exists(doc_path):
         os.remove(doc_path)
-        print(" [PASS] Cleanup")
+        print(" \033[92m[PASS]\033[0m Cleanup")
 
     print("--- Docx Simulation Complete ---")
 

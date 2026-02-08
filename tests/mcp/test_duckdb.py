@@ -37,19 +37,19 @@ async def test_duckdb_real_simulation():
             # 4. Analysis
             print("4. Running Analysis (get_column_stats)...")
             res = await session.call_tool("get_column_stats", arguments={"table_name": "users", "column_name": "score"})
-            print(f" [PASS] Stats: {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m Stats: {res.content[0].text}")
             
             # 5. SQL Query
             print("5. Querying (Fetch All)...")
             res = await session.call_tool("fetch_all", arguments={"query": "SELECT * FROM users WHERE age > 28"})
-            print(f" [PASS] Rows: {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m Rows: {res.content[0].text}")
             
             # 6. Spatial (Extensions)
             print("6. Spatial Ops (Point)...")
             try:
                 res = await session.call_tool("st_point", arguments={"lat": 40.7128, "lon": -74.0060})
                 if not res.isError:
-                    print(f" [PASS] Point WKT: {res.content[0].text}")
+                    print(f" \033[92m[PASS]\033[0m Point WKT: {res.content[0].text}")
                 else:
                     print(" [INFO] Spatial extension might need loading (install_extension spatial)")
             except Exception as e:
@@ -62,9 +62,9 @@ async def test_duckdb_real_simulation():
                 # Direct export first
                 res = await session.call_tool("export_csv", arguments={"table_or_query": "users", "file_path": csv_path})
                 if not res.isError:
-                    print(f" [PASS] Export CSV: {res.content[0].text}")
+                    print(f" \033[92m[PASS]\033[0m Export CSV: {res.content[0].text}")
                 else:
-                    print(f" [FAIL] Export CSV: {res.content[0].text}")
+                    print(f" \033[91m[FAIL]\033[0m Export CSV: {res.content[0].text}")
             except Exception as e:
                  print(f" [WARN] Export failed: {e}")
                 
@@ -75,7 +75,7 @@ async def test_duckdb_real_simulation():
                 res = await session.call_tool("fts_create_index", arguments={"table_name": "users", "id_col": "id", "text_cols": ["name"]})
                 if not res.isError:
                     res = await session.call_tool("fts_search", arguments={"table_name": "users", "keyword": "Alice"})
-                    print(f" [PASS] FTS Search: {res.content[0].text}")
+                    print(f" \033[92m[PASS]\033[0m FTS Search: {res.content[0].text}")
                 else:
                     print(f" [INFO] FTS not available or failed: {res.content[0].text}")
             except Exception as e:

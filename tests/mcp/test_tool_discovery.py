@@ -22,23 +22,23 @@ async def test_tool_discovery_real_simulation():
             # 1. Search PyPI
             print(f"1. Searching PyPI for '{query}'...")
             res = await session.call_tool("search_pypi", arguments={"query": query, "max_results": 3})
-            print(f" [PASS] Results: {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m Results: {res.content[0].text}")
 
             # 2. Package Info
             print(f"2. Getting Info for '{query}'...")
             res = await session.call_tool("package_info", arguments={"package_name": query, "registry": "pypi"})
             # Info might be long, just print start
-            print(f" [PASS] Info Length: {len(res.content[0].text)}")
+            print(f" \033[92m[PASS]\033[0m Info Length: {len(res.content[0].text)}")
 
             # 3. Evaluate Package
             print("3. Evaluating Package (MCP Suitability)...")
             res = await session.call_tool("evaluate_package", arguments={"package_name": query})
-            print(f" [PASS] Report: {res.content[0].text[:100]}...")
+            print(f" \033[92m[PASS]\033[0m Report: {res.content[0].text[:100]}...")
 
             # 4. Registry List
             print("4. Listing Registry...")
             res = await session.call_tool("tool_registry_list", arguments={})
-            print(f" [PASS] Registry: {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m Registry: {res.content[0].text}")
 
     print("--- Tool Discovery Simulation Complete ---")
 

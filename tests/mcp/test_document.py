@@ -22,9 +22,9 @@ async def test_document_real_simulation():
             url = "https://en.wikipedia.org/wiki/Python_(programming_language)"
             res = await session.call_tool("html_parser", arguments={"url": url, "extract": "text", "selector": "h1"})
             if not res.isError:
-                print(f" [PASS] HTML H1: {res.content[0].text}")
+                print(f" \033[92m[PASS]\033[0m HTML H1: {res.content[0].text}")
             else:
-                print(f" [FAIL] {res.content[0].text}")
+                print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
             # 2. PDF Parser (Public PDF)
             print("2. PDF Parser (W3C HTTP Spec)...")
@@ -32,23 +32,23 @@ async def test_document_real_simulation():
             # Limit pages to 1 to avoid huge download/parse
             res = await session.call_tool("pdf_parser", arguments={"url": pdf_url, "pages": "1"})
             if not res.isError:
-                print(f" [PASS] PDF Content: {res.content[0].text[:100]}...")
+                print(f" \033[92m[PASS]\033[0m PDF Content: {res.content[0].text[:100]}...")
             else:
-                 print(f" [FAIL] {res.content[0].text}")
+                 print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
             # 3. JSON Parser (Public JSON)
             print("3. JSON Parser (Sort of)...")
             json_url = "https://jsonplaceholder.typicode.com/todos/1"
             res = await session.call_tool("json_parser", arguments={"url": json_url})
             if not res.isError:
-                print(f" [PASS] JSON Content: {res.content[0].text}")
+                print(f" \033[92m[PASS]\033[0m JSON Content: {res.content[0].text}")
             else:
-                print(f" [FAIL] {res.content[0].text}")
+                print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
             if not res.isError:
-                print(f" [PASS] JSON Content: {res.content[0].text}")
+                print(f" \033[92m[PASS]\033[0m JSON Content: {res.content[0].text}")
             else:
-                print(f" [FAIL] {res.content[0].text}")
+                print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
             # 4. Docx Parser
             print("4. Docx Parser (Create dummy)...")
@@ -59,9 +59,9 @@ async def test_document_real_simulation():
             
             res = await session.call_tool("docx_parser", arguments={"url": "test_doc_parser.docx"})
             if not res.isError:
-                print(f" [PASS] Docx Text: {res.content[0].text}")
+                print(f" \033[92m[PASS]\033[0m Docx Text: {res.content[0].text}")
             else:
-                print(f" [FAIL] {res.content[0].text}")
+                print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
                 
             # 5. Xlsx Parser
             print("5. Xlsx Parser (Create dummy)...")
@@ -71,9 +71,9 @@ async def test_document_real_simulation():
             
             res = await session.call_tool("xlsx_parser", arguments={"url": "test_doc_parser.xlsx"})
             if not res.isError:
-                print(f" [PASS] Xlsx Content: {res.content[0].text}")
+                print(f" \033[92m[PASS]\033[0m Xlsx Content: {res.content[0].text}")
             else:
-                print(f" [FAIL] {res.content[0].text}")
+                print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
             # Cleanup
             import os

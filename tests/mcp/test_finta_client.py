@@ -56,11 +56,11 @@ async def test_finta_tools_dynamic():
                     # Generic call with 'data' argument
                     res = await session.call_tool(tool.name, arguments={"data": data})
                     if not res.isError:
-                        print(" [PASS]")
+                        print(" \033[92m[PASS]\033[0m")
                         success += 1
                     else:
                         # Some tools might need extra params, check if error is meaningful
-                        print(f" [FAIL] {res.content[0].text[:50] if res.content else 'Error'}")
+                        print(f" \033[91m[FAIL]\033[0m {res.content[0].text[:50] if res.content else 'Error'}")
                         failed += 1
                 except Exception as e:
                      print(f" [EXCEPTION] {e}")

@@ -52,10 +52,10 @@ async def test_yfinance_tools_dynamic():
                     res = await session.call_tool(name, arguments={"ticker": "MSFT", "symbol": "MSFT"})
                     
                     if not res.isError:
-                        print(" [PASS]")
+                        print(" \033[92m[PASS]\033[0m")
                         success += 1
                     else:
-                        print(f" [FAIL] {res.content[0].text[:50] if res.content else 'Error'}")
+                        print(f" \033[91m[FAIL]\033[0m {res.content[0].text[:50] if res.content else 'Error'}")
                         # Don't increment failure for network issues or deprecated tools
                         # But log it
                         failed += 1
@@ -129,9 +129,9 @@ async def test_simulation_full_coverage():
                 try:
                     res = await session.call_tool(tool_name, arguments=args)
                     if res.isError:
-                        print(f" [FAIL] {res.content[0].text[:50]}")
+                        print(f" \033[91m[FAIL]\033[0m {res.content[0].text[:50]}")
                         return False
-                    print(" [PASS]")
+                    print(" \033[92m[PASS]\033[0m")
                     return True
                 except Exception as e:
                     print(f" [EXCEPTION] {e}")

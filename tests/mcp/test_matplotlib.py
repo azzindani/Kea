@@ -25,7 +25,7 @@ async def test_matplotlib_real_simulation():
             res = await session.call_tool("plot_line", arguments={"x": x, "y": y, "title": "Square Numbers"})
             if not res.isError:
                 path = res.content[0].text
-                print(f" [PASS] Saved to: {path}")
+                print(f" \033[92m[PASS]\033[0m Saved to: {path}")
                 if os.path.exists(path):
                     # Clean up
                     try:
@@ -33,14 +33,14 @@ async def test_matplotlib_real_simulation():
                     except:
                         pass
             else:
-                 print(f" [FAIL] {res.content[0].text}")
+                 print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
             # 2. Plot Scatter
             print("2. Plotting Scatter Chart...")
             res = await session.call_tool("plot_scatter", arguments={"x": x, "y": y, "title": "Scatter Test"})
             if not res.isError:
                 path = res.content[0].text
-                print(f" [PASS] Saved to: {path}")
+                print(f" \033[92m[PASS]\033[0m Saved to: {path}")
                 if os.path.exists(path):
                      try:
                         os.remove(path)
@@ -52,7 +52,7 @@ async def test_matplotlib_real_simulation():
             res = await session.call_tool("plot_bar", arguments={"x": ["A", "B", "C"], "height": [3, 7, 5], "title": "Bar Test"})
             if not res.isError:
                 path = res.content[0].text
-                print(f" [PASS] Saved to: {path}")
+                print(f" \033[92m[PASS]\033[0m Saved to: {path}")
                 if os.path.exists(path):
                      try:
                         os.remove(path)
@@ -65,14 +65,14 @@ async def test_matplotlib_real_simulation():
             data = np.random.randn(100).tolist()
             res = await session.call_tool("plot_hist", arguments={"x": data, "title": "Hist Test"})
             if not res.isError:
-                 print(f" [PASS] Hist Saved: {res.content[0].text}")
+                 print(f" \033[92m[PASS]\033[0m Hist Saved: {res.content[0].text}")
             
             # 5. Heatmap
             print("5. Plotting Heatmap...")
             matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
             res = await session.call_tool("plot_heatmap", arguments={"data": matrix, "title": "Heatmap Test"})
             if not res.isError:
-                 print(f" [PASS] Heatmap Saved: {res.content[0].text}")
+                 print(f" \033[92m[PASS]\033[0m Heatmap Saved: {res.content[0].text}")
                  
             # 6. 3D Surface
             print("6. Plotting 3D Surface...")
@@ -82,7 +82,7 @@ async def test_matplotlib_real_simulation():
             Z = [[1, 0, 1], [0, 0, 0], [1, 0, 1]]
             res = await session.call_tool("plot_surface", arguments={"X": X, "Y": Y, "Z": Z, "title": "3D Test"})
             if not res.isError:
-                 print(f" [PASS] 3D Saved: {res.content[0].text}")
+                 print(f" \033[92m[PASS]\033[0m 3D Saved: {res.content[0].text}")
                  
             # Cleanup all
             # (Assuming cleanup logic is improved or just manual check)

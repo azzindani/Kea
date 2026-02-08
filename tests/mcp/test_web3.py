@@ -41,7 +41,7 @@ async def test_web3_full_coverage():
             await session.call_tool("get_chain_id", arguments={"rpc_url": rpc_url})
             await session.call_tool("get_code", arguments={"address": usdt, "rpc_url": rpc_url})
             await session.call_tool("switch_chain", arguments={"chain": "ethereum"})
-            print(" [PASS] Core RPC tools")
+            print(" \033[92m[PASS]\033[0m Core RPC tools")
 
             # --- 2. MARKETS ---
             print("\n[2. Markets]")
@@ -53,13 +53,13 @@ async def test_web3_full_coverage():
             bayc = "0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D"
             await session.call_tool("get_nft_owner", arguments={"token_address": bayc, "token_id": "1", "rpc_url": rpc_url})
             await session.call_tool("get_nft_metadata_uri", arguments={"token_address": bayc, "token_id": "1", "rpc_url": rpc_url})
-            print(" [PASS] Market tools")
+            print(" \033[92m[PASS]\033[0m Market tools")
 
             # --- 3. MULTICALL ---
             print("\n[3. Multicall]")
             await session.call_tool("get_bulk_balances", arguments={"addresses": [vitalik, usdt], "rpc_url": rpc_url})
             await session.call_tool("get_bulk_token_balances", arguments={"wallet_address": vitalik, "token_addresses": [usdt, weth], "rpc_url": rpc_url})
-            print(" [PASS] Multicall tools")
+            print(" \033[92m[PASS]\033[0m Multicall tools")
 
             # --- 4. UTILS/ENS ---
             print("\n[4. Utils/ENS]")
@@ -69,7 +69,7 @@ async def test_web3_full_coverage():
             
             await session.call_tool("to_wei", arguments={"amount": 1, "unit": "ether"})
             await session.call_tool("from_wei", arguments={"amount": 1000000000000000000, "unit": "ether"})
-            print(" [PASS] Utils/ENS tools")
+            print(" \033[92m[PASS]\033[0m Utils/ENS tools")
 
             # --- 5. DEFI / EVENTS / ACTION ---
             print("\n[5. DeFi/Action]")
@@ -86,7 +86,7 @@ async def test_web3_full_coverage():
             
             await session.call_tool("wrap_eth", arguments={"amount": 0.001, "private_key": dummy_key, "rpc_url": rpc_url})
             await session.call_tool("unwrap_eth", arguments={"amount": 0.001, "private_key": dummy_key, "rpc_url": rpc_url})
-            print(" [PASS] DeFi/Action tools")
+            print(" \033[92m[PASS]\033[0m DeFi/Action tools")
 
             # --- 6. LENDING / ORACLES ---
             print("\n[6. Lending/Oracles]")
@@ -102,7 +102,7 @@ async def test_web3_full_coverage():
             await session.call_tool("get_chainlink_eth_usd", arguments={})
             await session.call_tool("get_chainlink_btc_usd", arguments={})
             await session.call_tool("get_chainlink_usdc_usd", arguments={})
-            print(" [PASS] Lending/Oracle tools")
+            print(" \033[92m[PASS]\033[0m Lending/Oracle tools")
 
             # --- 7. UNIVERSAL ---
             print("\n[7. Universal]")
@@ -115,7 +115,7 @@ async def test_web3_full_coverage():
                 "rpc_url": rpc_url
             })
             await session.call_tool("decode_transaction", arguments={"tx_hash": "0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060", "abi": '[{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"Transfer","type":"event"}]', "rpc_url": rpc_url})
-            print(" [PASS] Universal tools")
+            print(" \033[92m[PASS]\033[0m Universal tools")
 
             # --- 8. YIELD / SAFETY ---
             print("\n[8. Yield/Safety]")
@@ -123,7 +123,7 @@ async def test_web3_full_coverage():
             # Curve (3pool: DAI/USDC/USDT) - check quote
             await session.call_tool("get_curve_quote", arguments={"token_in": usdt, "token_out": weth, "amount_in": 100, "rpc_url": rpc_url})
             await session.call_tool("simulate_transaction", arguments={"to_address": vitalik, "value": 1, "data": "0x", "from_address": vitalik, "rpc_url": rpc_url})
-            print(" [PASS] Yield/Safety tools")
+            print(" \033[92m[PASS]\033[0m Yield/Safety tools")
 
             # --- 9. DYNAMIC SHORTCUTS ---
             print("\n[9. Dynamic Shortcuts]")
@@ -141,7 +141,7 @@ async def test_web3_full_coverage():
                     await session.call_tool(f"get_{t}_aave_data", arguments={})
                 except:
                     pass
-            print(" [PASS] Dynamic tools")
+            print(" \033[92m[PASS]\033[0m Dynamic tools")
 
     print("\n--- Web3 100% Simulation Complete ---")
 

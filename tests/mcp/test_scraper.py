@@ -23,16 +23,16 @@ async def test_scraper_real_simulation():
             print(f"1. Fetching {url}...")
             res = await session.call_tool("fetch_url", arguments={"url": url})
             if not res.isError:
-                 print(f" [PASS] Fetched {len(res.content[0].text)} chars")
+                 print(f" \033[92m[PASS]\033[0m Fetched {len(res.content[0].text)} chars")
             else:
-                 print(f" [FAIL] {res.content[0].text}")
+                 print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
             # 2. Browser Scrape
             print("2. Browser Scrape...")
             # We assume playwright is installed with the server dependencies
             res = await session.call_tool("browser_scrape_page", arguments={"url": url, "screenshot": True})
             if not res.isError:
-                 print(f" [PASS] Browser scrape successful")
+                 print(f" \033[92m[PASS]\033[0m Browser scrape successful")
             else:
                  print(f" [WARN] Browser scrape failed (maybe browser not installed): {res.content[0].text}")
 

@@ -59,10 +59,10 @@ async def test_crawler_real_simulation():
                 return
 
             if res.isError:
-                 print(f" [FAIL] Crawl: {res.content[0].text if res.content else 'Error'}")
+                 print(f" \033[91m[FAIL]\033[0m Crawl: {res.content[0].text if res.content else 'Error'}")
             else:
                  content = res.content[0].text
-                 print(f" [PASS] Crawl successful. Content len: {len(content)}")
+                 print(f" \033[92m[PASS]\033[0m Crawl successful. Content len: {len(content)}")
                  assert "Example Domain" in content
             
             print("--- Crawler Simulation Complete ---")

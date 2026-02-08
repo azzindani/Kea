@@ -10,7 +10,7 @@ async def main():
     print("🧪 Verifying Orchestrator Service Import...")
     try:
         from services.orchestrator.main import app
-        print("✅ Orchestrator Service Imported Successfully.")
+        print("\033[92m✅\033[0m Orchestrator Service Imported Successfully.")
         return 0
     except Exception as e:
         print(f"❌ Orchestrator Import Failed: {e}")

@@ -29,45 +29,45 @@ async def test_ccxt_real_simulation():
             print(f"1. Fetching Ticker for {exchange} {symbol}...")
             res = await session.call_tool("get_ticker", arguments={"exchange": exchange, "symbol": symbol})
             if not res.isError:
-                print(f" [PASS] Ticker Data caught (Sample): {res.content[0].text[:100]}...")
+                print(f" \033[92m[PASS]\033[0m Ticker Data caught (Sample): {res.content[0].text[:100]}...")
             else:
-                print(f" [FAIL] {res.content[0].text}")
+                print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
             # 2. OHLCV
             print(f"2. Fetching OHLCV (1d)...")
             res = await session.call_tool("get_ohlcv", arguments={"exchange": exchange, "symbol": symbol, "timeframe": "1d", "limit": 3})
             if not res.isError:
-                print(f" [PASS] Candles caught (Sample): {res.content[0].text[:100]}...")
+                print(f" \033[92m[PASS]\033[0m Candles caught (Sample): {res.content[0].text[:100]}...")
             else:
-                print(f" [FAIL] {res.content[0].text}")
+                print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
                 
             # 3. Order Book
             print(f"3. Fetching Order Book...")
             res = await session.call_tool("get_order_book", arguments={"exchange": exchange, "symbol": symbol, "limit": 5})
             if not res.isError:
-                print(f" [PASS] Book depth caught")
+                print(f" \033[92m[PASS]\033[0m Book depth caught")
             else:
-                print(f" [FAIL] {res.content[0].text}")
+                print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
             # 4. Global Price (Aggregator)
             print(f"4. Testing Aggregator (Global Price)...")
             res = await session.call_tool("get_global_price", arguments={"symbol": symbol})
             if not res.isError:
-                print(f" [PASS] Global Price: {res.content[0].text}")
+                print(f" \033[92m[PASS]\033[0m Global Price: {res.content[0].text}")
             else:
-                print(f" [FAIL] {res.content[0].text}")
+                print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
                 
             # 5. Metadata
             print(f"5. Listing Markets (Coinbase)...")
             res = await session.call_tool("list_exchange_markets", arguments={"exchange": "coinbase"})
             if not res.isError:
-                print(f" [PASS] Markets listed (Length check desc)")
+                print(f" \033[92m[PASS]\033[0m Markets listed (Length check desc)")
 
             # 6. Derivatives (Funding Rate)
             print(f"6. Testing Derivatives (Funding Rate)...")
             res = await session.call_tool("get_funding_rate", arguments={"exchange": exchange, "symbol": "BTC/USDT:USDT"})
             if not res.isError:
-                 print(f" [PASS] Funding Rate: {res.content[0].text}")
+                 print(f" \033[92m[PASS]\033[0m Funding Rate: {res.content[0].text}")
             else:
                  # Might fail if not available or symbol diff
                  print(f" [INFO] Funding Rate: {res.content[0].text}")

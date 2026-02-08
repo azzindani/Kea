@@ -47,12 +47,12 @@ async def test_google_real_simulation():
             res = await session.call_tool("search_google", arguments={"query": query, "num_results": 3})
             
             if res.isError:
-                print(f" [FAIL] {res.content[0].text if res.content else 'Unknown Error'}")
+                print(f" \033[91m[FAIL]\033[0m {res.content[0].text if res.content else 'Unknown Error'}")
                 # We might fail if rate limited or no internet, so we log but maybe don't hard fail assert if prone to flakes
                 # But user asked for real simulation, so we expect success.
             else:
                 content = res.content[0].text
-                print(f" [PASS] Got result length: {len(content)}")
+                print(f" \033[92m[PASS]\033[0m Got result length: {len(content)}")
                 assert "Python" in content
                 
             print("--- Google Search Simulation Complete ---")

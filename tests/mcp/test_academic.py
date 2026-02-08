@@ -28,9 +28,9 @@ async def test_academic_real_simulation():
                 print(f"1. Testing PubMed Search ('{query}')...")
                 res = await session.call_tool("pubmed_search", arguments={"query": query, "max_results": 3})
                 if res.isError:
-                    print(f" [FAIL] {res.content[0].text}")
+                    print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
                 else:
-                    print(f" [PASS] Got results length: {len(res.content[0].text)}")
+                    print(f" \033[92m[PASS]\033[0m Got results length: {len(res.content[0].text)}")
 
             # 3. ArXiv Search
             if "arxiv_search" in tool_names:
@@ -38,9 +38,9 @@ async def test_academic_real_simulation():
                 print(f"2. Testing ArXiv Search ('{query}')...")
                 res = await session.call_tool("arxiv_search", arguments={"query": query, "max_results": 2})
                 if res.isError:
-                    print(f" [FAIL] {res.content[0].text}")
+                    print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
                 else:
-                    print(f" [PASS] Got results length: {len(res.content[0].text)}")
+                    print(f" \033[92m[PASS]\033[0m Got results length: {len(res.content[0].text)}")
 
             # 4. Semantic Scholar
             if "semantic_scholar_search" in tool_names:
@@ -51,7 +51,7 @@ async def test_academic_real_simulation():
                     # Semantic Scholar API might be strict or require key, accept fail/warn
                     print(f" [WARN/FAIL] {res.content[0].text}")
                 else:
-                    print(f" [PASS] Got results: {res.content[0].text[:100]}...")
+                    print(f" \033[92m[PASS]\033[0m Got results: {res.content[0].text[:100]}...")
 
             # 5. Crossref (Metadata)
             if "crossref_lookup" in tool_names:
@@ -59,9 +59,9 @@ async def test_academic_real_simulation():
                 print(f"4. Testing Crossref Lookup ('{doi}')...")
                 res = await session.call_tool("crossref_lookup", arguments={"doi": doi})
                 if not res.isError:
-                     print(f" [PASS] Found metadata")
+                     print(f" \033[92m[PASS]\033[0m Found metadata")
                 else:
-                     print(f" [FAIL] {res.content[0].text}")
+                     print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
             # 6. Paper Downloader
             if "paper_downloader" in tool_names:
@@ -70,7 +70,7 @@ async def test_academic_real_simulation():
                 print(f"5. Testing Paper Downloader ('{doi}')...")
                 res = await session.call_tool("paper_downloader", arguments={"doi": doi})
                 if not res.isError:
-                     print(f" [PASS] Result: {res.content[0].text}")
+                     print(f" \033[92m[PASS]\033[0m Result: {res.content[0].text}")
                 else:
                      print(f" [WARN] Download failed (expected in some envs): {res.content[0].text}")
 

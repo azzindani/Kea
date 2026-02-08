@@ -40,7 +40,7 @@ async def test_vision_real_simulation():
             res = await session.call_tool("screenshot_extract", arguments={"image_base64": b64_img, "extraction_type": "text"})
             
             if not res.isError:
-                 print(f" [PASS] Extracted: {res.content[0].text}")
+                 print(f" \033[92m[PASS]\033[0m Extracted: {res.content[0].text}")
             else:
                  print(f" [WARN] Extraction Failed (Missing Keys?): {res.content[0].text}")
 

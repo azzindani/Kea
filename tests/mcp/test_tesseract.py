@@ -39,7 +39,7 @@ async def test_tesseract_real_simulation():
             # If not installed, it might error or return empty. We handle gracefully.
             res = await session.call_tool("image_to_string", arguments={"image_input": abs_path})
             if not res.isError:
-                 print(f" [PASS] OCR Result: {res.content[0].text.strip()}")
+                 print(f" \033[92m[PASS]\033[0m OCR Result: {res.content[0].text.strip()}")
             else:
                  print(f" [WARN] OCR Failed (Tesseract installed?): {res.content[0].text}")
 
@@ -47,23 +47,23 @@ async def test_tesseract_real_simulation():
             print("2. Getting Char Boxes...")
             res = await session.call_tool("get_char_boxes", arguments={"image_input": abs_path})
             if not res.isError:
-                 print(f" [PASS] Boxes Found: {len(res.content[0].text)}")
+                 print(f" \033[92m[PASS]\033[0m Boxes Found: {len(res.content[0].text)}")
 
             # 3. Preprocessing (Grayscale)
             print("3. Preprocessing (Grayscale)...")
             res = await session.call_tool("preprocess_grayscale", arguments={"image_input": abs_path})
-            print(" [PASS] Preprocessed" if not res.isError else f" [FAIL] {res.content[0].text}")
+            print(" \033[92m[PASS]\033[0m Preprocessed" if not res.isError else f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
             # 4. HOCR Output
             print("4. Getting HOCR...")
             res = await session.call_tool("image_to_hocr", arguments={"image_input": abs_path})
-            print(" [PASS] HOCR Generated" if not res.isError else f" [FAIL] {res.content[0].text}")
+            print(" \033[92m[PASS]\033[0m HOCR Generated" if not res.isError else f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
             # 5. OSD
             print("5. Orientation Check...")
             res = await session.call_tool("ocr_osd_only", arguments={"image_input": abs_path})
              # OSD might fail on small dummy images, but we call it
-            print(" [PASS] OSD Called")
+            print(" \033[92m[PASS]\033[0m OSD Called")
 
     # Cleanup
     if os.path.exists(img_path):

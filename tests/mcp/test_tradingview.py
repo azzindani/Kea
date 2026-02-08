@@ -22,17 +22,17 @@ async def test_tradingview_real_simulation():
             # 1. TA Summary
             print(f"1. Getting TA Summary for {symbol}...")
             res = await session.call_tool("get_ta_summary", arguments={"symbol": symbol, "exchange": "NASDAQ", "interval": "1d"})
-            print(f" [PASS] Summary: {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m Summary: {res.content[0].text}")
 
             # 2. Get Fundamental (P/E)
             print(f"2. Getting P/E for {symbol}...")
             res = await session.call_tool("get_tv_price_earnings", arguments={"ticker": symbol})
-            print(f" [PASS] P/E: {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m P/E: {res.content[0].text}")
 
             # 3. Market Scan (Top Gainers)
             print("3. Scanning Top Gainers...")
             res = await session.call_tool("scan_america_top_gainers", arguments={"limit": 5})
-            print(f" [PASS] Gainers: {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m Gainers: {res.content[0].text}")
 
     print("--- TradingView Simulation Complete ---")
 

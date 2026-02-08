@@ -23,21 +23,21 @@ async def test_xmltodict_real_simulation():
             print(f"1. Parsing XML: '{xml_str}'...")
             res = await session.call_tool("parse_xml_string", arguments={"xml_input": xml_str})
             if not res.isError:
-                 print(f" [PASS] Parsed Dict: {res.content[0].text}")
+                 print(f" \033[92m[PASS]\033[0m Parsed Dict: {res.content[0].text}")
 
             # 2. Unparse Dict (Dict to XML)
             print("2. Unparsing Dict to XML...")
             data = {"root": {"status": "ok", "value": "100"}}
             res = await session.call_tool("unparse_dict_string", arguments={"data": data})
             if not res.isError:
-                 print(f" [PASS] XML Output: {res.content[0].text}")
+                 print(f" \033[92m[PASS]\033[0m XML Output: {res.content[0].text}")
 
             # 3. Valid Tool Call (Unparse Pretty)
             print("3. Unparsing Dict (Pretty)...")
             data = {"root": {"status": "ok", "value": "100"}}
             res = await session.call_tool("unparse_dict_pretty", arguments={"data": data})
             if not res.isError:
-                 print(f" [PASS] XML Output: {res.content[0].text}")
+                 print(f" \033[92m[PASS]\033[0m XML Output: {res.content[0].text}")
 
     print("--- XmlToDict Simulation Complete ---")
 

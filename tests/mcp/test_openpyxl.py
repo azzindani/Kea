@@ -24,7 +24,7 @@ async def test_openpyxl_real_simulation():
             print(f"1. Creating Workbook '{test_file}'...")
             res = await session.call_tool("create_new_workbook", arguments={"file_path": test_file, "overwrite": True})
             if not res.isError:
-                 print(f" [PASS] Created")
+                 print(f" \033[92m[PASS]\033[0m Created")
             
             # 2. Write Data
             print("2. Writing Data...")
@@ -35,12 +35,12 @@ async def test_openpyxl_real_simulation():
                 [3, "Charlie", 4500]
             ]
             res = await session.call_tool("write_range_values", arguments={"file_path": test_file, "data": data, "start_cell": "A1"})
-            print(f" [PASS] {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m {res.content[0].text}")
             
             # 3. Styling (Font)
             print("3. Styling Header...")
             res = await session.call_tool("set_cell_font", arguments={"file_path": test_file, "cell": "A1", "bold": True})
-            print(f" [PASS] {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m {res.content[0].text}")
 
             # 4. Create Chart
             print("4. Creating Chart...")
@@ -51,14 +51,14 @@ async def test_openpyxl_real_simulation():
                 "title": "Sales Data"
             })
             if not res.isError:
-                print(f" [PASS] Chart added")
+                print(f" \033[92m[PASS]\033[0m Chart added")
             else:
-                 print(f" [FAIL] {res.content[0].text}")
+                 print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
             # 5. Read Back
             print("5. Reading Back Data...")
             res = await session.call_tool("read_range_values", arguments={"file_path": test_file, "range_string": "A1:C4"})
-            print(f" [PASS] Read: {res.content[0].text[:100]}...")
+            print(f" \033[92m[PASS]\033[0m Read: {res.content[0].text[:100]}...")
 
     # Cleanup
     if os.path.exists(test_file):

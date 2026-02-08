@@ -28,22 +28,22 @@ async def test_shutil_real_simulation():
             # 1. Valid Path
             print("1. Validating Path...")
             res = await session.call_tool("validate_path", arguments={"path": os.getcwd()})
-            print(f" [PASS] Valid: {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m Valid: {res.content[0].text}")
 
             # 2. Touch File
             print(f"2. Creating file '{test_file}'...")
             res = await session.call_tool("touch_file", arguments={"path": os.path.abspath(test_file)})
-            print(f" [PASS] Touched: {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m Touched: {res.content[0].text}")
 
             # 3. Copy File
             print(f"3. Copying to '{copy_file}'...")
             res = await session.call_tool("copy_file", arguments={"src": os.path.abspath(test_file), "dst": os.path.abspath(copy_file)})
-            print(f" [PASS] Copied: {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m Copied: {res.content[0].text}")
             
             # 4. Get Disk Usage
             print("4. Checking Disk Usage...")
             res = await session.call_tool("get_disk_usage", arguments={"path": "."})
-            print(f" [PASS] Usage: {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m Usage: {res.content[0].text}")
 
             # 5. Archive
             print("5. Archiving...")

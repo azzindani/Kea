@@ -26,20 +26,20 @@ async def test_sec_edgar_real_simulation():
             # Using 'amount=1' to minimize impact.
             res = await session.call_tool("get_10k_latest", arguments={"ticker": ticker})
             if not res.isError:
-                 print(f" [PASS] Downloaded/Extracted: {res.content[0].text[:100]}...")
+                 print(f" \033[92m[PASS]\033[0m Downloaded/Extracted: {res.content[0].text[:100]}...")
             else:
                  print(f" [WARN] 10-K Download failed: {res.content[0].text}")
 
             # 2. List Filings
             print(f"2. Listing Filings for {ticker}...")
             res = await session.call_tool("list_filings", arguments={"ticker": ticker})
-            print(f" [PASS] Listings: {res.content[0].text[:100]}...")
+            print(f" \033[92m[PASS]\033[0m Listings: {res.content[0].text[:100]}...")
 
             # 3. Latest 8-K
             print(f"3. Downloading latest 8-K for {ticker}...")
             res = await session.call_tool("get_8k_latest", arguments={"ticker": ticker})
             if not res.isError:
-                 print(f" [PASS] 8-K Path: {res.content[0].text}")
+                 print(f" \033[92m[PASS]\033[0m 8-K Path: {res.content[0].text}")
 
             # 4. Search in Filing (using previous path if available, else skip)
             # For simulation, we assume some filing exists or we search library

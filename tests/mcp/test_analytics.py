@@ -30,27 +30,27 @@ async def test_analytics_real_simulation():
                 print(f"1. Testing EDA Auto ({data_url})...")
                 res = await session.call_tool("eda_auto", arguments={"data_url": data_url})
                 if res.isError:
-                    print(f" [FAIL] {res.content[0].text}")
+                    print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
                 else:
-                    print(f" [PASS] Report generated ({len(res.content[0].text)} chars)")
+                    print(f" \033[92m[PASS]\033[0m Report generated ({len(res.content[0].text)} chars)")
             
             # 3. Data Profiler
             if "data_profiler" in tool_names:
                 print("2. Testing Data Profiler...")
                 res = await session.call_tool("data_profiler", arguments={"data_url": data_url, "minimal": True})
                 if not res.isError:
-                    print(" [PASS] Profile generated")
+                    print(" \033[92m[PASS]\033[0m Profile generated")
                 else:
-                    print(f" [FAIL] {res.content[0].text}")
+                    print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
             # 4. Correlation Matrix
             if "correlation_matrix" in tool_names:
                 print("3. Testing Correlation Matrix...")
                 res = await session.call_tool("correlation_matrix", arguments={"data_url": data_url})
                 if not res.isError:
-                    print(f" [PASS] Matrix:\n{res.content[0].text}")
+                    print(f" \033[92m[PASS]\033[0m Matrix:\n{res.content[0].text}")
                 else:
-                    print(f" [FAIL] {res.content[0].text}")
+                    print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
             # 5. Statistical Test
             if "statistical_test" in tool_names:
@@ -65,9 +65,9 @@ async def test_analytics_real_simulation():
                     "group_column": "species" 
                 })
                 if not res.isError:
-                    print(f" [PASS] T-Test Result: {res.content[0].text[:50]}...")
+                    print(f" \033[92m[PASS]\033[0m T-Test Result: {res.content[0].text[:50]}...")
                 else:
-                    print(f" [FAIL] {res.content[0].text}")
+                    print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
             # 6. Data Cleaner
             if "data_cleaner" in tool_names:
@@ -78,9 +78,9 @@ async def test_analytics_real_simulation():
                     "remove_duplicates": True
                 })
                 if not res.isError:
-                    print(f" [PASS] Cleaned summary: {res.content[0].text[:50]}...")
+                    print(f" \033[92m[PASS]\033[0m Cleaned summary: {res.content[0].text[:50]}...")
                 else:
-                    print(f" [FAIL] {res.content[0].text}")
+                    print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
             # 7. Feature Engineer
             if "feature_engineer" in tool_names:
@@ -91,7 +91,7 @@ async def test_analytics_real_simulation():
                     "operations": ["log_transform:sepal_width"] 
                 })
                 if not res.isError:
-                    print(f" [PASS] Engineered summary: {res.content[0].text[:50]}...")
+                    print(f" \033[92m[PASS]\033[0m Engineered summary: {res.content[0].text[:50]}...")
                 else:
                     # Might fail if op not supported, strict check later
                     print(f" [WARN/FAIL] {res.content[0].text}") 

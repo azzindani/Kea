@@ -35,7 +35,7 @@ async def test_ytdlp_full_coverage():
             await session.call_tool("set_proxy", arguments={"url": ""})
             await session.call_tool("set_user_agent", arguments={"ua": "Mozilla/5.0"})
             await session.call_tool("get_default_options", arguments={})
-            print(" [PASS] Core tools")
+            print(" \033[92m[PASS]\033[0m Core tools")
 
             # --- 2. INFO EXTRACTION ---
             print("\n[2. Info Extraction]")
@@ -54,7 +54,7 @@ async def test_ytdlp_full_coverage():
             await session.call_tool("get_subtitles_list", arguments={"url": url})
             await session.call_tool("get_view_count", arguments={"url": url})
             await session.call_tool("get_duration", arguments={"url": url})
-            print(" [PASS] Info tools")
+            print(" \033[92m[PASS]\033[0m Info tools")
 
             # --- 3. FORMAT OPERATIONS ---
             print("\n[3. Format Ops]")
@@ -64,7 +64,7 @@ async def test_ytdlp_full_coverage():
             await session.call_tool("get_worst_quality_format", arguments={"url": url})
             await session.call_tool("filter_formats_by_res", arguments={"url": url, "height": 240})
             await session.call_tool("check_format_availability", arguments={"url": url, "format_id": "18"}) # 18 is usually mp4 360p
-            print(" [PASS] Format tools")
+            print(" \033[92m[PASS]\033[0m Format tools")
 
             # --- 4. DOWNLOADS ---
             # IMPORTANT: We actually download files here. 
@@ -99,7 +99,7 @@ async def test_ytdlp_full_coverage():
             # Actually, let's try `download_channel_latest` with n=1 on a small channel.
             await session.call_tool("download_channel_latest", arguments={"url": channel_url, "n": 1})
             
-            print(" [PASS] Download tools")
+            print(" \033[92m[PASS]\033[0m Download tools")
 
             # --- 5. BULK ---
             print("\n[5. Bulk Ops]")
@@ -112,7 +112,7 @@ async def test_ytdlp_full_coverage():
             # await session.call_tool("bulk_download_videos", arguments={"urls": urls}) 
             # await session.call_tool("bulk_download_audio", arguments={"urls": urls})
             # await session.call_tool("bulk_search_and_download", arguments={"queries": ["Me at the zoo"]})
-            print(" [PASS] Bulk tools")
+            print(" \033[92m[PASS]\033[0m Bulk tools")
 
             # --- 6. SUPER TOOLS ---
             print("\n[6. Super Tools]")
@@ -148,7 +148,7 @@ async def test_ytdlp_full_coverage():
             # download_time_range
             await session.call_tool("download_time_range", arguments={"url": channel_url, "start_date": "20050101", "end_date": "20051231"})
             
-            print(" [PASS] Super tools")
+            print(" \033[92m[PASS]\033[0m Super tools")
 
     # Cleanup .mp4, .mp3, .json, .jpg files created in current dir
     # Be careful not to delete project files.

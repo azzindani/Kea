@@ -45,11 +45,11 @@ async def test_ddg_real_world_simulation():
             res = await session.call_tool("search_text", arguments={"query": query, "max_results": 3})
             
             if res.isError:
-                print(f" [FAIL] {res.content[0].text if res.content else 'Unknown Error'}")
+                print(f" \033[91m[FAIL]\033[0m {res.content[0].text if res.content else 'Unknown Error'}")
                 assert False, "Search failed"
             else:
                 content = res.content[0].text
-                print(f" [PASS] Got {len(content)} chars of result")
+                print(f" \033[92m[PASS]\033[0m Got {len(content)} chars of result")
                 # print(f"   Sample: {content[:200]}...")
                 assert "OpenAI" in content or "API" in content
             
@@ -61,9 +61,9 @@ async def test_ddg_real_world_simulation():
                 print(f"2. Searching images for '{query}'...")
                 img_res = await session.call_tool("search_images", arguments={"query": query, "max_results": 2})
                 if not img_res.isError:
-                    print(" [PASS] Image search successful")
+                    print(" \033[92m[PASS]\033[0m Image search successful")
                 else:
-                    print(f" [FAIL] {img_res.content[0].text}")
+                    print(f" \033[91m[FAIL]\033[0m {img_res.content[0].text}")
             
             print("--- DDG Simulation Complete ---")
 

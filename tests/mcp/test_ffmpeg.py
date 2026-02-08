@@ -28,7 +28,7 @@ async def test_ffmpeg_real_simulation():
             if is_available:
                 print("2. Getting Version...")
                 res = await session.call_tool("get_ffmpeg_version")
-                print(f" [PASS] Version: {res.content[0].text}")
+                print(f" \033[92m[PASS]\033[0m Version: {res.content[0].text}")
 
             # 3. Create Test Video (Active Simulation)
             print("3. Generating Test Video (color test source)...")
@@ -39,25 +39,25 @@ async def test_ffmpeg_real_simulation():
             
                 # Generate 3 seconds of video
                 ffmpeg.input('testsrc=size=320x240:rate=30', f='lavfi').output(test_video, t=3).overwrite_output().run(quiet=True)
-                print(" [PASS] Test video generated")
+                print(" \033[92m[PASS]\033[0m Test video generated")
                 
                 # 4. Probe & Info
                 print("4. Probing & Info...")
                 res = await session.call_tool("probe_file", arguments={"path": test_video})
                 if not res.isError:
-                    print(f" [PASS] Probe: {res.content[0].text[:50]}...")
+                    print(f" \033[92m[PASS]\033[0m Probe: {res.content[0].text[:50]}...")
                 
                 res = await session.call_tool("get_duration", arguments={"path": test_video})
-                print(f" [PASS] Duration: {res.content[0].text}")
+                print(f" \033[92m[PASS]\033[0m Duration: {res.content[0].text}")
 
                 res = await session.call_tool("get_resolution", arguments={"path": test_video})
-                print(f" [PASS] Resolution: {res.content[0].text}")
+                print(f" \033[92m[PASS]\033[0m Resolution: {res.content[0].text}")
 
                 # 5. Conversion
                 print("5. Converting to MKV...")
                 res = await session.call_tool("convert_format", arguments={"input_path": test_video, "output_path": test_output})
                 if not res.isError:
-                     print(f" [PASS] Conversion: {res.content[0].text}")
+                     print(f" \033[92m[PASS]\033[0m Conversion: {res.content[0].text}")
                 
             except ImportError:
                 print(" [WARN] ffmpeg-python not installed in test env. Skipping generation.")

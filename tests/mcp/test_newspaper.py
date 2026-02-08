@@ -26,11 +26,11 @@ async def test_newspaper_real_simulation():
             print(f"1. Building Source ({url})...")
             res = await session.call_tool("build_source", arguments={"url": url})
             if res.isError:
-                 print(f" [FAIL] {res.content[0].text}")
+                 print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
                  # If build fails (network), try a simpler direct article logic if possible, 
                  # but for now we proceed.
             else:
-                 print(f" [PASS] Source built")
+                 print(f" \033[92m[PASS]\033[0m Source built")
 
             # 2. Get Articles List
             print("2. Getting Articles List...")
@@ -39,7 +39,7 @@ async def test_newspaper_real_simulation():
                 try:
                     import json
                     articles = json.loads(res.content[0].text)
-                    print(f" [PASS] Found {len(articles)} articles")
+                    print(f" \033[92m[PASS]\033[0m Found {len(articles)} articles")
                     
                     if len(articles) > 0:
                         article_url = articles[0]
@@ -47,12 +47,12 @@ async def test_newspaper_real_simulation():
                         # 3. Single Article Title
                         print(f"3. Fetching Title for {article_url}...")
                         res = await session.call_tool("get_article_title", arguments={"url": article_url})
-                        print(f" [PASS] Title: {res.content[0].text}")
+                        print(f" \033[92m[PASS]\033[0m Title: {res.content[0].text}")
                         
                         # 4. NLP
                         print(f"4. NLP Analysis...")
                         res = await session.call_tool("get_article_nlp", arguments={"url": article_url})
-                        print(f" [PASS] NLP Data received")
+                        print(f" \033[92m[PASS]\033[0m NLP Data received")
                 except:
                     print(f" [WARN] Could not parse article list or empty: {res.content[0].text}")
 
@@ -60,7 +60,7 @@ async def test_newspaper_real_simulation():
             print("5. Google Trending Terms...")
             res = await session.call_tool("get_google_trending_terms")
             if not res.isError:
-                print(f" [PASS] Trends: {res.content[0].text}")
+                print(f" \033[92m[PASS]\033[0m Trends: {res.content[0].text}")
 
     print("--- Newspaper Simulation Complete ---")
 

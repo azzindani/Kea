@@ -26,7 +26,7 @@ async def test_xgboost_real_simulation():
             res = await session.call_tool("xgb_classifier", arguments={"X": X, "y": y, "n_estimators": 5})
             if not res.isError:
                 # Returns model ID or path usually, or JSON
-                 print(f" [PASS] Model Trained: {str(res.content[0].text)[:100]}...")
+                 print(f" \033[92m[PASS]\033[0m Model Trained: {str(res.content[0].text)[:100]}...")
             else:
                  print(f" [WARN] Training Failed: {res.content[0].text}")
 
@@ -36,14 +36,14 @@ async def test_xgboost_real_simulation():
             y_reg = [1, 2, 3, 4]
             res = await session.call_tool("xgb_regressor", arguments={"X": X_reg, "y": y_reg})
             if not res.isError:
-                 print(f" [PASS] Regressor: {res.content[0].text[:50]}...")
+                 print(f" \033[92m[PASS]\033[0m Regressor: {res.content[0].text[:50]}...")
 
             # 3. Native Booster (Train)
             print("3. Native Booster Train...")
             # Native expects DMatrix params usually, but tool handles it
             res = await session.call_tool("booster_train", arguments={"X": X, "y": y, "params": {"objective": "binary:logistic"}})
             if not res.isError:
-                 print(f" [PASS] Booster: {res.content[0].text[:50]}...")
+                 print(f" \033[92m[PASS]\033[0m Booster: {res.content[0].text[:50]}...")
 
     print("--- XGBoost Simulation Complete ---")
 

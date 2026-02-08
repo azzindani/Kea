@@ -41,7 +41,7 @@ async def test_hashlib_full_coverage():
             await session.call_tool("algorithms_available", arguments={})
             await session.call_tool("get_hash_info", arguments={"algo_name": "sha256"})
             await session.call_tool("check_algorithm", arguments={"algo_name": "md5"})
-            print(" [PASS] Core info tools")
+            print(" \033[92m[PASS]\033[0m Core info tools")
 
             # --- 2. STRING HASHING ---
             print("\n[2. String Hashing]")
@@ -54,13 +54,13 @@ async def test_hashlib_full_coverage():
                 await session.call_tool(f"{algo}_string", arguments={"text": test_string})
             
             await session.call_tool("hash_string_generic", arguments={"text": test_string, "algo_name": "sha256"})
-            print(" [PASS] All string hash tools")
+            print(" \033[92m[PASS]\033[0m All string hash tools")
 
             # --- 3. SHAKE (Variable Length) ---
             print("\n[3. SHAKE]")
             await session.call_tool("shake_128_string", arguments={"text": test_string, "length": 16})
             await session.call_tool("shake_256_string", arguments={"text": test_string, "length": 16})
-            print(" [PASS] SHAKE tools")
+            print(" \033[92m[PASS]\033[0m SHAKE tools")
 
             # --- 4. FILE HASHING ---
             print("\n[4. File Hashing]")
@@ -70,7 +70,7 @@ async def test_hashlib_full_coverage():
             
             await session.call_tool("hash_file_generic", arguments={"file_path": test_file_name, "algo_name": "sha256"})
             await session.call_tool("hash_file_partial", arguments={"file_path": test_file_name, "algo_name": "sha256", "chunk_size": 10})
-            print(" [PASS] All file hash tools")
+            print(" \033[92m[PASS]\033[0m All file hash tools")
 
             # --- 5. BULK ---
             print("\n[5. Bulk Operations]")
@@ -81,7 +81,7 @@ async def test_hashlib_full_coverage():
             await session.call_tool("hash_directory", arguments={"directory": ".", "pattern": "*.txt"})
             res = await session.call_tool("hash_directory_manifest", arguments={"directory": "."})
             manifest_json = res.content[0].text
-            print(" [PASS] Bulk & Directory tools")
+            print(" \033[92m[PASS]\033[0m Bulk & Directory tools")
 
             # --- 6. SECURITY ---
             print("\n[6. Security & HMAC]")
@@ -96,8 +96,8 @@ async def test_hashlib_full_coverage():
             # Verify HMAC
             res = await session.call_tool("verify_hmac", arguments={"key": key, "message": test_string, "signature": sig})
             if "true" in str(res.content[0].text).lower():
-                print(" [PASS] verified hmac")
-            print(" [PASS] Security tools")
+                print(" \033[92m[PASS]\033[0m verified hmac")
+            print(" \033[92m[PASS]\033[0m Security tools")
 
             # --- 7. SUPER TOOLS ---
             print("\n[7. Super Tools]")
@@ -145,7 +145,7 @@ async def test_hashlib_full_coverage():
             await session.call_tool("create_merkle_root", arguments={"items": ["a", "b", "c"]})
             await session.call_tool("compare_text_similarity", arguments={"text1": "hello", "text2": "hello world"})
             
-            print(" [PASS] Super tools")
+            print(" \033[92m[PASS]\033[0m Super tools")
 
     # Cleanup
     for f in [test_file_name, "test_hash_dup.txt", dummy_csv, "test_hash_out.csv"]:

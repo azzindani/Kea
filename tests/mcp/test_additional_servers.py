@@ -16,7 +16,7 @@ class TestAcademicServer:
         """Test academic server imports."""
         from mcp_servers.academic_server import server
         assert server is not None
-        print("\n✅ Academic server imports work")
+        print("\n\033[92m✅\033[0m Academic server imports work")
     
     def test_search_papers(self):
         """Test academic paper search."""
@@ -29,7 +29,7 @@ class TestAcademicServer:
         tool_names = [t.name for t in tools]
         
         assert any("search" in name.lower() or "paper" in name.lower() for name in tool_names) or len(tools) > 0
-        print(f"\n✅ Academic server has {len(tools)} tools")
+        print(f"\n\033[92m✅\033[0m Academic server has {len(tools)} tools")
 
 
 class TestAnalyticsServer:
@@ -39,7 +39,7 @@ class TestAnalyticsServer:
         """Test analytics server imports."""
         from mcp_servers.analytics_server import server
         assert server is not None
-        print("\n✅ Analytics server imports work")
+        print("\n\033[92m✅\033[0m Analytics server imports work")
     
     def test_list_tools(self):
         """Test listing analytics tools."""
@@ -49,7 +49,7 @@ class TestAnalyticsServer:
         tools = server.get_tools()
         
         assert len(tools) >= 1
-        print(f"\n✅ Analytics server has {len(tools)} tools")
+        print(f"\n\033[92m✅\033[0m Analytics server has {len(tools)} tools")
 
 
 class TestBrowserAgentServer:
@@ -59,7 +59,7 @@ class TestBrowserAgentServer:
         """Test browser agent server imports."""
         from mcp_servers.browser_agent_server import server
         assert server is not None
-        print("\n✅ Browser agent server imports work")
+        print("\n\033[92m✅\033[0m Browser agent server imports work")
     
     def test_list_tools(self):
         """Test listing browser tools."""
@@ -69,7 +69,7 @@ class TestBrowserAgentServer:
         tools = server.get_tools()
         
         assert len(tools) >= 1
-        print(f"\n✅ Browser agent has {len(tools)} tools")
+        print(f"\n\033[92m✅\033[0m Browser agent has {len(tools)} tools")
 
 
 class TestCrawlerServer:
@@ -79,7 +79,7 @@ class TestCrawlerServer:
         """Test crawler server imports."""
         from mcp_servers.crawler_server import server
         assert server is not None
-        print("\n✅ Crawler server imports work")
+        print("\n\033[92m✅\033[0m Crawler server imports work")
     
     def test_list_tools(self):
         """Test listing crawler tools."""
@@ -89,7 +89,7 @@ class TestCrawlerServer:
         tools = server.get_tools()
         
         assert len(tools) >= 1
-        print(f"\n✅ Crawler has {len(tools)} tools")
+        print(f"\n\033[92m✅\033[0m Crawler has {len(tools)} tools")
 
 
 class TestDataSourcesServer:
@@ -99,7 +99,7 @@ class TestDataSourcesServer:
         """Test data sources server imports."""
         from mcp_servers.data_sources_server import server
         assert server is not None
-        print("\n✅ Data sources server imports work")
+        print("\n\033[92m✅\033[0m Data sources server imports work")
     
     def test_list_tools(self):
         """Test listing data source tools."""
@@ -109,7 +109,7 @@ class TestDataSourcesServer:
         tools = server.get_tools()
         
         assert len(tools) >= 1
-        print(f"\n✅ Data sources has {len(tools)} tools")
+        print(f"\n\033[92m✅\033[0m Data sources has {len(tools)} tools")
 
 
 class TestDocumentServer:
@@ -119,7 +119,7 @@ class TestDocumentServer:
         """Test document server imports."""
         from mcp_servers.document_server import server
         assert server is not None
-        print("\n✅ Document server imports work")
+        print("\n\033[92m✅\033[0m Document server imports work")
     
     def test_list_tools(self):
         """Test listing document tools."""
@@ -129,7 +129,7 @@ class TestDocumentServer:
         tools = server.get_tools()
         
         assert len(tools) >= 1
-        print(f"\n✅ Document server has {len(tools)} tools")
+        print(f"\n\033[92m✅\033[0m Document server has {len(tools)} tools")
 
 
 class TestMLServer:
@@ -139,7 +139,7 @@ class TestMLServer:
         """Test ML server imports."""
         from mcp_servers.ml_server import server
         assert server is not None
-        print("\n✅ ML server imports work")
+        print("\n\033[92m✅\033[0m ML server imports work")
     
     def test_list_tools(self):
         """Test listing ML tools."""
@@ -149,7 +149,7 @@ class TestMLServer:
         tools = server.get_tools()
         
         assert len(tools) >= 1
-        print(f"\n✅ ML server has {len(tools)} tools")
+        print(f"\n\033[92m✅\033[0m ML server has {len(tools)} tools")
 
 
 class TestQualitativeServer:
@@ -159,7 +159,7 @@ class TestQualitativeServer:
         """Test qualitative server imports."""
         from mcp_servers.qualitative_server import server
         assert server is not None
-        print("\n✅ Qualitative server imports work")
+        print("\n\033[92m✅\033[0m Qualitative server imports work")
     
     def test_list_tools(self):
         """Test listing qualitative tools."""
@@ -169,7 +169,7 @@ class TestQualitativeServer:
         tools = server.get_tools()
         
         assert len(tools) >= 1
-        print(f"\n✅ Qualitative has {len(tools)} tools")
+        print(f"\n\033[92m✅\033[0m Qualitative has {len(tools)} tools")
 
 
 class TestRegulatoryServer:
@@ -179,7 +179,7 @@ class TestRegulatoryServer:
         """Test regulatory server imports."""
         from mcp_servers.regulatory_server import server
         assert server is not None
-        print("\n✅ Regulatory server imports work")
+        print("\n\033[92m✅\033[0m Regulatory server imports work")
     
     def test_list_tools(self):
         """Test listing regulatory tools."""
@@ -189,7 +189,7 @@ class TestRegulatoryServer:
         tools = server.get_tools()
         
         assert len(tools) >= 1
-        print(f"\n✅ Regulatory has {len(tools)} tools")
+        print(f"\n\033[92m✅\033[0m Regulatory has {len(tools)} tools")
 
 
 class TestSecurityServer:
@@ -199,7 +199,7 @@ class TestSecurityServer:
         """Test security server imports."""
         from mcp_servers.security_server import server
         assert server is not None
-        print("\n✅ Security server imports work")
+        print("\n\033[92m✅\033[0m Security server imports work")
     
     def test_list_tools(self):
         """Test listing security tools."""
@@ -209,7 +209,7 @@ class TestSecurityServer:
         tools = server.get_tools()
         
         assert len(tools) >= 1
-        print(f"\n✅ Security has {len(tools)} tools")
+        print(f"\n\033[92m✅\033[0m Security has {len(tools)} tools")
 
 
 class TestToolDiscoveryServer:
@@ -219,7 +219,7 @@ class TestToolDiscoveryServer:
         """Test tool discovery server imports."""
         from mcp_servers.tool_discovery_server import server
         assert server is not None
-        print("\n✅ Tool discovery server imports work")
+        print("\n\033[92m✅\033[0m Tool discovery server imports work")
     
     def test_list_tools(self):
         """Test listing discovery tools."""
@@ -229,7 +229,7 @@ class TestToolDiscoveryServer:
         tools = server.get_tools()
         
         assert len(tools) >= 1
-        print(f"\n✅ Tool discovery has {len(tools)} tools")
+        print(f"\n\033[92m✅\033[0m Tool discovery has {len(tools)} tools")
 
 
 class TestVisualizationServer:
@@ -239,7 +239,7 @@ class TestVisualizationServer:
         """Test visualization server imports."""
         from mcp_servers.visualization_server import server
         assert server is not None
-        print("\n✅ Visualization server imports work")
+        print("\n\033[92m✅\033[0m Visualization server imports work")
     
     def test_list_tools(self):
         """Test listing visualization tools."""
@@ -249,7 +249,7 @@ class TestVisualizationServer:
         tools = server.get_tools()
         
         assert len(tools) >= 1
-        print(f"\n✅ Visualization has {len(tools)} tools")
+        print(f"\n\033[92m✅\033[0m Visualization has {len(tools)} tools")
 
 
 if __name__ == "__main__":

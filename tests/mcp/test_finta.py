@@ -32,35 +32,35 @@ async def test_finta_real_simulation():
             print("1. Calculating RSI...")
             res = await session.call_tool("calculate_rsi", arguments={"data": data})
             if not res.isError:
-                 print(f" [PASS] RSI Data: {res.content[0].text[:100]}...")
+                 print(f" \033[92m[PASS]\033[0m RSI Data: {res.content[0].text[:100]}...")
             else:
-                 print(f" [FAIL] {res.content[0].text}")
+                 print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
             # 2. SMA
             print("2. Calculating SMA...")
             res = await session.call_tool("calculate_sma", arguments={"data": data})
             if not res.isError:
-                 print(f" [PASS] SMA Data: {res.content[0].text[:100]}...")
+                 print(f" \033[92m[PASS]\033[0m SMA Data: {res.content[0].text[:100]}...")
 
             # 3. Bollinger Bands
             print("3. Calculating Bollinger Bands...")
             res = await session.call_tool("calculate_bbands", arguments={"data": data})
             if not res.isError:
-                 print(f" [PASS] BBands Data: {res.content[0].text[:100]}...")
+                 print(f" \033[92m[PASS]\033[0m BBands Data: {res.content[0].text[:100]}...")
             
             # 4. Ichimoku (Cloud)
             print("4. Calculating Ichimoku (Cloud)...")
             res = await session.call_tool("calculate_ichimoku", arguments={"data": data})
             if not res.isError:
-                 print(f" [PASS] Ichimoku Data: {res.content[0].text[:100]}...")
+                 print(f" \033[92m[PASS]\033[0m Ichimoku Data: {res.content[0].text[:100]}...")
 
             # 5. Bulk All
             print("5. Calculating ALL Indicators (Bulk)...")
             res = await session.call_tool("get_all_indicators", arguments={"data": data})
             if not res.isError:
-                print(f" [PASS] Bulk Result Length: {len(res.content[0].text)}")
+                print(f" \033[92m[PASS]\033[0m Bulk Result Length: {len(res.content[0].text)}")
             else:
-                print(f" [FAIL] {res.content[0].text}")
+                print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
     print("--- Finta Simulation Complete ---")
 

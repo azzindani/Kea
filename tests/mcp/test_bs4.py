@@ -41,10 +41,10 @@ async def test_bs4_real_simulation():
             print("1. Parsing HTML...")
             res = await session.call_tool("parse_html", arguments={"html": html_content})
             if res.isError:
-                print(f" [FAIL] Parse: {res.content[0].text}")
+                print(f" \033[91m[FAIL]\033[0m Parse: {res.content[0].text}")
                 return
             soup_id = res.content[0].text
-            print(f" [PASS] Soup ID: {soup_id}")
+            print(f" \033[92m[PASS]\033[0m Soup ID: {soup_id}")
             
             # 2. Get Stats
             res = await session.call_tool("get_stats", arguments={"soup_id": soup_id})
@@ -59,24 +59,24 @@ async def test_bs4_real_simulation():
             import json
             try:
                 children = json.loads(res.content[0].text)
-                print(f" [PASS] Children found: {len(children)}")
+                print(f" \033[92m[PASS]\033[0m Children found: {len(children)}")
             except:
-                print(f" [PASS] Children (raw): {res.content[0].text[:50]}...")
+                print(f" \033[92m[PASS]\033[0m Children (raw): {res.content[0].text[:50]}...")
             
             # 4. Search
             print("3. Search (find_by_text 'Microservices')...")
             res = await session.call_tool("find_by_text", arguments={"text_regex": "Microservices", "soup_id": soup_id})
             assert not res.isError
-            print(f" [PASS] Found: {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m Found: {res.content[0].text}")
             
             # 5. Extraction
             print("4. Extraction (get_text of h1)...")
             res = await session.call_tool("get_text", arguments={"selector": "h1", "soup_id": soup_id})
-            print(f" [PASS] Text: '{res.content[0].text}'")
+            print(f" \033[92m[PASS]\033[0m Text: '{res.content[0].text}'")
             
             print("   Extraction (get_attr data-id)...")
             res = await session.call_tool("get_attr", arguments={"selector": "li", "attr": "data-id", "soup_id": soup_id})
-            print(f" [PASS] Attr: {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m Attr: {res.content[0].text}")
             
             # 6. Modification
             print("5. Modification (add_class)...")
@@ -91,7 +91,7 @@ async def test_bs4_real_simulation():
             print("6. Conversion (to_markdown)...")
             res = await session.call_tool("to_markdown", arguments={"soup_id": soup_id})
             if not res.isError:
-                print(f" [PASS] Markdown Preview:\n{res.content[0].text[:100]}...")
+                print(f" \033[92m[PASS]\033[0m Markdown Preview:\n{res.content[0].text[:100]}...")
 
             # 8. Super Tools
             print("7. Super Tools (bulk_extract)...")
@@ -100,23 +100,23 @@ async def test_bs4_real_simulation():
                 "soup_id": soup_id
             })
             if not res.isError:
-                print(f" [PASS] Bulk: {res.content[0].text}")
+                print(f" \033[92m[PASS]\033[0m Bulk: {res.content[0].text}")
             
             print("   Super Tools (view_tree)...")
             res = await session.call_tool("view_tree", arguments={"soup_id": soup_id, "depth": 2})
             if not res.isError:
-                print(f" [PASS] Tree:\n{res.content[0].text[:100]}...")
+                print(f" \033[92m[PASS]\033[0m Tree:\n{res.content[0].text[:100]}...")
 
             print("   Super Tools (extract_table)...")
             # Create a table first since none exists
             await session.call_tool("insert_after", arguments={"selector": "h1", "html": "<table><tr><td>A</td><td>B</td></tr><tr><td>1</td><td>2</td></tr></table>", "soup_id": soup_id})
             res = await session.call_tool("extract_table", arguments={"soup_id": soup_id})
             if not res.isError:
-                print(f" [PASS] Table: {res.content[0].text}")
+                print(f" \033[92m[PASS]\033[0m Table: {res.content[0].text}")
             
             # 8. Cleanup
             await session.call_tool("close_soup", arguments={"soup_id": soup_id})
-            print(" [PASS] Soup closed")
+            print(" \033[92m[PASS]\033[0m Soup closed")
 
     print("--- BS4 Simulation Complete ---")
 

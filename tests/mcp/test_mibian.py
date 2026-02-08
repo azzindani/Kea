@@ -43,22 +43,22 @@ async def test_mibian_real_simulation():
             
             res = await session.call_tool("calculate_bs_price", arguments=args)
             if not res.isError:
-                print(f" [PASS] Price: {res.content[0].text}")
+                print(f" \033[92m[PASS]\033[0m Price: {res.content[0].text}")
             else:
-                 print(f" [FAIL] {res.content[0].text}")
+                 print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
             # 2. Greeks (Delta)
             print("2. BS Delta...")
             res = await session.call_tool("calculate_bs_delta", arguments=args)
             if not res.isError:
-                print(f" [PASS] Delta: {res.content[0].text}")
+                print(f" \033[92m[PASS]\033[0m Delta: {res.content[0].text}")
 
             # 3. IV Calculation
             print("3. Implied Volatility (Price=3.5)...")
             iv_args = {"underlyingPrice": S, "strikePrice": K, "interestRate": r, "daysToExpiration": t, "optionPrice": 3.5}
             res = await session.call_tool("calculate_implied_volatility", arguments=iv_args)
             if not res.isError:
-                print(f" [PASS] IV: {res.content[0].text}%")
+                print(f" \033[92m[PASS]\033[0m IV: {res.content[0].text}%")
 
             # 4. Bulk Option Chain
             print("4. Option Chain (S=100, K=[90,100,110])...")
@@ -71,7 +71,7 @@ async def test_mibian_real_simulation():
             }
             res = await session.call_tool("price_option_chain", arguments=chain_args)
             if not res.isError:
-                 print(f" [PASS] Chain: {res.content[0].text[:100]}...")
+                 print(f" \033[92m[PASS]\033[0m Chain: {res.content[0].text[:100]}...")
 
     print("--- Mibian Simulation Complete ---")
 

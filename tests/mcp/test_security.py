@@ -21,23 +21,23 @@ async def test_security_real_simulation():
             print("1. Sanitizing HTML...")
             dirty_html = "<script>alert('xss')</script><b>Hello</b>"
             res = await session.call_tool("content_sanitizer", arguments={"content": dirty_html, "allow_html": True})
-            print(f" [PASS] Sanitized: {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m Sanitized: {res.content[0].text}")
 
             # 2. File Hash Check (on content)
             print("2. Hashing Content...")
             res = await session.call_tool("file_hash_check", arguments={"content": "suspicious_payload"})
-            print(f" [PASS] Hash Report: {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m Hash Report: {res.content[0].text}")
 
             # 3. Code Safety Check
             print("3. Checking Code Safety...")
             unsafe_code = "import os; os.system('rm -rf /')"
             res = await session.call_tool("code_safety_check", arguments={"code": unsafe_code})
-            print(f" [PASS] Analysis: {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m Analysis: {res.content[0].text}")
 
             # 4. URL Scanner
             print("4. URL Scanner...")
             res = await session.call_tool("url_scanner", arguments={"url": "http://example.com"})
-            print(f" [PASS] Scan: {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m Scan: {res.content[0].text}")
 
             # 5. Domain Reputation
             print("5. Domain Reputation...")

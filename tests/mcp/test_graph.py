@@ -12,7 +12,7 @@ async def main():
     try:
         from services.orchestrator.core.graph import compile_research_graph
         graph = compile_research_graph()
-        print("✅ Graph Compiled Successfully.")
+        print("\033[92m✅\033[0m Graph Compiled Successfully.")
         return 0
     except Exception as e:
         print(f"❌ Graph Compilation Failed: {e}")

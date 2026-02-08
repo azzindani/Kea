@@ -21,7 +21,7 @@ async def test_regulatory_real_simulation():
             print("1. Searching EDGAR (Tesla)...")
             res = await session.call_tool("edgar_search", arguments={"company": "Tesla", "filing_type": "10-K"})
             if not res.isError:
-                 print(f" [PASS] Search results received")
+                 print(f" \033[92m[PASS]\033[0m Search results received")
             else:
                  print(f" [WARN] EDGAR Search failed (network/rate limit?): {res.content[0].text}")
 
@@ -29,7 +29,7 @@ async def test_regulatory_real_simulation():
             print("2. Searching eCFR (Drones)...")
             res = await session.call_tool("ecfr_search", arguments={"query": "drones"})
             if not res.isError:
-                 print(f" [PASS] eCFR results received")
+                 print(f" \033[92m[PASS]\033[0m eCFR results received")
 
             # 3. Federal Register
             print("3. Federal Register...")

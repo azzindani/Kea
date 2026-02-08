@@ -34,34 +34,34 @@ async def test_pdfplumber_real_simulation():
             # 1. Metadata
             print("1. Getting Metadata...")
             res = await session.call_tool("get_pdf_metadata", arguments={"path": pdf_file})
-            print(f" [PASS] Metadata: {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m Metadata: {res.content[0].text}")
 
             # 2. Page Count
             print("2. Counting Pages...")
             res = await session.call_tool("get_page_count", arguments={"path": pdf_file})
-            print(f" [PASS] Pages: {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m Pages: {res.content[0].text}")
 
             # 3. Extract Text
             print("3. Extracting Text (Page 1)...")
             res = await session.call_tool("extract_text_simple", arguments={"path": pdf_file, "page_number": 1})
-            print(f" [PASS] Text: {res.content[0].text[:50]}...")
+            print(f" \033[92m[PASS]\033[0m Text: {res.content[0].text[:50]}...")
 
             # 4. Extract Tables
             print("4. Extracting Tables (Page 1)...")
             res = await session.call_tool("extract_tables", arguments={"path": pdf_file, "page_number": 1})
-            print(f" [PASS] Tables found")
+            print(f" \033[92m[PASS]\033[0m Tables found")
 
             # 5. Extract Images
             print("5. Extracting Images...")
             res = await session.call_tool("extract_images", arguments={"path": pdf_file, "page_number": 1})
             if not res.isError:
-                 print(f" [PASS] Images extracted")
+                 print(f" \033[92m[PASS]\033[0m Images extracted")
 
             # 6. Extract Hyperlinks
             print("6. Extracting Hyperlinks...")
             res = await session.call_tool("extract_hyperlinks", arguments={"path": pdf_file, "page_number": 1})
             if not res.isError:
-                 print(f" [PASS] Hyperlinks extracted")
+                 print(f" \033[92m[PASS]\033[0m Hyperlinks extracted")
 
     # Cleanup
     if os.path.exists(pdf_file):

@@ -23,7 +23,7 @@ async def test_playwright_real_simulation():
             print("1. Launching Browser...")
             res = await session.call_tool("launch_browser", arguments={"browser_type": "chromium"})
             if res.isError:
-                print(f" [FAIL] {res.content[0].text}")
+                print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
                 return
             
             # 2. Navigate
@@ -31,19 +31,19 @@ async def test_playwright_real_simulation():
             print(f"2. Navigating to {url}...")
             res = await session.call_tool("goto_page", arguments={"url": url})
             if not res.isError:
-                 print(f" [PASS] Navigated")
+                 print(f" \033[92m[PASS]\033[0m Navigated")
 
             # 3. Get Title
             print("3. Getting Title...")
             res = await session.call_tool("evaluate_js", arguments={"script": "document.title"})
-            print(f" [PASS] Title: {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m Title: {res.content[0].text}")
 
             # 4. Screenshot
             print("4. Taking Screenshot...")
             screenshot_path = "test_screenshot.png"
             res = await session.call_tool("screenshot_page", arguments={"path": screenshot_path})
             if not res.isError:
-                print(f" [PASS] Screenshot saved")
+                print(f" \033[92m[PASS]\033[0m Screenshot saved")
                 if os.path.exists(screenshot_path):
                     os.remove(screenshot_path)
 
@@ -53,7 +53,7 @@ async def test_playwright_real_simulation():
             print("5. Clicking Element...")
             res = await session.call_tool("click_element", arguments={"selector": "a"}) # The 'More information' link
             if not res.isError:
-                 print(f" [PASS] Clicked link")
+                 print(f" \033[92m[PASS]\033[0m Clicked link")
 
     print("--- Playwright Simulation Complete ---")
 

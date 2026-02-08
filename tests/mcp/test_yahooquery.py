@@ -23,29 +23,29 @@ async def test_yahooquery_real_simulation():
             print(f"1. Fetching Snapshot for {ticker}...")
             res = await session.call_tool("get_fundamental_snapshot", arguments={"tickers": ticker})
             if not res.isError:
-                 print(f" [PASS] Snapshot Data Length: {len(res.content[0].text)}")
+                 print(f" \033[92m[PASS]\033[0m Snapshot Data Length: {len(res.content[0].text)}")
                  
             # 2. Search Ticker
             print("2. Searching for 'Tesla'...")
             res = await session.call_tool("search_ticker", arguments={"query": "Tesla"})
-            print(f" [PASS] Results: {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m Results: {res.content[0].text}")
 
             # 3. Trending Symbols
             print("3. Getting Trending Symbols...")
             res = await session.call_tool("get_trending_symbols", arguments={"country": "united states", "count": 3})
-            print(f" [PASS] Trending: {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m Trending: {res.content[0].text}")
 
             # 4. Income Statement
             print("4. Getting Income Statement...")
             res = await session.call_tool("get_income_statement", arguments={"ticker": ticker})
             if not res.isError:
-                 print(f" [PASS] Income Stmt Rows: {len(res.content[0].text)}")
+                 print(f" \033[92m[PASS]\033[0m Income Stmt Rows: {len(res.content[0].text)}")
 
             # 5. Balance Sheet
             print("5. Getting Balance Sheet...")
             res = await session.call_tool("get_balance_sheet", arguments={"ticker": ticker})
             if not res.isError:
-                 print(f" [PASS] Balance Sheet Rows: {len(res.content[0].text)}")
+                 print(f" \033[92m[PASS]\033[0m Balance Sheet Rows: {len(res.content[0].text)}")
 
     print("--- YahooQuery Simulation Complete ---")
 

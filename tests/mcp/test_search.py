@@ -23,7 +23,7 @@ async def test_search_real_simulation():
             print(f"1. Web Search: '{query}'...")
             res = await session.call_tool("web_search", arguments={"query": query, "max_results": 2})
             if not res.isError:
-                 print(f" [PASS] Results found (Length: {len(res.content[0].text)})")
+                 print(f" \033[92m[PASS]\033[0m Results found (Length: {len(res.content[0].text)})")
             else:
                  print(f" [WARN] Search failed (network/API key?): {res.content[0].text}")
 
@@ -31,7 +31,7 @@ async def test_search_real_simulation():
             print(f"2. News Search: '{query}'...")
             res = await session.call_tool("news_search", arguments={"query": query, "max_results": 2})
             if not res.isError:
-                 print(f" [PASS] News found (Length: {len(res.content[0].text)})")
+                 print(f" \033[92m[PASS]\033[0m News found (Length: {len(res.content[0].text)})")
 
     print("--- Search Simulation Complete ---")
 

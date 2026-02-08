@@ -32,19 +32,19 @@ async def test_seaborn_real_simulation():
             res = await session.call_tool("scatterplot", arguments={"data": data, "x": "x", "y": "y", "hue": "group"})
             if not res.isError:
                 path = res.content[0].text
-                print(f" [PASS] Saved to: {path}")
+                print(f" \033[92m[PASS]\033[0m Saved to: {path}")
                 if os.path.exists(path):
                     try: os.remove(path)
                     except: pass
             else:
-                 print(f" [FAIL] {res.content[0].text}")
+                 print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
             # 2. Histplot
             print("2. Histplot...")
             res = await session.call_tool("histplot", arguments={"data": data, "x": "y"})
             if not res.isError:
                 path = res.content[0].text
-                print(f" [PASS] Saved to: {path}")
+                print(f" \033[92m[PASS]\033[0m Saved to: {path}")
                 if os.path.exists(path):
                     try: os.remove(path)
                     except: pass
@@ -64,7 +64,7 @@ async def test_seaborn_real_simulation():
             print("3. Auto Plot...")
             res = await session.call_tool("auto_plot", arguments={"data": data, "x": "x", "y": "y"})
             if not res.isError:
-                 print(f" [PASS] Auto plot created")
+                 print(f" \033[92m[PASS]\033[0m Auto plot created")
                  path = res.content[0].text
                  if os.path.exists(path):
                     try: os.remove(path)

@@ -41,25 +41,25 @@ async def test_visualization_real_simulation():
                 "title": "Test Scatter"
             })
             if not res.isError:
-                 print(f" [PASS] Chart Created (Length: {len(res.content[0].text)})")
+                 print(f" \033[92m[PASS]\033[0m Chart Created (Length: {len(res.content[0].text)})")
             
             # 2. Correlation Heatmap
             print("2. Creating Heatmap...")
             res = await session.call_tool("create_correlation_heatmap", arguments={"data_url": abs_path})
             if not res.isError:
-                 print(f" [PASS] Heatmap Created")
+                 print(f" \033[92m[PASS]\033[0m Heatmap Created")
 
             # 3. Distribution Plot
             print("3. Creating Distribution Plot...")
             res = await session.call_tool("create_distribution_plot", arguments={"data_url": abs_path, "columns": ["y"]})
             if not res.isError:
-                 print(f" [PASS] Distribution Created")
+                 print(f" \033[92m[PASS]\033[0m Distribution Created")
 
             # 4. Pairplot
             print("4. Creating Pairplot...")
             res = await session.call_tool("create_pairplot", arguments={"data_url": abs_path, "columns": ["x", "y"], "color_column": "category"})
             if not res.isError:
-                 print(f" [PASS] Pairplot Created")
+                 print(f" \033[92m[PASS]\033[0m Pairplot Created")
 
     # Cleanup
     if os.path.exists(csv_path):

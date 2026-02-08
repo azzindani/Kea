@@ -61,9 +61,9 @@ async def test_fs_real_simulation():
             # Tools usually take 'path' and 'content'
             res_write = await session.call_tool(write_tool, arguments={"path": test_path, "content": content_to_write})
             if res_write.isError:
-                print(f" [FAIL] Write: {res_write.content[0].text}")
+                print(f" \033[91m[FAIL]\033[0m Write: {res_write.content[0].text}")
                 return
-            print(" [PASS] Write successful")
+            print(" \033[92m[PASS]\033[0m Write successful")
             
             # 2. Read File
             read_tool = "read_file" if "read_file" in tool_names else "fs_read"
@@ -71,10 +71,10 @@ async def test_fs_real_simulation():
             res_read = await session.call_tool(read_tool, arguments={"path": test_path})
             
             if res_read.isError:
-                print(f" [FAIL] Read: {res_read.content[0].text}")
+                print(f" \033[91m[FAIL]\033[0m Read: {res_read.content[0].text}")
             else:
                 read_content = res_read.content[0].text
-                print(f" [PASS] Read content: '{read_content}'")
+                print(f" \033[92m[PASS]\033[0m Read content: '{read_content}'")
                 assert content_to_write in read_content
             
             # 3. List Directory (to see it)
@@ -83,7 +83,7 @@ async def test_fs_real_simulation():
             res_list = await session.call_tool(list_tool, arguments={"path": temp_dir})
             if not res_list.isError:
                  if test_file_name in res_list.content[0].text:
-                     print(" [PASS] File found in directory listing")
+                     print(" \033[92m[PASS]\033[0m File found in directory listing")
                  else:
                      print(f" [WARN] File not found in listing (might be paginated/filtered)")
             

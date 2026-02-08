@@ -31,9 +31,9 @@ async def test_portfolio_real_simulation():
             print("1. Loading Prices...")
             res = await session.call_tool("load_prices_csv", arguments={"file_path": csv_file})
             if res.isError:
-                print(f" [FAIL] {res.content[0].text}")
+                print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
             else:
-                print(f" [PASS] Loaded")
+                print(f" \033[92m[PASS]\033[0m Loaded")
 
             # Store prices_input (usually just the path or JSON string)
             # The tool `load_prices_csv` returns JSON string, which is `prices_input` for other tools?
@@ -44,25 +44,25 @@ async def test_portfolio_real_simulation():
             # 2. Expected Returns (Mean)
             print("2. Calculating Expected Returns...")
             res = await session.call_tool("mean_historical_return", arguments={"prices_input": prices_input})
-            print(f" [PASS] Returns: {res.content[0].text}")
+            print(f" \033[92m[PASS]\033[0m Returns: {res.content[0].text}")
 
             # 2b. Risk Model (Sample Cov)
             print("2b. Risk Model (Sample Cov)...")
             res = await session.call_tool("sample_cov", arguments={"prices_input": prices_input})
             if not res.isError:
-                 print(f" [PASS] Covariance calculated")
+                 print(f" \033[92m[PASS]\033[0m Covariance calculated")
 
             # 2c. HRP Optimization
             print("2c. HRP Optimization...")
             res = await session.call_tool("hrp_optimize", arguments={"prices_input": prices_input})
             if not res.isError:
-                 print(f" [PASS] HRP Weights: {res.content[0].text}")
+                 print(f" \033[92m[PASS]\033[0m HRP Weights: {res.content[0].text}")
 
             # 3. Optimize (Max Sharpe)
             print("3. Optimizing Max Sharpe...")
             res = await session.call_tool("ef_max_sharpe", arguments={"prices_input": prices_input})
             if not res.isError:
-                 print(f" [PASS] Weights: {res.content[0].text}")
+                 print(f" \033[92m[PASS]\033[0m Weights: {res.content[0].text}")
             
             # 4. Generate Report
             # Needs weights from step 3
@@ -74,7 +74,7 @@ async def test_portfolio_real_simulation():
                     res = await session.call_tool("generate_report", arguments={"prices_input": prices_input, "weights": weights})
                     if not res.isError:
                          report_path = res.content[0].text
-                         print(f" [PASS] Report: {report_path}")
+                         print(f" \033[92m[PASS]\033[0m Report: {report_path}")
                          if os.path.exists(report_path):
                             try: os.remove(report_path)
                             except: pass

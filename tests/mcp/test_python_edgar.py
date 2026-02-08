@@ -26,21 +26,21 @@ async def test_python_edgar_real_simulation():
             # The server likely handles it or uses valid default
             res = await session.call_tool("analyze_company_profile", arguments={"ticker": ticker})
             if res.isError:
-                 print(f" [FAIL] {res.content[0].text}")
+                 print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
             else:
-                 print(f" [PASS] Profile received (Length: {len(res.content[0].text)})")
+                 print(f" \033[92m[PASS]\033[0m Profile received (Length: {len(res.content[0].text)})")
 
             # 2. Find Filings
             print("2. Finding Filings (10-K)...")
             res = await session.call_tool("find_filings", arguments={"ticker": ticker, "form": "10-K", "limit": 1})
             if not res.isError:
-                 print(f" [PASS] Filings found")
+                 print(f" \033[92m[PASS]\033[0m Filings found")
             
             # 3. Filing Sections
             print("3. Getting Filing Sections...")
             res = await session.call_tool("get_filing_sections", arguments={"ticker": ticker, "form": "10-K"})
             if not res.isError:
-                 print(f" [PASS] Sections listed")
+                 print(f" \033[92m[PASS]\033[0m Sections listed")
 
     print("--- Python Edgar Simulation Complete ---")
 
