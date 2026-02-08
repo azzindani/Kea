@@ -10,7 +10,9 @@ import structlog
 try:
     from mcp.server.fastmcp import FastMCP as LibFastMCP, Image, Text, Resource
     from pydantic import ValidationError
-except ImportError:
+except ImportError as e:
+    import sys
+    print(f"DEBUG: Failed to import MCP dependencies: {e}", file=sys.stderr)
     # Fallback for environments where mcp is not installed
     # This ensures the file is at least importable
     class LibFastMCP:
