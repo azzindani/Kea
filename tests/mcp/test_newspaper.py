@@ -37,36 +37,40 @@ async def test_newspaper_real_simulation():
             res = await session.call_tool("get_source_articles_list", arguments={"url": url, "limit": 5})
             if not res.isError:
                 try:
-                    import json
-                    articles = json.loads(res.content[0].text)
-                    print(f" \033[92m[PASS]\033[0m Found {len(articles)} articles")
-                    
-                    if len(articles) > 0:
-                        # Find a suitable article causing less 404s
-                        # Some URLs in the list might be invalid or relative if parsing failed partially
-                        valid_articles = [a for a in articles if a.startswith("http")]
-                        if valid_articles:
-                            article_url = valid_articles[0]
-                        else:
-                            print(" [WARN] No valid article URLs found")
-                            return
+                    if not res.content:
+                        print(" [WARN] No content returned from article list")
+                    else:
+                        import json
+                        articles = json.loads(res.content[0].text)
+                        print(f" \033[92m[PASS]\033[0m Found {len(articles)} articles")
                         
-                        # 3. Single Article Title
-                        print(f"3. Fetching Title for {article_url}...")
-                        res = await session.call_tool("get_article_title", arguments={"url": article_url})
-                        print(f" \033[92m[PASS]\033[0m Title: {res.content[0].text}")
-                        
-                        # 4. NLP
-                        print(f"4. NLP Analysis...")
-                        res = await session.call_tool("get_article_nlp", arguments={"url": article_url})
-                        print(f" \033[92m[PASS]\033[0m NLP Data received")
-                except:
-                    print(f" [WARN] Could not parse article list or empty: {res.content[0].text}")
+                        if len(articles) > 0:
+                            # Find a suitable article causing less 404s
+                            # Some URLs in the list might be invalid or relative if parsing failed partially
+                            valid_articles = [a for a in articles if a.startswith("http")]
+                            if valid_articles:
+                                article_url = valid_articles[0]
+                                
+                                # 3. Single Article Title
+                                print(f"3. Fetching Title for {article_url}...")
+                                res = await session.call_tool("get_article_title", arguments={"url": article_url})
+                                if not res.isError and res.content:
+                                    print(f" \033[92m[PASS]\033[0m Title: {res.content[0].text}")
+                                
+                                # 4. NLP
+                                print(f"4. NLP Analysis...")
+                                res = await session.call_tool("get_article_nlp", arguments={"url": article_url})
+                                if not res.isError and res.content:
+                                    print(f" \033[92m[PASS]\033[0m NLP Data received")
+                            else:
+                                print(" [WARN] No valid article URLs found")
+                except Exception as e:
+                    print(f" [WARN] Could not parse article list or empty: {e}")
 
             # 5. Trending
             print("5. Google Trending Terms...")
             res = await session.call_tool("get_google_trending_terms")
-            if not res.isError:
+            if not res.isError and res.content:
                 print(f" \033[92m[PASS]\033[0m Trends: {res.content[0].text}")
 
     print("--- Newspaper Simulation Complete ---")

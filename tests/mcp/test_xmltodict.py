@@ -9,7 +9,7 @@ async def test_xmltodict_real_simulation():
     """
     REAL SIMULATION: Verify XmlToDict Server.
     """
-    params = get_server_params("xmltodict_server", extra_dependencies=[])
+    params = get_server_params("xmltodict_server", extra_dependencies=["xmltodict"])
     
     xml_str = """<root><person><name>John</name><age>30</age></person></root>"""
     

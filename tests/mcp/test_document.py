@@ -52,7 +52,13 @@ async def test_document_real_simulation():
 
             # 4. Docx Parser
             print("4. Docx Parser (Create dummy)...")
-            import docx
+            try:
+                import docx
+                HAS_DOCX = True
+            except ImportError:
+                HAS_DOCX = False
+                print(" \033[93m[WARN]\033[0m python-docx not installed, skipping DOCX test")
+
             import os
             
             # Use absolute path to ensure server can find it
@@ -60,24 +66,25 @@ async def test_document_real_simulation():
             docx_path = os.path.join(cwd, "test_doc_parser.docx")
             xlsx_path = os.path.join(cwd, "test_doc_parser.xlsx")
             
-            doc = docx.Document()
-            doc.add_paragraph("Hello from Document Server Test")
-            doc.save(docx_path)
-            
-            # Ensure file exists
-            if not os.path.exists(docx_path):
-                print(f" [FAIL] Docx file not created at {docx_path}")
-            
-            # The server expects a URL or path. For local files, we might need 'file://' prefix or just absolute path depending on implementation.
-            # Looking at document_server/tools/word.py (which I haven't seen but assuming checks file existence), absolute path should work if it's local.
-            # But wait, document_server might be running in a different container/environment if it was real, but here it's stdio in same env.
-            # The 'url' argument usually implies downloadable, but let's try absolute path.
-            
-            res = await session.call_tool("docx_parser", arguments={"url": docx_path})
-            if not res.isError:
-                print(f" \033[92m[PASS]\033[0m Docx Text: {res.content[0].text}")
-            else:
-                print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
+            if HAS_DOCX:
+                doc = docx.Document()
+                doc.add_paragraph("Hello from Document Server Test")
+                doc.save(docx_path)
+                
+                # Ensure file exists
+                if not os.path.exists(docx_path):
+                    print(f" [FAIL] Docx file not created at {docx_path}")
+                
+                # The server expects a URL or path. For local files, we might need 'file://' prefix or just absolute path depending on implementation.
+                # Looking at document_server/tools/word.py (which I haven't seen but assuming checks file existence), absolute path should work if it's local.
+                # But wait, document_server might be running in a different container/environment if it was real, but here it's stdio in same env.
+                # The 'url' argument usually implies downloadable, but let's try absolute path.
+                
+                res = await session.call_tool("docx_parser", arguments={"url": docx_path})
+                if not res.isError:
+                    print(f" \033[92m[PASS]\033[0m Docx Text: {res.content[0].text}")
+                else:
+                    print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
                 
             # 5. Xlsx Parser
             print("5. Xlsx Parser (Create dummy)...")

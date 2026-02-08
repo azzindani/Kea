@@ -21,9 +21,13 @@ async def test_textblob_real_simulation():
             await session.initialize()
             
             # 1. Sentiment Analysis
+            # 1. Sentiment Analysis
             print(f"1. Analyzing Sentiment: '{text}'...")
             res = await session.call_tool("analyze_sentiment", arguments={"text": text})
-            print(f" \033[92m[PASS]\033[0m Sentiment: {res.content[0].text}")
+            if not res.isError and res.content:
+                print(f" \033[92m[PASS]\033[0m Sentiment: {res.content[0].text}")
+            else:
+                 print(f" \033[91m[FAIL]\033[0m {res.content[0].text if res.content else 'No content'}")
 
             # 2. Spelling Correction
             print(f"2. Correcting Spelling: '{bad_text}'...")
