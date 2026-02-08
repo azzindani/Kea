@@ -1,0 +1,20 @@
+# Error patterns for Microplanner heuristic checks
+error_patterns:
+  definitive:
+    - tool not found
+    - not found in registry
+    - missing required parameter
+    - tool reported an error
+    - no data returned
+    - empty result returned
+    - rate limit exceeded
+    - authentication failed
+    - invalid ticker
+    - symbol not found
+    - connection refused
+    - timeout error
+    - data unavailable
+    - balance sheet data unavailable
+    - income statement data unavailable
+    - cash flow data unavailable
+    - no data available for

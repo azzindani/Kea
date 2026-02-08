@@ -41,7 +41,7 @@ async def test_wbgapi_real_simulation():
             print("4. Listing Regions...")
             res = await session.call_tool("list_regions", arguments={})
             if not res.isError:
-                 print(f" \033[92m[PASS]\033[0m Regions: {res.content[0].text[:50]}...")
+                 print(f" \033[92m[PASS]\033[0m Regions: {res.content[0].text[:1000]}...")
 
     print("--- World Bank Simulation Complete ---")
 

@@ -39,22 +39,22 @@ async def test_pandas_ta_real_simulation():
             # 1. RSI
             print("1. Calculating RSI...")
             res = await session.call_tool("calculate_rsi", arguments={"data": data})
-            print(f" \033[92m[PASS]\033[0m RSI: {res.content[0].text[:100]}...")
+            print(f" \033[92m[PASS]\033[0m RSI: {res.content[0].text[:1000]}...")
 
             # 2. MACD
             print("2. Calculating MACD...")
             res = await session.call_tool("calculate_macd", arguments={"data": data})
-            print(f" \033[92m[PASS]\033[0m MACD: {res.content[0].text[:100]}...")
+            print(f" \033[92m[PASS]\033[0m MACD: {res.content[0].text[:1000]}...")
 
             # 3. SMA
             print("3. Calculating SMA...")
             res = await session.call_tool("calculate_sma", arguments={"data": data, "params": {"length": 3}})
-            print(f" \033[92m[PASS]\033[0m SMA: {res.content[0].text[:100]}...")
+            print(f" \033[92m[PASS]\033[0m SMA: {res.content[0].text[:1000]}...")
 
             # 4. Supertrend
             print("4. Calculating Supertrend...")
             res = await session.call_tool("calculate_supertrend", arguments={"data": data})
-            print(f" \033[92m[PASS]\033[0m Supertrend: {res.content[0].text[:100]}...")
+            print(f" \033[92m[PASS]\033[0m Supertrend: {res.content[0].text[:1000]}...")
 
             # 5. All Indicators
             print("5. Bulk Indicators (Suite)...")

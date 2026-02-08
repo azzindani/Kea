@@ -51,7 +51,7 @@ async def test_academic_real_simulation():
                     # Semantic Scholar API might be strict or require key, accept fail/warn
                     print(f" [WARN/FAIL] {res.content[0].text}")
                 else:
-                    print(f" \033[92m[PASS]\033[0m Got results: {res.content[0].text[:100]}...")
+                    print(f" \033[92m[PASS]\033[0m Got results: {res.content[0].text[:1000]}...")
 
             # 5. Crossref (Metadata)
             if "crossref_lookup" in tool_names:

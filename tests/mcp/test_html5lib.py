@@ -56,7 +56,7 @@ async def test_html5lib_real_simulation():
             # 4. Serialize
             print("4. Serializing...")
             res = await session.call_tool("serialize_pretty", arguments={"html_input": html_content})
-            print(f" \033[92m[PASS]\033[0m Pretty HTML:\n{res.content[0].text[:100]}...")
+            print(f" \033[92m[PASS]\033[0m Pretty HTML:\n{res.content[0].text[:1000]}...")
 
             # 5. Super Tools
             print("5. Repairing Broken HTML...")

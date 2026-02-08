@@ -33,7 +33,7 @@ async def test_tool_discovery_real_simulation():
             # 3. Evaluate Package
             print("3. Evaluating Package (MCP Suitability)...")
             res = await session.call_tool("evaluate_package", arguments={"package_name": query})
-            print(f" \033[92m[PASS]\033[0m Report: {res.content[0].text[:100]}...")
+            print(f" \033[92m[PASS]\033[0m Report: {res.content[0].text[:1000]}...")
 
             # 4. Registry List
             print("4. Listing Registry...")

@@ -44,7 +44,7 @@ async def test_pdfplumber_real_simulation():
             # 3. Extract Text
             print("3. Extracting Text (Page 1)...")
             res = await session.call_tool("extract_text_simple", arguments={"path": pdf_file, "page_number": 1})
-            print(f" \033[92m[PASS]\033[0m Text: {res.content[0].text[:50]}...")
+            print(f" \033[92m[PASS]\033[0m Text: {res.content[0].text[:1000]}...")
 
             # 4. Extract Tables
             print("4. Extracting Tables (Page 1)...")

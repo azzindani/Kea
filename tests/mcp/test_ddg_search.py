@@ -50,7 +50,7 @@ async def test_ddg_real_world_simulation():
             else:
                 content = res.content[0].text
                 print(f" \033[92m[PASS]\033[0m Got {len(content)} chars of result")
-                # print(f"   Sample: {content[:200]}...")
+                # print(f"   Sample: {content[:1000]}...")
                 assert "OpenAI" in content or "API" in content
             
             # Step 2: Image Search (if available) - verify tool first

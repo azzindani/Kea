@@ -65,7 +65,7 @@ async def test_analytics_real_simulation():
                     "group_column": "species" 
                 })
                 if not res.isError:
-                    print(f" \033[92m[PASS]\033[0m T-Test Result: {res.content[0].text[:50]}...")
+                    print(f" \033[92m[PASS]\033[0m T-Test Result: {res.content[0].text[:1000]}...")
                 else:
                     print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
@@ -78,7 +78,7 @@ async def test_analytics_real_simulation():
                     "remove_duplicates": True
                 })
                 if not res.isError:
-                    print(f" \033[92m[PASS]\033[0m Cleaned summary: {res.content[0].text[:50]}...")
+                    print(f" \033[92m[PASS]\033[0m Cleaned summary: {res.content[0].text[:1000]}...")
                 else:
                     print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
@@ -91,7 +91,7 @@ async def test_analytics_real_simulation():
                     "operations": ["log_transform:sepal_width"] 
                 })
                 if not res.isError:
-                    print(f" \033[92m[PASS]\033[0m Engineered summary: {res.content[0].text[:50]}...")
+                    print(f" \033[92m[PASS]\033[0m Engineered summary: {res.content[0].text[:1000]}...")
                 else:
                     # Might fail if op not supported, strict check later
                     print(f" [WARN/FAIL] {res.content[0].text}") 

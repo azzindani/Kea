@@ -51,7 +51,7 @@ async def test_analysis_real_simulation():
                 ]
                 res = await session.call_tool("meta_analysis", arguments={"data_points": points, "analysis_type": "comparison"})
                 if not res.isError:
-                     print(f" \033[92m[PASS]\033[0m {res.content[0].text[:100]}...")
+                     print(f" \033[92m[PASS]\033[0m {res.content[0].text[:1000]}...")
                 else:
                      print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 

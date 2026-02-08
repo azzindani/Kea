@@ -53,7 +53,7 @@ async def test_lxml_real_simulation():
             # 4. Convert to Dict
             print("4. XML to Dict...")
             res = await session.call_tool("xml_to_dict_lxml", arguments={"xml_input": xml_content})
-            print(f" \033[92m[PASS]\033[0m Dict: {res.content[0].text[:100]}...")
+            print(f" \033[92m[PASS]\033[0m Dict: {res.content[0].text[:1000]}...")
             
             # 5. Transform
             print("5. Transforming (Absolute Links)...")

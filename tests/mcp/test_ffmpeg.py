@@ -45,7 +45,7 @@ async def test_ffmpeg_real_simulation():
                 print("4. Probing & Info...")
                 res = await session.call_tool("probe_file", arguments={"path": test_video})
                 if not res.isError:
-                    print(f" \033[92m[PASS]\033[0m Probe: {res.content[0].text[:50]}...")
+                    print(f" \033[92m[PASS]\033[0m Probe: {res.content[0].text[:1000]}...")
                 
                 res = await session.call_tool("get_duration", arguments={"path": test_video})
                 print(f" \033[92m[PASS]\033[0m Duration: {res.content[0].text}")

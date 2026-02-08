@@ -26,14 +26,14 @@ async def test_sec_edgar_real_simulation():
             # Using 'amount=1' to minimize impact.
             res = await session.call_tool("get_10k_latest", arguments={"ticker": ticker})
             if not res.isError:
-                 print(f" \033[92m[PASS]\033[0m Downloaded/Extracted: {res.content[0].text[:100]}...")
+                 print(f" \033[92m[PASS]\033[0m Downloaded/Extracted: {res.content[0].text[:1000]}...")
             else:
                  print(f" [WARN] 10-K Download failed: {res.content[0].text}")
 
             # 2. List Filings
             print(f"2. Listing Filings for {ticker}...")
             res = await session.call_tool("list_filings", arguments={"ticker": ticker})
-            print(f" \033[92m[PASS]\033[0m Listings: {res.content[0].text[:100]}...")
+            print(f" \033[92m[PASS]\033[0m Listings: {res.content[0].text[:1000]}...")
 
             # 3. Latest 8-K
             print(f"3. Downloading latest 8-K for {ticker}...")

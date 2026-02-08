@@ -49,7 +49,7 @@ async def test_browser_full_coverage():
             res = await session.call_tool("search_memory_recall", arguments={"query": query})
             # Check calling works, don't assert strict content if memory is ephemeral or empty
             if not res.isError:
-                 print(f"    Recall Result: {str(res.content[0].text)[:50]}...")
+                 print(f"    Recall Result: {str(res.content[0].text)[:1000]}...")
 
     print("--- Browser Agent 100% Simulation Complete ---")
 

@@ -32,7 +32,7 @@ async def test_document_real_simulation():
             # Limit pages to 1 to avoid huge download/parse
             res = await session.call_tool("pdf_parser", arguments={"url": pdf_url, "pages": "1"})
             if not res.isError:
-                print(f" \033[92m[PASS]\033[0m PDF Content: {res.content[0].text[:100]}...")
+                print(f" \033[92m[PASS]\033[0m PDF Content: {res.content[0].text[:1000]}...")
             else:
                  print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 

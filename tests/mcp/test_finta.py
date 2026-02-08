@@ -32,7 +32,7 @@ async def test_finta_real_simulation():
             print("1. Calculating RSI...")
             res = await session.call_tool("calculate_rsi", arguments={"data": data})
             if not res.isError:
-                 print(f" \033[92m[PASS]\033[0m RSI Data: {res.content[0].text[:100]}...")
+                 print(f" \033[92m[PASS]\033[0m RSI Data: {res.content[0].text[:1000]}...")
             else:
                  print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
@@ -40,19 +40,19 @@ async def test_finta_real_simulation():
             print("2. Calculating SMA...")
             res = await session.call_tool("calculate_sma", arguments={"data": data})
             if not res.isError:
-                 print(f" \033[92m[PASS]\033[0m SMA Data: {res.content[0].text[:100]}...")
+                 print(f" \033[92m[PASS]\033[0m SMA Data: {res.content[0].text[:1000]}...")
 
             # 3. Bollinger Bands
             print("3. Calculating Bollinger Bands...")
             res = await session.call_tool("calculate_bbands", arguments={"data": data})
             if not res.isError:
-                 print(f" \033[92m[PASS]\033[0m BBands Data: {res.content[0].text[:100]}...")
+                 print(f" \033[92m[PASS]\033[0m BBands Data: {res.content[0].text[:1000]}...")
             
             # 4. Ichimoku (Cloud)
             print("4. Calculating Ichimoku (Cloud)...")
             res = await session.call_tool("calculate_ichimoku", arguments={"data": data})
             if not res.isError:
-                 print(f" \033[92m[PASS]\033[0m Ichimoku Data: {res.content[0].text[:100]}...")
+                 print(f" \033[92m[PASS]\033[0m Ichimoku Data: {res.content[0].text[:1000]}...")
 
             # 5. Bulk All
             print("5. Calculating ALL Indicators (Bulk)...")

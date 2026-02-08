@@ -60,7 +60,7 @@ async def test_finta_tools_dynamic():
                         success += 1
                     else:
                         # Some tools might need extra params, check if error is meaningful
-                        print(f" \033[91m[FAIL]\033[0m {res.content[0].text[:50] if res.content else 'Error'}")
+                        print(f" \033[91m[FAIL]\033[0m {res.content[0].text[:1000] if res.content else 'Error'}")
                         failed += 1
                 except Exception as e:
                      print(f" [EXCEPTION] {e}")

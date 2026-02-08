@@ -58,7 +58,7 @@ async def test_openpyxl_real_simulation():
             # 5. Read Back
             print("5. Reading Back Data...")
             res = await session.call_tool("read_range_values", arguments={"file_path": test_file, "range_string": "A1:C4"})
-            print(f" \033[92m[PASS]\033[0m Read: {res.content[0].text[:100]}...")
+            print(f" \033[92m[PASS]\033[0m Read: {res.content[0].text[:1000]}...")
 
     # Cleanup
     if os.path.exists(test_file):

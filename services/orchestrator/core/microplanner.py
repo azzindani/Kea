@@ -66,6 +66,20 @@ class Microplanner:
         self.use_llm = use_llm and llm_callback is not None
         self._replan_count = 0
         self._completed_nodes: list[tuple[str, str]] = []  # (node_id, summary)
+        
+        # Load error patterns from vocab
+        from shared.vocab import load_vocab
+        vocab = load_vocab("microplanner")
+        self.definitive_error_patterns = vocab.get("error_patterns", {}).get("definitive", [])
+        
+        # Fallback if config is missing (safety)
+        if not self.definitive_error_patterns:
+            self.definitive_error_patterns = [
+                "tool not found", "not found in registry", "missing required parameter",
+                "tool reported an error", "no data returned", "empty result returned",
+                "rate limit exceeded", "authentication failed", "invalid ticker",
+                "symbol not found", "connection refused", "timeout error"
+            ]
 
     async def checkpoint(
         self,
@@ -161,26 +175,13 @@ class Microplanner:
             output_lower = output_str.lower()
             
             # These are DEFINITIVE error patterns (phrase-level, not word-level)
-            definitive_error_patterns = [
-                "tool not found",
-                "not found in registry",
-                "missing required parameter",
-                "tool reported an error",
-                "no data returned",
-                "empty result returned",
-                "rate limit exceeded",
-                "authentication failed",
-                "invalid ticker",
-                "symbol not found",
-                "connection refused",
-                "timeout error",
-                # Ticker/data availability errors (indicates wrong ticker)
-                "data unavailable",
-                "balance sheet data unavailable",
-                "income statement data unavailable",
-                "cash flow data unavailable",
-                "no data available for",
-            ]
+            # These are DEFINITIVE error patterns (phrase-level, not word-level)
+            # Loaded from config/vocab/microplanner.yaml
+            definitive_error_patterns = self.definitive_error_patterns
+            
+            # Legacy fallback if list is empty (should not happen due to init safety)
+            if not definitive_error_patterns:
+                 definitive_error_patterns = ["error", "failed", "exception"]
             
             # Only trigger expansion if:
             # 1. Output is suspiciously short (likely an error message, not data)

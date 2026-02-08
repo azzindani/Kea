@@ -37,7 +37,7 @@ class TestFetchUrl:
         # Check for actual content from example.com
         content_str = str(data.get("content", data.get("result", "")))
         assert "Example Domain" in content_str or "example" in content_str.lower(), \
-            f"Expected example.com content, got: {content_str[:200]}"
+            f"Expected example.com content, got: {content_str[:1000]}"
     
     @pytest.mark.mcp
     @pytest.mark.asyncio
@@ -90,7 +90,7 @@ class TestBatchScrape:
         # Check for batch scrape results
         content_str = str(data.get("content", data.get("result", "")))
         assert "Batch" in content_str or "example" in content_str.lower(), \
-            f"Expected batch results, got: {content_str[:200]}"
+            f"Expected batch results, got: {content_str[:1000]}"
 
 
 if __name__ == "__main__":

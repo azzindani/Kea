@@ -32,13 +32,13 @@ async def test_ml_real_simulation():
             print("2. Clustering (KMeans, k=3)...")
             res = await session.call_tool("convert_clustering", arguments={"data_url": data_url, "n_clusters": 3})
             if not res.isError:
-                print(f" \033[92m[PASS]\033[0m Clusters: {res.content[0].text[:100]}...")
+                print(f" \033[92m[PASS]\033[0m Clusters: {res.content[0].text[:1000]}...")
 
             # 3. Anomaly Detection
             print("3. Anomaly Detection...")
             res = await session.call_tool("anomaly_detection", arguments={"data_url": data_url})
             if not res.isError:
-                print(f" \033[92m[PASS]\033[0m Anomalies: {res.content[0].text[:100]}...")
+                print(f" \033[92m[PASS]\033[0m Anomalies: {res.content[0].text[:1000]}...")
 
             # 4. Time Series Forecast
             print("4. Forecasting...")
@@ -47,7 +47,7 @@ async def test_ml_real_simulation():
             # Let's use the same data_url but forecast 'sepal_length' (treated as series)
             res = await session.call_tool("time_series_forecast", arguments={"data_url": data_url, "value_column": "sepal_length", "periods": 5})
             if not res.isError:
-                 print(f" \033[92m[PASS]\033[0m Forecast: {res.content[0].text[:100]}...")
+                 print(f" \033[92m[PASS]\033[0m Forecast: {res.content[0].text[:1000]}...")
 
     print("--- ML Simulation Complete ---")
 

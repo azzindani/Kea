@@ -43,7 +43,7 @@ async def test_textblob_real_simulation():
             # 5. Word Definitions
             print("5. Word Definition (Analysis)...")
             res = await session.call_tool("define_word", arguments={"word": "analysis"})
-            print(f" \033[92m[PASS]\033[0m Def: {res.content[0].text[:50]}...")
+            print(f" \033[92m[PASS]\033[0m Def: {res.content[0].text[:1000]}...")
 
             # 6. Full Report
             print("6. Full Text Report...")

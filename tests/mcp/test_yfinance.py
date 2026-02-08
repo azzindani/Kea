@@ -55,7 +55,7 @@ async def test_yfinance_tools_dynamic():
                         print(" \033[92m[PASS]\033[0m")
                         success += 1
                     else:
-                        print(f" \033[91m[FAIL]\033[0m {res.content[0].text[:50] if res.content else 'Error'}")
+                        print(f" \033[91m[FAIL]\033[0m {res.content[0].text[:1000] if res.content else 'Error'}")
                         # Don't increment failure for network issues or deprecated tools
                         # But log it
                         failed += 1
@@ -89,7 +89,7 @@ async def test_scenario_market_analysis():
             print(f"1. Fetching Price for {ticker}...")
             price_res = await session.call_tool("get_current_price", arguments={"ticker": ticker})
             assert not price_res.isError
-            print(f"   Result: {price_res.content[0].text[:100]}...")
+            print(f"   Result: {price_res.content[0].text[:1000]}...")
             
             # Step 2: Market Cap
             print(f"2. Fetching Market Cap...")
@@ -101,7 +101,7 @@ async def test_scenario_market_analysis():
             print(f"3. Fetching Analyst Ratings...")
             rating_res = await session.call_tool("get_analyst_ratings", arguments={"ticker": ticker})
             assert not rating_res.isError
-            print(f"   Result: {rating_res.content[0].text[:100]}...")
+            print(f"   Result: {rating_res.content[0].text[:1000]}...")
             
             print("--- Scenario Complete: Success ✅ ---")
 
@@ -129,7 +129,7 @@ async def test_simulation_full_coverage():
                 try:
                     res = await session.call_tool(tool_name, arguments=args)
                     if res.isError:
-                        print(f" \033[91m[FAIL]\033[0m {res.content[0].text[:50]}")
+                        print(f" \033[91m[FAIL]\033[0m {res.content[0].text[:1000]}")
                         return False
                     print(" \033[92m[PASS]\033[0m")
                     return True

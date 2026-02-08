@@ -61,7 +61,7 @@ async def test_bs4_real_simulation():
                 children = json.loads(res.content[0].text)
                 print(f" \033[92m[PASS]\033[0m Children found: {len(children)}")
             except:
-                print(f" \033[92m[PASS]\033[0m Children (raw): {res.content[0].text[:50]}...")
+                print(f" \033[92m[PASS]\033[0m Children (raw): {res.content[0].text[:1000]}...")
             
             # 4. Search
             print("3. Search (find_by_text 'Microservices')...")
@@ -91,7 +91,7 @@ async def test_bs4_real_simulation():
             print("6. Conversion (to_markdown)...")
             res = await session.call_tool("to_markdown", arguments={"soup_id": soup_id})
             if not res.isError:
-                print(f" \033[92m[PASS]\033[0m Markdown Preview:\n{res.content[0].text[:100]}...")
+                print(f" \033[92m[PASS]\033[0m Markdown Preview:\n{res.content[0].text[:1000]}...")
 
             # 8. Super Tools
             print("7. Super Tools (bulk_extract)...")
@@ -105,7 +105,7 @@ async def test_bs4_real_simulation():
             print("   Super Tools (view_tree)...")
             res = await session.call_tool("view_tree", arguments={"soup_id": soup_id, "depth": 2})
             if not res.isError:
-                print(f" \033[92m[PASS]\033[0m Tree:\n{res.content[0].text[:100]}...")
+                print(f" \033[92m[PASS]\033[0m Tree:\n{res.content[0].text[:1000]}...")
 
             print("   Super Tools (extract_table)...")
             # Create a table first since none exists

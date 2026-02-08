@@ -71,7 +71,7 @@ async def test_mibian_real_simulation():
             }
             res = await session.call_tool("price_option_chain", arguments=chain_args)
             if not res.isError:
-                 print(f" \033[92m[PASS]\033[0m Chain: {res.content[0].text[:100]}...")
+                 print(f" \033[92m[PASS]\033[0m Chain: {res.content[0].text[:1000]}...")
 
     print("--- Mibian Simulation Complete ---")
 

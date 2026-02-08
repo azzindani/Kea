@@ -29,7 +29,7 @@ async def test_ccxt_real_simulation():
             print(f"1. Fetching Ticker for {exchange} {symbol}...")
             res = await session.call_tool("get_ticker", arguments={"exchange": exchange, "symbol": symbol})
             if not res.isError:
-                print(f" \033[92m[PASS]\033[0m Ticker Data caught (Sample): {res.content[0].text[:100]}...")
+                print(f" \033[92m[PASS]\033[0m Ticker Data caught (Sample): {res.content[0].text[:1000]}...")
             else:
                 print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
@@ -37,7 +37,7 @@ async def test_ccxt_real_simulation():
             print(f"2. Fetching OHLCV (1d)...")
             res = await session.call_tool("get_ohlcv", arguments={"exchange": exchange, "symbol": symbol, "timeframe": "1d", "limit": 3})
             if not res.isError:
-                print(f" \033[92m[PASS]\033[0m Candles caught (Sample): {res.content[0].text[:100]}...")
+                print(f" \033[92m[PASS]\033[0m Candles caught (Sample): {res.content[0].text[:1000]}...")
             else:
                 print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
                 

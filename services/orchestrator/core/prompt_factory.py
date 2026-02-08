@@ -180,58 +180,26 @@ class PromptFactory:
         self._domain_templates.update(domains)
         self._task_modifiers.update(tasks)
         
+        # Load detection vocab
+        from shared.vocab import load_vocab
+        vocab = load_vocab("classification")
+        self.domain_keywords = vocab.get("domains", {})
+        self.task_keywords = vocab.get("task_types", {})
+        
         logger.info(f"PromptFactory initialized with {len(self._domain_templates)} domains and {len(self._task_modifiers)} task modifiers")
     
     def detect_domain(self, query: str) -> Domain:
         """Detect domain from query text."""
         query_lower = query.lower()
         
-        # Finance indicators
-        if any(kw in query_lower for kw in [
-            "stock", "revenue", "profit", "market cap", "p/e", "earnings",
-            "investment", "dividend", "financial", "trading", "valuation",
-            "sec filing", "10-k", "10-q", "balance sheet", "cash flow"
-        ]):
-            return Domain.FINANCE
-        
-        # Medical indicators
-        if any(kw in query_lower for kw in [
-            "disease", "treatment", "drug", "clinical", "patient", "symptom",
-            "diagnosis", "therapy", "medical", "health", "pharma", "fda",
-            "trial", "efficacy", "side effect", "dosage"
-        ]):
-            return Domain.MEDICAL
-        
-        # Legal indicators
-        if any(kw in query_lower for kw in [
-            "law", "legal", "regulation", "statute", "court", "case",
-            "contract", "compliance", "liability", "rights", "patent",
-            "trademark", "litigation", "sue", "judgment"
-        ]):
-            return Domain.LEGAL
-        
-        # Engineering indicators
-        if any(kw in query_lower for kw in [
-            "code", "software", "system", "architecture", "api", "database",
-            "performance", "scalability", "infrastructure", "deploy",
-            "algorithm", "optimize", "technical", "engineering"
-        ]):
-            return Domain.ENGINEERING
-        
-        # Academic indicators
-        if any(kw in query_lower for kw in [
-            "research", "study", "paper", "journal", "peer-review",
-            "methodology", "hypothesis", "experiment", "thesis",
-            "publication", "citation", "academic"
-        ]):
-            return Domain.ACADEMIC
-        
-        # Data indicators
-        if any(kw in query_lower for kw in [
-            "data", "dataset", "analysis", "statistics", "correlation",
-            "trend", "visualization", "etl", "pipeline", "query"
-        ]):
-            return Domain.DATA
+        # Check against loaded keywords
+        for domain_name, keywords in self.domain_keywords.items():
+            if any(kw in query_lower for kw in keywords):
+                try:
+                    # Finds matching enum by value
+                    return Domain(domain_name)
+                except ValueError:
+                    pass
         
         return Domain.GENERAL
     
@@ -239,26 +207,13 @@ class PromptFactory:
         """Detect task type from query."""
         query_lower = query.lower()
         
-        if any(kw in query_lower for kw in ["compare", "versus", "vs", "difference"]):
-            return TaskType.COMPARE
-        
-        if any(kw in query_lower for kw in ["summarize", "summary", "brief", "overview"]):
-            return TaskType.SUMMARIZE
-        
-        if any(kw in query_lower for kw in ["extract", "get", "list all", "find all"]):
-            return TaskType.EXTRACT
-        
-        if any(kw in query_lower for kw in ["verify", "check", "validate", "is it true"]):
-            return TaskType.VALIDATE
-        
-        if any(kw in query_lower for kw in ["predict", "forecast", "future", "will"]):
-            return TaskType.FORECAST
-        
-        if any(kw in query_lower for kw in ["explain", "why", "how does", "what is"]):
-            return TaskType.EXPLAIN
-        
-        if any(kw in query_lower for kw in ["analyze", "analysis", "examine"]):
-            return TaskType.ANALYSIS
+        # Check against loaded keywords
+        for task_name, keywords in self.task_keywords.items():
+            if any(kw in query_lower for kw in keywords):
+                try:
+                    return TaskType(task_name)
+                except ValueError:
+                    pass
         
         return TaskType.RESEARCH
     
