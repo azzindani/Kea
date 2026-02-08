@@ -1,7 +1,7 @@
 import yt_dlp
 import os
 import structlog
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 logger = structlog.get_logger()
 
@@ -46,6 +46,12 @@ def set_user_agent(ua: str) -> str:
     CONFIG["user_agent"] = ua
     return "User Agent updated."
 
+class SilentLogger:
+    def debug(self, msg): pass
+    def warning(self, msg): pass
+    def error(self, msg): pass
+    def info(self, msg): pass
+
 def get_default_options() -> Dict[str, Any]:
     """Return current config dict suitable for YoutubeDL."""
     opts = {
@@ -56,6 +62,8 @@ def get_default_options() -> Dict[str, Any]:
         "user_agent": CONFIG["user_agent"],
         # Basic error handling
         "ignoreerrors": True,
+        # Prevent stdout pollution
+        "logger": SilentLogger(),
     }
     if CONFIG["cookies_file"]:
         opts["cookiefile"] = CONFIG["cookies_file"]
