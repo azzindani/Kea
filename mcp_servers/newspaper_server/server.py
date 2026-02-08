@@ -20,6 +20,9 @@ from typing import List, Dict, Any
 logger = structlog.get_logger()
 
 # Create the FastMCP server
+from shared.logging import setup_logging
+setup_logging()
+
 mcp = FastMCP("newspaper_server", dependencies=["newspaper3k"])
 
 # 1. Single Article Intelligence

@@ -22,6 +22,9 @@ import asyncio
 logger = structlog.get_logger()
 
 # Create the FastMCP server
+from shared.logging import setup_logging
+setup_logging()
+
 mcp = FastMCP("wbgapi_server", dependencies=["wbgapi", "pandas"])
 
 async def run_op(op_func, diff_args=None, **kwargs):

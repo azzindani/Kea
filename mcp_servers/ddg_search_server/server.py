@@ -27,6 +27,9 @@ from typing import List, Dict, Any, Optional
 logger = structlog.get_logger()
 
 # Create the FastMCP server
+from shared.logging import setup_logging
+setup_logging()
+
 mcp = FastMCP("ddg_search_server", dependencies=["duckduckgo_search"])
 
 # ==========================================

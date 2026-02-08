@@ -23,6 +23,9 @@ import asyncio
 logger = structlog.get_logger()
 
 # Create the FastMCP server
+from shared.logging import setup_logging
+setup_logging()
+
 mcp = FastMCP("web3_server", dependencies=["web3"])
 
 async def run_op(op_func, diff_args=None, **kwargs):

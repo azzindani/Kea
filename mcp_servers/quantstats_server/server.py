@@ -25,6 +25,9 @@ from typing import Dict, Any, List
 logger = structlog.get_logger()
 
 # Create the FastMCP server
+from shared.logging import setup_logging
+setup_logging()
+
 mcp = FastMCP("quantstats_server", dependencies=["quantstats", "pandas", "matplotlib", "seaborn", "yfinance"])
 
 # ==========================================

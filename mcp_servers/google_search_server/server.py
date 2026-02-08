@@ -28,6 +28,9 @@ from typing import List, Dict, Any, Optional
 logger = structlog.get_logger()
 
 # Create the FastMCP server
+from shared.logging import setup_logging
+setup_logging()
+
 mcp = FastMCP("google_search_server", dependencies=["googlesearch-python", "beautifulsoup4"])
 
 # ==========================================

@@ -31,6 +31,9 @@ from typing import List, Dict, Any, Optional, Union
 logger = structlog.get_logger()
 
 # Create the FastMCP server
+from shared.logging import setup_logging
+setup_logging()
+
 mcp = FastMCP("statsmodels_server", dependencies=["statsmodels", "scipy", "numpy", "pandas"])
 DataInput = Union[List[List[float]], List[Dict[str, Any]], str]
 VectorInput = Union[List[float], str]

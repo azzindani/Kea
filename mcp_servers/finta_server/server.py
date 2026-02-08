@@ -29,6 +29,9 @@ import structlog
 logger = structlog.get_logger()
 
 # Create the FastMCP server
+from shared.logging import setup_logging
+setup_logging()
+
 mcp = FastMCP("finta_server", dependencies=["pandas", "finta"])
 
 # --- 1. BULK / SUITE TOOLS ---

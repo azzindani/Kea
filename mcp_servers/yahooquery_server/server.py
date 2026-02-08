@@ -27,6 +27,9 @@ import structlog
 logger = structlog.get_logger()
 
 # Create the FastMCP server
+from shared.logging import setup_logging
+setup_logging()
+
 mcp = FastMCP("yahooquery_server", dependencies=["yahooquery", "pandas"])
 
 # --- Ticker Search Tool (USE FIRST when unsure of ticker symbol) ---

@@ -23,6 +23,9 @@ from typing import List, Dict, Any, Optional, Union
 logger = structlog.get_logger()
 
 # Create the FastMCP server
+from shared.logging import setup_logging
+setup_logging()
+
 mcp = FastMCP("bs4_server", dependencies=["beautifulsoup4", "lxml", "html5lib"])
 
 # ==========================================

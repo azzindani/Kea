@@ -26,6 +26,9 @@ from typing import List, Dict, Any, Optional, Union
 logger = structlog.get_logger()
 
 # Create the FastMCP server
+from shared.logging import setup_logging
+setup_logging()
+
 mcp = FastMCP("seaborn_server", dependencies=["seaborn", "matplotlib", "pandas", "numpy", "scipy"])
 DataInput = Union[List[List[Any]], List[Dict[str, Any]], str, Dict[str, Any]]
 VectorInput = Union[List[Any], str]

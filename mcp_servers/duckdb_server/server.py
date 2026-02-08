@@ -30,6 +30,9 @@ from typing import Dict, Any, Optional, List
 logger = structlog.get_logger()
 
 # Create the FastMCP server
+from shared.logging import setup_logging
+setup_logging()
+
 mcp = FastMCP("duckdb_server", dependencies=["pandas", "duckdb", "pyarrow"])
 
 # ==========================================

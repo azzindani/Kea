@@ -18,6 +18,9 @@ from typing import Optional, Dict
 logger = structlog.get_logger()
 
 # Create the FastMCP server
+from shared.logging import setup_logging
+setup_logging()
+
 mcp = FastMCP("scraper_server")
 
 @mcp.tool()

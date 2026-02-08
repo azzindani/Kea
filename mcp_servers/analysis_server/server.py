@@ -24,6 +24,9 @@ from typing import List, Dict, Any, Union
 logger = structlog.get_logger()
 
 # Create the FastMCP server
+from shared.logging import setup_logging
+setup_logging()
+
 mcp = FastMCP("analysis_server")
 
 @mcp.tool()

@@ -101,13 +101,18 @@ Kea includes a multi-layered financial stack:
 ### Tool Development Pattern
 
 ```python
+# In server.py
 @mcp.tool()
 async def my_new_tool(query: str) -> str:
     """
     Clear docstring for the LLM to understand utility.
+    
+    [RAG Context]
+    Hidden context for the retriever to find this tool.
+    "keyword1", "keyword2", "synonym"
     """
-    # implementation logic
-    return "Result"
+    # implementation logic (delegated to tools/my_feature.py)
+    return await my_feature.logic(query)
 ```
 
 ---
@@ -145,6 +150,26 @@ server_name/
 - **"Super Tools"**: Prefer comprehensive tools (e.g., `analyze_stock_full`) over granular ones (`get_price`, `get_volue`).
 - **Bulk Operations**: Always implement bulk retrieval (e.g., `get_prices(symbols: List[str])`) to minimize round-trips.
 - **Self-Contained**: Tools should manage their own state or be stateless.
+- **RAG-Optimized Docstrings**:
+  - **Location**: Must be placed in `server.py` on the `@mcp.tool()` decorated functions.
+  - **Format**:
+    ```python
+    @mcp.tool()
+    async def my_tool(arg: str) -> str:
+        """SHORT SUMMARY (e.g., FETCHES price). [ACTION]
+        
+        [RAG Context]
+        Detailed explanation (up to 200 chars) to enrich retrieval.
+        Includes keywords, synonyms, and specific use cases.
+        """
+    ```
+  - **Tags**: 
+    - End the summary line with `[ACTION]` or `[DATA]`.
+    - Use a `[RAG Context]` block for the detailed description.
+  - **Content**: The context block should be rich in keywords to ensure the tool is found by the semantic retriever, but concise (max ~200 chars).
+- **Auto-Detection**:
+  - The `mcp_servers` package uses dynamic discovery.
+  - Ensure your server has a `server.py` file in its root directory to be automatically loaded.
 
 ---
 

@@ -18,6 +18,9 @@ import json
 logger = structlog.get_logger()
 
 # Create the FastMCP server
+from shared.logging import setup_logging
+setup_logging()
+
 mcp = FastMCP("tradingview_server", dependencies=["tradingview_ta", "requests"])
 
 # --- 1. CORE TA TOOLS ---

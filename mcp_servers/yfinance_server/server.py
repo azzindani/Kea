@@ -28,6 +28,9 @@ import yfinance as yf
 logger = structlog.get_logger()
 
 # Create the FastMCP server
+from shared.logging import setup_logging
+setup_logging()
+
 mcp = FastMCP("yfinance_server", dependencies=["yfinance", "pandas", "numpy", "matplotlib", "scipy"])
 
 # --- Market Tools ---

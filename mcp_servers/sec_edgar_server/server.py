@@ -56,6 +56,9 @@ from tools.timeline import get_filing_timeline
 
 logger = structlog.get_logger()
 
+from shared.logging import setup_logging
+setup_logging()
+
 mcp = FastMCP(
     "sec_edgar_server",
     dependencies=["sec-edgar-downloader", "pandas", "beautifulsoup4", "lxml", "textblob"]

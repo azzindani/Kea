@@ -30,6 +30,9 @@ from typing import Optional, List, Any
 logger = structlog.get_logger()
 
 # Create the FastMCP server
+from shared.logging import setup_logging
+setup_logging()
+
 mcp = FastMCP("visualization_server", dependencies=["plotly", "pandas", "numpy", "kaleido"])
 
 @mcp.tool()

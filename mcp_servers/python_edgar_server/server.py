@@ -30,6 +30,9 @@ import asyncio
 logger = structlog.get_logger()
 
 # Create the FastMCP server
+from shared.logging import setup_logging
+setup_logging()
+
 mcp = FastMCP("python_edgar_server", dependencies=["edgartools", "pandas"])
 
 async def run_op(op_func, **kwargs):

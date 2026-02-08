@@ -31,6 +31,9 @@ from typing import List, Dict, Any, Optional, Union
 logger = structlog.get_logger()
 
 # Create the FastMCP server
+from shared.logging import setup_logging
+setup_logging()
+
 mcp = FastMCP("networkx_server", dependencies=["networkx", "scipy", "numpy", "pandas"])
 GraphInput = Union[List[List[Any]], Dict[str, Any], str]
 

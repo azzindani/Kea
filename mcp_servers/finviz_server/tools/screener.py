@@ -40,7 +40,9 @@ async def get_screener_signal(limit: int = 100000, signal: str = None) -> ToolRe
         
         # Get dataframe (limit isn't natively supported well in all library versions, 
         # so we fetch and head)
-        df = foverview.screener_view()
+        from shared.stdout_suppression import suppress_stdout
+        with suppress_stdout():
+            df = foverview.screener_view()
         
         if df is None or df.empty:
             return ToolResult(content=[TextContent(text="No results found.")])
