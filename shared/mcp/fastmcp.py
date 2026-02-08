@@ -39,7 +39,7 @@ except ImportError:
                     self._tools = {}
             self._tool_manager = MockToolManager()
 
-        def tool(self, name: Optional[str] = None, description: Optional[str] = None): 
+        def tool(self, name: Optional[str] = None, description: Optional[str] = None, **kwargs): 
             def decorator(f):
                 tool_name = name or f.__name__
                 # Mock tool object with name attribute
@@ -49,8 +49,8 @@ except ImportError:
                 return f
             return decorator
 
-        def add_tool(self, fn: Callable, name: Optional[str] = None, description: Optional[str] = None):
-            return self.tool(name=name, description=description)(fn)
+        def add_tool(self, fn: Callable, name: Optional[str] = None, description: Optional[str] = None, **kwargs):
+            return self.tool(name=name, description=description, **kwargs)(fn)
 
         def run(self, transport: str = "stdio"):
             """No-op for dummy but can be made to block if needed."""
@@ -114,7 +114,7 @@ class FastMCP(LibFastMCP):
         super().__init__(name, **kwargs)
         self.server_name = name
 
-    def tool(self, name: Optional[str] = None, description: Optional[str] = None):
+    def tool(self, name: Optional[str] = None, description: Optional[str] = None, **kwargs):
         """
         Decorator to register a tool with standardized execution wrapper.
         """
@@ -227,17 +227,17 @@ class FastMCP(LibFastMCP):
             wrapper.__signature__ = inspect.signature(func)
             
             # Register the WRAPPED function with the parent FastMCP
-            LibFastMCP.tool(self, name=tool_name, description=tool_desc)(wrapper)
+            LibFastMCP.tool(self, name=tool_name, description=tool_desc, **kwargs)(wrapper)
             
             return wrapper
         return decorator
 
-    def add_tool(self, fn: Callable, name: Optional[str] = None, description: Optional[str] = None):
+    def add_tool(self, fn: Callable, name: Optional[str] = None, description: Optional[str] = None, **kwargs):
         """
         Manually register a tool.
         """
         # We use our own tool decorator to ensure the wrapper is applied
-        @self.tool(name=name, description=description)
+        @self.tool(name=name, description=description, **kwargs)
         @wraps(fn)
         async def wrapped_fn(*args, **kwargs):
             if inspect.iscoroutinefunction(fn):
@@ -260,13 +260,13 @@ class FastMCP(LibFastMCP):
             # Fallback for dummy or if super().run fails (e.g. dummy's pass)
             logger.info("mcp_server_run_called", server=self.server_name, transport=transport)
 
-    def resource(self, uri: str, name: str, description: Optional[str] = None, mime_type: Optional[str] = None):
+    def resource(self, uri: str, name: str, description: Optional[str] = None, mime_type: Optional[str] = None, **kwargs):
         """Proxy for resource decorator."""
-        return LibFastMCP.resource(self, uri, name, description, mime_type)
+        return LibFastMCP.resource(self, uri, name, description, mime_type, **kwargs)
 
-    def prompt(self, name: Optional[str] = None, description: Optional[str] = None):
+    def prompt(self, name: Optional[str] = None, description: Optional[str] = None, **kwargs):
         """Proxy for prompt decorator."""
-        return LibFastMCP.prompt(self, name, description)
+        return LibFastMCP.prompt(self, name, description, **kwargs)
 
     def _format_error(self, code: str, message: str, meta: Dict, details: Optional[Dict] = None) -> str:
         """Constructs the standard error envelope."""
