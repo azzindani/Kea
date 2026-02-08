@@ -55,25 +55,43 @@ If the math is valid and inputs are in the source data, ACCEPT the derived value
 
 Be constructive - don't just criticize, suggest improvements."""
     
-    async def critique(self, answer: str, facts: list, sources: list) -> str:
+    async def _get_knowledge_context(self, query: str) -> str:
+        """Retrieve domain-specific rules and knowledge for critique."""
+        try:
+            from shared.knowledge.retriever import get_knowledge_retriever
+            import asyncio
+
+            retriever = get_knowledge_retriever()
+            context = await asyncio.wait_for(
+                retriever.retrieve_all(query, skill_limit=1, rule_limit=2),
+                timeout=3.0,
+            )
+            return context
+        except Exception:
+            return ""
+
+    async def critique(
+        self, answer: str, facts: list, sources: list, query: str = ""
+    ) -> str:
         """
         Critique a generated answer.
-        
+
         Args:
             answer: The Generator's answer
             facts: Available facts
             sources: Source references
-            
+            query: Original research query (for knowledge retrieval)
+
         Returns:
             Critique with specific feedback
         """
         logger.info("Critic: Analyzing answer")
-        
+
         try:
             import os
             if not os.getenv("OPENROUTER_API_KEY"):
                 return self._fallback_critique(answer)
-            
+
             provider = OpenRouterProvider()
             from shared.config import get_settings
             config = LLMConfig(
@@ -81,9 +99,20 @@ Be constructive - don't just criticize, suggest improvements."""
                 temperature=0.4,
                 max_tokens=32768,
             )
-            
+
+            # Retrieve domain knowledge (especially rules) for informed critique
+            knowledge_context = await self._get_knowledge_context(
+                query or answer[:200]
+            )
+            system_prompt = self.system_prompt
+            if knowledge_context:
+                system_prompt += f"\n\n{knowledge_context}"
+                logger.info(
+                    f"Critic: Injecting {len(knowledge_context)} chars of domain knowledge"
+                )
+
             messages = [
-                LLMMessage(role=LLMRole.SYSTEM, content=self.system_prompt),
+                LLMMessage(role=LLMRole.SYSTEM, content=system_prompt),
                 LLMMessage(
                     role=LLMRole.USER,
                     content=f"""Critique this answer:
