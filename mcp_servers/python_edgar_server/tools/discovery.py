@@ -17,6 +17,16 @@ async def analyze_company_profile(arguments: dict) -> ToolResult:
             "cik": company.cik,
             "name": company.name,
             "industry": getattr(company, 'industry', 'N/A'),
+            "sic": getattr(company, 'sic', 'N/A'),
+            "sic_description": getattr(company, 'sic_description', 'N/A'),
+            "fiscal_year_end": getattr(company, 'fiscal_year_end', 'N/A'),
+            "state_of_incorporation": getattr(company, 'state_of_incorporation', 'N/A'),
+            "mailing_address": str(company.mailing_address()) if hasattr(company, 'mailing_address') and callable(company.mailing_address) else str(getattr(company, 'mailing_address', None)),
+            "business_address": str(company.business_address()) if hasattr(company, 'business_address') and callable(company.business_address) else str(getattr(company, 'business_address', None)),
+            "phone": getattr(company, 'phone', 'N/A'),
+            "ein": getattr(company, 'ein', 'N/A'),
+            "tickers": getattr(company, 'tickers', []),
+            "exchanges": getattr(company, 'exchanges', [])
         }
         
         # Recent Filings via Pandas

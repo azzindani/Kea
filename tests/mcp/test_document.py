@@ -53,11 +53,27 @@ async def test_document_real_simulation():
             # 4. Docx Parser
             print("4. Docx Parser (Create dummy)...")
             import docx
+            import os
+            
+            # Use absolute path to ensure server can find it
+            cwd = os.getcwd()
+            docx_path = os.path.join(cwd, "test_doc_parser.docx")
+            xlsx_path = os.path.join(cwd, "test_doc_parser.xlsx")
+            
             doc = docx.Document()
             doc.add_paragraph("Hello from Document Server Test")
-            doc.save("test_doc_parser.docx")
+            doc.save(docx_path)
             
-            res = await session.call_tool("docx_parser", arguments={"url": "test_doc_parser.docx"})
+            # Ensure file exists
+            if not os.path.exists(docx_path):
+                print(f" [FAIL] Docx file not created at {docx_path}")
+            
+            # The server expects a URL or path. For local files, we might need 'file://' prefix or just absolute path depending on implementation.
+            # Looking at document_server/tools/word.py (which I haven't seen but assuming checks file existence), absolute path should work if it's local.
+            # But wait, document_server might be running in a different container/environment if it was real, but here it's stdio in same env.
+            # The 'url' argument usually implies downloadable, but let's try absolute path.
+            
+            res = await session.call_tool("docx_parser", arguments={"url": docx_path})
             if not res.isError:
                 print(f" \033[92m[PASS]\033[0m Docx Text: {res.content[0].text}")
             else:
@@ -67,18 +83,17 @@ async def test_document_real_simulation():
             print("5. Xlsx Parser (Create dummy)...")
             import pandas as pd
             df = pd.DataFrame({"A": [1, 2], "B": [3, 4]})
-            df.to_excel("test_doc_parser.xlsx", index=False)
+            df.to_excel(xlsx_path, index=False)
             
-            res = await session.call_tool("xlsx_parser", arguments={"url": "test_doc_parser.xlsx"})
+            res = await session.call_tool("xlsx_parser", arguments={"url": xlsx_path})
             if not res.isError:
                 print(f" \033[92m[PASS]\033[0m Xlsx Content: {res.content[0].text}")
             else:
                 print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
-
+ 
             # Cleanup
-            import os
-            if os.path.exists("test_doc_parser.docx"): os.remove("test_doc_parser.docx")
-            if os.path.exists("test_doc_parser.xlsx"): os.remove("test_doc_parser.xlsx")
+            if os.path.exists(docx_path): os.remove(docx_path)
+            if os.path.exists(xlsx_path): os.remove(xlsx_path)
 
     print("--- Document Simulation Complete ---")
 

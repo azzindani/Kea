@@ -24,7 +24,20 @@ async def get_fama_french_data(dataset_name: str = None, start_date: str = None,
     try:
         # returns dict of DataFrames (e.g. {0: Monthly, 1: Annual})
         # We usually want the first one (highest freq)
-        ds = web.DataReader(name, "famafrench", start=start, end=end_date)
+        # Monkeypatch pandas.read_csv temporarily to strip 'date_parser' (removed in Pandas 2.0)
+        # pandas_datareader hasn't fully updated yet
+        _original_read_csv = pd.read_csv
+        
+        def _patched_read_csv(*args, **kwargs):
+            if 'date_parser' in kwargs:
+                kwargs.pop('date_parser')
+            return _original_read_csv(*args, **kwargs)
+            
+        pd.read_csv = _patched_read_csv
+        try:
+            ds = web.DataReader(name, "famafrench", start=start, end=end_date)
+        finally:
+            pd.read_csv = _original_read_csv
         
         if not ds:
             return "No data found."

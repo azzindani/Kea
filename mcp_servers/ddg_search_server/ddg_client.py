@@ -5,7 +5,7 @@ import structlog
 import warnings
 
 # Suppress "renamed to ddgs" warning
-warnings.filterwarnings("ignore", category=RuntimeWarning, module="duckduckgo_search")
+warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*renamed to ddgs.*")
 
 logger = structlog.get_logger()
 

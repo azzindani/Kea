@@ -29,7 +29,7 @@ async def sql_query_tool(arguments: dict) -> ToolResult:
         ToolResult with query results
     """
     query = arguments.get("query", "")
-    data_sources = arguments.get("data_sources", {})
+    data_sources = arguments.get("data_sources") or {}
     
     if not query:
         return ToolResult(

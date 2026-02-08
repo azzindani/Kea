@@ -80,6 +80,10 @@ async def test_ccxt_real_simulation():
                  # dry run or small days
                  pass
 
+            # 8. Cleanup
+            print(f"8. Cleanup Resources...")
+            await session.call_tool("cleanup_resources")
+
     print("--- CCXT Simulation Complete ---")
 
 if __name__ == "__main__":

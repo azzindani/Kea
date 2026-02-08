@@ -153,7 +153,14 @@ class ConsoleFormatter(logging.Formatter):
         if prefix:
             prefix = f"{prefix} "
         
-        timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        # Check if python is shutting down
+        if not sys or not datetime:
+            return f"{prefix}{record.name}: {record.getMessage()}"
+
+        try:
+            timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        except (ImportError, TypeError, AttributeError):
+            timestamp = "SHUTDOWN"
         
         try:
             message = record.getMessage()

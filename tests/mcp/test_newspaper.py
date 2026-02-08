@@ -42,7 +42,14 @@ async def test_newspaper_real_simulation():
                     print(f" \033[92m[PASS]\033[0m Found {len(articles)} articles")
                     
                     if len(articles) > 0:
-                        article_url = articles[0]
+                        # Find a suitable article causing less 404s
+                        # Some URLs in the list might be invalid or relative if parsing failed partially
+                        valid_articles = [a for a in articles if a.startswith("http")]
+                        if valid_articles:
+                            article_url = valid_articles[0]
+                        else:
+                            print(" [WARN] No valid article URLs found")
+                            return
                         
                         # 3. Single Article Title
                         print(f"3. Fetching Title for {article_url}...")

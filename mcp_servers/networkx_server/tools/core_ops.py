@@ -36,7 +36,7 @@ def parse_graph(data: GraphInput, directed: bool = False) -> nx.Graph:
         # 2. Dict (Adjacency or Node-Link)
         if isinstance(parsed, dict):
             # Check for Node-Link format (d3.js style)
-            if "nodes" in parsed and "links" in parsed:
+            if "nodes" in parsed and ("links" in parsed or "edges" in parsed):
                 return nx.node_link_graph(parsed, directed=directed)
             
             # Check for Adjacency Dict

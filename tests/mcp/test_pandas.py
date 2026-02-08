@@ -178,8 +178,8 @@ async def test_pandas_full_coverage():
             # --- 15. CHAIN ---
             print("\n[15. Chain]")
             steps = [
-                {"tool": "filter_data", "args": {"query": "age > 25"}},
-                {"tool": "select_columns", "args": {"columns": ["name", "city"]}}
+                {"op": "filter", "args": {"query": "age > 25"}},
+                {"op": "select", "args": {"columns": ["name", "city"]}}
             ]
             await session.call_tool("execute_chain", arguments={"initial_file_path": csv_path, "steps": steps, "final_output_path": get_out("chain")})
 

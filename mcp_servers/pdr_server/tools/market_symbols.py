@@ -15,7 +15,24 @@ async def get_nasdaq_symbol_list(query: str = None) -> str:
     """
     try:
         # get_nasdaq_symbols() returns a DataFrame indexed by Symbol
-        df = get_nasdaq_symbols()
+        # PDR's get_nasdaq_symbols is broken in some versions (passing args to read_csv incorrectly)
+        # We reimplement a robust version here
+        try:
+            return get_nasdaq_symbols()
+        except TypeError:
+            # Fallback for "read_csv() takes 1 positional argument but 2 were given"
+            url = "ftp://ftp.nasdaqtrader.com/SymbolDirectory/nasdaqtraded.txt"
+            df = pd.read_csv(url, sep="|")
+            
+            # Clean up logic similar to PDR
+            df = df[df['Test Issue'] == 'N']
+            df = df[df['ETF'] == 'N'] # Optional, but standard PDR filtering often includes this
+            # Actually PDR returns all, let's just return what we have with proper index
+            df = df.set_index("Symbol") if "Symbol" in df.columns else df
+            return df
+        except Exception:
+            # Secondary fallback if FTP fails
+            raise
         
         # Filter options?
         # Maybe just return top N or filtering by query

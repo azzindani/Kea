@@ -279,6 +279,16 @@ async def list_all_supported_exchanges() -> str:
     """META: List all supported CCXT exchanges (~100+)."""
     return str(ccxt.exchanges)
 
+@mcp.tool()
+async def cleanup_resources() -> str:
+    """CLEANS UP resources. [ACTION]
+    
+    [RAG Context]
+    Closes all active exchange connections.
+    """
+    await exchange_manager.ExchangeManager.close_all()
+    return "Resources cleaned up."
+
 if __name__ == "__main__":
     mcp.run()
 

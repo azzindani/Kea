@@ -114,6 +114,11 @@ async def fetch_world_bank(indicator: str, country: str = "all", start_year: int
         logger.error(f"World Bank type error: {e}")
         return f"Error: Invalid parameters for World Bank data (indicator: {indicator})"
     except Exception as e:
+        error_msg = str(e)
+        if "JSON decoding error" in error_msg:
+            logger.error(f"World Bank API JSON error: {error_msg}")
+            return f"Error: World Bank API returned invalid JSON. The service might be temporarily unavailable or the query is invalid."
+        
         logger.error(f"World Bank error: {e}")
         return f"Error: {e}"
 

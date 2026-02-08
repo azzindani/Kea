@@ -1,38 +1,28 @@
-"""
-MCP Tool Tests: Python Tools.
-
-Tests for Python execution MCP tools via API.
-"""
-
 import pytest
-import httpx
+import asyncio
+from mcp import ClientSession
+from mcp.client.stdio import stdio_client
+from tests.mcp.client_utils import get_server_params
 
-
-API_URL = "http://localhost:8080"
-
+# Helper for stdio testing
+async def run_tool_test(tool_name: str, arguments: dict, dependencies: list[str] = None):
+    params = get_server_params("python_server", extra_dependencies=dependencies or ["pandas", "duckdb", "numpy"])
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            result = await session.call_tool(tool_name, arguments=arguments)
+            return result
 
 class TestExecuteCode:
     """Tests for execute_code tool."""
     
-    @pytest.mark.mcp
     @pytest.mark.asyncio
     async def test_simple_print(self):
         """Execute simple print statement."""
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.post(
-                f"{API_URL}/api/v1/mcp/tools/invoke",
-                json={
-                    "tool_name": "execute_code",
-                    "arguments": {"code": "print(2 + 2)"},
-                }
-            )
-        
-        if response.status_code == 200:
-            data = response.json()
-            result_text = str(data.get("result", ""))
-            assert "4" in result_text
+        res = await run_tool_test("execute_code", {"code": "print(2 + 2)"})
+        assert not res.isError
+        assert "4" in res.content[0].text
     
-    @pytest.mark.mcp
     @pytest.mark.asyncio
     async def test_pandas_operations(self):
         """Execute pandas code."""
@@ -41,62 +31,43 @@ import pandas as pd
 df = pd.DataFrame({'a': [1, 2, 3], 'b': [4, 5, 6]})
 print(df.sum())
 """
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.post(
-                f"{API_URL}/api/v1/mcp/tools/invoke",
-                json={
-                    "tool_name": "execute_code",
-                    "arguments": {"code": code},
-                }
-            )
-        
-        assert response.status_code in [200, 500]
+        res = await run_tool_test("execute_code", {"code": code})
+        assert not res.isError
+        # df.sum() output usually contains columns and values
+        assert "a" in res.content[0].text
+        assert "6" in res.content[0].text # sum of a
+        assert "15" in res.content[0].text # sum of b
 
 
 class TestSQLQuery:
     """Tests for sql_query tool."""
     
-    @pytest.mark.mcp
     @pytest.mark.asyncio
     async def test_simple_query(self):
         """Execute simple SQL query."""
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.post(
-                f"{API_URL}/api/v1/mcp/tools/invoke",
-                json={
-                    "tool_name": "sql_query",
-                    "arguments": {
-                        "query": "SELECT 1 + 1 as result",
-                    },
-                }
-            )
-        
-        if response.status_code == 200:
-            data = response.json()
-            assert "result" in data
+        res = await run_tool_test("sql_query", {"query": "SELECT 1 + 1 as result"})
+        assert not res.isError
+        assert "2" in res.content[0].text
 
 
 class TestDataframeOps:
     """Tests for dataframe_ops tool."""
     
-    @pytest.mark.mcp
     @pytest.mark.asyncio
     async def test_describe_operation(self):
         """Run describe operation."""
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.post(
-                f"{API_URL}/api/v1/mcp/tools/invoke",
-                json={
-                    "tool_name": "dataframe_ops",
-                    "arguments": {
-                        "operation": "describe",
-                        "data": "a,b\n1,2\n3,4\n5,6",
-                    },
-                }
-            )
+        # Using execute_code to generate output first might be easier, 
+        # but dataframe_ops takes a string/json representation usually?
+        # Let's check server impl. It accepts 'data' parameter.
         
-        assert response.status_code in [200, 500]
-
+        data = "a,b\n1,2\n3,4\n5,6"
+        res = await run_tool_test("dataframe_ops", {
+            "operation": "describe",
+            "data": data,
+        })
+        assert not res.isError
+        assert "count" in res.content[0].text or "mean" in res.content[0].text
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v", "-m", "mcp"])
+    import sys
+    sys.exit(pytest.main(["-v", "-s", __file__]))

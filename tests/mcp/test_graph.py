@@ -26,5 +26,5 @@ if __name__ == "__main__":
 
 @pytest.mark.asyncio
 async def test_main():
-    await verify()
+    await main()
 

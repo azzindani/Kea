@@ -67,7 +67,8 @@ def get_figure_output(fig: go.Figure, format: str = 'png', width: int = 1000, he
     try:
         img_bytes = pio.to_image(fig, format=format, width=width, height=height, scale=scale)
         return base64.b64encode(img_bytes).decode('utf-8')
-    except ValueError as e:
-        # Fallback if kaleido not installed/working, return JSON
+    except Exception as e:
+        # Fallback if kaleido not installed/working/crashing, return JSON
+        # This handles ValueError (missing kaleido), RuntimeError (chrome missing), etc.
         logger.warning(f"Static image generation failed: {e}. Returning JSON.")
         return pio.to_json(fig)
