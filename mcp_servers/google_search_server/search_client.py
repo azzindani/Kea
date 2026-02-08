@@ -2,7 +2,6 @@ import asyncio
 from typing import List, Dict, Any, Optional, Union
 from googlesearch import search
 import structlog
-import time
 import random
 
 logger = structlog.get_logger()
@@ -54,12 +53,11 @@ class GoogleSearchClient:
                     # The 'pause' argument is the sleep_interval
                     iterator = search(
                         query, 
-                        num=num_results, 
-                        stop=num_results, 
+                        num_results=num_results, 
                         lang=lang, 
                         region=region, 
                         advanced=advanced,
-                        pause=sleep_interval
+                        sleep_interval=sleep_interval
                     )
                     
                     for item in iterator:

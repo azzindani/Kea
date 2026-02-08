@@ -14,7 +14,10 @@ async def parse_pdf(url: str, pages: str = "all", extract_tables: bool = False) 
         import fitz # PyMuPDF
         
         # Download PDF
-        async with httpx.AsyncClient(timeout=60) as client:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+        async with httpx.AsyncClient(timeout=60, follow_redirects=True, headers=headers) as client:
             response = await client.get(url)
             response.raise_for_status()
             pdf_bytes = response.content

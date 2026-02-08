@@ -32,10 +32,10 @@ async def test_ffmpeg_real_simulation():
 
             # 3. Create Test Video (Active Simulation)
             print("3. Generating Test Video (color test source)...")
+            test_video = "test_gen.mp4"
+            test_output = "test_out.mkv"
             try:
                 import ffmpeg
-                test_video = "test_gen.mp4"
-                test_output = "test_out.mkv"
             
                 # Generate 3 seconds of video
                 ffmpeg.input('testsrc=size=320x240:rate=30', f='lavfi').output(test_video, t=3).overwrite_output().run(quiet=True)

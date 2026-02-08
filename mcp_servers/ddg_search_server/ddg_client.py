@@ -1,8 +1,11 @@
 import asyncio
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Dict, Any, Optional
 from duckduckgo_search import DDGS
 import structlog
-import random
+import warnings
+
+# Suppress "renamed to ddgs" warning
+warnings.filterwarnings("ignore", category=RuntimeWarning, module="duckduckgo_search")
 
 logger = structlog.get_logger()
 

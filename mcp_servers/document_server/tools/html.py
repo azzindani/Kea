@@ -12,7 +12,10 @@ async def parse_html(url: str, extract: str = "text", selector: str = None) -> s
     extract: 'text', 'links', 'tables', 'images'
     """
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True, headers=headers) as client:
             response = await client.get(url)
             response.raise_for_status()
             html = response.text

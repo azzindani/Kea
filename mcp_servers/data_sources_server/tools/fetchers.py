@@ -86,14 +86,16 @@ async def fetch_world_bank(indicator: str, country: str = "all", start_year: int
     try:
         import wbgapi as wb
         
-        time_range = None
+        # Build arguments dynamically to avoid passing None
+        kwargs = {"labels": True}
+        
         if start_year and end_year:
-            time_range = range(start_year, end_year + 1)
+            kwargs["time"] = range(start_year, end_year + 1)
         
         if country == "all":
-            data = wb.data.DataFrame(indicator, time=time_range, labels=True)
+            data = wb.data.DataFrame(indicator, **kwargs)
         else:
-            data = wb.data.DataFrame(indicator, economy=country, time=time_range, labels=True)
+            data = wb.data.DataFrame(indicator, economy=country, **kwargs)
         
         if data is None or data.empty:
             return f"No data found for indicator '{indicator}'"

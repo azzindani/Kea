@@ -73,8 +73,14 @@ class JSONFormatter(logging.Formatter):
             "level": record.levelname,
             "service": self.service_name,
             "logger": record.name,
-            "message": record.getMessage(),
+            "logger": record.name,
+            # "message": record.getMessage(),
         }
+        
+        try:
+            log_entry["message"] = record.getMessage()
+        except Exception:
+             log_entry["message"] = str(record.msg) + (f" {record.args}" if record.args else "")
         
         # Add trace context if available
         if ctx.trace_id:
@@ -149,9 +155,14 @@ class ConsoleFormatter(logging.Formatter):
         
         timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
         
+        try:
+            message = record.getMessage()
+        except Exception:
+            message = str(record.msg) + (f" {record.args}" if record.args else "")
+
         return (
             f"{color}[{timestamp}] {record.levelname:8}{self.RESET} "
-            f"{prefix}{record.name}: {record.getMessage()}"
+            f"{prefix}{record.name}: {message}"
         )
 
 

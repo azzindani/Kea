@@ -25,21 +25,11 @@ async def test_mibian_real_simulation():
             await session.initialize()
             
             # 1. BS Price
+            # 1. BS Price
             print(f"1. BS Price (S={S}, K={K}, t={t}, v={v})...")
-            # Arguments need specific structure expected by tool (usually list of args or named)
-            # Checking server definition: calculate_bs_price expects underlyingPrice, strikePrice, interestRate, daysToExpiration, volatility
-            # But the tool adds them as arguments. Mibian library usually takes list [S, K, r, t, v] or similar. 
-            # The tool signature in server.py needs to be checked. It imports from tools.pricing.
-            # Assuming standard named args mapped or args list.
-            # Let's try named arguments based on standard finance inputs.
-            # From server.py, it uses `calculate_bs_price`.
-            # I'll guess arguments based on common naming: underlyingPrice, strikePrice, interestRate, daysToExpiration, volatility.
-            # If `calculate_bs_price` is a wrapper, it likely takes these.
             
-            # Actually, `fastmcp` introspects. Let's list tools to see args or just try standard ones.
-            # Based on typical mibian usage: BS([S, K, r, t], volatility=v) generally.
-            # Let's try sending common params.
-            args = {"underlyingPrice": S, "strikePrice": K, "interestRate": r, "daysToExpiration": t, "volatility": v}
+            # Correct arguments matching server.py definition
+            args = {"underlying": S, "strike": K, "interest": r, "days": t, "volatility": v}
             
             res = await session.call_tool("calculate_bs_price", arguments=args)
             if not res.isError:
@@ -55,21 +45,22 @@ async def test_mibian_real_simulation():
 
             # 3. IV Calculation
             print("3. Implied Volatility (Price=3.5)...")
-            iv_args = {"underlyingPrice": S, "strikePrice": K, "interestRate": r, "daysToExpiration": t, "optionPrice": 3.5}
+            iv_args = {"underlying": S, "strike": K, "interest": r, "days": t, "call_price": 3.5}
             res = await session.call_tool("calculate_implied_volatility", arguments=iv_args)
             if not res.isError:
                 print(f" \033[92m[PASS]\033[0m IV: {res.content[0].text}%")
 
             # 4. Bulk Option Chain
             print("4. Option Chain (S=100, K=[90,100,110])...")
-            chain_args = {
-                "underlyingPrice": S,
-                "strikes": [90, 100, 110],
-                "interestRate": r,
-                "daysToExpiration": t,
-                "volatility": v
-            }
-            res = await session.call_tool("price_option_chain", arguments=chain_args)
+            # bulk tool 'price_option_chain' expects a list of dicts in 'data' argument
+            # Check server.py: async def price_option_chain(data: list[dict]) -> str:
+            
+            chain_data = [
+                {"underlying": S, "strike": k, "interest": r, "days": t, "volatility": v}
+                for k in [90, 100, 110]
+            ]
+            
+            res = await session.call_tool("price_option_chain", arguments={"data": chain_data})
             if not res.isError:
                  print(f" \033[92m[PASS]\033[0m Chain: {res.content[0].text[:1000]}...")
 

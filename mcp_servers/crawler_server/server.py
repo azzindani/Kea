@@ -30,7 +30,7 @@ setup_logging()
 mcp = FastMCP("crawler_server")
 
 @mcp.tool()
-async def web_crawler(start_url: str, max_depth: int = 1000, max_pages: int = 100000, same_domain: bool = True, delay: float = 0.5) -> str:
+async def web_crawler(start_url: str = None, url: str = None, max_depth: int = 1000, max_pages: int = 100000, same_domain: bool = True, delay: float = 0.5) -> str:
     """CRAWLS website recursively. [ACTION]
     
     [RAG Context]
@@ -38,7 +38,10 @@ async def web_crawler(start_url: str, max_depth: int = 1000, max_pages: int = 10
         max_depth: Depth limit
         same_domain: Restrict to domain
     """
-    return await crawl_ops.web_crawler(start_url, max_depth, max_pages, same_domain, delay)
+    target = start_url or url
+    if not target:
+        return "Error: Missing 'start_url' or 'url' argument."
+    return await crawl_ops.web_crawler(target, max_depth, max_pages, same_domain, delay)
 
 @mcp.tool()
 async def sitemap_parser(url: str, filter_pattern: Optional[str] = None) -> str:
@@ -87,5 +90,5 @@ class CrawlerServer:
         # Access internal tool manager to get list of tool objects
         # We need to return objects that have a .name attribute
         if hasattr(self.mcp, '_tool_manager') and hasattr(self.mcp._tool_manager, '_tools'):
-             return list(self.mcp._tool_manager._tools.values())
+            return list(self.mcp._tool_manager._tools.values())
         return []

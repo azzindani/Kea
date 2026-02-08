@@ -54,6 +54,14 @@ async def test_fs_real_simulation():
             tools = await session.list_tools()
             tool_names = [t.name for t in tools.tools]
             
+            # 0. Initialize DB (ensure schema exists)
+            print("0. Initializing DB...")
+            res_init = await session.call_tool("fs_init")
+            if res_init.isError:
+                 print(f" [WARN] Init failed (might be already init): {res_init.content[0].text}")
+            else:
+                 print(f" [INFO] DB Init: {res_init.content[0].text}")
+
             # 1. Write File
             write_tool = "write_file" if "write_file" in tool_names else "fs_write"
             print(f"1. Writing to {test_path} using {write_tool}...")
