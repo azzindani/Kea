@@ -287,7 +287,7 @@ async def calculate_indicators(ticker: str, indicators: List[str] = ["sma", "rsi
 
 # --- Charts ---
 @mcp.tool()
-async def get_price_chart(ticker: str, period: str = "1y", **kwargs) -> Image:
+async def get_price_chart(ticker: str, period: str = "1y") -> Image:
     """GENERATES price chart. [ACTION]
     
     [RAG Context]
@@ -343,7 +343,7 @@ async def get_full_report(ticker: str) -> str:
 
 # --- Dynamic Info Tool ---
 @mcp.tool()
-async def get_ticker_info(ticker: str, key: str = "longName", **kwargs) -> str:
+async def get_ticker_info(ticker: str, key: str = "longName") -> str:
     """EXTRACTS raw metric from info. [ACTION]
     
     [RAG Context]

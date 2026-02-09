@@ -1,6 +1,7 @@
 
 import asyncio
 import yfinance as yf
+import pandas as pd
 from mcp_servers.yfinance_server.utils.ticker_cache import TickerCache
 from shared.logging import get_logger
 
@@ -8,7 +9,7 @@ logger = get_logger(__name__)
 
 cache = TickerCache()
 
-async def get_tickers_by_country(country_code: str = "US", **kwargs) -> str:
+async def get_tickers_by_country(country_code: str = "US") -> str:
     """
     Get all stock tickers for a specific country or exchange.
     
