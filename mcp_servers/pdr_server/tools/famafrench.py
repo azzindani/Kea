@@ -42,6 +42,10 @@ async def get_fama_french_data(dataset_name: str = None, start_date: str = None,
             
         try:
             ds = web.DataReader(name, "famafrench", start=start, end=end_date)
+        except TypeError:
+            # Fallback: if date comparison fails (int period index vs Timestamp
+            # after date_parser removal), fetch without date filters
+            ds = web.DataReader(name, "famafrench")
         finally:
             pd.read_csv = _original_read_csv
             if _original_ff_read_csv:
