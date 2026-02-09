@@ -1,6 +1,7 @@
 import pytest
 import asyncio
 import os
+import shutil
 from mcp import ClientSession
 from mcp.client.stdio import stdio_client
 from tests.mcp.client_utils import get_server_params
@@ -50,7 +51,7 @@ async def test_zipfile_real_simulation():
             # 5. Extract File
             print("5. Extracting File...")
             extract_dir = "test_extract"
-            res = await session.call_tool("extract_member", arguments={"path": abs_zip_path, "member": file_name, "target_dir": os.path.abspath(extract_dir)})
+            res = await session.call_tool("extract_member", arguments={"path": abs_zip_path, "member": file_name, "extract_path": os.path.abspath(extract_dir)})
             print(f" \033[92m[PASS]\033[0m Extracted to: {res.content[0].text}")
 
             # 6. Bulk Create (Mock)
