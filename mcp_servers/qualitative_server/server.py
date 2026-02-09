@@ -18,7 +18,7 @@ from shared.mcp.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from mcp_servers.qualitative_server.tools import coding, entities, graph
+from mcp_servers.qualitative_server.tools import coding, entities as entities_ops, graph
 import structlog
 import asyncio
 from typing import List, Dict, Any, Optional
@@ -95,7 +95,7 @@ async def entity_extractor(text: str, entity_types: List[str] = ["person", "org"
     Extract named entities (people, orgs, places, dates).
     Returns JSON list of entities.
     """
-    return await run_op(entities.entity_extractor, text=text, entity_types=entity_types)
+    return await run_op(entities_ops.entity_extractor, text=text, entity_types=entity_types)
 
 @mcp.tool()
 async def connection_mapper(entities: List[str], context: str = "") -> str:
@@ -105,7 +105,7 @@ async def connection_mapper(entities: List[str], context: str = "") -> str:
     Map relationships between entities (detective-style).
     Returns graph/connection string.
     """
-    return await run_op(entities.connection_mapper, entities=entities, context=context)
+    return await run_op(entities_ops.connection_mapper, entities=entities, context=context)
 
 # --- 3. Investigation Graph ---
 @mcp.tool()

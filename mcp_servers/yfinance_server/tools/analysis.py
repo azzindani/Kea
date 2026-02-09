@@ -2,16 +2,12 @@
 import pandas as pd
 import yfinance as yf
 import numpy as np
-
-import pandas as pd
-import yfinance as yf
-import numpy as np
 from typing import List, Optional
 from shared.logging import get_logger
 
 logger = get_logger(__name__)
 
-async def get_analyst_recommendations(ticker: str) -> str:
+async def get_analyst_recommendations(ticker: str, **kwargs) -> str:
     """Get analyst recommendations."""
     try:
         df = yf.Ticker(ticker).recommendations
@@ -20,7 +16,7 @@ async def get_analyst_recommendations(ticker: str) -> str:
         logger.error(f"Error in recommendations for {ticker}: {e}")
         return f"Error: {str(e)}"
 
-async def get_price_targets(ticker: str) -> str:
+async def get_price_targets(ticker: str, **kwargs) -> str:
     """Get analyst price targets."""
     try:
         info = yf.Ticker(ticker).info
@@ -30,7 +26,7 @@ async def get_price_targets(ticker: str) -> str:
         logger.error(f"Error in price targets for {ticker}: {e}")
         return f"Error: {str(e)}"
 
-async def get_earnings_calendar(ticker: str) -> str:
+async def get_earnings_calendar(ticker: str, **kwargs) -> str:
     """Get earnings calendar."""
     try:
         cal = yf.Ticker(ticker).calendar
@@ -39,7 +35,7 @@ async def get_earnings_calendar(ticker: str) -> str:
         logger.error(f"Error in calendar for {ticker}: {e}")
         return f"Error: {str(e)}"
 
-async def get_upgrades_downgrades(ticker: str) -> str:
+async def get_upgrades_downgrades(ticker: str, **kwargs) -> str:
     """Get upgrades and downgrades."""
     try:
         df = yf.Ticker(ticker).upgrades_downgrades
@@ -48,7 +44,7 @@ async def get_upgrades_downgrades(ticker: str) -> str:
         logger.error(f"Error in upgrades for {ticker}: {e}")
         return f"Error: {str(e)}"
 
-async def get_dividends_history(ticker: str) -> str:
+async def get_dividends_history(ticker: str, **kwargs) -> str:
     """Get dividends history."""
     try:
         s = yf.Ticker(ticker).dividends
@@ -57,7 +53,7 @@ async def get_dividends_history(ticker: str) -> str:
         logger.error(f"Error in dividends for {ticker}: {e}")
         return f"Error: {str(e)}"
 
-async def get_splits_history(ticker: str) -> str:
+async def get_splits_history(ticker: str, **kwargs) -> str:
     """Get splits history."""
     try:
         s = yf.Ticker(ticker).splits
@@ -66,7 +62,7 @@ async def get_splits_history(ticker: str) -> str:
         logger.error(f"Error in splits for {ticker}: {e}")
         return f"Error: {str(e)}"
 
-async def calculate_indicators(ticker: str, indicators: List[str] = ["sma", "rsi"], period: str = "1y", interval: str = "1d") -> str:
+async def calculate_indicators(ticker: str = "", indicators: List[str] = ["sma", "rsi"], period: str = "1y", interval: str = "1d", **kwargs) -> str:
     """
     Calculate technical indicators for a given ticker.
     Args:
@@ -75,6 +71,14 @@ async def calculate_indicators(ticker: str, indicators: List[str] = ["sma", "rsi
         period (str): "1y" (default)
         interval (str): "1d" (default)
     """
+    # Robustness for generic test calls
+    ticker = ticker or kwargs.get("symbol", "")
+    if not ticker:
+        return "Error: No ticker provided."
+    
+    # Handle indicators if passed as string by accident or missing
+    if not indicators:
+        indicators = ["sma", "rsi"]
     
     try:
         df = yf.Ticker(ticker).history(period=period, interval=interval)

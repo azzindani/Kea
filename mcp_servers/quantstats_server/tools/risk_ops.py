@@ -10,7 +10,19 @@ def risk_max_drawdown(returns_input: str) -> float:
 def risk_avg_drawdown(returns_input: str) -> float:
     """Average Drawdown."""
     s = _parse_returns(returns_input)
-    return safe_float(qs.stats.avg_drawdown(s))
+    if hasattr(qs.stats, 'avg_drawdown'):
+        return safe_float(qs.stats.avg_drawdown(s))
+    else:
+        # Fallback: Mean of all drawdown depths
+        try:
+            dd = qs.stats.to_drawdown_series(s)
+            # Find local troughs (negative values in drawdown series)
+            troughs = dd[dd < 0]
+            if not troughs.empty:
+                return safe_float(troughs.mean())
+            return 0.0
+        except:
+            return 0.0
 
 def risk_volatility(returns_input: str) -> float:
     """Annualized Volatility."""

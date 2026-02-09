@@ -29,19 +29,18 @@ async def analyze_company_profile(arguments: dict) -> ToolResult:
             "exchanges": getattr(company, 'exchanges', [])
         }
         
-        # Recent Filings via Pandas
+        # Recent Filings (Head 5)
         filings = company.get_filings()
-        df = filings.to_pandas()
-        
-        # Head 5
         recent = []
-        # Check DataFrame columns (accession_number vs accession_no) usually accession_number in pandas
-        for idx, row in df.head(5).iterrows():
+        filing_list = filings.head(5)
+        for filing in filing_list:
             recent.append({
-                "form": row.get('form'),
-                "date": str(row.get('filing_date')),
-                "accession": row.get('accession_number'),
-                "primary": row.get('primary_document')
+                "form": filing.form,
+                "date": str(filing.filing_date),
+                "accession": filing.accession_number,
+                "primary": filing.primary_document,
+                "homepage_url": filing.homepage_url,
+                "primary_document_url": filing.primary_document_url
             })
             
         info['recent_filings'] = recent
@@ -65,19 +64,19 @@ async def find_filings(arguments: dict) -> ToolResult:
         limit = arguments.get('limit', 10)
         
         company = EdgarCore.get_company(ticker)
-        # Form filter in get_filings might still be safe?
         filings = company.get_filings(form=form) if form else company.get_filings()
         
-        df = filings.to_pandas()
         # Slice head
-        df = df.head(limit)
+        filing_list = filings.head(limit)
         
         results = []
-        for idx, row in df.iterrows():
+        for filing in filing_list:
             results.append({
-                "form": row.get('form'),
-                "date": str(row.get('filing_date')),
-                "accession": row.get('accession_number')
+                "form": filing.form,
+                "date": str(filing.filing_date),
+                "accession": filing.accession_number,
+                "homepage_url": filing.homepage_url,
+                "primary_document_url": filing.primary_document_url
             })
             
         return dict_to_result({"filings": results, "count": len(results)}, f"Filings: {ticker} {form or ''}")

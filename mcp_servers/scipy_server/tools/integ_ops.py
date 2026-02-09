@@ -1,17 +1,13 @@
-from mcp_servers.scipy_server.tools.core_ops import to_serializable, parse_data, NumericData
+from mcp_servers.scipy_server.tools.core_ops import to_serializable, parse_data, compile_function, NumericData
 from scipy import integrate
 import numpy as np
 from typing import Dict, Any, List, Optional, Callable
 
-def _make_func(func_str: str) -> Callable:
-    if "lambda" not in func_str:
-        func_str = f"lambda x: {func_str}"
-    return eval(func_str, {"np": np, "abs": abs, "sin": np.sin, "cos": np.cos, "exp": np.exp, "sqrt": np.sqrt})
-
 async def integrate_quad(func_str: str, a: float, b: float) -> Dict[str, float]:
     """Calculate definite integral of f(x) from a to b using QUADPACK."""
-    fun = _make_func(func_str)
+    fun = compile_function(func_str)
     res, err = integrate.quad(fun, a, b)
+    # res might be a list/tuple depending on quad variation, but usually (y, abserr)
     return {"result": float(res), "error": float(err)}
 
 async def integrate_simpson(y_data: NumericData, x_data: Optional[NumericData] = None, dx: float = 1.0) -> float:
@@ -36,14 +32,9 @@ async def solve_ivp(func_str: str, t_span: List[float], y0: List[float], t_eval:
     """
     Solve Initial Value Problem (ODE). 
     dy/dt = f(t, y).
-    func_str must accept (t, y). E.g. "lambda t, y: -0.5 * y"
+    func_str must accept (t, y). E.g. "lambda t, y: -0.5 * y" or just "-0.5 * y"
     """
-    # Note: func must be lambda t, y
-    if "lambda" not in func_str:
-        # User might provide just expression assuming t,y vars
-        func_str = f"lambda t, y: {func_str}"
-        
-    fun = _make_func(func_str)
+    fun = compile_function(func_str, required_vars=['t', 'y'])
     
     res = integrate.solve_ivp(fun, t_span, y0, t_eval=t_eval)
     

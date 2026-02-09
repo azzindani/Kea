@@ -1,18 +1,26 @@
-
-import yfinance as yf
-import pandas as pd
-
 import yfinance as yf
 import pandas as pd
 from shared.logging import get_logger
 
 logger = get_logger(__name__)
 
-async def get_options_chain(ticker: str, date: str) -> str:
+async def get_options_chain(ticker: str, date: str = "", **kwargs) -> str:
     """Get Options Chain for a specific date."""
+    # Robustness for generic test calls
+    ticker = ticker or kwargs.get("symbol", "")
+    if not ticker:
+        return "Error: No ticker provided."
     
     try:
         stock = yf.Ticker(ticker)
+        
+        # If date is not provided, use the first available expiration
+        if not date:
+            exps = stock.options
+            if not exps:
+                return f"No options available for {ticker}"
+            date = exps[0]
+
         opt = stock.option_chain(date)
         
         # Return summary to avoid exploding context
@@ -32,7 +40,7 @@ async def get_options_chain(ticker: str, date: str) -> str:
         logger.error(f"Options tool error: {e}")
         return f"Error: {str(e)}"
 
-async def get_option_expirations(ticker: str) -> str:
+async def get_option_expirations(ticker: str, **kwargs) -> str:
     """Get available option expiration dates."""
     try:
         exps = yf.Ticker(ticker).options

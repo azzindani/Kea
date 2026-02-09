@@ -5,10 +5,12 @@ description = "MCP Server for newspaper_server"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "feedparser",
+    "httpx",
     "lxml",
     "lxml_html_clean",
     "mcp",
-    "newspaper3k",
+    "newspaper4k",
     "nltk",
     "pydantic",
     "python-dotenv",

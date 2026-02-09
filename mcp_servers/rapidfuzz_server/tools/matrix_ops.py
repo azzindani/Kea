@@ -5,7 +5,9 @@ from typing import List, Dict, Any, Union, Optional
 
 def cdist_distance(queries: List[str], choices: List[str], metric: str = "Levenshtein") -> List[List[float]]:
     """Compute distance matrix (List A vs List B). Returns List of Lists (2D array)."""
-    dist_func = getattr(distance, metric, distance.Levenshtein)
+    dist_obj = getattr(distance, metric, distance.Levenshtein)
+    # Handle module vs function (e.g. distance.Levenshtein vs distance.Levenshtein.distance)
+    dist_func = getattr(dist_obj, "distance", dist_obj)
     # workers=-1 means use all cores.
     matrix = process.cdist(queries, choices, scorer=dist_func, workers=-1)
     return matrix.tolist()

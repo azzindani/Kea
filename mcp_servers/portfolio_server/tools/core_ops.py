@@ -19,13 +19,25 @@ def _parse_prices(prices_input: Union[str, Dict, List]) -> pd.DataFrame:
                  # Assume JSON string
                  try:
                      data = json.loads(prices_input)
+                     
+                     # --- UNWRAP FASTMCP ENVELOPE ---
+                     if isinstance(data, dict) and "status" in data and "data" in data:
+                         data = data["data"]
+                     
+                     if isinstance(data, str):
+                         # Data might be a double-encoded JSON string
+                         data = json.loads(data)
+                         
                      df = pd.DataFrame(data)
-                     # if dict of dicts (dates as keys), orient might need check
                  except:
                      # Fallback: simple CSV string?
                      df = pd.read_csv(io.StringIO(prices_input), parse_dates=True, index_col=0)
         elif isinstance(prices_input, dict):
-            df = pd.DataFrame(prices_input)
+            # Check for envelope in dict form
+            data = prices_input
+            if "status" in data and "data" in data:
+                data = data["data"]
+            df = pd.DataFrame(data)
         elif isinstance(prices_input, list):
              df = pd.DataFrame(prices_input)
         else:
@@ -34,14 +46,21 @@ def _parse_prices(prices_input: Union[str, Dict, List]) -> pd.DataFrame:
         # Ensure index is datetime
         if not isinstance(df.index, pd.DatetimeIndex):
              # Try to find date col if not index
-             if 'date' in df.columns.astype(str).str.lower():
-                 date_col = [c for c in df.columns if str(c).lower() == 'date'][0]
+             # Check columns (might be strings if loaded from JSON)
+             cols = [str(c).lower() for c in df.columns]
+             if 'date' in cols:
+                 date_col = df.columns[cols.index('date')]
                  df = df.set_index(date_col)
+             elif 'index' in cols: # Split orient json handling
+                 index_col = df.columns[cols.index('index')]
+                 df = df.set_index(index_col)
              
              df.index = pd.to_datetime(df.index)
         
         # Sort index
         df = df.sort_index()
+        # Drop columns that are not assets (like 'index' or 'date' if they remained)
+        df = df.select_dtypes(include=['number'])
         return df
     except Exception as e:
         logger.error("failed_to_parse_prices", error=str(e))
@@ -50,15 +69,16 @@ def _parse_prices(prices_input: Union[str, Dict, List]) -> pd.DataFrame:
 import os
 
 def load_prices_csv(file_path: str) -> str:
-    """Load prices from CSV and return summary json (to verify)."""
+    """Load prices from CSV and return as JSON string."""
     if not os.path.exists(file_path): raise FileNotFoundError(f"File not found: {file_path}")
     df = pd.read_csv(file_path, parse_dates=True, index_col=0)
-    return f"Loaded {len(df)} rows, {len(df.columns)} assets: {list(df.columns)}"
+    # Return as JSON to be passed to other tools
+    return df.to_json(orient="split", date_format="iso")
 
 def load_prices_json(json_data: str) -> str:
     """Load prices from JSON string."""
     df = _parse_prices(json_data)
-    return f"Loaded {len(df)} rows, {len(df.columns)} assets: {list(df.columns)}"
+    return df.to_json(orient="split", date_format="iso")
 
 def validate_tickers(prices_input: str) -> Dict[str, Any]:
     """Check data quality (missing values)."""

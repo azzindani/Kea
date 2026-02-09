@@ -11,9 +11,10 @@ async def test_statsmodels_full_coverage():
     """
     params = get_server_params("statsmodels_server", extra_dependencies=["statsmodels", "scipy", "numpy", "pandas"])
     
-    # Dummy Data
-    y = [1.0, 2.0, 3.0, 4.0, 5.0]
-    x = [[1.0, 1.0], [1.0, 2.0], [1.0, 3.0], [1.0, 4.0], [1.0, 5.0]] # with intercept column for OLS
+    # Dummy Data - Use more varied data to avoid singularity/convergence issues
+    y = [1.2, 2.5, 3.1, 4.8, 5.0]
+    # x: Use non-constant columns
+    x = [[1.2, 0.5], [2.1, 1.2], [3.3, 2.1], [4.5, 3.5], [5.1, 4.2]]
     x_simple = [1.0, 2.0, 3.0, 4.0, 5.0]
     
     # Time Data for TSA
@@ -70,18 +71,22 @@ async def test_statsmodels_full_coverage():
             
             # --- 4. MULTIVAR ---
             print("\n[4. Multivar]")
-            # PCA expects 2D
+            # PCA/FA expect 2D and benefit from non-constant columns
             await session.call_tool("pca", arguments={"data": x, "ncomp": 1})
             await session.call_tool("factor_analysis", arguments={"data": x, "n_factor": 1})
-            # MANOVA needs Multi output?
-            y_multi = [[1, 2], [2, 3], [3, 4], [4, 5], [5, 6]]
+            
+            # MANOVA/CanCorr need non-collinear multi-output
+            # y_multi columns should not be perfectly correlated
+            y_multi = [[1.2, 0.8], [2.1, 1.5], [3.4, 2.2], [4.1, 3.8], [5.5, 4.5]]
             await session.call_tool("manova", arguments={"endog": y_multi, "exog": x})
             await session.call_tool("canon_corr", arguments={"endog": y_multi, "exog": x})
             
             # --- 5. NONPARAM ---
             print("\n[5. Nonparam]")
             await session.call_tool("kde_univar", arguments={"data": y})
-            await session.call_tool("kde_multivar", arguments={"data": [y, y], "var_type": "c"}) # list of vars
+            # Fix kde_multivar: var_type length must match number of columns
+            # Using x which has 2 columns
+            await session.call_tool("kde_multivar", arguments={"data": x, "var_type": "cc"}) 
             await session.call_tool("lowess", arguments={"endog": y, "exog": x_simple})
             
             # --- 6. STAT TOOLS ---

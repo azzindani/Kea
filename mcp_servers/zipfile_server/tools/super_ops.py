@@ -2,10 +2,9 @@ import zipfile
 import shutil
 import os
 import datetime
-import fnmatch
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any
 
-def merge_zip_files(zip1: str, zip2: str, output_zip: str) -> str:
+def merge_zip_files(zip1: str, zip2: str, output_zip: str, **kwargs) -> str:
     """Combine Zip A and Zip B into Zip C."""
     with zipfile.ZipFile(output_zip, 'w', compression=zipfile.ZIP_DEFLATED) as z_out:
         # Copy zip1
@@ -18,7 +17,7 @@ def merge_zip_files(zip1: str, zip2: str, output_zip: str) -> str:
                 z_out.writestr(item, z2.read(item.filename))
     return f"Merged {zip1} and {zip2} into {output_zip}"
 
-def update_file_in_zip(zip_path: str, member: str, new_content: str) -> str:
+def update_file_in_zip(zip_path: str, member: str, new_content: str, **kwargs) -> str:
     """'Edit' a file (Read all -> Write new Zip with replaced content)."""
     temp_zip = zip_path + ".temp"
     try:
@@ -35,7 +34,7 @@ def update_file_in_zip(zip_path: str, member: str, new_content: str) -> str:
         if os.path.exists(temp_zip): os.remove(temp_zip)
         return f"Error: {e}"
 
-def delete_file_from_zip(zip_path: str, member: str) -> str:
+def delete_file_from_zip(zip_path: str, member: str, **kwargs) -> str:
     """'Delete' (Read all -> Write new Zip excluding target)."""
     temp_zip = zip_path + ".temp"
     try:
@@ -50,7 +49,7 @@ def delete_file_from_zip(zip_path: str, member: str) -> str:
         if os.path.exists(temp_zip): os.remove(temp_zip)
         return f"Error: {e}"
 
-def search_text_in_zip(path: str, keyword: str) -> List[str]:
+def search_text_in_zip(path: str, keyword: str, **kwargs) -> List[str]:
     """Search for string content across all files in zip."""
     matches = []
     with zipfile.ZipFile(path, 'r') as zf:
@@ -66,7 +65,7 @@ def search_text_in_zip(path: str, keyword: str) -> List[str]:
                 pass
     return matches
 
-def audit_security(path: str) -> Dict[str, Any]:
+def audit_security(path: str, **kwargs) -> Dict[str, Any]:
     """Check for Zip Bombs (compression ratio) and Zip Slip paths."""
     issues = []
     with zipfile.ZipFile(path, 'r') as zf:
@@ -84,7 +83,7 @@ def audit_security(path: str) -> Dict[str, Any]:
         "issues": issues
     }
 
-def convert_to_structure(path: str) -> Dict[str, Any]:
+def convert_to_structure(path: str, **kwargs) -> Dict[str, Any]:
     """Return JSON tree structure of zip content."""
     tree = {}
     with zipfile.ZipFile(path, 'r') as zf:
@@ -97,14 +96,14 @@ def convert_to_structure(path: str) -> Dict[str, Any]:
                 current = current[part]
     return tree
 
-def backup_and_zip(dir_path: str) -> str:
+def backup_and_zip(dir_path: str, **kwargs) -> str:
     """Copy folder, Zip it, timestamp it."""
     ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     out_name = f"{os.path.basename(dir_path)}_backup_{ts}"
     shutil.make_archive(out_name, 'zip', dir_path)
     return f"Created {out_name}.zip"
 
-def compare_zips(path1: str, path2: str) -> Dict[str, Any]:
+def compare_zips(path1: str, path2: str, **kwargs) -> Dict[str, Any]:
     """Compare file lists and CRCs of two zips."""
     def get_sigs(p):
         with zipfile.ZipFile(p, 'r') as z:

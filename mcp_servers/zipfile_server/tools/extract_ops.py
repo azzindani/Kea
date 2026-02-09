@@ -10,7 +10,7 @@ def _is_safe_path(base_dir: str, target_path: str) -> bool:
     target = (base / target_path).resolve()
     return base in target.parents or base == target
 
-def extract_all(path: str, extract_path: str, pwd: Optional[str] = None) -> str:
+def extract_all(path: str, extract_path: str, pwd: Optional[str] = None, **kwargs) -> str:
     """Extract entire archive to path (Safely)."""
     if not os.path.exists(extract_path):
         os.makedirs(extract_path)
@@ -24,7 +24,7 @@ def extract_all(path: str, extract_path: str, pwd: Optional[str] = None) -> str:
         zf.extractall(extract_path, pwd=pwd.encode() if pwd else None)
         return f"Extracted to {extract_path}"
 
-def extract_member(path: str, member: str, extract_path: str, pwd: Optional[str] = None) -> str:
+def extract_member(path: str, member: str, extract_path: str, pwd: Optional[str] = None, **kwargs) -> str:
     """Extract single file."""
     if not _is_safe_path(extract_path, member):
         return "Error: Unsafe path."
@@ -33,7 +33,7 @@ def extract_member(path: str, member: str, extract_path: str, pwd: Optional[str]
         zf.extract(member, extract_path, pwd=pwd.encode() if pwd else None)
         return f"Extracted {member}"
 
-def extract_members_list(path: str, members: List[str], extract_path: str) -> str:
+def extract_members_list(path: str, members: List[str], extract_path: str, **kwargs) -> str:
     """Extract specific list of files."""
     for m in members:
         if not _is_safe_path(extract_path, m): return f"Error: Unsafe path {m}"
@@ -42,11 +42,11 @@ def extract_members_list(path: str, members: List[str], extract_path: str) -> st
         zf.extractall(extract_path, members=members)
         return f"Extracted {len(members)} files."
 
-def extract_with_password(path: str, member: str, extract_path: str, pwd: str) -> str:
+def extract_with_password(path: str, member: str, extract_path: str, pwd: str, **kwargs) -> str:
     """Extract using password."""
-    return extract_member(path, member, extract_path, pwd)
+    return extract_member(path, member, extract_path, pwd, **kwargs)
 
-def extract_by_pattern(path: str, pattern: str, extract_path: str) -> str:
+def extract_by_pattern(path: str, pattern: str, extract_path: str, **kwargs) -> str:
     """Extract files matching regex."""
     regex = re.compile(pattern)
     with zipfile.ZipFile(path, 'r') as zf:
@@ -57,7 +57,7 @@ def extract_by_pattern(path: str, pattern: str, extract_path: str) -> str:
         zf.extractall(extract_path, members=members)
         return f"Extracted {len(members)} matching files."
 
-def extract_by_extension(path: str, extension: str, extract_path: str) -> str:
+def extract_by_extension(path: str, extension: str, extract_path: str, **kwargs) -> str:
     """Extract all .txt files etc."""
     # ext should include dot, e.g. ".txt"
     with zipfile.ZipFile(path, 'r') as zf:
@@ -65,6 +65,6 @@ def extract_by_extension(path: str, extension: str, extract_path: str) -> str:
         zf.extractall(extract_path, members=members)
         return f"Extracted {len(members)} {extension} files."
 
-def safe_extract(path: str, extract_path: str) -> str:
+def safe_extract(path: str, extract_path: str, **kwargs) -> str:
     """Extract preventing Zip Slip (path traversal check). Alias for extract_all with checks included."""
-    return extract_all(path, extract_path)
+    return extract_all(path, extract_path, **kwargs)

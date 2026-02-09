@@ -9,7 +9,12 @@ async def test_spacy_full_coverage():
     """
     REAL SIMULATION: Verify Spacy Server (100% Tool Coverage - 40+ Tools).
     """
-    params = get_server_params("spacy_server", extra_dependencies=["spacy", "pandas", "matplotlib"])
+    params = get_server_params("spacy_server", extra_dependencies=[
+        "spacy", 
+        "pandas", 
+        "matplotlib",
+        "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl"
+    ])
     
     # Test Data
     text = "Apple is looking at buying U.K. startup for $1 billion on January 5th. Dr. Smith loves NLP."

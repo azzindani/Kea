@@ -1,5 +1,5 @@
 from mcp_servers.newspaper_server.tools.core import NewsClient
-import newspaper
+import newspaper4k as newspaper
 from typing import List
 
 async def get_google_trending_terms() -> List[str]:

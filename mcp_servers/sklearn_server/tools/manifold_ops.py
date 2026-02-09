@@ -6,6 +6,8 @@ from typing import Dict, Any, List, Optional
 async def isomap(X: DataInput, n_components: int = 2, n_neighbors: int = 5) -> Dict[str, Any]:
     """Isomap Embedding."""
     X_df = parse_data(X)
+    # n_neighbors must be < n_samples
+    n_neighbors = min(n_neighbors, X_df.shape[0] - 1)
     model = Isomap(n_components=n_components, n_neighbors=n_neighbors)
     transformed = model.fit_transform(X_df)
     return to_serializable({
@@ -16,6 +18,8 @@ async def isomap(X: DataInput, n_components: int = 2, n_neighbors: int = 5) -> D
 async def lle(X: DataInput, n_components: int = 2, n_neighbors: int = 5, method: str = 'standard') -> Dict[str, Any]:
     """Locally Linear Embedding."""
     X_df = parse_data(X)
+    # n_neighbors must be < n_samples
+    n_neighbors = min(n_neighbors, X_df.shape[0] - 1)
     model = LocallyLinearEmbedding(n_components=n_components, n_neighbors=n_neighbors, method=method, random_state=42)
     transformed = model.fit_transform(X_df)
     return to_serializable({

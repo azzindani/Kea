@@ -1,14 +1,13 @@
 from textblob import TextBlob
 from collections import Counter
-from typing import List, Dict, Any, Tuple
-import statistics
+from typing import List, Dict, Any
 
 def full_text_report(text: str) -> Dict[str, Any]:
     """JSON with sentiment, tags, nouns, language, correctness."""
     blob = TextBlob(text)
     return {
         "sentiment": {"polarity": blob.sentiment.polarity, "subjectivity": blob.sentiment.subjectivity},
-        "language": blob.detect_language() if len(text) > 3 else "unknown",
+        "language": "unsupported (feature removed in TextBlob)",
         "noun_phrases": list(blob.noun_phrases),
         "sentences_count": len(blob.sentences),
         "words_count": len(blob.words),

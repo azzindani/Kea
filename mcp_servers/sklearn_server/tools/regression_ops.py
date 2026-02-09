@@ -36,6 +36,9 @@ async def decision_tree_reg(X: DataInput, y: VectorInput, max_depth: Optional[in
     return await _train_regressor(DecisionTreeRegressor(max_depth=max_depth), X, y)
 
 async def knn_regressor(X: DataInput, y: VectorInput, n_neighbors: int = 5) -> Dict[str, Any]:
+    X_df = parse_data(X)
+    # n_neighbors must be <= n_samples
+    n_neighbors = min(n_neighbors, X_df.shape[0])
     return await _train_regressor(KNeighborsRegressor(n_neighbors=n_neighbors), X, y)
 
 async def mlp_regressor(X: DataInput, y: VectorInput, hidden_layer_sizes: List[int] = [100]) -> Dict[str, Any]:

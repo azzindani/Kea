@@ -32,6 +32,9 @@ def _patch_famafrench_read_csv():
         if date_parser_func and parse_dates_val is not None:
             try:
                 result.index = result.index.map(lambda x: date_parser_func(str(x)))
+                # Drop rows where index is NaT (e.g., from non-data rows at end of CSV)
+                # This is crucial for PeriodIndex compatibility in Pandas 3.0
+                result = result[result.index.notna()]
             except Exception:
                 pass
         return result

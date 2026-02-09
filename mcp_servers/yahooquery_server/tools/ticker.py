@@ -247,3 +247,14 @@ async def get_technical_snapshot(tickers: str) -> str:
     except Exception as e:
         return f"Error: {str(e)}"
 
+async def get_income_statement(tickers: str, frequency: str = "a") -> str:
+    """FETCHES income statement."""
+    return await get_bulk_financials_handler(tickers, "income_statement", frequency)
+
+async def get_balance_sheet(tickers: str, frequency: str = "a") -> str:
+    """FETCHES balance sheet."""
+    return await get_bulk_financials_handler(tickers, "balance_sheet", frequency)
+
+async def get_cash_flow(tickers: str, frequency: str = "a") -> str:
+    """FETCHES cash flow statement."""
+    return await get_bulk_financials_handler(tickers, "cash_flow", frequency)

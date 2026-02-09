@@ -14,14 +14,28 @@ def get_nlp(model_name: str = "en_core_web_sm") -> spacy.language.Language:
     """Get or load a spacy model."""
     if model_name not in LOADED_MODELS:
         try:
-            # logger.info("loading_spacy_model", model=model_name)
-            # Suppress output during load too
+            # First attempt to load
             with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
                 LOADED_MODELS[model_name] = spacy.load(model_name)
         except OSError:
-            # logger.info("downloading_spacy_model", model=model_name)
-            # Suppress stdout/stderr to protect JSON-RPC
+            # Attempt download via spacy's CLI
+            # NOTE: This often fails in restricted or uv-managed environments if pip is not in PATH
             try:
+                import subprocess
+                import sys
+                
+                # Check if pip is available before trying spacy.cli.download
+                pip_available = False
+                try:
+                    subprocess.run([sys.executable, "-m", "pip", "--version"], capture_output=True, check=True)
+                    pip_available = True
+                except (subprocess.CalledProcessError, FileNotFoundError):
+                    logger.warning("pip_not_available_for_download")
+
+                if not pip_available:
+                    # If pip is missing, spacy.cli.download will definitely fail with OSError
+                    raise OSError(f"Cannot download '{model_name}': pip is not available in the current environment.")
+
                 with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
                     try:
                         spacy.cli.download(model_name)
@@ -29,9 +43,11 @@ def get_nlp(model_name: str = "en_core_web_sm") -> spacy.language.Language:
                         raise OSError(f"Failed to download model '{model_name}': pip might be missing or permission denied.")
                     
                     LOADED_MODELS[model_name] = spacy.load(model_name)
-            except Exception:
-                # logger.error("failed_download_spacy_model", error=str(e))
-                raise
+            except Exception as e:
+                logger.error("failed_to_download_model", model=model_name, error=str(e))
+                raise OSError(f"Failed to download model '{model_name}': {str(e)}. "
+                             "Please install it manually using 'pip install <model_url>' "
+                             "or ensure 'pip' is available.")
     return LOADED_MODELS[model_name]
 
 def load_model(model_name: str = "en_core_web_sm") -> str:

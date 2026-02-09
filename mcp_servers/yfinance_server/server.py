@@ -274,7 +274,7 @@ async def get_splits_history(ticker: str) -> str:
     return await analysis.get_splits_history(ticker)
 
 @mcp.tool()
-async def calculate_indicators(ticker: str, indicators: List[str], period: str = "1y") -> str:
+async def calculate_indicators(ticker: str, indicators: List[str] = ["sma", "rsi"], period: str = "1y") -> str:
     """CALCULATES technical indicators. [ACTION]
     
     [RAG Context]
@@ -287,7 +287,7 @@ async def calculate_indicators(ticker: str, indicators: List[str], period: str =
 
 # --- Charts ---
 @mcp.tool()
-async def get_price_chart(ticker: str, period: str = "1y") -> Image:
+async def get_price_chart(ticker: str, period: str = "1y", **kwargs) -> Image:
     """GENERATES price chart. [ACTION]
     
     [RAG Context]
@@ -299,7 +299,7 @@ async def get_price_chart(ticker: str, period: str = "1y") -> Image:
 
 # --- Options ---
 @mcp.tool()
-async def get_options_chain(ticker: str, date: str) -> str:
+async def get_options_chain(ticker: str, date: str = "") -> str:
     """FETCHES options chain (Calls/Puts). [ACTION]
     
     [RAG Context]
@@ -321,7 +321,7 @@ async def get_option_expirations(ticker: str) -> str:
 
 # --- Aggregators ---
 @mcp.tool()
-async def get_tickers_by_country(country_code: str) -> str:
+async def get_tickers_by_country(country_code: str = "US") -> str:
     """SEARCHES tickers by country. [ACTION]
     
     [RAG Context]
@@ -343,7 +343,7 @@ async def get_full_report(ticker: str) -> str:
 
 # --- Dynamic Info Tool ---
 @mcp.tool()
-async def get_ticker_info(ticker: str, key: str) -> str:
+async def get_ticker_info(ticker: str, key: str = "longName", **kwargs) -> str:
     """EXTRACTS raw metric from info. [ACTION]
     
     [RAG Context]

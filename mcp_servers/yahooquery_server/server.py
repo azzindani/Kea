@@ -101,6 +101,45 @@ async def get_bulk_financials(tickers: str, module_name: str, frequency: str = "
     return await ticker.get_bulk_financials_handler(tickers, module_name, frequency)
 
 @mcp.tool()
+async def get_income_statement(ticker_symbol: str, frequency: str = "a") -> str:
+    """FETCHES income statement. [ACTION]
+    
+    [RAG Context]
+    Get Income Statement for a specific ticker.
+    Args:
+        ticker_symbol: e.g. "AAPL"
+        frequency: a (annual) or q (quarterly)
+    Returns JSON/Markdown string.
+    """
+    return await ticker.get_income_statement(ticker_symbol, frequency)
+
+@mcp.tool()
+async def get_balance_sheet(ticker_symbol: str, frequency: str = "a") -> str:
+    """FETCHES balance sheet. [ACTION]
+    
+    [RAG Context]
+    Get Balance Sheet for a specific ticker.
+    Args:
+        ticker_symbol: e.g. "AAPL"
+        frequency: a (annual) or q (quarterly)
+    Returns JSON/Markdown string.
+    """
+    return await ticker.get_balance_sheet(ticker_symbol, frequency)
+
+@mcp.tool()
+async def get_cash_flow(ticker_symbol: str, frequency: str = "a") -> str:
+    """FETCHES cash flow statement. [ACTION]
+    
+    [RAG Context]
+    Get Cash Flow Statement for a specific ticker.
+    Args:
+        ticker_symbol: e.g. "AAPL"
+        frequency: a (annual) or q (quarterly)
+    Returns JSON/Markdown string.
+    """
+    return await ticker.get_cash_flow(ticker_symbol, frequency)
+
+@mcp.tool()
 async def get_bulk_options(tickers: str) -> str:
     """FETCHES bulk options. [ACTION]
     

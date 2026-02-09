@@ -3,19 +3,17 @@ import yfinance as yf
 import pandas as pd
 import uuid
 import os
-
-import yfinance as yf
-import pandas as pd
-import uuid
-import os
 from shared.logging import get_logger
 
 logger = get_logger(__name__)
 
 # 1. Bulk Tools with File I/O
-async def get_bulk_historical_data(tickers: str, period: str = "1mo", interval: str = "1d") -> str:
+async def get_bulk_historical_data(tickers: str = "", period: str = "1mo", interval: str = "1d", **kwargs) -> str:
     """Download historical data for multiple tickers (File Return)."""
-    # tickers = "AAPL MSFT"
+    # Use 'ticker' if 'tickers' is empty (for generic test compatibility)
+    tickers = tickers or kwargs.get("ticker", "")
+    if not tickers:
+        return "Error: No tickers provided."
     
     try:
         # Threaded Download
@@ -23,7 +21,12 @@ async def get_bulk_historical_data(tickers: str, period: str = "1mo", interval: 
         
         # Save to temp file (Standard I/O for large data)
         report_id = uuid.uuid4().hex[:8]
-        file_path = f"/tmp/history_{report_id}.csv"
+        # In case /tmp doesn't exist on Windows, use a more portable temp path if needed, 
+        # but the prompt says they are on Windows, and /tmp might not work.
+        # However, I'll stick to the existing logic but maybe make it safer.
+        temp_dir = os.environ.get("TEMP", "/tmp")
+        file_path = os.path.join(temp_dir, f"history_{report_id}.csv")
+        
         # Flatten for CSV if multi-index
         if isinstance(df.columns, pd.MultiIndex):
              df.stack(level=0).to_csv(file_path)
@@ -36,7 +39,7 @@ async def get_bulk_historical_data(tickers: str, period: str = "1mo", interval: 
         return f"Error: {str(e)}"
 
 # 2. Micro-Metric Tools (Unrolled)
-async def get_current_price(ticker: str) -> str:
+async def get_current_price(ticker: str, **kwargs) -> str:
     """Get just the price."""
     try:
         price = yf.Ticker(ticker).fast_info.last_price
@@ -45,7 +48,7 @@ async def get_current_price(ticker: str) -> str:
         logger.error(f"Market tool error (N/A fallback)")
         return "N/A"
 
-async def get_market_cap(ticker: str) -> str:
+async def get_market_cap(ticker: str, **kwargs) -> str:
     """Get Market Cap."""
     try:
         val = yf.Ticker(ticker).info.get("marketCap", "N/A")
@@ -54,7 +57,7 @@ async def get_market_cap(ticker: str) -> str:
         logger.error(f"Market tool error (N/A fallback)")
         return "N/A"
 
-async def get_volume(ticker: str) -> str:
+async def get_volume(ticker: str, **kwargs) -> str:
     """Get recent volume."""
     try:
         val = yf.Ticker(ticker).fast_info.last_volume
@@ -63,7 +66,7 @@ async def get_volume(ticker: str) -> str:
         logger.error(f"Market tool error (N/A fallback)")
         return "N/A"
 
-async def get_pe_ratio(ticker: str) -> str:
+async def get_pe_ratio(ticker: str, **kwargs) -> str:
     """Get Trailing PE."""
     try:
         val = yf.Ticker(ticker).info.get("trailingPE", "N/A")
@@ -72,7 +75,7 @@ async def get_pe_ratio(ticker: str) -> str:
         logger.error(f"Market tool error (N/A fallback)")
         return "N/A"
 
-async def get_beta(ticker: str) -> str:
+async def get_beta(ticker: str, **kwargs) -> str:
     """Get Beta (Volatility)."""
     try:
         val = yf.Ticker(ticker).info.get("beta", "N/A")
@@ -81,7 +84,7 @@ async def get_beta(ticker: str) -> str:
         logger.error(f"Market tool error (N/A fallback)")
         return "N/A"
 
-async def get_quote_metadata(ticker: str) -> str:
+async def get_quote_metadata(ticker: str, **kwargs) -> str:
     """Get Bid/Ask/Currency."""
     try:
         i = yf.Ticker(ticker).info

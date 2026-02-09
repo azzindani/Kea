@@ -9,10 +9,14 @@ from tests.mcp.client_utils import get_server_params
 
 def create_dummy_image(text="Hello World"):
     """Creates a simple image with text for OCR testing."""
-    img = Image.new('RGB', (200, 100), color=(255, 255, 255))
+    # OSD needs more characters. Let's create a bigger image with repeated text.
+    long_text = (text + " ") * 20 + "\n"
+    full_text = long_text * 10
+    
+    img = Image.new('RGB', (800, 600), color=(255, 255, 255))
     d = ImageDraw.Draw(img)
-    # Use default font
-    d.text((10,10), text, fill=(0,0,0))
+    d.multiline_text((20,20), full_text, fill=(0,0,0), spacing=10)
+    
     path = "test_ocr_image.png"
     img.save(path)
     return path
