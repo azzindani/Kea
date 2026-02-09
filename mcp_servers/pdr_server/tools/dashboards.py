@@ -1,13 +1,12 @@
 
 
-import pandas_datareader.data as web
 from shared.logging import get_logger
 import datetime
 import pandas as pd
 
+from mcp_servers.pdr_server.tools.famafrench import read_famafrench
+
 logger = get_logger(__name__)
-# Importing the map won't work easily here due to circular dep possibility, 
-# but we can redefine or import safely if clean.
 
 
 async def get_factor_dashboard() -> str:
@@ -22,11 +21,11 @@ async def get_factor_dashboard() -> str:
         # We must make separate calls and merge.
         
         # 1. 5 Factors
-        f5 = web.DataReader("F-F_Research_Data_5_Factors_2x3_daily", "famafrench", start=start)
+        f5 = read_famafrench("F-F_Research_Data_5_Factors_2x3_daily", start=start)
         df_f5 = f5[0] # Monthly/Daily table
-        
+
         # 2. Momentum
-        mom = web.DataReader("F-F_Momentum_Factor_daily", "famafrench", start=start)
+        mom = read_famafrench("F-F_Momentum_Factor_daily", start=start)
         df_mom = mom[0]
         
         # Join
@@ -52,7 +51,7 @@ async def get_global_factors_dashboard() -> str:
     try:
         results = {}
         for region, code in datasets.items():
-            data = web.DataReader(code, "famafrench", start=start)
+            data = read_famafrench(code, start=start)
             # Take the Mkt-RF column roughly (usually first column is Mkt-RF)
             # Actually keys usually 0 is monthly.
             df = data[0]
@@ -75,7 +74,7 @@ async def get_industry_health_dashboard() -> str:
     start = datetime.datetime.now() - datetime.timedelta(days=365) # 1 Year view
     
     try:
-        data = web.DataReader("49_Industry_Portfolios_daily", "famafrench", start=start) # Daily
+        data = read_famafrench("49_Industry_Portfolios_daily", start=start) # Daily
         df = data[0] # Value weighted returns usually
         
         return f"### 49 Industry Health (Daily Returns %)\n\n{df.tail(10).to_markdown()}"
@@ -89,7 +88,7 @@ async def get_liquidity_dashboard() -> str:
     """
     start = datetime.datetime.now() - datetime.timedelta(days=365*2)
     try:
-        data = web.DataReader("Liquidity_Factor", "famafrench", start=start)
+        data = read_famafrench("Liquidity_Factor", start=start)
         df = data[0]
         return f"### Market Liquidity Factor\n\n{df.tail(20).to_markdown()}"
     except Exception as e:
