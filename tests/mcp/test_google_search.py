@@ -46,18 +46,22 @@ async def test_google_real_simulation():
             res = await session.call_tool("search_google", arguments={"query": query, "num": 3})
             
             if res.isError:
-                print(f" \033[91m[FAIL]\033[0m {res.content[0].text if res.content else 'Unknown Error'}")
+                error_text = res.content[0].text if res.content else 'Unknown Error'
+                print(f" \033[91m[FAIL]\033[0m {error_text}")
+                if "Connect" in error_text or "Proxy" in error_text or "HTTPError" in error_text:
+                    pytest.skip("Google unreachable (network restriction)")
             else:
                 if not res.content:
                     print(f" \033[93m[WARN]\033[0m Empty results. Google might be rate limiting.")
+                    pytest.skip("Google returned no content (network restriction)")
                 else:
                     content = res.content[0].text
                     print(f" \033[92m[PASS]\033[0m Got result length: {len(content)}")
-                    # print(f"DEBUG CONTENT: {content[:500]}")
-                    
+
                     # Check for empty result which might happen if google blocks bot
                     if len(content) < 10 or content == "[]":
                          print(f" \033[93m[WARN]\033[0m Empty results. Google might be rate limiting.")
+                         pytest.skip("Google returned empty results (rate limiting)")
                     else:
                          assert "Python" in content or "python" in content.lower()
                 

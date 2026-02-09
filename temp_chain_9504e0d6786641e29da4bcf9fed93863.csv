@@ -1,0 +1,4 @@
+id,name,age,salary,city,date,tags,meta
+2,Bob,30,60000,LA,2023-01-02,"['b', 'c']",{'source': 'app'}
+3,Charlie,35,70000,Chicago,2023-01-03,['a'],{}
+4,David,40,80000,NY,2023-01-04,['c'],{}

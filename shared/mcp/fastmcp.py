@@ -123,7 +123,7 @@ class FastMCP(LibFastMCP):
             # 1. Get the original tool name/desc if not provided
             tool_name = name or func.__name__
             tool_desc = description or func.__doc__
-            
+
             # Check if original function is async
             is_async = inspect.iscoroutinefunction(func)
 
@@ -163,7 +163,7 @@ class FastMCP(LibFastMCP):
                             execution_time_ms = (time.perf_counter() - start_time) * 1000
                             meta["duration_ms"] = round(execution_time_ms, 2)
                             meta["retry_count"] = retry_count
-                            
+
                             def json_serial(obj):
                                 if hasattr(obj, "model_dump"):
                                     return obj.model_dump()
@@ -224,8 +224,12 @@ class FastMCP(LibFastMCP):
                         details={"traceback": traceback.format_exc()}
                     )
 
-            # Preserve signature for FastMCP introspection
-            wrapper.__signature__ = inspect.signature(func)
+            # Preserve parameter signature for FastMCP introspection,
+            # but override return annotation to str since the wrapper always
+            # returns a JSON envelope string (avoids Pydantic validation errors
+            # for tools annotated to return list/dict/int/etc.)
+            orig_sig = inspect.signature(func)
+            wrapper.__signature__ = orig_sig.replace(return_annotation=str)
             
             # --- GUARD AGAINST RECURSION ---
             # Mark as standardized to avoid double wrapping if called again via inheritance
