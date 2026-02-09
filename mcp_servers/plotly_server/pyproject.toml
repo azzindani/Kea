@@ -5,7 +5,7 @@ description = "MCP Server for plotly_server"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "kaleido",
+    "kaleido==0.1.0.post1",
     "mcp",
     "numpy",
     "pandas",
@@ -13,6 +13,7 @@ dependencies = [
     "pydantic",
     "python-dotenv",
     "scipy",
+    "statsmodels",
     "structlog",
     "wrapt",
 ]

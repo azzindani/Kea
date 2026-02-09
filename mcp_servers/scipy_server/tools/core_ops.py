@@ -2,11 +2,56 @@ import numpy as np
 import structlog
 from typing import Any, List, Union, Optional
 import json
+import re
 
 logger = structlog.get_logger()
 
 # Common type for numerical input
 NumericData = Union[List[float], List[int], str] 
+
+def compile_function(func_str: str, default_var: str = 'x', required_vars: Optional[List[str]] = None) -> Any:
+    """
+    Safely compile a string into a python function.
+    Supports:
+    - lambda x: ...
+    - a*x + b (automatically detects parameters)
+    - x[0]**2 (vector input)
+    
+    If required_vars is provided, they will be the first arguments in that order.
+    Ex: required_vars=['t', 'y'] -> lambda t, y, a, b: ...
+    """
+    func_str = func_str.strip()
+    
+    # 1. If it's already a lambda, just eval it
+    if "lambda" in func_str:
+        return eval(func_str, {"np": np, "abs": abs, "sin": np.sin, "cos": np.cos, "exp": np.exp, "sqrt": np.sqrt})
+    
+    # 2. Try to detect parameters in expression
+    # Use regex to find all variable-like words not in math/builtin list
+    math_names = {"np", "abs", "sin", "cos", "exp", "sqrt", "log", "tan", "pi", "e"}
+    words = re.findall(r'[a-zA-Z_][a-zA-Z0-9_]*', func_str)
+    
+    # Variables that are part of the "main" signature
+    main_vars = required_vars if required_vars else [default_var]
+    main_vars_set = set(main_vars)
+    
+    # Detect other parameters
+    params = []
+    for word in words:
+        if word in math_names:
+            continue
+        if word in main_vars_set:
+            continue
+        if word not in params:
+            params.append(word)
+            
+    # Reconstruct as lambda: lambda main_vars, params...: ...
+    signature = ", ".join(main_vars + params)
+        
+    lambda_str = f"lambda {signature}: {func_str}"
+    logger.debug("compiled_function", original=func_str, result=lambda_str)
+    
+    return eval(lambda_str, {"np": np, "abs": abs, "sin": np.sin, "cos": np.cos, "exp": np.exp, "sqrt": np.sqrt})
 
 def parse_data(data: NumericData) -> np.ndarray:
     """

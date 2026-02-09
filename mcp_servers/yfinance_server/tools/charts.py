@@ -1,25 +1,19 @@
-
 import os
-# Clear MPLBACKEND before importing matplotlib (Kaggle sets invalid value)
-os.environ.pop('MPLBACKEND', None)
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import yfinance as yf
 import uuid
-import os
-
-import matplotlib.pyplot as plt
-import yfinance as yf
-import uuid
-import os
 import base64
+import matplotlib
+import matplotlib.pyplot as plt
+import yfinance as yf
 from mcp.server.fastmcp import Image
 from shared.logging import get_logger
 
+# Clear MPLBACKEND before importing matplotlib
+os.environ.pop('MPLBACKEND', None)
+matplotlib.use("Agg")
+
 logger = get_logger(__name__)
 
-async def get_price_chart(ticker: str, period: str = "1y") -> Image:
+async def get_price_chart(ticker: str, period: str = "1y", **kwargs) -> Image:
     """
     Generate a price chart image.
     Args:

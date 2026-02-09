@@ -25,7 +25,7 @@ class TvScreener:
     def __init__(self):
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-            "Content-Type": "application/x-www-form-urlencoded"
+            "Content-Type": "application/json"
         }
 
     def fetch(self, market="america", query=None, columns=None, range_limit=100) -> list:
@@ -40,17 +40,20 @@ class TvScreener:
             "options": {"lang": "en"},
             "range": [0, range_limit],
             "sort": query.get("sort", {"sortBy": "market_cap_basic", "sortOrder": "desc"}) if query else {"sortBy": "market_cap_basic", "sortOrder": "desc"},
-            "symbols": query.get("symbols", {"query": {"types": []}}) if query else {"query": {"types": []}}
+            "symbols": {"query": {"types": []}, "tickers": []}
         }
 
         # If strict symbol list is provided (Bulk Data Mode)
         if query and "symbol_list" in query:
-            payload["symbols"] = {"tickers": query["symbol_list"]}
+            payload["symbols"] = {"tickers": query["symbol_list"], "query": {"types": []}}
             payload.pop("filter", None) # Filters might conflict with explicit tickers
             payload.pop("sort", None)
+        elif query and "symbols" in query:
+            payload["symbols"] = query["symbols"]
 
         try:
-            resp = requests.post(url, headers=self.headers, data=json.dumps(payload), timeout=10)
+            # Use json= parameter to automatically set Content-Type and handle serialization
+            resp = requests.post(url, headers=self.headers, json=payload, timeout=10)
             resp.raise_for_status()
             data = resp.json()
             

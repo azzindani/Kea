@@ -4,18 +4,17 @@ from typing import List, Dict, Any
 async def build_source(url: str, memoize: bool = True) -> Dict[str, Any]:
     """Build a news source and return high-level stats."""
     try:
-        # Heavy operation
-        s = NewsClient.build_source(url, memoize)
+        s = await NewsClient.build_source(url, memoize)
         
         return {
-            "url": s.url,
-            "brand": s.brand,
-            "description": s.description,
-            "article_count": len(s.articles),
-            "category_count": len(s.categories),
-            "feed_count": len(s.feeds),
-            "categories": [c.url for c in s.categories],
-            "feeds": [f.url for f in s.feeds]
+            "url": s.get("url"),
+            "brand": s.get("brand"),
+            "description": s.get("description"),
+            "article_count": len(s.get("article_urls", [])),
+            "category_count": len(s.get("categories", [])),
+            "feed_count": len(s.get("feeds", [])),
+            "categories": s.get("categories", []),
+            "feeds": s.get("feeds", [])
         }
     except Exception as e:
         return {"error": str(e)}
@@ -23,29 +22,29 @@ async def build_source(url: str, memoize: bool = True) -> Dict[str, Any]:
 async def get_source_categories(url: str) -> List[Dict[str, str]]:
     """Get category URLs from a source."""
     try:
-        s = NewsClient.build_source(url) # Memoized default
-        return [{"url": c.url, "title": c.title} for c in s.categories]
+        s = await NewsClient.build_source(url)
+        return [{"url": c, "title": "Category"} for c in s.get("categories", [])]
     except Exception as e:
         return [{"error": str(e)}]
 
 async def get_source_feeds(url: str) -> List[str]:
     """Get RSS feed URLs from a source."""
     try:
-        s = NewsClient.build_source(url)
-        return [f.url for f in s.feeds]
+        s = await NewsClient.build_source(url)
+        return s.get("feeds", [])
     except Exception as e:
         return [str(e)]
 
 async def get_source_articles_list(url: str, limit: int = 100000) -> List[str]:
     """Get list of article URLs found on the source (no download)."""
     try:
-        s = NewsClient.build_source(url)
+        s = await NewsClient.build_source(url)
         
-        # If no articles found, try forcing a fresh build (bypass cache)
-        # This helps if the previous build failed or was empty
-        if not s.articles:
-            s = NewsClient.build_source(url, memoize=False)
+        article_urls = s.get("article_urls", [])
+        if not article_urls:
+            s = await NewsClient.build_source(url, memoize=False)
+            article_urls = s.get("article_urls", [])
             
-        return [a.url for a in s.articles[:limit]]
+        return article_urls[:limit]
     except Exception as e:
         return [str(e)]

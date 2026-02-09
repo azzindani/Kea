@@ -1,23 +1,21 @@
+import asyncio
 from mcp_servers.newspaper_server.tools.core import NewsClient
-from newspaper import Article
-import concurrent.futures
 from typing import List, Dict, Any
 
-def _process_single_article(url):
-    """Helper for threading."""
+async def _process_single_article(url):
+    """Helper for async processing."""
     try:
-        # Create fresh article object
-        a = Article(url, config=NewsClient.get_config())
-        a.download()
-        a.parse()
-        a.nlp()
+        a = await NewsClient.get_article(url, {'nlp': True})
+        if "error" in a:
+            return {"url": url, "error": a["error"], "status": "failed"}
+            
         return {
             "url": url,
-            "title": a.title,
-            "publish_date": str(a.publish_date),
-            "summary": a.summary,
-            "keywords": a.keywords,
-            "top_image": a.top_image,
+            "title": a.get("title"),
+            "publish_date": a.get("publish_date"),
+            "summary": a.get("summary"),
+            "keywords": a.get("keywords"),
+            "top_image": a.get("top_image"),
             "status": "success"
         }
     except Exception as e:
@@ -25,23 +23,15 @@ def _process_single_article(url):
 
 async def bulk_article_extraction(urls: List[str], workers: int = 10) -> Dict[str, Any]:
     """
-    Multithreaded download and NLP processing of a list of URLs.
+    Asynchronous download and NLP processing of a list of URLs.
     Args:
         urls: list[str]
-        workers: int (default 10)
+        workers: int (not used with asyncio, but kept for signature compatibility)
     """
     try:
-        results = []
-        
-        # Use ThreadPoolExecutor for I/O bound tasks
-        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-            future_to_url = {executor.submit(_process_single_article, url): url for url in urls}
-            for future in concurrent.futures.as_completed(future_to_url):
-                res = future.result()
-                results.append(res)
-                
+        tasks = [_process_single_article(url) for url in urls]
+        results = await asyncio.gather(*tasks)
         return {"processed": len(results), "articles": results}
-        
     except Exception as e:
         return {"error": str(e)}
 
@@ -51,25 +41,25 @@ async def analyze_news_source(url: str, limit: int = 100000) -> Dict[str, Any]:
     """
     try:
         # 1. Build Source
-        s = NewsClient.build_source(url)
+        s = await NewsClient.build_source(url)
         
         # 2. Get Article URLs
-        article_urls = [a.url for a in s.articles[:limit]]
+        article_urls = s.get("article_urls", [])[:limit]
         
         # 3. Bulk Process
-        processed = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-            futures = {executor.submit(_process_single_article, u): u for u in article_urls}
-            for future in concurrent.futures.as_completed(futures):
-                processed.append(future.result())
+        if article_urls:
+            tasks = [_process_single_article(u) for u in article_urls]
+            processed = await asyncio.gather(*tasks)
+        else:
+            processed = []
                 
         return {
-            "source": s.brand or url,
-            "description": s.description,
-            "discovered_count": len(s.articles),
+            "source": s.get("brand") or url,
+            "description": s.get("description"),
+            "discovered_count": len(s.get("article_urls", [])),
             "analyzed_count": len(processed),
-            "feed_urls": [f.url for f in s.feeds],
-            "category_urls": [c.url for c in s.categories],
+            "feed_urls": s.get("feeds", []),
+            "category_urls": s.get("categories", []),
             "articles": processed
         }
         

@@ -38,7 +38,12 @@ async def get_filing_section_content(arguments: dict) -> ToolResult:
         if not content:
              return dict_to_result({"items_available": str(list(obj.items.keys())) if hasattr(obj,'items') else []}, f"Item '{item}' not found")
              
-        return dict_to_result({"item": item, "content": str(content)[:50000]}, "Section Content")
+        return dict_to_result({
+            "item": item, 
+            "content": str(content)[:50000],
+            "homepage_url": f.homepage_url,
+            "primary_document_url": f.primary_document_url
+        }, "Section Content")
         
     except Exception as e:
         return ToolResult(isError=True, content=[TextContent(text=str(e))])

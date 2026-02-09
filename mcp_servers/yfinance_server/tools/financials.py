@@ -1,7 +1,5 @@
-
 import yfinance as yf
-
-import yfinance as yf
+import pandas as pd
 from shared.logging import get_logger
 
 logger = get_logger(__name__)
@@ -56,21 +54,21 @@ async def _get_stmt(ticker: str, type_: str, freq: str) -> str:
         return f"Error: {str(e)}"
 
 # Unrolled Tools
-async def get_income_statement_annual(ticker: str) -> str:
+async def get_income_statement_annual(ticker: str, **kwargs) -> str:
     return await _get_stmt(ticker, "income", "annual")
 
-async def get_income_statement_quarterly(ticker: str) -> str:
+async def get_income_statement_quarterly(ticker: str, **kwargs) -> str:
     return await _get_stmt(ticker, "income", "quarterly")
 
-async def get_balance_sheet_annual(ticker: str) -> str:
+async def get_balance_sheet_annual(ticker: str, **kwargs) -> str:
     return await _get_stmt(ticker, "balance", "annual")
 
-async def get_balance_sheet_quarterly(ticker: str) -> str:
+async def get_balance_sheet_quarterly(ticker: str, **kwargs) -> str:
     return await _get_stmt(ticker, "balance", "quarterly")
 
-async def get_cash_flow_statement_annual(ticker: str) -> str:
+async def get_cash_flow_statement_annual(ticker: str, **kwargs) -> str:
     return await _get_stmt(ticker, "cashflow", "annual")
 
-async def get_cash_flow_statement_quarterly(ticker: str) -> str:
+async def get_cash_flow_statement_quarterly(ticker: str, **kwargs) -> str:
     return await _get_stmt(ticker, "cashflow", "quarterly")
 

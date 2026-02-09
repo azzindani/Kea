@@ -182,61 +182,75 @@ def is_encrypted(path: str, member: str) -> bool:
 # 3. Extract
 # ==========================================
 @mcp.tool()
-def extract_all(path: str, extract_path: str, pwd: Optional[str] = None) -> str: 
+def extract_all(path: str, extract_path: str = "", pwd: Optional[str] = None) -> str: 
     """EXTRACTS all files from zip. [ACTION]
     
     [RAG Context]
     """
+    if not extract_path:
+        return "Error: No extraction path provided (extract_path)."
     return extract_ops.extract_all(path, extract_path, pwd)
 
 @mcp.tool()
-def extract_member(path: str, member: str, extract_path: str, pwd: Optional[str] = None) -> str: 
+def extract_member(path: str, member: str, extract_path: str = "", pwd: Optional[str] = None) -> str: 
     """EXTRACTS single file from zip. [ACTION]
     
     [RAG Context]
     """
+    if not extract_path:
+        return "Error: No extraction path provided (extract_path)."
     return extract_ops.extract_member(path, member, extract_path, pwd)
 
 @mcp.tool()
-def extract_members_list(path: str, members: List[str], extract_path: str) -> str: 
+def extract_members_list(path: str, members: List[str], extract_path: str = "") -> str: 
     """EXTRACTS multiple files. [ACTION]
     
     [RAG Context]
     """
+    if not extract_path:
+        return "Error: No extraction path provided (extract_path)."
     return extract_ops.extract_members_list(path, members, extract_path)
 
 @mcp.tool()
-def extract_with_password(path: str, member: str, extract_path: str, pwd: str) -> str: 
+def extract_with_password(path: str, member: str, extract_path: str = "", pwd: str = "") -> str: 
     """EXTRACTS encrypted file. [ACTION]
     
     [RAG Context]
     """
+    if not extract_path:
+        return "Error: No extraction path provided (extract_path)."
     return extract_ops.extract_with_password(path, member, extract_path, pwd)
 
 @mcp.tool()
-def extract_by_pattern(path: str, pattern: str, extract_path: str) -> str: 
+def extract_by_pattern(path: str, pattern: str, extract_path: str = "") -> str: 
     """EXTRACTS files matching pattern. [ACTION]
     
     [RAG Context]
     Glob pattern.
     """
+    if not extract_path:
+        return "Error: No extraction path provided (extract_path)."
     return extract_ops.extract_by_pattern(path, pattern, extract_path)
 
 @mcp.tool()
-def extract_by_extension(path: str, extension: str, extract_path: str) -> str: 
+def extract_by_extension(path: str, extension: str, extract_path: str = "") -> str: 
     """EXTRACTS files by extension. [ACTION]
     
     [RAG Context]
     """
+    if not extract_path:
+        return "Error: No extraction path provided (extract_path)."
     return extract_ops.extract_by_extension(path, extension, extract_path)
 
 @mcp.tool()
-def safe_extract(path: str, extract_path: str) -> str: 
+def safe_extract(path: str, extract_path: str = "") -> str: 
     """EXTRACTS verifying paths (Zip Slip). [ACTION]
     
     [RAG Context]
     Prevents path traversal attacks.
     """
+    if not extract_path:
+        return "Error: No extraction path provided (extract_path)."
     return extract_ops.safe_extract(path, extract_path)
 
 # ==========================================

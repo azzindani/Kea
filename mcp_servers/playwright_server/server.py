@@ -604,6 +604,15 @@ async def get_browser_info() -> Dict[str, str]:
     """
     return await browser_ops.get_browser_info()
 
+@mcp.tool()
+async def close_browser() -> str: 
+    """CLOSES browser and cleans up resources. [ACTION]
+    
+    [RAG Context]
+    """
+    await BrowserSession.close()
+    return "Browser closed."
+
 # ==========================================
 # 12. Super Tools
 # ==========================================

@@ -1,8 +1,7 @@
 
 import asyncio
-
-import asyncio
 import yfinance as yf
+import pandas as pd
 from mcp_servers.yfinance_server.utils.ticker_cache import TickerCache
 from shared.logging import get_logger
 
@@ -19,17 +18,30 @@ async def get_tickers_by_country(country_code: str = "US") -> str:
     Returns size of universe and sample tickers.
     """
     
-    tickers = cache.get_tickers_for_country(country_code)
-    if not tickers:
-        return f"No ticker list found for country: {country_code}"
-    
     try:
-        # Download snaphot (1d price)
-        df = yf.download(tickers, period="1d", group_by="ticker", threads=True, progress=False)
+        # Ensure it's awaited and robust against potential issues
+        tickers_coro = cache.get_tickers_for_country(country_code)
+        if asyncio.iscoroutine(tickers_coro):
+            tickers = await tickers_coro
+        else:
+            tickers = tickers_coro
+            
+        if not tickers:
+            return f"No ticker list found for country: {country_code}"
         
+        # Download snapshot (1d price)
+        # Use limit to avoid massive downloads in discovery
+        sample_tickers = tickers[:50]
+        df = yf.download(sample_tickers, period="1d", group_by="ticker", threads=True, progress=False)
+        
+        if df.empty:
+            return f"Scanned {len(tickers)} tickers for {country_code}, but no market data was available for samples."
+
         # Extract last Close for summary
-        # This implementation is simplified for the artifact
-        closes = df.iloc[-1].to_dict() # massive dict
+        if isinstance(df.columns, pd.MultiIndex):
+            closes = {t: df[t]['Close'].iloc[-1] for t in sample_tickers if t in df.columns.levels[0]}
+        else:
+            closes = df['Close'].to_dict()
         
         # Just return summary stats
         return f"""
@@ -43,6 +55,6 @@ Sample Data (Top 5):
 """
         
     except Exception as e:
-        logger.error(f"Discovery tool error: {e}")
+        logger.error(f"Discovery tool error: {e}", exc_info=True)
         return f"Error: {str(e)}"
 

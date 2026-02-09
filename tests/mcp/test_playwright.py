@@ -55,6 +55,10 @@ async def test_playwright_real_simulation():
             if not res.isError:
                  print(f" \033[92m[PASS]\033[0m Clicked link")
 
+            # 6. Cleanup
+            print("6. Closing Browser...")
+            await session.call_tool("close_browser")
+
     print("--- Playwright Simulation Complete ---")
 
 if __name__ == "__main__":

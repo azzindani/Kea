@@ -79,4 +79,12 @@ def stats_common_sense_ratio(returns_input: str) -> float:
 def stats_expectancy(returns_input: str) -> float:
     """Expectancy."""
     s = _parse_returns(returns_input)
-    return safe_float(qs.stats.expectancy(s))
+    # Fallback if expectancy is missing
+    if hasattr(qs.stats, 'expectancy'):
+        return safe_float(qs.stats.expectancy(s))
+    else:
+        # Expectancy = (Win Rate * Avg Win) + (Loss Rate * Avg Loss)
+        win_rate = qs.stats.win_rate(s) / 100.0
+        avg_win = qs.stats.avg_win(s)
+        avg_loss = qs.stats.avg_loss(s)
+        return safe_float((win_rate * avg_win) + ((1 - win_rate) * avg_loss))

@@ -11,9 +11,12 @@ async def pls_regression(X: DataInput, Y: DataInput, n_components: int = 2) -> D
     model = PLSRegression(n_components=n_components)
     model.fit(X_df, Y_df)
     
+    # Use transform to get scores (x_scores_)
+    x_scores = model.transform(X_df)
+    
     return to_serializable({
-        "x_scores": model.x_scores_.tolist(),
-        "y_scores": model.y_scores_.tolist(),
+        "x_scores": x_scores.tolist(),
+        "y_scores": model.y_scores_.tolist() if hasattr(model, 'y_scores_') else [],
         "x_weights": model.x_weights_.tolist(),
         "model": serialize_model(model)
     })
@@ -26,8 +29,12 @@ async def cca(X: DataInput, Y: DataInput, n_components: int = 2) -> Dict[str, An
     model = CCA(n_components=n_components)
     model.fit(X_df, Y_df)
     
+    # Use transform to get scores (x_scores_)
+    x_scores = model.transform(X_df)
+    # CCA transform returns x_scores if only X provided
+    
     return to_serializable({
-        "x_scores": model.x_scores_.tolist(),
-        "y_scores": model.y_scores_.tolist(),
+        "x_scores": x_scores.tolist(),
+        "y_scores": model.y_scores_.tolist() if hasattr(model, 'y_scores_') else [],
         "model": serialize_model(model)
     })

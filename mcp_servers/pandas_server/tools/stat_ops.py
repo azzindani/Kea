@@ -38,7 +38,8 @@ def quantile(file_path: str, column: str, q: float, output_path: str = "") -> Di
 def correlation_matrix(file_path: str, method: str = "pearson") -> Dict[str, Any]:
     """Get correlation matrix."""
     df = load_dataframe(file_path)
-    corr = df.corr(method=method)
+    numeric_df = df.select_dtypes(include="number")
+    corr = numeric_df.corr(method=method)
     return corr.to_dict()
     
 def clip_values(file_path: str, columns: List[str], lower: Optional[float] = None, upper: Optional[float] = None, output_path: str = "") -> str:

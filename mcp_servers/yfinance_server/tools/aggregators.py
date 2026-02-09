@@ -1,12 +1,9 @@
-
-import yfinance as yf
-
 import yfinance as yf
 from shared.logging import get_logger
 
 logger = get_logger(__name__)
 
-async def get_full_ticker_report(ticker: str) -> str:
+async def get_full_ticker_report(ticker: str, **kwargs) -> str:
     """
     MULTI-TALENT: Get Price, Info, Financials, Holders in one go.
     Saves 5+ round trips.

@@ -26,20 +26,25 @@ def report_html(returns_input: str, benchmark_input: str = None, title: str = "S
     return str(path)
 
 def report_metrics(returns_input: str, benchmark_input: str = None) -> str:
-    """Get all metrics as a dictionary (JSON)."""
-    # qs.reports.metrics(display=False) returns dataframe
+    """Metric report table."""
     s = _parse_returns(returns_input)
+    # Ensure DatetimeIndex
+    if not isinstance(s.index, pd.DatetimeIndex):
+        s.index = pd.to_datetime(s.index)
+        
     b = None
     if benchmark_input:
-        b = _parse_returns(benchmark_input) if len(benchmark_input) > 10 else qs.utils.download_returns(benchmark_input)
-        
+        b = _parse_returns(benchmark_input) if len(benchmark_input) > 20 else qs.utils.download_returns(benchmark_input)
+        if b is not None and not isinstance(b.index, pd.DatetimeIndex):
+            b.index = pd.to_datetime(b.index)
+            
     df = qs.reports.metrics(s, benchmark=b, display=False, mode='full')
-    return df.to_json(orient='index')
+    return df.to_json(orient='split')
 
 def report_full(returns_input: str) -> str:
-    """Get full text report as string."""
-    # This usually prints to stdout. We can capture it.
-    # But qs.reports.metrics gives us the data. 
-    # Let's rely on report_metrics for data.
-    # If we really want the text output:
-    return "Use report_metrics for structured data or report_html for visual report."
+    """Full performance report."""
+    s = _parse_returns(returns_input)
+    # Ensure DatetimeIndex
+    if not isinstance(s.index, pd.DatetimeIndex):
+        s.index = pd.to_datetime(s.index)
+    return qs.reports.metrics(s, display=False).to_json(orient='split')

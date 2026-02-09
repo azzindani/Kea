@@ -69,6 +69,10 @@ async def get_filing_sections(arguments: dict) -> ToolResult:
             elif isinstance(obj.items, list): sections = [str(i) for i in obj.items] 
             else: sections = ["Unknown structure"]
             
-        return dict_to_result({"sections": sections}, "Filing Sections")
+        return dict_to_result({
+            "sections": sections,
+            "homepage_url": filing.homepage_url,
+            "primary_document_url": filing.primary_document_url
+        }, "Filing Sections")
     except Exception as e:
         return ToolResult(isError=True, content=[TextContent(text=str(e))])

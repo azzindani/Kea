@@ -1,5 +1,6 @@
 import pytest
 import asyncio
+import os
 from tests.mcp.client_utils import SafeClientSession as ClientSession
 from mcp.client.stdio import stdio_client
 from tests.mcp.client_utils import get_server_params
@@ -25,6 +26,7 @@ async def test_filesystem_server():
             print("Filesystem verification passed (Tools present).")
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="DATABASE_URL not set (filesystem server requires PostgreSQL)")
 async def test_fs_real_simulation():
     """
     REAL SIMULATION: Create, Read, and Delete a real file.

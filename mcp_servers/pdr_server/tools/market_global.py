@@ -22,14 +22,15 @@ async def get_stooq_data(symbols: list[str], start_date: str = None) -> str:
         start = start_date
         
     try:
+        end = datetime.datetime.now()
         # Returns DataFrame with MultiIndex columns if multiple symbols
-        df = web.DataReader(symbols, "stooq", start=start) # End default is now
-        
+        df = web.DataReader(symbols, "stooq", start=start, end=end)
+
         # Clean NaT values which crash to_markdown/strftime
         df.index = pd.to_datetime(df.index, errors='coerce')
         if isinstance(df.index, pd.DatetimeIndex):
             df = df[df.index.notna()]
-        
+
         return f"### Stooq Data (Last 50 rows)\n\n{df.head(50).to_markdown()}"
         
     except Exception as e:

@@ -24,59 +24,72 @@ qs.extend_pandas()
 def _parse_returns(returns_input: Union[str, float, Dict, List]) -> pd.Series:
     """Helper to parse input into a Returns Series."""
     try:
+        data_to_parse = returns_input
+        
+        # 1. Handle String Input (JSON/CSV)
         if isinstance(returns_input, str):
-            # Ticker check? 
-            # Ideally if it looks like a ticker (e.g. "AAPL", "^GSPC"), we download.
-            # But inputs should differ (e.g. `ticker` vs `data`). 
-            
-            if len(returns_input) < 10 and returns_input.isalnum():
-                # Treat as ticker shorthand if short and clean? 
-                # Better to be explicit in tool args. 
-                # Here we assume data string (json/csv).
-                try:
-                    # JSON?
-                    data = json.loads(returns_input)
-                    if isinstance(data, dict):
-                        # Dictionary {date: value}
-                        series = pd.Series(data)
-                        series.index = pd.to_datetime(series.index)
-                    elif isinstance(data, list):
-                        series = pd.Series(data) 
-                except:
-                    # CSV?
-                    try:
-                        df = pd.read_csv(io.StringIO(returns_input), parse_dates=True, index_col=0)
-                        # Assume first column is returns
-                        series = df.iloc[:, 0]
-                    except:
-                        raise ValueError("Could not parse string input as JSON or CSV.")
-            else:
-                 # Try json load first for long strings
-                try:
-                    data = json.loads(returns_input)
-                    series = pd.Series(data)
-                    series.index = pd.to_datetime(series.index)
-                except:
-                     # Fallback CSV
-                    df = pd.read_csv(io.StringIO(returns_input), parse_dates=True, index_col=0)
-                    series = df.iloc[:, 0]
+            try:
+                # Try JSON
+                parsed = json.loads(returns_input)
+                
+                # Unwrap FastMCP envelope if present
+                if isinstance(parsed, dict) and "data" in parsed and "status" in parsed:
+                    data_to_parse = parsed["data"]
+                    # If data is still a string, try parsing it again
+                    if isinstance(data_to_parse, str):
+                        try:
+                            data_to_parse = json.loads(data_to_parse)
+                        except:
+                            pass
+                else:
+                    data_to_parse = parsed
+            except:
+                # Not JSON, maybe CSV or raw string
+                data_to_parse = returns_input
 
-        elif isinstance(returns_input, dict):
-            series = pd.Series(returns_input)
-            series.index = pd.to_datetime(series.index)
-        elif isinstance(returns_input, list):
-            series = pd.Series(returns_input)
+        # 2. Convert to Series
+        if isinstance(data_to_parse, dict):
+            series = pd.Series(data_to_parse)
+        elif isinstance(data_to_parse, list):
+            series = pd.Series(data_to_parse)
+        elif isinstance(data_to_parse, str):
+            # Try CSV
+            try:
+                df = pd.read_csv(io.StringIO(data_to_parse), parse_dates=True, index_col=0)
+                series = df.iloc[:, 0]
+            except:
+                raise ValueError("Could not parse string input as JSON or CSV.")
         else:
-            raise ValueError("Unsupported data type")
-            
-        # Ensure proper sort and numeric
-        series = series.sort_index()
+            series = pd.Series(data_to_parse)
+
+        # 3. Ensure DatetimeIndex
+        if not isinstance(series.index, pd.DatetimeIndex):
+            try:
+                series.index = pd.to_datetime(series.index)
+            except:
+                # If it's just a range index, we might need to assume frequency or fail
+                # But typically it should have dates.
+                pass
+        
+        # Ensure it is a Series
+        if not isinstance(series, pd.Series):
+            series = pd.Series(series)
+
+        # Ensure numeric and drop NaNs
         series = pd.to_numeric(series, errors='coerce').dropna()
+        
+        # Ensure name for quantstats
+        if not series.name:
+            series.name = "Returns"
+            
+        # Ensure proper sort
+        series = series.sort_index()
+        
         return series
     
     except Exception as e:
         logger.error("failed_to_parse_returns", error=str(e))
-        raise ValueError(f"Failed to parse returns: {str(e)}")
+        raise ValueError(f"Failed to parse returns: {str(e)}") from e
 
 def download_returns(ticker: str, period: str = "max") -> str:
     """Download market returns for a ticker via yfinance."""

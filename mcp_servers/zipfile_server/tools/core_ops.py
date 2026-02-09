@@ -1,16 +1,16 @@
 import zipfile
 import os
 import structlog
-from typing import Dict, Any, Union, Optional
+from typing import Dict, Any
 
 logger = structlog.get_logger()
 
-def is_zipfile(path: str) -> bool:
+def is_zipfile(path: str, **kwargs) -> bool:
     """Check if a file is a valid ZIP file."""
     if not os.path.exists(path): return False
     return zipfile.is_zipfile(path)
 
-def validate_archive(path: str) -> Dict[str, Any]:
+def validate_archive(path: str, **kwargs) -> Dict[str, Any]:
     """Detailed integrity check using zipfile.testzip()."""
     if not is_zipfile(path):
         return {"valid": False, "error": "Not a zip file or does not exist."}
@@ -25,7 +25,7 @@ def validate_archive(path: str) -> Dict[str, Any]:
     except Exception as e:
         return {"valid": False, "error": str(e)}
 
-def get_zip_comment(path: str) -> str:
+def get_zip_comment(path: str, **kwargs) -> str:
     """Return the global comment of the archive."""
     try:
         with zipfile.ZipFile(path, 'r') as zf:
@@ -33,7 +33,7 @@ def get_zip_comment(path: str) -> str:
     except Exception as e:
         return f"Error: {e}"
 
-def set_zip_comment(path: str, comment: str) -> str:
+def set_zip_comment(path: str, comment: str, **kwargs) -> str:
     """Update the archive comment (requires rewrite usually, but zipfile supports mode 'a')."""
     try:
         with zipfile.ZipFile(path, 'a') as zf:
@@ -42,7 +42,7 @@ def set_zip_comment(path: str, comment: str) -> str:
     except Exception as e:
         return f"Error: {e}"
 
-def get_compression_type(path: str) -> Dict[str, str]:
+def get_compression_type(path: str, **kwargs) -> Dict[str, str]:
     """Check defaults (stored, deflated, bzip2, lzma)."""
     # Check first file or default
     try:
@@ -66,6 +66,6 @@ def get_compression_type(path: str) -> Dict[str, str]:
     except Exception as e:
         return {"error": str(e)}
 
-def check_integrity(path: str) -> Dict[str, Any]:
+def check_integrity(path: str, **kwargs) -> Dict[str, Any]:
     """Alias for validate_archive."""
-    return validate_archive(path)
+    return validate_archive(path, **kwargs)

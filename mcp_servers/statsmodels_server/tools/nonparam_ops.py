@@ -2,8 +2,7 @@ from mcp_servers.statsmodels_server.tools.core_ops import parse_dataframe, parse
 import statsmodels.nonparametric.api as nparam
 from statsmodels.nonparametric.kde import KDEUnivariate
 from statsmodels.nonparametric.kernel_density import KDEMultivariate
-import numpy as np
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 
 async def kde_univar(data: VectorInput, kernel: str = 'gau', fft: bool = True) -> Dict[str, Any]:
     """Univariate Kernel Density Estimation."""
@@ -22,8 +21,16 @@ async def kde_multivar(data: DataInput, var_type: str) -> Dict[str, Any]:
     var_type: string of 'c' (continuous), 'u' (unordered discrete), 'o' (ordered). e.g. 'cc'
     """
     df = parse_dataframe(data)
+    
+    # Validation: var_type must match number of columns
+    if len(var_type) != df.shape[1]:
+        logger.warning("kde_multivar_var_type_mismatch", var_type=var_type, n_cols=df.shape[1])
+        # Try to adapt var_type if it's a single character repeated? No, better to be explicit.
+        raise ValueError(f"var_type length ({len(var_type)}) must match number of columns in data ({df.shape[1]}). "
+                         "Example: 'cc' for two continuous variables.")
+
     kde = KDEMultivariate(data=df, var_type=var_type)
-    # Return pdf at data points?
+    # Return pdf at data points
     pdf = kde.pdf(df)
     return to_serializable({"pdf": pdf.tolist(), "bw": kde.bw.tolist()})
 

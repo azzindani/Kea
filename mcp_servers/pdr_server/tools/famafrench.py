@@ -1,6 +1,7 @@
 
 import pandas_datareader.data as web
 import pandas_datareader.famafrench as ff
+from contextlib import contextmanager
 
 from shared.logging import get_logger
 import pandas as pd
@@ -8,44 +9,68 @@ import datetime
 
 logger = get_logger(__name__)
 
+
+@contextmanager
+def _patch_famafrench_read_csv():
+    """Patch read_csv to handle date_parser removal in Pandas 2.0+.
+
+    pandas_datareader still passes date_parser + parse_dates to read_csv,
+    but Pandas 3.0 removed date_parser entirely. Without it, the Fama-French
+    date formats (e.g. "192607") aren't parsed, leaving the index as raw
+    integers and causing a TypeError when truncate() compares int vs Timestamp.
+
+    Fix: strip both deprecated kwargs, call the original read_csv, then apply
+    the date parser function manually to the index afterward.
+    """
+    _original_read_csv = pd.read_csv
+    _original_ff_read_csv = getattr(ff, 'read_csv', None)
+
+    def _patched_read_csv(*args, **kwargs):
+        date_parser_func = kwargs.pop('date_parser', None)
+        parse_dates_val = kwargs.pop('parse_dates', None)
+        result = _original_read_csv(*args, **kwargs)
+        if date_parser_func and parse_dates_val is not None:
+            try:
+                result.index = result.index.map(lambda x: date_parser_func(str(x)))
+                # Drop rows where index is NaT (e.g., from non-data rows at end of CSV)
+                # This is crucial for PeriodIndex compatibility in Pandas 3.0
+                result = result[result.index.notna()]
+            except Exception:
+                pass
+        return result
+
+    pd.read_csv = _patched_read_csv
+    if _original_ff_read_csv:
+        setattr(ff, 'read_csv', _patched_read_csv)
+    try:
+        yield
+    finally:
+        pd.read_csv = _original_read_csv
+        if _original_ff_read_csv:
+            setattr(ff, 'read_csv', _original_ff_read_csv)
+
+
+def read_famafrench(name: str, start: object = None, end: object = None) -> dict:
+    """Read Fama-French data with Pandas 3.0 compatibility."""
+    with _patch_famafrench_read_csv():
+        return web.DataReader(name, "famafrench", start=start, end=end)
+
+
 async def get_fama_french_data(dataset_name: str = None, start_date: str = None, end_date: str = None) -> str:
     """
     Get Fama-French Data.
     dataset_name: Code (e.g., 'F-F_Research_Data_Factors').
     """
     name = dataset_name
-    
+
     if not start_date:
         # Default to last 5 years
         start = datetime.datetime.now() - datetime.timedelta(days=365*5)
     else:
         start = start_date
-        
+
     try:
-        # returns dict of DataFrames (e.g. {0: Monthly, 1: Annual})
-        # We usually want the first one (highest freq)
-        # Monkeypatch pandas.read_csv temporarily to strip 'date_parser' (removed in Pandas 2.0)
-        # pandas_datareader hasn't fully updated yet
-        _original_read_csv = pd.read_csv
-        
-        def _patched_read_csv(*args, **kwargs):
-            if 'date_parser' in kwargs:
-                kwargs.pop('date_parser')
-            return _original_read_csv(*args, **kwargs)
-            
-        pd.read_csv = _patched_read_csv
-        
-        # Also patch the module-level import if it exists (common in PDR)
-        _original_ff_read_csv = getattr(ff, 'read_csv', None)
-        if _original_ff_read_csv:
-            setattr(ff, 'read_csv', _patched_read_csv)
-            
-        try:
-            ds = web.DataReader(name, "famafrench", start=start, end=end_date)
-        finally:
-            pd.read_csv = _original_read_csv
-            if _original_ff_read_csv:
-                setattr(ff, 'read_csv', _original_ff_read_csv)
+        ds = read_famafrench(name, start=start, end=end_date)
         
         if not ds:
             return "No data found."
