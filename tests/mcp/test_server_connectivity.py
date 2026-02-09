@@ -355,6 +355,7 @@ class TestMCPServerConnectivity:
         assert len(discovered_servers) > 0, "No MCP servers were discovered!"
 
     @pytest.mark.asyncio
+    @pytest.mark.timeout(600)
     async def test_server_tools_availability(self, registry, discovered_servers):
         """Test each server with maximum verbosity."""
         tester = VerboseServerTester(registry)

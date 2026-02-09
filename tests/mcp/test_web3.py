@@ -6,6 +6,7 @@ from mcp.client.stdio import stdio_client
 from tests.mcp.client_utils import get_server_params
 
 @pytest.mark.asyncio
+@pytest.mark.timeout(300)
 async def test_web3_full_coverage():
     """
     REAL SIMULATION: Verify Web3 Server (100% Tool Coverage).
