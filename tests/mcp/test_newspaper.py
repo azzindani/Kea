@@ -25,7 +25,16 @@ async def test_newspaper_real_simulation():
     """
     REAL SIMULATION: Verify Newspaper Server (Article Extraction).
     """
-    params = get_server_params("newspaper_server", extra_dependencies=["newspaper3k", "lxml[html_clean]"])
+    params = get_server_params("newspaper_server", extra_dependencies=[
+        "newspaper4k", 
+        "lxml[html_clean]", 
+        "trafilatura", 
+        "feedparser", 
+        "httpx", 
+        "nltk", 
+        "python-dotenv", 
+        "wrapt"
+    ])
     
     # Use Reuters - stable source that works well with newspaper3k feed discovery
     url = "https://www.reuters.com"

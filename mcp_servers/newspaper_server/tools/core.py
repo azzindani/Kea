@@ -2,8 +2,8 @@
 import warnings
 import asyncio
 import httpx
-import newspaper4k as newspaper
-from newspaper4k import Article, Source
+import newspaper
+from newspaper import Article, Source
 import trafilatura
 import feedparser
 import nltk
