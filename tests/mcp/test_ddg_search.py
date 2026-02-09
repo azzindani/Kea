@@ -31,48 +31,61 @@ async def test_ddg_real_world_simulation():
     REAL SIMULATION: Perform actual searches checking for result validity.
     """
     params = get_server_params("ddg_search_server", extra_dependencies=["duckduckgo-search"])
-    
+
     print(f"\n--- Starting Real-World Simulation: DDG Search ---")
-    
+
+    # Collect skip reason outside async context to avoid BaseExceptionGroup wrapping
+    skip_reason = None
+    failure_reason = None
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # Step 1: Text Search
             query = "OpenAI API documentation"
             print(f"1. Searching for '{query}'...")
-            
+
             res = await session.call_tool("search_text", arguments={"query": query, "max_results": 3})
-            
+
             if res.isError:
                 error_text = res.content[0].text if res.content else 'Unknown Error'
                 print(f" \033[91m[FAIL]\033[0m {error_text}")
                 if "RuntimeError" in error_text or "Connect" in error_text:
-                    pytest.skip("DuckDuckGo unreachable (network restriction)")
-                assert False, "Search failed"
+                    skip_reason = "DuckDuckGo unreachable (network restriction)"
+                else:
+                    failure_reason = "Search failed"
             elif not res.content:
                 print(f" \033[93m[WARN]\033[0m Search returned no content (likely rate limit or connectivity)")
-                pytest.skip("DDG returned no content (network restriction)")
+                skip_reason = "DDG returned no content (network restriction)"
             else:
                 content = res.content[0].text
                 print(f" \033[92m[PASS]\033[0m Got {len(content)} chars of result")
                 if not content or content == "[]":
-                    pytest.skip("DDG returned empty results (network restriction)")
-                assert "OpenAI" in content or "API" in content
-            
-            # Step 2: Image Search (if available) - verify tool first
-            tools_res = await session.list_tools()
-            tool_names = [t.name for t in tools_res.tools]
-            
-            if "search_images" in tool_names:
-                print(f"2. Searching images for '{query}'...")
-                img_res = await session.call_tool("search_images", arguments={"query": query, "max_results": 2})
-                if not img_res.isError:
-                    print(" \033[92m[PASS]\033[0m Image search successful")
+                    skip_reason = "DDG returned empty results (network restriction)"
                 else:
-                    print(f" \033[91m[FAIL]\033[0m {img_res.content[0].text}")
-            
-            print("--- DDG Simulation Complete ---")
+                    assert "OpenAI" in content or "API" in content
+
+            if not skip_reason and not failure_reason:
+                # Step 2: Image Search (if available) - verify tool first
+                tools_res = await session.list_tools()
+                tool_names = [t.name for t in tools_res.tools]
+
+                if "search_images" in tool_names:
+                    print(f"2. Searching images for '{query}'...")
+                    img_res = await session.call_tool("search_images", arguments={"query": query, "max_results": 2})
+                    if not img_res.isError:
+                        print(" \033[92m[PASS]\033[0m Image search successful")
+                    else:
+                        print(f" \033[91m[FAIL]\033[0m {img_res.content[0].text}")
+
+                print("--- DDG Simulation Complete ---")
+
+    # Raise skip/failure after exiting async context managers
+    if skip_reason:
+        pytest.skip(skip_reason)
+    if failure_reason:
+        assert False, failure_reason
 
 if __name__ == "__main__":
     # Allow running directly: python tests/mcp/test_ddg_search.py
