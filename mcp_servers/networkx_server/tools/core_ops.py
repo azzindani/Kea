@@ -2,6 +2,7 @@ import networkx as nx
 import structlog
 from typing import Any, List, Union, Optional, Dict, Tuple
 import json
+import ast
 
 logger = structlog.get_logger()
 
@@ -12,21 +13,33 @@ logger = structlog.get_logger()
 # - Node-Link JSON: {"nodes": [{"id": 1}], "links": [{"source": 1, "target": 2}]}
 GraphInput = Union[List[List[Any]], Dict[str, Any], str]
 
+def _unwrap_fastmcp(data: Any) -> Any:
+    """Extract graph data from a fastmcp response envelope if present."""
+    if isinstance(data, dict) and "status" in data and "data" in data:
+        return data["data"]
+    return data
+
 def parse_graph(data: GraphInput, directed: bool = False) -> nx.Graph:
     """
     Parse input data into a NetworkX Graph or DiGraph.
     """
     g_cls = nx.DiGraph if directed else nx.Graph
-    
+
     try:
         if isinstance(data, str):
-            # Try JSON parsing first
+            # Try JSON parsing first, then Python literal as fallback
             try:
                 parsed = json.loads(data)
             except json.JSONDecodeError:
-                raise ValueError("Input string is not valid JSON.")
+                try:
+                    parsed = ast.literal_eval(data)
+                except (ValueError, SyntaxError):
+                    raise ValueError("Input string is not valid JSON or Python literal.")
         else:
             parsed = data
+
+        # Unwrap fastmcp response envelope if present
+        parsed = _unwrap_fastmcp(parsed)
 
         # 1. Edge List (List of Lists/Tuples)
         if isinstance(parsed, list):
