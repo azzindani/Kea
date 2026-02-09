@@ -26,11 +26,18 @@ def flatten_json(file_path: str, column: str, output_path: str, sep: str = "_") 
     sample = df[column].dropna().iloc[0] if not df[column].dropna().empty else None
     if isinstance(sample, str):
         import json
-        # Apply strict parsing, or lenient?
-        try:
-             df[column] = df[column].apply(lambda x: json.loads(x) if isinstance(x, str) else x)
-        except Exception:
-             pass # Maybe it's not valid JSON, proceed and let pd.json_normalize fail or handle it
+        import ast
+        def _parse_dict(x: object) -> object:
+            if not isinstance(x, str):
+                return x
+            try:
+                return json.loads(x)
+            except (json.JSONDecodeError, TypeError):
+                try:
+                    return ast.literal_eval(x)
+                except (ValueError, SyntaxError):
+                    return x
+        df[column] = df[column].apply(_parse_dict)
 
     # Normalize
     # records must be a list of dicts.
