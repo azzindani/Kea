@@ -11,6 +11,14 @@ if root_path not in sys.path:
 os.environ.pop('MPLBACKEND', None)
 import matplotlib
 matplotlib.use("Agg")
+
+import logging
+# Suppress font manager warnings (e.g., "Arial not found")
+logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
+
+import warnings
+warnings.filterwarnings("ignore", message=".*font family.*not found.*")
+
 from shared.mcp.fastmcp import FastMCP
 import sys
 from pathlib import Path

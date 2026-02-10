@@ -36,8 +36,8 @@ async def test_newspaper_real_simulation():
         "wrapt"
     ])
     
-    # Use Reuters - stable source that works well with newspaper3k feed discovery
-    url = "https://www.reuters.com"
+    # Use CNN - more stable and permissive for automated testing simulations
+    url = "https://www.cnn.com"
     
     print(f"\n--- Starting Real-World Simulation: Newspaper Server ---")
     

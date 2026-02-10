@@ -18,7 +18,7 @@ async def parse_pdf(url: str, pages: str = "all", extract_tables: bool = False) 
             "Accept-Language": "en-US,en;q=0.9",
             "Referer": "https://www.google.com/"
         }
-        async with httpx.AsyncClient(timeout=60, follow_redirects=True, headers=headers, http2=True) as client:
+        async with httpx.AsyncClient(timeout=60, follow_redirects=True, headers=headers) as client:
             response = await client.get(url)
             
             # Handle 300 Multiple Choices

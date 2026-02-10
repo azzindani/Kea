@@ -32,7 +32,7 @@ logger = structlog.get_logger()
 from shared.logging.structured import setup_logging
 setup_logging()
 
-mcp = FastMCP("document_server", dependencies=["httpx", "h2", "pymupdf", "python-docx", "pandas", "bs4"])
+mcp = FastMCP("document_server", dependencies=["httpx", "pymupdf", "python-docx", "pandas", "bs4"])
 
 @mcp.tool()
 async def pdf_parser(url: str, pages: str = "all", extract_tables: bool = False) -> str:

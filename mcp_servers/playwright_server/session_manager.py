@@ -70,16 +70,30 @@ class BrowserSession:
     @classmethod
     async def close(cls):
         """Cleanup resources."""
-        if cls._context:
-            await cls._context.close()
-        if cls._browser:
-            await cls._browser.close()
-        if cls._playwright:
-            await cls._playwright.stop()
+        try:
+            if cls._context:
+                await cls._context.close()
+        except: pass
+        finally:
+            cls._context = None
+
+        try:
+            if cls._browser:
+                await cls._browser.close()
+        except: pass
+        finally:
+            cls._browser = None
+
+        try:
+            if cls._playwright:
+                await cls._playwright.stop()
+        except: pass
+        finally:
+            cls._playwright = None
             
-        cls._context = None
-        cls._browser = None
-        cls._playwright = None
+        # Small delay to allow asyncio to reap the driver process transport
+        # before the tool returns and the loop potentially closes/server exits.
+        await asyncio.sleep(0.2)
         logger.info("playwright_session_closed")
 
     @classmethod

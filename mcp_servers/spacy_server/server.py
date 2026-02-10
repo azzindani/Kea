@@ -33,6 +33,10 @@ logger = structlog.get_logger()
 from shared.logging import setup_logging
 setup_logging()
 
+import warnings
+# Suppress spaCy W007 warning about missing word vectors in small models
+warnings.filterwarnings("ignore", message=r".*\[W007\].*", category=UserWarning)
+
 mcp = FastMCP("spacy_server", dependencies=["spacy", "pandas", "matplotlib"])
 
 # ==========================================

@@ -7,7 +7,7 @@ logger = structlog.get_logger(__name__)
 # Standard columns that act as "Bulk Data" for any ticker
 DEFAULT_COLUMNS = [
     "name", "description", "logoid", 
-    "close", "change", "change_abs", "Val.Traded", "volume", 
+    "close", "change", "change_abs", "Value.Traded", "volume", 
     "market_cap_basic", "price_earnings_ttm", "earnings_per_share_basic_ttm",
     "number_of_employees", "sector", "RSI", "MACD.macd", "MACD.signal"
 ]
@@ -28,20 +28,18 @@ class TvScreener:
         
         cols = columns if columns else DEFAULT_COLUMNS
         
-        # Default query if none provided (Get everything, sorted by Market Cap)
-        sort_data = query.get("sort", {"field": "market_cap_basic", "order": "desc"}) if query else {"field": "market_cap_basic", "order": "desc"}
-        
-        # Ensure we use 'field' and 'order' for the API
-        if "sortBy" in sort_data:
-            sort_data["field"] = sort_data.pop("sortBy")
-        if "sortOrder" in sort_data:
-            sort_data["order"] = sort_data.pop("sortOrder")
+        # Normalize sort data to sortBy/sortOrder
+        sort_input = query.get("sort", {}) if query else {}
+        sort_data = {
+            "sortBy": sort_input.get("sortBy") or sort_input.get("field") or "market_cap_basic",
+            "sortOrder": sort_input.get("sortOrder") or sort_input.get("order") or "desc"
+        }
 
         payload = {
             "columns": cols,
             "filter": query.get("filter", []) if query else [],
-            "options": {"lang": "en"},
-            "range": [0, min(range_limit, 1000)], # Cap at 1000 for safety
+            "options": {"lang": "en", "active_symbols_only": True},
+            "range": [0, min(range_limit, 100)],
             "sort": sort_data,
             "symbols": {"query": {"types": []}, "tickers": []}
         }
@@ -70,8 +68,13 @@ class TvScreener:
                     row[col] = val
                 results.append(row)
             return results
-        except Exception as e:
+        except requests.exceptions.RequestException as e:
             logger.error(f"Screener fetch error: {e}")
+            if hasattr(e.response, "text"):
+                logger.error(f"Response text: {e.response.text}")
+            return [{"error": str(e)}]
+        except Exception as e:
+            logger.error(f"Unexpected error in screener: {e}")
             return [{"error": str(e)}]
 
 # --- TOOL HANDLERS ---
@@ -90,17 +93,17 @@ async def scan_market(market: str = "america", limit: int = 100000, preset: str 
     
     # Presets Logic
     if preset == "top_gainers":
-        query["sort"] = {"field": "change", "order": "desc"}
+        query["sort"] = {"sortBy": "change", "sortOrder": "desc"}
     elif preset == "top_losers":
-        query["sort"] = {"field": "change", "order": "asc"}
+        query["sort"] = {"sortBy": "change", "sortOrder": "asc"}
     elif preset == "most_active":
-        query["sort"] = {"field": "volume", "order": "desc"}
+        query["sort"] = {"sortBy": "volume", "sortOrder": "desc"}
     elif preset == "oversold":
         query["filter"] = [{"left": "RSI", "operation": "less", "right": 30}]
-        query["sort"] = {"field": "RSI", "order": "asc"}
+        query["sort"] = {"sortBy": "RSI", "sortOrder": "asc"}
     elif preset == "overbought":
         query["filter"] = [{"left": "RSI", "operation": "greater", "right": 70}]
-        query["sort"] = {"field": "RSI", "order": "desc"}
+        query["sort"] = {"sortBy": "RSI", "sortOrder": "desc"}
         
     data = screener.fetch(market=market, query=query, range_limit=limit)
     return json.dumps(data, indent=2)
