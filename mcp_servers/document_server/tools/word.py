@@ -3,7 +3,7 @@ import httpx
 import os
 import io
 import json
-# from docx import Document (deferred)
+from docx import Document
 from shared.logging.structured import get_logger
 
 logger = get_logger(__name__)
@@ -22,11 +22,7 @@ async def parse_docx(url: str) -> str:
             with open(url, "rb") as f:
                 docx_bytes = f.read()
         
-        try:
-            from docx import Document
-            doc = Document(io.BytesIO(docx_bytes))
-        except ImportError:
-            raise ImportError("python-docx not installed")
+        doc = Document(io.BytesIO(docx_bytes))
         
         output_data = {
             "source": url,
@@ -40,8 +36,6 @@ async def parse_docx(url: str) -> str:
         
         return json.dumps(output_data, indent=2)
         
-    except ImportError:
-        return "python-docx not installed. Run: pip install python-docx"
     except Exception as e:
         logger.error(f"DOCX Parser error: {e}")
         return f"Error: {str(e)}"

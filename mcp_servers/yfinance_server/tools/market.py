@@ -8,16 +8,16 @@ from shared.logging import get_logger
 logger = get_logger(__name__)
 
 # 1. Bulk Tools with File I/O
-async def get_bulk_historical_data(tickers: str = "", period: str = "1mo", interval: str = "1d", **kwargs) -> str:
+async def get_bulk_historical_data(tickers: str = None, ticker: str = None, period: str = "1mo", interval: str = "1d") -> str:
     """Download historical data for multiple tickers (File Return)."""
-    # Use 'ticker' if 'tickers' is empty (for generic test compatibility)
-    tickers = tickers or kwargs.get("ticker", "")
-    if not tickers:
-        return "Error: No tickers provided."
+    # Robustness for both singular and plural argument names
+    target_tickers = tickers or ticker
+    if not target_tickers:
+        return "Error: No tickers provided. Please provide 'tickers' (space-separated) or 'ticker'."
     
     try:
         # Threaded Download
-        df = yf.download(tickers, period=period, interval=interval, group_by="ticker", threads=True, progress=False)
+        df = yf.download(target_tickers, period=period, interval=interval, group_by="ticker", threads=True, progress=False)
         
         # Save to temp file (Standard I/O for large data)
         report_id = uuid.uuid4().hex[:8]
@@ -33,7 +33,7 @@ async def get_bulk_historical_data(tickers: str = "", period: str = "1mo", inter
         else:
              df.to_csv(file_path)
              
-        return f"Fetched history for {len(tickers.split())} tickers. Data saved to file: {file_path}"
+        return f"Fetched history for {len(target_tickers.split())} tickers. Data saved to file: {file_path}"
     except Exception as e:
         logger.error(f"Market tool error: {e}")
         return f"Error: {str(e)}"

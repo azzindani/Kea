@@ -14,6 +14,9 @@ logger = get_logger(__name__)
 
 # Suppress warnings
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="newspaper")
+import logging
+logging.getLogger('newspaper.network').setLevel(logging.ERROR)
+logging.getLogger('newspaper').setLevel(logging.ERROR)
 
 # Ensure NLTK data
 try:
@@ -37,9 +40,10 @@ class NewsClient:
     def get_config() -> newspaper.Config:
         config = newspaper.Config()
         config.browser_user_agent = NewsClient.HEADERS["User-Agent"]
+        config.headers = NewsClient.HEADERS
         config.request_timeout = 30
         config.number_threads = 5
-        config.http_success_only = True
+        config.http_success_only = False # Allow 401/403 to be handled by higher level if needed
         return config
 
     @staticmethod
@@ -114,13 +118,13 @@ class NewsClient:
         # Supplement with feedparser for better feed discovery
         feeds = [f.url for f in source.feeds]
         if not feeds:
-             # Try common feed paths if newspaper failed
-             feed_urls = [f"{url.rstrip('/')}/feed", f"{url.rstrip('/')}/rss", f"{url.rstrip('/')}/feeds"]
-             for f_url in feed_urls:
-                 d = await asyncio.to_thread(feedparser.parse, f_url)
-                 if d.entries:
-                     feeds.append(f_url)
-                     break
+            # Try common feed paths if newspaper failed
+            feed_urls = [f"{url.rstrip('/')}/feed", f"{url.rstrip('/')}/rss", f"{url.rstrip('/')}/feeds"]
+            for f_url in feed_urls:
+                d = await asyncio.to_thread(feedparser.parse, f_url)
+                if d.entries:
+                    feeds.append(f_url)
+                    break
 
         return {
             "url": source.url,

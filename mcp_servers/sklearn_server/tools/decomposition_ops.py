@@ -26,7 +26,7 @@ async def tsne(X: DataInput, n_components: int = 2, perplexity: float = 30.0) ->
 
 async def nmf(X: DataInput, n_components: int = 2) -> Dict[str, Any]:
     X_df = parse_data(X)
-    model = NMF(n_components=n_components, random_state=42)
+    model = NMF(n_components=n_components, random_state=42, max_iter=1000)
     transformed = model.fit_transform(X_df)
     return to_serializable({
         "transformed": transformed.tolist(),

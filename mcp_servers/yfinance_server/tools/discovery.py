@@ -9,13 +9,17 @@ logger = get_logger(__name__)
 
 cache = TickerCache()
 
-async def get_tickers_by_country(country_code: str = "US") -> str:
+async def get_tickers_by_country(country_code: str, limit: int = 50) -> str:
     """
     Get all stock tickers for a specific country or exchange.
     
     Use this tool to find "all companies" or "tickers" for a region.
     Supported inputs: "US" (USA), "ID" (Indonesia/IDX), "IN" (India), etc.
     Returns size of universe and sample tickers.
+    
+    Args:
+        country_code: ISO 2 character country code (e.g. "US")
+        limit: Number of tickers to sample for the report (default: 50)
     """
     
     try:
@@ -31,7 +35,7 @@ async def get_tickers_by_country(country_code: str = "US") -> str:
         
         # Download snapshot (1d price)
         # Use limit to avoid massive downloads in discovery
-        sample_tickers = tickers[:50]
+        sample_tickers = tickers[:limit]
         df = yf.download(sample_tickers, period="1d", group_by="ticker", threads=True, progress=False)
         
         if df.empty:

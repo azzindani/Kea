@@ -96,18 +96,19 @@ async def get_quote_metadata(ticker: str) -> str:
     return await market.get_quote_metadata(ticker)
 
 @mcp.tool()
-async def get_bulk_historical_data(tickers: str, period: str = "1mo", interval: str = "1d") -> str:
+async def get_bulk_historical_data(tickers: str = None, ticker: str = None, period: str = "1mo", interval: str = "1d") -> str:
     """FETCHES historical data (Bulk). [ACTION]
     
     [RAG Context]
     Args:
         tickers: Space-separated symbols (e.g. "AAPL MSFT BBCA.JK")
+        ticker: Singular symbol (alias for tickers)
         period: "1d", "5d", "1mo", "6mo", "1y", "ytd", "max"
         interval: "1m" (7d max), "1h", "1d", "1wk", "1mo"
         
     Returns CSV string with Open/High/Low/Close/Volume for all tickers.
     """
-    return await market.get_bulk_historical_data(tickers, period, interval)
+    return await market.get_bulk_historical_data(tickers, ticker, period, interval)
 
 # --- Financials ---
 @mcp.tool()
@@ -274,7 +275,7 @@ async def get_splits_history(ticker: str) -> str:
     return await analysis.get_splits_history(ticker)
 
 @mcp.tool()
-async def calculate_indicators(ticker: str, indicators: List[str] = ["sma", "rsi"], period: str = "1y") -> str:
+async def calculate_indicators(ticker: str, indicators: List[str] = ["sma", "rsi"], period: str = "1y", interval: str = "1d") -> str:
     """CALCULATES technical indicators. [ACTION]
     
     [RAG Context]
@@ -282,8 +283,9 @@ async def calculate_indicators(ticker: str, indicators: List[str] = ["sma", "rsi
     Args:
         indicators: List of ["sma", "ema", "rsi", "macd", "bbands"]
         period: Timeframe ("1y", "6mo")
+        interval: Data interval ("1d", "1h")
     """
-    return await analysis.calculate_indicators(ticker, indicators, period=period)
+    return await analysis.calculate_indicators(ticker, indicators, period=period, interval=interval)
 
 # --- Charts ---
 @mcp.tool()
@@ -299,15 +301,16 @@ async def get_price_chart(ticker: str, period: str = "1y") -> Image:
 
 # --- Options ---
 @mcp.tool()
-async def get_options_chain(ticker: str, date: str = "") -> str:
+async def get_options_chain(ticker: str, date: str = "", limit: int = 10) -> str:
     """FETCHES options chain (Calls/Puts). [ACTION]
     
     [RAG Context]
     Returns strike prices, bid/ask, and volume for options.
     Args:
         date: Expiration date "YYYY-MM-DD" (use get_option_expirations first)
+        limit: Number of rows to return (default: 10)
     """
-    return await options.get_options_chain(ticker, date)
+    return await options.get_options_chain(ticker, date, limit=limit)
 
 @mcp.tool()
 async def get_option_expirations(ticker: str) -> str:
@@ -321,15 +324,16 @@ async def get_option_expirations(ticker: str) -> str:
 
 # --- Aggregators ---
 @mcp.tool()
-async def get_tickers_by_country(country_code: str = "US") -> str:
+async def get_tickers_by_country(country_code: str, limit: int = 50) -> str:
     """SEARCHES tickers by country. [ACTION]
     
     [RAG Context]
     Returns a universe of stocks for a region.
     Args:
         country_code: ISO code (e.g. "ID" for Indonesia, "US" for USA).
+        limit: Number of tickers to sample for the report (default: 50).
     """
-    return await discovery.get_tickers_by_country(country_code)
+    return await discovery.get_tickers_by_country(country_code, limit=limit)
 
 @mcp.tool()
 async def get_full_report(ticker: str) -> str:

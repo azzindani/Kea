@@ -49,7 +49,15 @@ def _parse_returns(returns_input: Union[str, float, Dict, List]) -> pd.Series:
 
         # 2. Convert to Series
         if isinstance(data_to_parse, dict):
-            series = pd.Series(data_to_parse)
+            if all(k in data_to_parse for k in ("index", "data")):
+                # Handle pandas split orientation
+                series = pd.Series(
+                    data_to_parse["data"], 
+                    index=data_to_parse["index"], 
+                    name=data_to_parse.get("name")
+                )
+            else:
+                series = pd.Series(data_to_parse)
         elif isinstance(data_to_parse, list):
             series = pd.Series(data_to_parse)
         elif isinstance(data_to_parse, str):
@@ -64,12 +72,7 @@ def _parse_returns(returns_input: Union[str, float, Dict, List]) -> pd.Series:
 
         # 3. Ensure DatetimeIndex
         if not isinstance(series.index, pd.DatetimeIndex):
-            try:
-                series.index = pd.to_datetime(series.index)
-            except:
-                # If it's just a range index, we might need to assume frequency or fail
-                # But typically it should have dates.
-                pass
+            series.index = pd.to_datetime(series.index)
         
         # Ensure it is a Series
         if not isinstance(series, pd.Series):
@@ -85,6 +88,10 @@ def _parse_returns(returns_input: Union[str, float, Dict, List]) -> pd.Series:
         # Ensure proper sort
         series = series.sort_index()
         
+        # Final safety check for empty series which crashes quantstats
+        if series.empty:
+            raise ValueError("Parsed return series is empty.")
+            
         return series
     
     except Exception as e:

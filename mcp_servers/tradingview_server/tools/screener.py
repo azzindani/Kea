@@ -1,18 +1,13 @@
-
 import json
 import requests
-import asyncio
-import json
-import requests
-import asyncio
-from shared.logging import get_logger
+import structlog
 
-logger = get_logger(__name__)
+logger = structlog.get_logger(__name__)
 
 # Standard columns that act as "Bulk Data" for any ticker
 DEFAULT_COLUMNS = [
     "name", "description", "logoid", 
-    "close", "change", "change_abs", "Val.Traded", "volume", 
+    "close", "change", "change_abs", "Value.Traded", "volume", 
     "market_cap_basic", "price_earnings_ttm", "earnings_per_share_basic_ttm",
     "number_of_employees", "sector", "RSI", "MACD.macd", "MACD.signal"
 ]
@@ -33,13 +28,19 @@ class TvScreener:
         
         cols = columns if columns else DEFAULT_COLUMNS
         
-        # Default query if none provided (Get everything, sorted by Market Cap)
+        # Normalize sort data to sortBy/sortOrder
+        sort_input = query.get("sort", {}) if query else {}
+        sort_data = {
+            "sortBy": sort_input.get("sortBy") or sort_input.get("field") or "market_cap_basic",
+            "sortOrder": sort_input.get("sortOrder") or sort_input.get("order") or "desc"
+        }
+
         payload = {
             "columns": cols,
             "filter": query.get("filter", []) if query else [],
-            "options": {"lang": "en"},
-            "range": [0, range_limit],
-            "sort": query.get("sort", {"sortBy": "market_cap_basic", "sortOrder": "desc"}) if query else {"sortBy": "market_cap_basic", "sortOrder": "desc"},
+            "options": {"lang": "en", "active_symbols_only": True},
+            "range": [0, min(range_limit, 100)],
+            "sort": sort_data,
             "symbols": {"query": {"types": []}, "tickers": []}
         }
 
@@ -67,8 +68,13 @@ class TvScreener:
                     row[col] = val
                 results.append(row)
             return results
-        except Exception as e:
+        except requests.exceptions.RequestException as e:
             logger.error(f"Screener fetch error: {e}")
+            if hasattr(e.response, "text"):
+                logger.error(f"Response text: {e.response.text}")
+            return [{"error": str(e)}]
+        except Exception as e:
+            logger.error(f"Unexpected error in screener: {e}")
             return [{"error": str(e)}]
 
 # --- TOOL HANDLERS ---

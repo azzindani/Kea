@@ -16,8 +16,10 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import Any
 
+from shared.config import get_settings
 from shared.logging import get_logger
 
 logger = get_logger(__name__)
@@ -37,6 +39,11 @@ class KnowledgeRetriever:
         self._registry: Any = None
         self._available = False
         self._init_attempted = False
+        
+        # Simple in-memory cache: (key) -> (timestamp, result)
+        # Key: (query, domain, category, tags_tuple, limit, enable_reranking)
+        self._cache: dict[tuple, tuple[float, str]] = {}
+        self._cache_ttl = 60.0  # 60s TTL
 
     async def _ensure_registry(self) -> bool:
         """Lazily initialize the registry connection."""
@@ -66,24 +73,30 @@ class KnowledgeRetriever:
         category: str | None = None,
         tags: list[str] | None = None,
         min_similarity: float = 0.3,
+        enable_reranking: bool = True,
     ) -> str:
         """
         Retrieve formatted knowledge context for prompt injection.
 
-        Args:
-            query: User query or task description
-            limit: Max number of knowledge items to retrieve
-            domain: Optional domain filter (e.g., "finance")
-            category: Optional category filter ("skill", "rule", "persona")
-            tags: Optional tag filter
-            min_similarity: Minimum similarity threshold
-
-        Returns:
-            Formatted string ready for system prompt injection,
-            or empty string if no relevant knowledge found.
+        Features:
+        - In-memory caching (60s TTL)
+        - Structured logging of selected items
+        - Reranking pass-through
         """
         if not await self._ensure_registry():
             return ""
+
+        # Check cache
+        # Sort tags for stable key
+        tags_tuple = tuple(sorted(tags)) if tags else None
+        cache_key = (query, domain, category, tags_tuple, limit, enable_reranking)
+        
+        now = time.time()
+        if cache_key in self._cache:
+            timestamp, cached_result = self._cache[cache_key]
+            if now - timestamp < self._cache_ttl:
+                logger.debug(f"Knowledge Cache Hit: {category}/{domain} for '{query[:30]}...'")
+                return cached_result
 
         try:
             results = await asyncio.wait_for(
@@ -93,12 +106,22 @@ class KnowledgeRetriever:
                     domain=domain,
                     category=category,
                     tags=tags,
+                    enable_reranking=enable_reranking,
                 ),
-                timeout=5.0,
+                timeout=10.0,
             )
 
             if not results:
                 return ""
+
+            # Structured logging for visibility
+            log_items = [
+                f"{r['knowledge_id']} ({r.get('similarity', 0.0):.2f})" 
+                for r in results
+            ]
+            logger.info(
+                f"Knowledge Retrieved ({category or 'all'}): {len(results)} items -> {log_items}"
+            )
 
             # Filter by similarity threshold
             relevant = [r for r in results if r.get("similarity", 0) >= min_similarity]
@@ -106,9 +129,14 @@ class KnowledgeRetriever:
             if not relevant:
                 return ""
 
-            return self._format_context(relevant)
+            formatted = self._format_context(relevant)
+            
+            # Update cache
+            self._cache[cache_key] = (now, formatted)
+            
+            return formatted
 
-        except TimeoutError:
+        except asyncio.TimeoutError:
             logger.warning("KnowledgeRetriever: Search timed out")
             return ""
         except Exception as e:
@@ -143,21 +171,37 @@ class KnowledgeRetriever:
             category="rule",
         )
 
+    async def retrieve_procedures(
+        self,
+        query: str,
+        limit: int = 3,
+        domain: str | None = None,
+    ) -> str:
+        """Retrieve procedure-type knowledge (Standard Operating Procedures)."""
+        return await self.retrieve_context(
+            query=query,
+            limit=limit,
+            domain=domain,
+            category="procedure",
+        )
+
     async def retrieve_all(
         self,
         query: str,
         skill_limit: int = 3,
         rule_limit: int = 2,
+        procedure_limit: int = 2,
         domain: str | None = None,
     ) -> str:
         """
-        Retrieve both skills and rules for comprehensive context.
+        Retrieve combined context (Skills + Rules + Procedures).
 
-        Returns combined formatted context with skills and rules sections.
+        Returns combined formatted context with skills, rules, and procedures sections.
         """
-        skills, rules = await asyncio.gather(
+        skills, rules, procedures = await asyncio.gather(
             self.retrieve_skills(query, limit=skill_limit, domain=domain),
             self.retrieve_rules(query, limit=rule_limit, domain=domain),
+            self.retrieve_procedures(query, limit=procedure_limit, domain=domain),
             return_exceptions=True,
         )
 
@@ -166,6 +210,8 @@ class KnowledgeRetriever:
             parts.append(skills)
         if isinstance(rules, str) and rules:
             parts.append(rules)
+        if isinstance(procedures, str) and procedures:
+            parts.append(procedures)
 
         return "\n\n".join(parts)
 

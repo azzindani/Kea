@@ -1,5 +1,6 @@
 from mcp_servers.quantstats_server.tools.core_ops import _parse_returns
 import quantstats as qs
+import pandas as pd
 import os
 import tempfile
 import base64

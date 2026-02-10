@@ -201,7 +201,7 @@ register_performance()
 # --- 3. SCREENER / BULK DATA ---
 
 @mcp.tool()
-async def scan_market(market: str = "america", limit: int = 100000, preset: str = "market_cap") -> str:
+async def scan_market(market: str = "america", limit: int = 100, preset: str = "market_cap") -> str:
     """SCANS market using preset. [ACTION]
     
     [RAG Context]
@@ -228,7 +228,7 @@ def register_presets():
     # Loop removed as it was shadowing the loop below
             
     def make_preset_handler(m_val, p_val):
-        async def p_handler(limit: int = 100000) -> str:
+        async def p_handler(limit: int = 100) -> str:
             return await screener_module.scan_market(m_val, limit, p_val)
         return p_handler
 

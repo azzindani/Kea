@@ -14,24 +14,38 @@ def _parse_prices(prices_input: Union[str, Dict, List]) -> pd.DataFrame:
         if isinstance(prices_input, str):
             # Check if it's a file path
             if prices_input.endswith('.csv') and os.path.exists(prices_input):
-                 df = pd.read_csv(prices_input, parse_dates=True, index_col=0)
+                df = pd.read_csv(prices_input, parse_dates=True, index_col=0)
             else:
-                 # Assume JSON string
-                 try:
-                     data = json.loads(prices_input)
-                     
-                     # --- UNWRAP FASTMCP ENVELOPE ---
-                     if isinstance(data, dict) and "status" in data and "data" in data:
-                         data = data["data"]
-                     
-                     if isinstance(data, str):
-                         # Data might be a double-encoded JSON string
-                         data = json.loads(data)
-                         
-                     df = pd.DataFrame(data)
-                 except:
-                     # Fallback: simple CSV string?
-                     df = pd.read_csv(io.StringIO(prices_input), parse_dates=True, index_col=0)
+                # Assume JSON string
+                try:
+                    data = json.loads(prices_input)
+                    
+                    # --- UNWRAP FASTMCP ENVELOPE ---
+                    if isinstance(data, dict) and "status" in data and "data" in data:
+                        if data["status"] == "error":
+                            raise ValueError(f"Server error: {data.get('data')}")
+                        data = data["data"]
+                    
+                    if isinstance(data, str):
+                        # Data might be a double-encoded JSON string
+                        try:
+                            data = json.loads(data)
+                        except json.JSONDecodeError:
+                            # Not JSON, maybe raw CSV string to be handled by fallback
+                            pass
+                    
+                    if isinstance(data, dict) and all(k in data for k in ("columns", "index", "data")):
+                        df = pd.DataFrame(data["data"], index=data["index"], columns=data["columns"])
+                    else:
+                        df = pd.DataFrame(data)
+                except ValueError as e:
+                    raise e
+                except Exception:
+                    # Fallback: simple CSV string?
+                    try:
+                        df = pd.read_csv(io.StringIO(str(prices_input)), parse_dates=True, index_col=0)
+                    except:
+                        raise ValueError(f"Could not parse prices input: {str(prices_input)[:100]}...")
         elif isinstance(prices_input, dict):
             # Check for envelope in dict form
             data = prices_input

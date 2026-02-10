@@ -31,6 +31,7 @@ class PostgresKnowledgeRegistry:
     def __init__(self, table_name: str = "knowledge_registry") -> None:
         self.table_name = table_name
         self.embedder = create_embedding_provider(use_local=True)
+        self._reranker = None
         self._pool: asyncpg.Pool | None = None
         self._db_url = os.getenv("DATABASE_URL")
         self._initialized = False
@@ -76,9 +77,24 @@ class PostgresKnowledgeRegistry:
                             content_hash TEXT NOT NULL,
                             metadata JSONB DEFAULT '{{}}'::jsonb,
                             embedding vector(1024),
+                            version TEXT DEFAULT '1.0',
+                            parent_id TEXT,
                             last_seen TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
                         )
                     """)
+
+                    # Idempotent schema migration for existing tables
+                    # Add version column
+                    try:
+                        await conn.execute(f"ALTER TABLE {self.table_name} ADD COLUMN IF NOT EXISTS version TEXT DEFAULT '1.0'")
+                    except Exception:
+                        pass # Column exists or other issue
+
+                    # Add parent_id column
+                    try:
+                        await conn.execute(f"ALTER TABLE {self.table_name} ADD COLUMN IF NOT EXISTS parent_id TEXT")
+                    except Exception:
+                        pass
 
                     try:
                         await conn.execute(f"""
@@ -101,6 +117,11 @@ class PostgresKnowledgeRegistry:
                         await conn.execute(f"""
                             CREATE INDEX IF NOT EXISTS {self.table_name}_tags_idx
                             ON {self.table_name} USING gin (tags)
+                        """)
+                        # Add index for hierarchical queries
+                        await conn.execute(f"""
+                            CREATE INDEX IF NOT EXISTS {self.table_name}_parent_idx
+                            ON {self.table_name} (parent_id)
                         """)
                     except Exception:
                         pass
@@ -197,8 +218,8 @@ class PostgresKnowledgeRegistry:
                             f"""
                             INSERT INTO {self.table_name}
                                 (knowledge_id, name, description, domain, category,
-                                 tags, content, content_hash, metadata, embedding)
-                            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10)
+                                 tags, content, content_hash, metadata, embedding, version, parent_id)
+                            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12)
                             ON CONFLICT (knowledge_id) DO UPDATE SET
                                 name = EXCLUDED.name,
                                 description = EXCLUDED.description,
@@ -209,6 +230,8 @@ class PostgresKnowledgeRegistry:
                                 content_hash = EXCLUDED.content_hash,
                                 metadata = EXCLUDED.metadata,
                                 embedding = EXCLUDED.embedding,
+                                version = EXCLUDED.version,
+                                parent_id = EXCLUDED.parent_id,
                                 last_seen = CURRENT_TIMESTAMP
                             """,
                             item["knowledge_id"],
@@ -221,6 +244,8 @@ class PostgresKnowledgeRegistry:
                             content_hash,
                             metadata,
                             embeddings[i],
+                            item.get("version", "1.0"),
+                            item.get("parent_id"),
                         )
 
                 logger.info(f"Knowledge Registry: Updated {len(updates_needed)} items.")
@@ -239,6 +264,14 @@ class PostgresKnowledgeRegistry:
 
         return 0
 
+    async def _get_reranker(self):
+        """Lazy load reranker (mirrors Vault's postgres_store pattern)."""
+        if self._reranker is None:
+            from shared.embedding.qwen3_reranker import create_reranker_provider
+
+            self._reranker = create_reranker_provider()
+        return self._reranker
+
     async def search(
         self,
         query: str,
@@ -246,9 +279,13 @@ class PostgresKnowledgeRegistry:
         domain: str | None = None,
         category: str | None = None,
         tags: list[str] | None = None,
+        enable_reranking: bool = True,
     ) -> list[dict[str, Any]]:
         """
-        Semantic search for knowledge items.
+        Two-stage semantic search for knowledge items.
+
+        Stage 1: pgvector cosine similarity (fast approximate recall)
+        Stage 2: Qwen3-Reranker-0.6B cross-encoder (precise relevance scoring)
 
         Args:
             query: Search query
@@ -256,6 +293,7 @@ class PostgresKnowledgeRegistry:
             domain: Filter by domain (e.g., "finance")
             category: Filter by category ("skill", "rule", "persona")
             tags: Filter by tags (any match)
+            enable_reranking: Whether to apply reranker (default True)
 
         Returns:
             List of matching knowledge items with similarity scores
@@ -263,6 +301,9 @@ class PostgresKnowledgeRegistry:
         try:
             pool = await self._get_pool()
             query_emb = await self.embedder.embed_query(query)
+
+            # Fetch 5x candidates when reranking (matches Vault pattern)
+            candidate_limit = limit * 5 if enable_reranking else limit
 
             conditions = []
             params: list[Any] = [query_emb]
@@ -287,7 +328,7 @@ class PostgresKnowledgeRegistry:
             if conditions:
                 where_clause = "WHERE " + " AND ".join(conditions)
 
-            params.append(limit)
+            params.append(candidate_limit)
 
             async with pool.acquire() as conn:
                 await register_vector(conn)
@@ -295,7 +336,7 @@ class PostgresKnowledgeRegistry:
                 rows = await conn.fetch(
                     f"""
                     SELECT knowledge_id, name, description, domain, category,
-                           tags, content, metadata,
+                           tags, content, metadata, version, parent_id,
                            1 - (embedding <=> $1) as similarity
                     FROM {self.table_name}
                     {where_clause}
@@ -305,7 +346,7 @@ class PostgresKnowledgeRegistry:
                     *params,
                 )
 
-                return [
+                initial_results = [
                     {
                         "knowledge_id": row["knowledge_id"],
                         "name": row["name"],
@@ -319,10 +360,36 @@ class PostgresKnowledgeRegistry:
                             if isinstance(row["metadata"], str)
                             else row["metadata"]
                         ),
+                        "version": row.get("version", "1.0"),
+                        "parent_id": row.get("parent_id"),
                         "similarity": float(row["similarity"]),
                     }
                     for row in rows
                 ]
+
+            # Stage 2: Rerank candidates with cross-encoder
+            if enable_reranking and initial_results:
+                try:
+                    reranker = await self._get_reranker()
+                    # Use content (truncated) for reranking — same field used for embedding
+                    docs = [r["content"][:4000] for r in initial_results]
+                    reranked = await reranker.rerank(query, docs, top_k=limit)
+
+                    # Rebuild results ordered by reranker score
+                    final_results = []
+                    for res in reranked:
+                        original = initial_results[res.index]
+                        original["similarity"] = res.score  # Replace cosine with reranker score
+                        final_results.append(original)
+
+                    return final_results
+                except Exception as e:
+                    logger.warning(
+                        f"Knowledge reranking failed (falling back to embedding score): {e}"
+                    )
+                    return initial_results[:limit]
+
+            return initial_results[:limit]
 
         except Exception as e:
             logger.error(f"Knowledge search failed: {e}")
@@ -336,7 +403,7 @@ class PostgresKnowledgeRegistry:
                 row = await conn.fetchrow(
                     f"""
                     SELECT knowledge_id, name, description, domain, category,
-                           tags, content, metadata
+                           tags, content, metadata, version, parent_id
                     FROM {self.table_name}
                     WHERE knowledge_id = $1
                     """,
@@ -357,6 +424,8 @@ class PostgresKnowledgeRegistry:
                         if isinstance(row["metadata"], str)
                         else row["metadata"]
                     ),
+                    "version": row.get("version", "1.0"),
+                    "parent_id": row.get("parent_id"),
                 }
         except Exception as e:
             logger.error(f"Knowledge get_by_id failed: {e}")

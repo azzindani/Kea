@@ -7,10 +7,10 @@ async def get_simple_moving_average(arguments: dict) -> ToolResult:
     """Calculate SMA (Simple Moving Average)."""
     ticker = arguments.get("ticker")
     window = int(arguments.get("window", 20))
+    period = arguments.get("period", "1y")
     try:
         # Fetch enough history
-        # (window + 10) to have data
-        hist = yf.Ticker(ticker).history(period="1y") 
+        hist = yf.Ticker(ticker).history(period=period) 
         if hist.empty: return ToolResult(isError=True, content=[TextContent(text="No data")])
         
         sma = hist['Close'].rolling(window=window).mean().iloc[-1]
@@ -21,8 +21,9 @@ async def get_rsi(arguments: dict) -> ToolResult:
     """Calculate RSI (Relative Strength Index)."""
     ticker = arguments.get("ticker")
     window = int(arguments.get("window", 14))
+    period = arguments.get("period", "6mo")
     try:
-        hist = yf.Ticker(ticker).history(period="6mo")
+        hist = yf.Ticker(ticker).history(period=period)
         delta = hist['Close'].diff()
         gain = (delta.where(delta > 0, 0)).rolling(window=window).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(window=window).mean()
@@ -38,7 +39,8 @@ async def get_macd(arguments: dict) -> ToolResult:
     """Calculate MACD (Moving Average Convergence Divergence)."""
     ticker = arguments.get("ticker")
     try:
-        hist = yf.Ticker(ticker).history(period="1y")
+        period = arguments.get("period", "1y")
+        hist = yf.Ticker(ticker).history(period=period)
         # Standard 12, 26, 9
         exp1 = hist['Close'].ewm(span=12, adjust=False).mean()
         exp2 = hist['Close'].ewm(span=26, adjust=False).mean()
@@ -57,8 +59,9 @@ async def get_bollinger_bands(arguments: dict) -> ToolResult:
     """Calculate Bollinger Bands (Upper, Middle, Lower)."""
     ticker = arguments.get("ticker")
     window = int(arguments.get("window", 20))
+    period = arguments.get("period", "1y")
     try:
-        hist = yf.Ticker(ticker).history(period="1y")
+        hist = yf.Ticker(ticker).history(period=period)
         sma = hist['Close'].rolling(window=window).mean()
         std = hist['Close'].rolling(window=window).std()
         

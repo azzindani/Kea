@@ -29,14 +29,22 @@ def _patch_famafrench_read_csv():
         date_parser_func = kwargs.pop('date_parser', None)
         parse_dates_val = kwargs.pop('parse_dates', None)
         result = _original_read_csv(*args, **kwargs)
+        
+        # If we have a date parser and parse_dates was requested
         if date_parser_func and parse_dates_val is not None:
             try:
+                # Apply the date parser manually
                 result.index = result.index.map(lambda x: date_parser_func(str(x)))
-                # Drop rows where index is NaT (e.g., from non-data rows at end of CSV)
-                # This is crucial for PeriodIndex compatibility in Pandas 3.0
-                result = result[result.index.notna()]
-            except Exception:
-                pass
+                
+                # Drop rows where index is NaT (crucial for PeriodIndex in Pandas 3.0)
+                # Pandas 3.0 truncate/slicing fails if NaT is present in a PeriodIndex
+                if hasattr(result.index, 'isna'):
+                    result = result[~result.index.isna()]
+                else:
+                    result = result[result.index.notna()]
+                    
+            except Exception as e:
+                logger.warning(f"Fama-French patch failed to parse dates: {e}")
         return result
 
     pd.read_csv = _patched_read_csv
@@ -52,6 +60,10 @@ def _patch_famafrench_read_csv():
 
 def read_famafrench(name: str, start: object = None, end: object = None) -> dict:
     """Read Fama-French data with Pandas 3.0 compatibility."""
+    # Ensure start/end are not empty strings which can cause issues in pdr
+    if start == "": start = None
+    if end == "": end = None
+    
     with _patch_famafrench_read_csv():
         return web.DataReader(name, "famafrench", start=start, end=end)
 
@@ -62,15 +74,17 @@ async def get_fama_french_data(dataset_name: str = None, start_date: str = None,
     dataset_name: Code (e.g., 'F-F_Research_Data_Factors').
     """
     name = dataset_name
+    
+    # Standardize empty strings to None
+    start = start_date if start_date != "" else None
+    end = end_date if end_date != "" else None
 
-    if not start_date:
+    if not start:
         # Default to last 5 years
         start = datetime.datetime.now() - datetime.timedelta(days=365*5)
-    else:
-        start = start_date
 
     try:
-        ds = read_famafrench(name, start=start, end=end_date)
+        ds = read_famafrench(name, start=start, end=end)
         
         if not ds:
             return "No data found."

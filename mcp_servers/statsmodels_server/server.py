@@ -34,6 +34,14 @@ logger = structlog.get_logger()
 from shared.logging import setup_logging
 setup_logging()
 
+import warnings
+from statsmodels.tools.sm_exceptions import InterpolationWarning, ConvergenceWarning, ValueWarning
+warnings.filterwarnings("ignore", category=InterpolationWarning)
+warnings.filterwarnings("ignore", category=ConvergenceWarning)
+warnings.filterwarnings("ignore", category=ValueWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
+
 mcp = FastMCP("statsmodels_server", dependencies=["statsmodels", "scipy", "numpy", "pandas"])
 DataInput = Union[List[List[float]], List[Dict[str, Any]], str]
 VectorInput = Union[List[float], str]

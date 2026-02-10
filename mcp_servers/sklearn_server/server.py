@@ -39,6 +39,12 @@ logger = structlog.get_logger()
 from shared.logging import setup_logging
 setup_logging()
 
+import warnings
+from sklearn.exceptions import ConvergenceWarning
+warnings.filterwarnings("ignore", category=ConvergenceWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
+
 mcp = FastMCP("sklearn_server", dependencies=["scikit-learn", "numpy", "pandas", "joblib", "threadpoolctl", "scipy"])
 DataInput = Union[List[List[Any]], List[Dict[str, Any]], str, Dict[str, Any]]
 VectorInput = Union[List[Any], str]

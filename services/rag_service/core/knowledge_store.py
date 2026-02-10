@@ -33,14 +33,16 @@ class KnowledgeStore:
         domain: str | None = None,
         category: str | None = None,
         tags: list[str] | None = None,
+        enable_reranking: bool = True,
     ) -> list[dict[str, Any]]:
-        """Semantic search for knowledge items."""
+        """Semantic search for knowledge items with optional reranking."""
         return await self._registry.search(
             query=query,
             limit=limit,
             domain=domain,
             category=category,
             tags=tags,
+            enable_reranking=enable_reranking,
         )
 
     async def get_by_id(self, knowledge_id: str) -> dict[str, Any] | None:

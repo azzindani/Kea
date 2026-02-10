@@ -1,9 +1,8 @@
 import pytest
-import asyncio
 import os
 import pandas as pd
 import numpy as np
-from mcp import ClientSession
+from tests.mcp.client_utils import SafeClientSession as ClientSession
 from mcp.client.stdio import stdio_client
 from tests.mcp.client_utils import get_server_params
 
@@ -21,7 +20,7 @@ async def test_portfolio_real_simulation():
     df = pd.DataFrame(data, index=dates, columns=["AAPL", "GOOG", "MSFT"])
     df.to_csv(csv_file)
     
-    print(f"\n--- Starting Real-World Simulation: Portfolio Server ---")
+    print("\n--- Starting Real-World Simulation: Portfolio Server ---")
     
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
@@ -33,12 +32,10 @@ async def test_portfolio_real_simulation():
             if res.isError:
                 print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
             else:
-                print(f" \033[92m[PASS]\033[0m Loaded")
+                print(" \033[92m[PASS]\033[0m Loaded")
 
             # Store prices_input (usually just the path or JSON string)
             # The tool `load_prices_csv` returns JSON string, which is `prices_input` for other tools?
-            # NOTE: Checks server.py, efficient_frontier tools take `prices_input`.
-            # If `load_prices_csv` returns JSON, we pass that JSON string as `prices_input`.
             prices_input = res.content[0].text
             
             # 2. Expected Returns (Mean)
@@ -50,19 +47,19 @@ async def test_portfolio_real_simulation():
             print("2b. Risk Model (Sample Cov)...")
             res = await session.call_tool("sample_cov", arguments={"prices_input": prices_input})
             if not res.isError:
-                 print(f" \033[92m[PASS]\033[0m Covariance calculated")
+                print(" \033[92m[PASS]\033[0m Covariance calculated")
 
             # 2c. HRP Optimization
             print("2c. HRP Optimization...")
             res = await session.call_tool("hrp_optimize", arguments={"prices_input": prices_input})
             if not res.isError:
-                 print(f" \033[92m[PASS]\033[0m HRP Weights: {res.content[0].text}")
+                print(f" \033[92m[PASS]\033[0m HRP Weights: {res.content[0].text}")
 
             # 3. Optimize (Max Sharpe)
             print("3. Optimizing Max Sharpe...")
             res = await session.call_tool("ef_max_sharpe", arguments={"prices_input": prices_input})
             if not res.isError:
-                 print(f" \033[92m[PASS]\033[0m Weights: {res.content[0].text}")
+                print(f" \033[92m[PASS]\033[0m Weights: {res.content[0].text}")
             
             # 4. Generate Report
             # Needs weights from step 3
@@ -73,18 +70,22 @@ async def test_portfolio_real_simulation():
                     print("4. Generating Report...")
                     res = await session.call_tool("generate_report", arguments={"prices_input": prices_input, "weights": weights})
                     if not res.isError:
-                         report_path = res.content[0].text
-                         print(f" \033[92m[PASS]\033[0m Report: {report_path}")
-                         if os.path.exists(report_path):
-                            try: os.remove(report_path)
-                            except: pass
-                except:
-                     pass
+                        report_path = res.content[0].text
+                        print(f" \033[92m[PASS]\033[0m Report: {report_path}")
+                        if os.path.exists(report_path):
+                            try:
+                                os.remove(report_path)
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
 
     # Cleanup
     if os.path.exists(csv_file):
-        try: os.remove(csv_file)
-        except: pass
+        try:
+            os.remove(csv_file)
+        except Exception:
+            pass
 
     print("--- Portfolio Simulation Complete ---")
 

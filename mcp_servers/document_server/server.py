@@ -11,6 +11,7 @@ if root_path not in sys.path:
 # dependencies = [
 #   "bs4",
 #   "httpx",
+#   "h2",
 #   "mcp",
 #   "pandas",
 #   "pymupdf",

@@ -24,7 +24,7 @@ async def parse_html(url: str, extract: str = "text", selector: str = None) -> s
             "Sec-Ch-Ua-Platform": '"Windows"',
             "Upgrade-Insecure-Requests": "1"
         }
-        async with httpx.AsyncClient(timeout=30, follow_redirects=True, headers=headers, http2=True) as client:
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True, headers=headers) as client:
             response = await client.get(url)
             response.raise_for_status()
             html = response.text
