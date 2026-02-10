@@ -66,6 +66,7 @@ class KnowledgeRetriever:
         category: str | None = None,
         tags: list[str] | None = None,
         min_similarity: float = 0.3,
+        enable_reranking: bool = True,
     ) -> str:
         """
         Retrieve formatted knowledge context for prompt injection.
@@ -77,6 +78,7 @@ class KnowledgeRetriever:
             category: Optional category filter ("skill", "rule", "persona")
             tags: Optional tag filter
             min_similarity: Minimum similarity threshold
+            enable_reranking: Whether to apply cross-encoder reranking (default True)
 
         Returns:
             Formatted string ready for system prompt injection,
@@ -93,8 +95,9 @@ class KnowledgeRetriever:
                     domain=domain,
                     category=category,
                     tags=tags,
+                    enable_reranking=enable_reranking,
                 ),
-                timeout=5.0,
+                timeout=10.0,
             )
 
             if not results:
