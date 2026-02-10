@@ -32,49 +32,51 @@ async def test_yfinance_tools_dynamic():
             tools = tools_res.tools
             print(f"\nDiscovered {len(tools)} tools via Client.")
             
+            # Create a temporary safe ticker list for the global sweep to avoid delisted tickers
+            import json
+            test_data_path = "mcp_servers/yfinance_server/data/TEST_QC_GENERIC.json"
             try:
-                assert len(tools) > 25, f"Expected >25 tools from YFinance, found {len(tools)}"
-            except AssertionError as e:
-                print(f"Warning: {e}") 
-                # Don't fail the whole suite if tool count changes, just warn
-                pass
-            
-            success = 0
-            failed = 0
-            
-            for tool in tools:
-                name = tool.name
-                print(f"Testing {name}...", end="")
+                with open(test_data_path, "w") as f:
+                    json.dump({"count": 5, "tickers": ["MSFT", "AAPL", "NVDA", "AMZN", "GOOG"]}, f)
                 
-                try:
-                    # Generic call - most YFinance tools take 'ticker' or 'symbol'
-                    # We use a stable ticker
-                    # We also provide a default country_code for discovery tools that now require it
-                    res = await session.call_tool(name, arguments={
-                        "ticker": "MSFT", 
-                        "symbol": "MSFT", 
-                        "country_code": "US",
-                        "indicators": ["sma"],
-                        "date": "2024-01-01" # Dummy date for options (server handles errors gracefully)
-                    })
+                success = 0
+                failed = 0
+                
+                for tool in tools:
+                    name = tool.name
+                    print(f"Testing {name}...", end="")
                     
-                    if not res.isError:
-                        print(" \033[92m[PASS]\033[0m")
-                        success += 1
-                    else:
-                        error_text = res.content[0].text if res.content else "Error"
-                        # If the error is still a validation error, we count it as a skip
-                        if "validation error" in error_text.lower():
-                            print(f" \033[93m[SKIP]\033[0m (Validation: Needs specific args)")
+                    try:
+                        # Generic call - most YFinance tools take 'ticker' or 'symbol'
+                        # We use a stable ticker and a safe country code
+                        res = await session.call_tool(name, arguments={
+                            "ticker": "MSFT", 
+                            "symbol": "MSFT", 
+                            "country_code": "TEST_QC_GENERIC",
+                            "indicators": ["sma"],
+                            "date": "" # Let server pick a valid date
+                        })
+                        
+                        if not res.isError:
+                            print(" \033[92m[PASS]\033[0m")
+                            success += 1
                         else:
-                            print(f" \033[91m[FAIL]\033[0m {error_text[:1000]}")
-                            failed += 1
-                except Exception as e:
-                     print(f" [EXCEPTION] {e}")
-                     failed += 1
-            
-            print(f"\nPassed: {success}, Failed: {failed}")
-            assert success > 0
+                            error_text = res.content[0].text if res.content else "Error"
+                            # If the error is still a validation error, we count it as a skip
+                            if "validation error" in error_text.lower():
+                                print(f" \033[93m[SKIP]\033[0m (Validation: Needs specific args)")
+                            else:
+                                print(f" \033[91m[FAIL]\033[0m {error_text[:1000]}")
+                                failed += 1
+                    except Exception as e:
+                         print(f" [EXCEPTION] {e}")
+                         failed += 1
+                
+                print(f"\nPassed: {success}, Failed: {failed}")
+                assert success > 0
+            finally:
+                if os.path.exists(test_data_path):
+                    os.remove(test_data_path)
 
 @pytest.mark.asyncio
 async def test_scenario_market_analysis():

@@ -96,18 +96,19 @@ async def get_quote_metadata(ticker: str) -> str:
     return await market.get_quote_metadata(ticker)
 
 @mcp.tool()
-async def get_bulk_historical_data(tickers: str, period: str = "1mo", interval: str = "1d") -> str:
+async def get_bulk_historical_data(tickers: str = None, ticker: str = None, period: str = "1mo", interval: str = "1d") -> str:
     """FETCHES historical data (Bulk). [ACTION]
     
     [RAG Context]
     Args:
         tickers: Space-separated symbols (e.g. "AAPL MSFT BBCA.JK")
+        ticker: Singular symbol (alias for tickers)
         period: "1d", "5d", "1mo", "6mo", "1y", "ytd", "max"
         interval: "1m" (7d max), "1h", "1d", "1wk", "1mo"
         
     Returns CSV string with Open/High/Low/Close/Volume for all tickers.
     """
-    return await market.get_bulk_historical_data(tickers, period, interval)
+    return await market.get_bulk_historical_data(tickers, ticker, period, interval)
 
 # --- Financials ---
 @mcp.tool()
