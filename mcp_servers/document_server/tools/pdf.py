@@ -1,5 +1,5 @@
 import httpx
-# import fitz # PyMuPDF (deferred)
+import fitz # PyMuPDF
 import json
 from shared.logging.structured import get_logger
 
@@ -11,8 +11,6 @@ async def parse_pdf(url: str, pages: str = "all", extract_tables: bool = False) 
     pages: 'all', '1-5', '1,3,5'
     """
     try:
-        import fitz # PyMuPDF
-        
         # Download PDF
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
@@ -40,6 +38,7 @@ async def parse_pdf(url: str, pages: str = "all", extract_tables: bool = False) 
         }
         
         # Parse page range
+        # ... (rest of the logic)
         if pages == "all":
             page_nums = range(doc.page_count)
         elif "-" in pages:
@@ -63,8 +62,6 @@ async def parse_pdf(url: str, pages: str = "all", extract_tables: bool = False) 
         doc.close()
         return json.dumps(output_data, indent=2)
         
-    except ImportError:
-        return "pymupdf not installed. Run: pip install pymupdf"
     except Exception as e:
         logger.error(f"PDF Parser error: {e}")
         return f"Error: {str(e)}"

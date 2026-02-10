@@ -1,12 +1,10 @@
 from mcp_servers.statsmodels_server.tools.core_ops import parse_dataframe, parse_series, to_serializable, DataInput, VectorInput
-import statsmodels.stats.api as sms
-import statsmodels.stats.descriptivestats as desc
 from statsmodels.stats.weightstats import ztest
 from statsmodels.stats.proportion import proportion_confint
 from statsmodels.stats.stattools import jarque_bera, durbin_watson, omni_normtest
-from statsmodels.stats.diagnostic import het_breuschpagan, het_goldfeldquandt, linear_rainbow
-import pandas as pd
-import numpy as np
+from statsmodels.stats.diagnostic import het_breuschpagan, het_goldfeldquandt
+import statsmodels.stats.descriptivestats as desc
+import statsmodels.api as sm
 from typing import Dict, Any, List, Optional
 
 async def jarque_bera_test(resids: VectorInput) -> Dict[str, Any]:
@@ -26,12 +24,15 @@ async def durbin_watson_test(resids: VectorInput) -> float:
 async def het_breuschpagan_test(resids: VectorInput, exog: DataInput) -> Dict[str, Any]:
     """Breusch-Pagan Lagrange Multiplier test for heteroscedasticity."""
     ex = parse_dataframe(exog)
+    ex = sm.add_constant(ex)
     lm, p_lm, f_val, p_f = het_breuschpagan(parse_series(resids), ex)
     return to_serializable({"lm": lm, "p_lm": p_lm, "f_stat": f_val, "p_f": p_f})
 
 async def het_goldfeldquandt_test(y: VectorInput, x: DataInput) -> Dict[str, Any]:
     """Goldfeld-Quandt homoskedasticity test."""
-    f, p, order = het_goldfeldquandt(parse_series(y), parse_dataframe(x))
+    x_df = parse_dataframe(x)
+    x_df = sm.add_constant(x_df)
+    f, p, order = het_goldfeldquandt(parse_series(y), x_df)
     return to_serializable({"f_stat": f, "pvalue": p, "ordering": order})
 
 async def linear_rainbow_test(res: Any) -> Dict[str, Any]:

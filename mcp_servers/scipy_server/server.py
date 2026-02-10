@@ -33,6 +33,10 @@ logger = structlog.get_logger()
 from shared.logging import setup_logging
 setup_logging()
 
+import warnings
+warnings.filterwarnings("ignore", message="One or more sample arguments is too small")
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+
 mcp = FastMCP("scipy_server", dependencies=["scipy", "numpy", "pandas"])
 
 # ==========================================

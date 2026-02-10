@@ -42,4 +42,4 @@ async def knn_regressor(X: DataInput, y: VectorInput, n_neighbors: int = 5) -> D
     return await _train_regressor(KNeighborsRegressor(n_neighbors=n_neighbors), X, y)
 
 async def mlp_regressor(X: DataInput, y: VectorInput, hidden_layer_sizes: List[int] = [100]) -> Dict[str, Any]:
-    return await _train_regressor(MLPRegressor(hidden_layer_sizes=tuple(hidden_layer_sizes)), X, y)
+    return await _train_regressor(MLPRegressor(hidden_layer_sizes=tuple(hidden_layer_sizes), max_iter=1000), X, y)

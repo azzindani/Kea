@@ -11,9 +11,9 @@ async def test_scipy_full_coverage():
     """
     params = get_server_params("scipy_server", extra_dependencies=["scipy", "numpy", "pandas"])
     
-    # Dummy Data
-    data = [1.0, 2.0, 3.0, 4.0, 5.0]
-    data2 = [1.1, 2.1, 3.1, 4.1, 5.1]
+    # Dummy Data - Increased size to avoid SmallSampleWarning (normaltest needs >= 8)
+    data = [1.0, 2.0, 3.0, 4.0, 5.0, 1.2, 2.2, 3.2, 4.2, 5.2]
+    data2 = [1.1, 2.1, 3.1, 4.1, 5.1, 1.3, 2.3, 3.3, 4.3, 5.3]
     matrix = [[1.0, 2.0], [3.0, 4.0]]
     matrix2 = [[5.0, 6.0], [7.0, 8.0]]
     points = [[0, 0], [0, 1], [1, 0], [1, 1]]

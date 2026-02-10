@@ -1,13 +1,8 @@
-
 import json
 import requests
-import asyncio
-import json
-import requests
-import asyncio
-from shared.logging import get_logger
+import structlog
 
-logger = get_logger(__name__)
+logger = structlog.get_logger(__name__)
 
 # Standard columns that act as "Bulk Data" for any ticker
 DEFAULT_COLUMNS = [
@@ -34,12 +29,20 @@ class TvScreener:
         cols = columns if columns else DEFAULT_COLUMNS
         
         # Default query if none provided (Get everything, sorted by Market Cap)
+        sort_data = query.get("sort", {"field": "market_cap_basic", "order": "desc"}) if query else {"field": "market_cap_basic", "order": "desc"}
+        
+        # Ensure we use 'field' and 'order' for the API
+        if "sortBy" in sort_data:
+            sort_data["field"] = sort_data.pop("sortBy")
+        if "sortOrder" in sort_data:
+            sort_data["order"] = sort_data.pop("sortOrder")
+
         payload = {
             "columns": cols,
             "filter": query.get("filter", []) if query else [],
             "options": {"lang": "en"},
-            "range": [0, range_limit],
-            "sort": query.get("sort", {"sortBy": "market_cap_basic", "sortOrder": "desc"}) if query else {"sortBy": "market_cap_basic", "sortOrder": "desc"},
+            "range": [0, min(range_limit, 1000)], # Cap at 1000 for safety
+            "sort": sort_data,
             "symbols": {"query": {"types": []}, "tickers": []}
         }
 
@@ -87,17 +90,17 @@ async def scan_market(market: str = "america", limit: int = 100000, preset: str 
     
     # Presets Logic
     if preset == "top_gainers":
-        query["sort"] = {"sortBy": "change", "sortOrder": "desc"}
+        query["sort"] = {"field": "change", "order": "desc"}
     elif preset == "top_losers":
-        query["sort"] = {"sortBy": "change", "sortOrder": "asc"}
+        query["sort"] = {"field": "change", "order": "asc"}
     elif preset == "most_active":
-        query["sort"] = {"sortBy": "volume", "sortOrder": "desc"}
+        query["sort"] = {"field": "volume", "order": "desc"}
     elif preset == "oversold":
         query["filter"] = [{"left": "RSI", "operation": "less", "right": 30}]
-        query["sort"] = {"sortBy": "RSI", "sortOrder": "asc"}
+        query["sort"] = {"field": "RSI", "order": "asc"}
     elif preset == "overbought":
         query["filter"] = [{"left": "RSI", "operation": "greater", "right": 70}]
-        query["sort"] = {"sortBy": "RSI", "sortOrder": "desc"}
+        query["sort"] = {"field": "RSI", "order": "desc"}
         
     data = screener.fetch(market=market, query=query, range_limit=limit)
     return json.dumps(data, indent=2)

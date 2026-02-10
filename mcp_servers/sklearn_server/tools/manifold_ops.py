@@ -31,7 +31,13 @@ async def lle(X: DataInput, n_components: int = 2, n_neighbors: int = 5, method:
 async def mds(X: DataInput, n_components: int = 2, metric: bool = True) -> Dict[str, Any]:
     """Multi-dimensional Scaling."""
     X_df = parse_data(X)
-    model = MDS(n_components=n_components, metric=metric, random_state=42, normalized_stress='auto')
+    # Handle version compatibility for 'metric' vs 'metric_mds'
+    kwargs = {"n_components": n_components, "random_state": 42, "normalized_stress": 'auto'}
+    try:
+        model = MDS(metric_mds=metric, **kwargs)
+    except TypeError:
+        model = MDS(metric=metric, **kwargs)
+        
     transformed = model.fit_transform(X_df)
     return to_serializable({
         "transformed": transformed.tolist(),

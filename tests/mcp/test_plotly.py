@@ -1,5 +1,4 @@
 import pytest
-import asyncio
 import os
 from mcp import ClientSession
 from mcp.client.stdio import stdio_client
@@ -10,7 +9,7 @@ async def test_plotly_real_simulation():
     """
     REAL SIMULATION: Verify Plotly Server (Visualization).
     """
-    params = get_server_params("plotly_server", extra_dependencies=["plotly", "kaleido", "pandas", "numpy", "scipy"])
+    params = get_server_params("plotly_server", extra_dependencies=["plotly", "kaleido", "pandas", "numpy", "scipy", "statsmodels"])
     
     data = [
         {"x": 1, "y": 2, "category": "A"},
@@ -19,7 +18,7 @@ async def test_plotly_real_simulation():
         {"x": 4, "y": 8, "category": "B"}
     ]
     
-    print(f"\n--- Starting Real-World Simulation: Plotly Server ---")
+    print("\n--- Starting Real-World Simulation: Plotly Server ---")
     
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
@@ -32,10 +31,12 @@ async def test_plotly_real_simulation():
                 path = res.content[0].text
                 print(f" \033[92m[PASS]\033[0m Saved to: {path}")
                 if os.path.exists(path):
-                    try: os.remove(path)
-                    except: pass
+                    try:
+                        os.remove(path)
+                    except Exception:
+                        pass
             else:
-                 print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
+                print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
             # 2. Bar
             print("2. Plotting Bar...")
@@ -44,18 +45,22 @@ async def test_plotly_real_simulation():
                 path = res.content[0].text
                 print(f" \033[92m[PASS]\033[0m Saved to: {path}")
                 if os.path.exists(path):
-                    try: os.remove(path)
-                    except: pass
+                    try:
+                        os.remove(path)
+                    except Exception:
+                        pass
 
             # 3. Auto Plot
             print("3. Auto Plot...")
             res = await session.call_tool("auto_plot", arguments={"data": data, "x": "x", "y": "y"})
             if not res.isError:
-                 print(f" \033[92m[PASS]\033[0m Auto plot created")
-                 path = res.content[0].text
-                 if os.path.exists(path):
-                    try: os.remove(path)
-                    except: pass
+                print(" \033[92m[PASS]\033[0m Auto plot created")
+                path = res.content[0].text
+                if os.path.exists(path):
+                    try:
+                        os.remove(path)
+                    except Exception:
+                        pass
 
             # 4. Candlestick
             print("4. Plotting Candlestick...")
@@ -65,11 +70,13 @@ async def test_plotly_real_simulation():
             ]
             res = await session.call_tool("plot_candlestick", arguments={"data": ohlc, "x": "x", "open": "open", "high": "high", "low": "low", "close": "close"})
             if not res.isError:
-                 print(f" \033[92m[PASS]\033[0m Candlestick created")
-                 path = res.content[0].text
-                 if os.path.exists(path):
-                    try: os.remove(path)
-                    except: pass
+                print(" \033[92m[PASS]\033[0m Candlestick created")
+                path = res.content[0].text
+                if os.path.exists(path):
+                    try:
+                        os.remove(path)
+                    except Exception:
+                        pass
 
     print("--- Plotly Simulation Complete ---")
 

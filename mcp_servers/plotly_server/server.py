@@ -14,6 +14,7 @@ if root_path not in sys.path:
 #   "pandas",
 #   "plotly",
 #   "scipy",
+#   "statsmodels",
 #   "structlog",
 # ]
 # ///

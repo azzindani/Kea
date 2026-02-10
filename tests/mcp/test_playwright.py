@@ -59,7 +59,13 @@ async def test_playwright_real_simulation():
             print("6. Closing Browser...")
             await session.call_tool("close_browser")
 
+            # Small delay to allow session cleanup tasks to settle
+            await asyncio.sleep(0.5)
+
+    # Another small sleep after stdio_client closes to allow transports to settle
+    await asyncio.sleep(0.2)
     print("--- Playwright Simulation Complete ---")
+
 
 if __name__ == "__main__":
     import sys
