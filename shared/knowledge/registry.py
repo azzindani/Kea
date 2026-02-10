@@ -77,9 +77,24 @@ class PostgresKnowledgeRegistry:
                             content_hash TEXT NOT NULL,
                             metadata JSONB DEFAULT '{{}}'::jsonb,
                             embedding vector(1024),
+                            version TEXT DEFAULT '1.0',
+                            parent_id TEXT,
                             last_seen TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
                         )
                     """)
+
+                    # Idempotent schema migration for existing tables
+                    # Add version column
+                    try:
+                        await conn.execute(f"ALTER TABLE {self.table_name} ADD COLUMN IF NOT EXISTS version TEXT DEFAULT '1.0'")
+                    except Exception:
+                        pass # Column exists or other issue
+
+                    # Add parent_id column
+                    try:
+                        await conn.execute(f"ALTER TABLE {self.table_name} ADD COLUMN IF NOT EXISTS parent_id TEXT")
+                    except Exception:
+                        pass
 
                     try:
                         await conn.execute(f"""
@@ -102,6 +117,11 @@ class PostgresKnowledgeRegistry:
                         await conn.execute(f"""
                             CREATE INDEX IF NOT EXISTS {self.table_name}_tags_idx
                             ON {self.table_name} USING gin (tags)
+                        """)
+                        # Add index for hierarchical queries
+                        await conn.execute(f"""
+                            CREATE INDEX IF NOT EXISTS {self.table_name}_parent_idx
+                            ON {self.table_name} (parent_id)
                         """)
                     except Exception:
                         pass
@@ -198,8 +218,8 @@ class PostgresKnowledgeRegistry:
                             f"""
                             INSERT INTO {self.table_name}
                                 (knowledge_id, name, description, domain, category,
-                                 tags, content, content_hash, metadata, embedding)
-                            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10)
+                                 tags, content, content_hash, metadata, embedding, version, parent_id)
+                            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12)
                             ON CONFLICT (knowledge_id) DO UPDATE SET
                                 name = EXCLUDED.name,
                                 description = EXCLUDED.description,
@@ -210,6 +230,8 @@ class PostgresKnowledgeRegistry:
                                 content_hash = EXCLUDED.content_hash,
                                 metadata = EXCLUDED.metadata,
                                 embedding = EXCLUDED.embedding,
+                                version = EXCLUDED.version,
+                                parent_id = EXCLUDED.parent_id,
                                 last_seen = CURRENT_TIMESTAMP
                             """,
                             item["knowledge_id"],
@@ -222,6 +244,8 @@ class PostgresKnowledgeRegistry:
                             content_hash,
                             metadata,
                             embeddings[i],
+                            item.get("version", "1.0"),
+                            item.get("parent_id"),
                         )
 
                 logger.info(f"Knowledge Registry: Updated {len(updates_needed)} items.")
@@ -312,7 +336,7 @@ class PostgresKnowledgeRegistry:
                 rows = await conn.fetch(
                     f"""
                     SELECT knowledge_id, name, description, domain, category,
-                           tags, content, metadata,
+                           tags, content, metadata, version, parent_id,
                            1 - (embedding <=> $1) as similarity
                     FROM {self.table_name}
                     {where_clause}
@@ -336,6 +360,8 @@ class PostgresKnowledgeRegistry:
                             if isinstance(row["metadata"], str)
                             else row["metadata"]
                         ),
+                        "version": row.get("version", "1.0"),
+                        "parent_id": row.get("parent_id"),
                         "similarity": float(row["similarity"]),
                     }
                     for row in rows
@@ -377,7 +403,7 @@ class PostgresKnowledgeRegistry:
                 row = await conn.fetchrow(
                     f"""
                     SELECT knowledge_id, name, description, domain, category,
-                           tags, content, metadata
+                           tags, content, metadata, version, parent_id
                     FROM {self.table_name}
                     WHERE knowledge_id = $1
                     """,
@@ -398,6 +424,8 @@ class PostgresKnowledgeRegistry:
                         if isinstance(row["metadata"], str)
                         else row["metadata"]
                     ),
+                    "version": row.get("version", "1.0"),
+                    "parent_id": row.get("parent_id"),
                 }
         except Exception as e:
             logger.error(f"Knowledge get_by_id failed: {e}")

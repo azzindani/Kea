@@ -39,7 +39,8 @@ async def get_price_chart(ticker: str, period: str = "1y", **kwargs) -> Image:
         # Save to temp
         img_id = uuid.uuid4().hex[:8]
         filename = f"chart_{ticker}_{img_id}.png"
-        path = f"/tmp/{filename}"
+        temp_dir = os.environ.get("TEMP", os.environ.get("TMP", "/tmp"))
+        path = os.path.join(temp_dir, filename)
         plt.savefig(path)
         plt.close()
         

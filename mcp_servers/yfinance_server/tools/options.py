@@ -4,8 +4,14 @@ from shared.logging import get_logger
 
 logger = get_logger(__name__)
 
-async def get_options_chain(ticker: str, date: str = "", **kwargs) -> str:
-    """Get Options Chain for a specific date."""
+async def get_options_chain(ticker: str, date: str = "", limit: int = 10, **kwargs) -> str:
+    """
+    Get Options Chain for a specific date.
+    Args:
+        ticker (str): "AAPL"
+        date (str): "2024-06-21" (optional, defaults to first available)
+        limit (int): Number of rows to return for calls/puts (default: 10)
+    """
     # Robustness for generic test calls
     ticker = ticker or kwargs.get("symbol", "")
     if not ticker:
@@ -24,8 +30,8 @@ async def get_options_chain(ticker: str, date: str = "", **kwargs) -> str:
         opt = stock.option_chain(date)
         
         # Return summary to avoid exploding context
-        calls = opt.calls[['contractSymbol', 'strike', 'lastPrice', 'volume', 'impliedVolatility']].head(10).to_markdown()
-        puts = opt.puts[['contractSymbol', 'strike', 'lastPrice', 'volume', 'impliedVolatility']].head(10).to_markdown()
+        calls = opt.calls[['contractSymbol', 'strike', 'lastPrice', 'volume', 'impliedVolatility']].head(limit).to_markdown()
+        puts = opt.puts[['contractSymbol', 'strike', 'lastPrice', 'volume', 'impliedVolatility']].head(limit).to_markdown()
         
         return f"""
 ### Options Chain ({ticker} @ {date})

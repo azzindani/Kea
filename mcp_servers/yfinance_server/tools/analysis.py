@@ -62,12 +62,12 @@ async def get_splits_history(ticker: str, **kwargs) -> str:
         logger.error(f"Error in splits for {ticker}: {e}")
         return f"Error: {str(e)}"
 
-async def calculate_indicators(ticker: str = "", indicators: List[str] = ["sma", "rsi"], period: str = "1y", interval: str = "1d", **kwargs) -> str:
+async def calculate_indicators(ticker: str, indicators: List[str] = ["sma", "rsi"], period: str = "1y", interval: str = "1d", **kwargs) -> str:
     """
     Calculate technical indicators for a given ticker.
     Args:
         ticker (str): "AAPL", "BBCA.JK"
-        indicators (list[str]): ["sma", "ema", "rsi", "macd", "bbands"]
+        indicators (list[str]): ["sma", "ema", "rsi", "macd", "bbands"] (default: ["sma", "rsi"])
         period (str): "1y" (default)
         interval (str): "1d" (default)
     """
