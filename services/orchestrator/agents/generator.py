@@ -6,10 +6,9 @@ The Optimist - generates comprehensive answers from facts.
 
 from __future__ import annotations
 
-from typing import Any
-from shared.logging import get_logger
-from shared.llm import OpenRouterProvider, LLMConfig
+from shared.llm import LLMConfig, OpenRouterProvider
 from shared.llm.provider import LLMMessage, LLMRole
+from shared.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -17,11 +16,11 @@ logger = get_logger(__name__)
 class GeneratorAgent:
     """
     The Generator (Optimist) Agent.
-    
+
     Role: Generate comprehensive, well-structured answers from collected facts.
     Personality: Optimistic, thorough, constructive.
     """
-    
+
     def __init__(self):
         self.name = "Generator"
         self.role = "The Optimist"
@@ -42,19 +41,24 @@ CRITICAL ANTI-HALLUCINATION RULES:
 6. When in doubt, say "Information not available" rather than guessing
 
 MANDATORY CITATION FORMAT:
-- For financial data: "According to Yahoo Finance [https://finance.yahoo.com/quote/TICKER], ..."
-- For web sources: "Source: [URL]"
-- For internal computations: "Based on internal calculation from [tool_name]"
-- NEVER make a numerical claim without a citation
+Every fact MUST be cited using the [TOOL CALL] record shown in Available Facts.
+Format: "[Source: tool=TOOL_NAME(arg=val, ...) | server=SERVER | Xms | URL_if_present]"
+- NEVER invent a URL — only use the url= field if it appears in the [TOOL CALL] record
+- No URL present: "Source: tool=yfinance_get_quote(ticker='AAPL') | server=mcp_host | 142ms"
+- URL present: "Source: tool=web_search(query='...') | 88ms | https://..."
+- NEVER make a numerical claim without citing its [TOOL CALL]
 
-EXAMPLE (CORRECT):
-"BCA Bank's 2025 free cash flow was 75.06T IDR [Source: https://finance.yahoo.com/quote/BBCA.JK]"
+EXAMPLE (CORRECT — no URL available):
+"BCA Bank's 2025 FCF was 75.06T IDR [Source: tool=yfinance_get_financials(ticker='BBCA.JK') | server=mcp_host | 210ms]"
 
-EXAMPLE (INCORRECT - NO CITATION):
-"BCA Bank's 2025 free cash flow was 75.06T IDR" ❌ MISSING SOURCE URL
+EXAMPLE (CORRECT — URL in output):
+"Article found at [Source: tool=web_search(query='BCA annual report') | 88ms | https://www.bca.co.id/...]"
 
-Every fact, number, or claim MUST be followed by [Source: URL] immediately."""
-    
+EXAMPLE (INCORRECT — fabricated URL):
+"BCA Bank's FCF was 75.06T IDR [Source: https://finance.yahoo.com/quote/BBCA.JK]" ❌ URL NOT FROM TOOL CALL
+
+Every fact, number, or claim MUST be followed by its [TOOL CALL] citation immediately."""
+
     async def _get_knowledge_context(self, query: str) -> str:
         """Retrieve domain-specific knowledge for the query."""
         try:
@@ -71,7 +75,9 @@ Every fact, number, or claim MUST be followed by [Source: URL] immediately."""
         except Exception:
             return ""
 
-    async def generate(self, query: str, facts: list, sources: list, revision_feedback: str = None) -> str:
+    async def generate(
+        self, query: str, facts: list, sources: list, revision_feedback: str = None
+    ) -> str:
         """
         Generate a comprehensive answer from facts.
 
@@ -87,11 +93,13 @@ Every fact, number, or claim MUST be followed by [Source: URL] immediately."""
 
         try:
             import os
+
             if not os.getenv("OPENROUTER_API_KEY"):
                 return self._fallback_generate(query, facts, sources)
 
             provider = OpenRouterProvider()
             from shared.config import get_settings
+
             config = LLMConfig(
                 model=get_settings().models.generator_model,
                 temperature=0.6,
@@ -104,26 +112,51 @@ Every fact, number, or claim MUST be followed by [Source: URL] immediately."""
                 logger.info(
                     f"Generator: Injecting {len(knowledge_context)} chars of domain knowledge"
                 )
-            
-            # Format facts with source URLs for citation
+
+            # Format facts with full tool call schema as citation
             facts_text = ""
             for idx, f in enumerate(facts):
                 if isinstance(f, dict):
-                    text = f.get('text', str(f))
-                    source_url = f.get('source_url', 'unknown')
-                    tool = f.get('source', 'unknown')
-                    facts_text += f"[Fact #{idx+1}] {text}\n  Source: {source_url} (via {tool})\n\n"
+                    text = f.get("text", str(f))
+                    citation = f.get("tool_citation")
+                    if citation and isinstance(citation, dict):
+                        t_name = citation.get("tool_name", "unknown")
+                        server = citation.get("server_name", "unknown")
+                        dur = citation.get("duration_ms", 0.0)
+                        ts = citation.get("invoked_at", "")
+                        url = citation.get("source_url", "")
+                        args = citation.get("arguments", {})
+                        args_str = (
+                            ", ".join(f"{k}={str(v)[:40]!r}" for k, v in list(args.items())[:5])
+                            if args
+                            else "no args"
+                        )
+                        url_part = f" | url={url}" if url else ""
+                        facts_text += (
+                            f"[Fact #{idx + 1}] {text}\n"
+                            f"  [TOOL CALL] tool={t_name}({args_str}) | server={server} | "
+                            f"{dur:.0f}ms | {ts}{url_part}\n\n"
+                        )
+                    else:
+                        source_url = f.get("source_url", "unknown")
+                        tool = f.get("source", "unknown")
+                        facts_text += (
+                            f"[Fact #{idx + 1}] {text}\n  Source: {source_url} (via {tool})\n\n"
+                        )
                 else:
-                    facts_text += f"[Fact #{idx+1}] {str(f)}\n  Source: unknown\n\n"
+                    facts_text += f"[Fact #{idx + 1}] {str(f)}\n  Source: unknown\n\n"
 
             if not facts_text:
                 facts_text = "No facts available"
 
             # Format sources list
-            sources_text = "\n".join([
-                f"- {s.get('url', 'unknown')} ({s.get('tool', 'unknown')})"
-                for s in sources
-            ]) if sources else "No sources available"
+            sources_text = (
+                "\n".join(
+                    [f"- {s.get('url', 'unknown')} ({s.get('tool', 'unknown')})" for s in sources]
+                )
+                if sources
+                else "No sources available"
+            )
 
             # Add revision feedback if this is a revision
             revision_context = ""
@@ -162,25 +195,25 @@ Generate a comprehensive answer that:
 4. Identifies any gaps in information
 5. Provides a confidence assessment
 
-CRITICAL: Every fact, statistic, or number MUST be followed by [Source: URL]."""
-                )
+CRITICAL: Every fact, statistic, or number MUST be followed by [Source: URL].""",
+                ),
             ]
-            
+
             response = await provider.complete(messages, config)
-            
+
             logger.info(f"Generator: Answer generated ({len(response.content)} chars)")
             return response.content
-            
+
         except Exception as e:
             logger.error(f"Generator error: {e}")
             return self._fallback_generate(query, facts, sources)
-    
+
     def _fallback_generate(self, query: str, facts: list, sources: list) -> str:
         """Fallback generation without LLM."""
         return f"""## Response to: {query}
 
 Based on {len(facts)} collected facts from {len(sources)} sources:
 
-{chr(10).join([f'- {str(f)[:100]}' for f in facts[:5]])}
+{chr(10).join([f"- {str(f)[:100]}" for f in facts[:5]])}
 
 Note: Full generation requires LLM integration."""
