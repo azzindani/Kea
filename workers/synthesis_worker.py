@@ -137,8 +137,23 @@ Be concise but comprehensive. Include specific data points."""
             return f"# Report for: {query}\n\nFacts collected: {len(facts)}"
 
     async def _save_result(self, job_id: str, report: str) -> None:
-        """Save synthesis result."""
-        logger.info(f"Report saved for {job_id}")
+        """Persist synthesis result to research_jobs and emit audit log."""
+        try:
+            from shared.database.connection import get_database_pool
+
+            pool = await get_database_pool()
+            await pool.execute(
+                """
+                UPDATE research_jobs
+                SET status = 'completed', result = $1, completed_at = NOW()
+                WHERE job_id = $2
+                """,
+                report,
+                job_id,
+            )
+            logger.info(f"Report persisted for job {job_id} ({len(report)} chars)")
+        except Exception as e:
+            logger.error(f"Failed to persist report for {job_id}: {e}")
 
 
 async def main():

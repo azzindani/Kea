@@ -7,13 +7,11 @@ Endpoints for LLM provider configuration and model management.
 from __future__ import annotations
 
 import os
-from typing import Any
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from shared.logging import get_logger
-
 
 logger = get_logger(__name__)
 
@@ -24,8 +22,10 @@ router = APIRouter()
 # Models
 # ============================================================================
 
+
 class LLMProvider(BaseModel):
     """LLM provider configuration."""
+
     name: str
     enabled: bool = True
     api_key_set: bool = False
@@ -34,6 +34,7 @@ class LLMProvider(BaseModel):
 
 class LLMModel(BaseModel):
     """LLM model information."""
+
     id: str
     name: str
     provider: str
@@ -46,6 +47,7 @@ class LLMModel(BaseModel):
 
 class LLMUsage(BaseModel):
     """LLM usage statistics."""
+
     total_requests: int
     total_tokens_input: int
     total_tokens_output: int
@@ -55,6 +57,7 @@ class LLMUsage(BaseModel):
 
 class GenerateRequest(BaseModel):
     """Direct generation request."""
+
     model: str
     messages: list[dict]
     max_tokens: int = 1000
@@ -89,21 +92,24 @@ _usage = {
 # Routes
 # ============================================================================
 
+
 @router.get("/providers")
 async def list_providers():
     """List available LLM providers."""
     providers = []
-    
+
     for name, config in _providers.items():
         api_key_set = bool(os.getenv(f"{name.upper()}_API_KEY"))
-        
-        providers.append(LLMProvider(
-            name=name,
-            enabled=config["enabled"],
-            api_key_set=api_key_set,
-            models=config["models"],
-        ))
-    
+
+        providers.append(
+            LLMProvider(
+                name=name,
+                enabled=config["enabled"],
+                api_key_set=api_key_set,
+                models=config["models"],
+            )
+        )
+
     return {"providers": providers}
 
 
@@ -111,9 +117,10 @@ async def list_providers():
 async def list_models(provider: str | None = None):
     """List available models."""
     from shared.config import get_settings
+
     settings = get_settings()
     default_model = settings.models.default_model
-    
+
     models = [
         LLMModel(
             id=default_model,
@@ -156,10 +163,10 @@ async def list_models(provider: str | None = None):
             pricing_output=10.0,
         ),
     ]
-    
+
     if provider:
         models = [m for m in models if m.provider == provider]
-    
+
     return {"models": models}
 
 
@@ -169,44 +176,90 @@ async def get_usage():
     return LLMUsage(**_usage)
 
 
-@router.post("/generate")
-async def generate(request: GenerateRequest):
-    """Direct LLM generation (for testing)."""
+def _count_tokens_approx(messages: list[dict]) -> int:
+    """Approximate token count using character heuristic (4 chars ≈ 1 token)."""
+    total_chars = sum(len(str(m.get("content", ""))) for m in messages)
+    return max(1, total_chars // 4)
+
+
+async def _call_openrouter(
+    api_key: str,
+    model: str,
+    messages: list[dict],
+    max_tokens: int,
+    temperature: float,
+) -> dict:
+    """Call OpenRouter with exponential backoff (3 retries: 1s, 2s, 4s)."""
+    import asyncio
+
     import httpx
-    
+
+    last_exc: Exception | None = None
+    for attempt in range(3):
+        try:
+            async with httpx.AsyncClient(timeout=60) as client:
+                resp = await client.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    json={
+                        "model": model,
+                        "messages": messages,
+                        "max_tokens": max_tokens,
+                        "temperature": temperature,
+                    },
+                )
+                if resp.status_code in (429, 500, 502, 503, 504) and attempt < 2:
+                    await asyncio.sleep(2**attempt)
+                    last_exc = httpx.HTTPStatusError(
+                        f"HTTP {resp.status_code}", request=resp.request, response=resp
+                    )
+                    continue
+                resp.raise_for_status()
+                return resp.json()
+        except httpx.HTTPError as exc:
+            last_exc = exc
+            if attempt < 2:
+                await asyncio.sleep(2**attempt)
+
+    raise last_exc or RuntimeError("OpenRouter call failed after retries")
+
+
+@router.post("/generate")
+async def generate(request: GenerateRequest) -> dict:
+    """Direct LLM generation with retry + fallback model."""
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
         raise HTTPException(status_code=500, detail="OPENROUTER_API_KEY not set")
-    
-    try:
-        async with httpx.AsyncClient(timeout=60) as client:
-            response = await client.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}"},
-                json={
-                    "model": request.model,
-                    "messages": request.messages,
-                    "max_tokens": request.max_tokens,
-                    "temperature": request.temperature,
-                }
+
+    fallback_model = os.getenv("FALLBACK_MODEL", "deepseek/deepseek-r1-0528:free")
+    input_tokens = _count_tokens_approx(request.messages)
+
+    for model in [request.model, fallback_model]:
+        try:
+            data = await _call_openrouter(
+                api_key, model, request.messages, request.max_tokens, request.temperature
             )
-            response.raise_for_status()
-            data = response.json()
-        
-        # Update usage
-        usage = data.get("usage", {})
-        _usage["total_requests"] += 1
-        _usage["total_tokens_input"] += usage.get("prompt_tokens", 0)
-        _usage["total_tokens_output"] += usage.get("completion_tokens", 0)
-        
-        return {
-            "content": data["choices"][0]["message"]["content"],
-            "model": data.get("model", request.model),
-            "usage": usage,
-        }
-        
-    except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=f"LLM API error: {str(e)}")
+            usage = data.get("usage", {})
+            prompt_tokens = usage.get("prompt_tokens", input_tokens)
+            completion_tokens = usage.get("completion_tokens", 0)
+            _usage["total_requests"] += 1
+            _usage["total_tokens_input"] += prompt_tokens
+            _usage["total_tokens_output"] += completion_tokens
+            return {
+                "content": data["choices"][0]["message"]["content"],
+                "model": data.get("model", model),
+                "usage": {
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "total_tokens": prompt_tokens + completion_tokens,
+                },
+            }
+        except Exception as exc:
+            if model == fallback_model:
+                raise HTTPException(
+                    status_code=502, detail=f"LLM API error (all providers failed): {exc}"
+                )
+            logger.warning(f"Primary model {model} failed, trying fallback {fallback_model}: {exc}")
 
 
 @router.post("/providers/{provider}/enable")
@@ -214,7 +267,7 @@ async def enable_provider(provider: str):
     """Enable an LLM provider."""
     if provider not in _providers:
         raise HTTPException(status_code=404, detail="Provider not found")
-    
+
     _providers[provider]["enabled"] = True
     return {"message": f"Provider {provider} enabled"}
 
@@ -224,7 +277,7 @@ async def disable_provider(provider: str):
     """Disable an LLM provider."""
     if provider not in _providers:
         raise HTTPException(status_code=404, detail="Provider not found")
-    
+
     _providers[provider]["enabled"] = False
     return {"message": f"Provider {provider} disabled"}
 
@@ -233,9 +286,9 @@ async def disable_provider(provider: str):
 async def get_llm_config():
     """Get current LLM configuration."""
     from shared.config import get_settings
-    
+
     settings = get_settings()
-    
+
     return {
         "default_provider": settings.llm.default_provider,
         "default_model": settings.llm.default_model,
