@@ -16,16 +16,23 @@ Key Features:
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Awaitable
+from typing import Any
 
-from shared.logging import get_logger
-from services.orchestrator.core.assembler import ArtifactStore, resolve_inputs, resolve_and_wire_inputs
+from services.orchestrator.core.assembler import (
+    ArtifactStore,
+    resolve_and_wire_inputs,
+)
 from services.orchestrator.core.workflow_nodes import (
-    WorkflowNode, NodeType, NodeStatus, NodeResult,
+    NodeResult,
+    NodeStatus,
+    NodeType,
+    WorkflowNode,
     parse_blueprint_node,
 )
+from shared.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -33,6 +40,7 @@ logger = get_logger(__name__)
 @dataclass
 class DAGExecutionResult:
     """Result from a full DAG execution."""
+
     total_nodes: int = 0
     completed: int = 0
     failed: int = 0
@@ -56,7 +64,7 @@ NodeExecutor = Callable[[WorkflowNode, dict[str, Any]], Awaitable[NodeResult]]
 # Type alias for the microplanner callback
 MicroplannerCallback = Callable[
     [WorkflowNode, NodeResult, list[WorkflowNode], ArtifactStore],
-    Awaitable[list[WorkflowNode] | None]
+    Awaitable[list[WorkflowNode] | None],
 ]
 
 
@@ -121,8 +129,7 @@ class DAGExecutor:
         self._semaphore = asyncio.Semaphore(self.max_parallel)
 
         logger.info(
-            f"🚀 DAG Executor starting: {len(nodes)} nodes, "
-            f"max_parallel={self.max_parallel}"
+            f"🚀 DAG Executor starting: {len(nodes)} nodes, max_parallel={self.max_parallel}"
         )
 
         # Main execution loop
@@ -175,16 +182,10 @@ class DAGExecutor:
                 continue
 
             # Check all dependencies are completed
-            deps_met = all(
-                dep_id in self._completed
-                for dep_id in node.depends_on
-            )
+            deps_met = all(dep_id in self._completed for dep_id in node.depends_on)
 
             # Check none of the dependencies failed (unless we want partial execution)
-            deps_failed = any(
-                dep_id in self._failed
-                for dep_id in node.depends_on
-            )
+            deps_failed = any(dep_id in self._failed for dep_id in node.depends_on)
 
             if deps_met and not deps_failed:
                 ready.append(node)
@@ -245,12 +246,9 @@ class DAGExecutor:
                     # Microplanner checkpoint
                     if self.microplanner:
                         remaining = [
-                            n for n in self._nodes.values()
-                            if n.status == NodeStatus.PENDING
+                            n for n in self._nodes.values() if n.status == NodeStatus.PENDING
                         ]
-                        new_nodes = await self.microplanner(
-                            node, result, remaining, self.store
-                        )
+                        new_nodes = await self.microplanner(node, result, remaining, self.store)
                         if new_nodes:
                             self._inject_nodes(new_nodes)
 
@@ -280,10 +278,7 @@ class DAGExecutor:
         import json
 
         # Create deterministic key from tool name + args
-        key_data = {
-            'tool': node.tool,
-            'args': node.args
-        }
+        key_data = {"tool": node.tool, "args": node.args}
         key_str = json.dumps(key_data, sort_keys=True)
         key_hash = hashlib.md5(key_str.encode()).hexdigest()[:8]
 
@@ -305,7 +300,7 @@ class DAGExecutor:
                     status=NodeStatus.COMPLETED,
                     output=cached_value,
                     artifacts={node.output_artifact: cached_value},
-                    metadata={'cached': True, 'cache_key': cache_key}
+                    metadata={"cached": True, "cache_key": cache_key},
                 )
 
         return None
@@ -319,7 +314,7 @@ class DAGExecutor:
             input_mapping=node.input_mapping,
             current_args=node.args,
             tool_name=node.tool,
-            store=self.store
+            store=self.store,
         )
         node.args.update(resolved)
 
@@ -342,6 +337,7 @@ class DAGExecutor:
         loop_data = None
         if node.loop_over:
             from services.orchestrator.core.assembler import _resolve_jsonpath
+
             loop_data = _resolve_jsonpath(node.loop_over, self.store)
 
         if loop_data is None:
@@ -377,9 +373,7 @@ class DAGExecutor:
                 # Inject the loop variable into args
                 child_args = child_step.get("args", {})
                 # Replace {{item}} placeholders with actual value
-                child_args = _substitute_loop_var(
-                    child_args, node.loop_variable, item
-                )
+                child_args = _substitute_loop_var(child_args, node.loop_variable, item)
                 child_step["args"] = child_args
 
                 # Also substitute in input_mapping
@@ -402,7 +396,7 @@ class DAGExecutor:
                     input_mapping=child.input_mapping,
                     current_args=child.args,
                     tool_name=child.tool,
-                    store=self.store
+                    store=self.store,
                 )
                 child.args.update(resolved)
                 return await self.node_executor(child, child.args)
@@ -422,19 +416,17 @@ class DAGExecutor:
                     for key, val in res.artifacts.items():
                         self.store.store(children[i].id, key, val)
             elif isinstance(res, Exception):
-                child_results.append(NodeResult(
-                    node_id=children[i].id,
-                    status=NodeStatus.FAILED,
-                    error=str(res),
-                ))
+                child_results.append(
+                    NodeResult(
+                        node_id=children[i].id,
+                        status=NodeStatus.FAILED,
+                        error=str(res),
+                    )
+                )
 
-        completed_count = sum(
-            1 for r in child_results if r.status == NodeStatus.COMPLETED
-        )
+        completed_count = sum(1 for r in child_results if r.status == NodeStatus.COMPLETED)
 
-        logger.info(
-            f"🔄 Loop {node.id} complete: {completed_count}/{len(children)} succeeded"
-        )
+        logger.info(f"🔄 Loop {node.id} complete: {completed_count}/{len(children)} succeeded")
 
         return NodeResult(
             node_id=node.id,
@@ -533,17 +525,41 @@ class DAGExecutor:
 
     def _inject_nodes(self, new_nodes: list[WorkflowNode]) -> None:
         """Inject new nodes into the live DAG during execution."""
+        injected_ids = []
         for node in new_nodes:
             if node.id not in self._nodes:
                 self._nodes[node.id] = node
                 self._result.total_nodes += 1
                 self._result.replans_triggered += 1
+                injected_ids.append(node.id)
                 logger.info(f"➕ Injected node: {node.id} ({node.node_type.value})")
+
+        # Publish plan-updated event to message bus (best-effort)
+        if injected_ids:
+            try:
+                import asyncio
+
+                from shared.messaging import Message, MessageType, get_message_bus
+
+                bus = get_message_bus()
+                asyncio.ensure_future(
+                    bus.send(
+                        Message.create(
+                            from_agent="microplanner",
+                            to_agent="*",
+                            message_type=MessageType.INFO,
+                            content={"event": "plan_updated", "injected_nodes": injected_ids},
+                        )
+                    )
+                )
+            except Exception:
+                pass
 
 
 # ============================================================================
 # Helper Functions
 # ============================================================================
+
 
 def _substitute_loop_var(obj: Any, var_name: str, value: Any) -> Any:
     """Recursively substitute {{var_name}} in strings within a dict/list."""

@@ -8,7 +8,7 @@ This is the PRODUCTION version that uses real LLM and MCP implementations.
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Literal, TypedDict
 
 from langgraph.graph import END, StateGraph
@@ -41,7 +41,7 @@ logger = get_logger(__name__)
 # ============================================================================
 
 
-class NodeName(str, Enum):
+class NodeName(StrEnum):
     """LangGraph node names."""
 
     ROUTER = "router"
@@ -266,7 +266,7 @@ async def _llm_correct_tool_parameters(
                     if schema:
                         tool_schema_info = f"\n**Tool Schema:** {json.dumps(schema, indent=2)}"
                     break
-        except:
+        except Exception:
             pass
 
         messages = [
@@ -484,7 +484,6 @@ async def researcher_node(state: GraphState) -> GraphState:
             from services.orchestrator.core.workflow_nodes import (
                 NodeResult,
                 NodeStatus,
-                NodeType,
                 WorkflowNode,
                 parse_blueprint,
             )
@@ -1106,6 +1105,43 @@ async def researcher_node(state: GraphState) -> GraphState:
                 calls.append(ToolCall(tool_name=t_name, arguments=final_inputs))
                 task_map[idx] = task
 
+            # COMPLIANCE GATE — filter out calls that fail before execution
+            from services.orchestrator.core.guardrails import check_tool_call as _check_tool
+
+            _compliant_calls: list[ToolCall] = []
+            _compliant_task_map: dict[int, dict] = {}
+            for _ci, (_call, _task) in enumerate(
+                zip(calls, [task_map[i] for i in range(len(calls))])
+            ):
+                _violations = await _check_tool(_call.tool_name, _call.arguments)
+                if _violations:
+                    _t_id = _task.get("task_id", "unknown")
+                    logger.warning(
+                        f"⚠️ GUARDRAIL: Blocked {_call.tool_name} for task {_t_id} "
+                        f"— {_violations[0]['message']}"
+                    )
+                    error_feedback.append(
+                        {
+                            "tool": _call.tool_name,
+                            "task_id": _t_id,
+                            "error": f"Compliance violation: {_violations[0]['message']}",
+                            "args": _call.arguments,
+                            "description": _task.get("description", ""),
+                        }
+                    )
+                    completed.add(_t_id)
+                else:
+                    _new_idx = len(_compliant_calls)
+                    _compliant_calls.append(_call)
+                    _compliant_task_map[_new_idx] = _task
+
+            calls = _compliant_calls
+            task_map = _compliant_task_map
+
+            if not calls:
+                logger.info("All batch calls blocked by compliance gate — skipping execution")
+                continue
+
             # EXECUTE BATCH
             results = await executor.execute_batch(calls, unified_tool_handler)
 
@@ -1354,7 +1390,7 @@ async def researcher_node(state: GraphState) -> GraphState:
                                 # Prevent cycling back to same OOM device immediately if count > 1
                                 if new_idx != curr_idx:
                                     new_device = f"cuda:{new_idx}"
-                            except:
+                            except Exception:
                                 pass
 
                     logger.warning(
@@ -1379,7 +1415,7 @@ async def researcher_node(state: GraphState) -> GraphState:
                     gc.collect()
                     if torch.cuda.is_available():
                         torch.cuda.empty_cache()
-                except:
+                except Exception:
                     pass
 
             # Reorder facts by reranker score
@@ -1845,7 +1881,7 @@ def get_tickers():
                 df_gh = pd.read_csv(url)
                 tickers = [f"{{t}}.JK" for t in df_gh.iloc[:, 0].tolist()[:50]]
                 print(f"   ✅ Discovered {{len(tickers)}} tickers from GitHub Fallback")
-            except:
+            except Exception:
                 pass
 
     except Exception as e:
