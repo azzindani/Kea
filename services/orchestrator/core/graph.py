@@ -1601,7 +1601,7 @@ async def judge_node(state: GraphState) -> GraphState:
         **state,
         "judge_verdict": verdict,
         "judge_confidence": confidence,  # Judge's assessment (for logging/debug)
-        "confidence": final_confidence,  # Actual confidence (GRPO or fallback)
+        "confidence": final_confidence,  # Actual confidence (Reward score or fallback)
         "revision_count": revision_count,
     }
 

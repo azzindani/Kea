@@ -101,7 +101,7 @@ async def calculate_agreement_score(facts: list[dict]) -> float:
         return 0.5
 
 
-async def calculate_grpo_reward(
+async def calculate_reward_score(
     facts: list[dict],
     tool_invocations: list[dict],
     query: str,
@@ -109,7 +109,7 @@ async def calculate_grpo_reward(
     completed_calls: set | None = None,
 ) -> dict[str, float]:
     """
-    GRPO-Style Reward Scoring for Kea (Generative Reward Policy Optimization).
+    Multi-Signal Reward Scoring for Kea.
     
     Combines multiple signals into a comprehensive reward score that guides
     the research loop more intelligently than simple agreement scoring.
@@ -164,7 +164,7 @@ async def calculate_grpo_reward(
                 
                 scores["relevance"] = float(np.mean(similarities))
         except Exception as e:
-            logger.debug(f"GRPO relevance calculation failed: {e}")
+            logger.debug(f"Reward relevance calculation failed: {e}")
             scores["relevance"] = 0.5 if facts else 0.0
     
     # ============================================================
@@ -223,7 +223,7 @@ async def calculate_grpo_reward(
     # ============================================================
     # FINAL WEIGHTED REWARD
     # ============================================================
-    # Weights inspired by GRPO: prioritize relevance and success
+    # Weights inspired by reward policy optimization: prioritize relevance and success
     final_reward = (
         0.30 * scores["relevance"] +
         0.15 * scores["novelty"] +
@@ -236,7 +236,7 @@ async def calculate_grpo_reward(
     # Clamp to [0, 1]
     scores["final_reward"] = max(0.0, min(1.0, final_reward))
     
-    logger.info(f"📊 GRPO Score: {scores['final_reward']:.3f} "
+    logger.info(f"📊 Reward Score: {scores['final_reward']:.3f} "
                 f"(rel={scores['relevance']:.2f}, nov={scores['novelty']:.2f}, "
                 f"succ={scores['success_rate']:.2f}, cit={scores['citation_coverage']:.2f}, "
                 f"eff={scores['efficiency']:.2f}, pen=-{scores['penalty']:.2f})")
@@ -515,13 +515,13 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
         logger.info(f"Keeper: Max iterations ({max_iterations}) reached")
         logger.info(f"   Proceeding to final report with achieved confidence score")
         
-        # Calculate GRPO score even when exiting due to max iterations
+        # Calculate reward score even when exiting due to max iterations
         # This ensures the final report shows the actual achieved confidence
         query = state.get("query", "")
         error_feedback = state.get("error_feedback", [])
         completed_calls = state.get("completed_calls", set())
         
-        grpo_scores = await calculate_grpo_reward(
+        reward_scores = await calculate_reward_score(
             facts=facts,
             tool_invocations=tool_invocations,
             query=query,
@@ -529,12 +529,12 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
             completed_calls=completed_calls,
         )
         
-        confidence_score = grpo_scores["final_reward"]
+        confidence_score = reward_scores["final_reward"]
         state["confidence"] = confidence_score
-        state["grpo_scores"] = grpo_scores
+        state["reward_scores"] = reward_scores
         state["stop_reason"] = f"max_iterations_with_{confidence_score:.0%}_confidence"
         
-        logger.info(f"   Final GRPO confidence: {confidence_score:.0%}")
+        logger.info(f"   Final Reward confidence: {confidence_score:.0%}")
         state["should_continue"] = False
         return state
     
@@ -557,7 +557,7 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
         error_feedback = state.get("error_feedback", [])
         completed_calls = state.get("completed_calls", set())
         
-        grpo_scores = await calculate_grpo_reward(
+        reward_scores = await calculate_reward_score(
             facts=facts,
             tool_invocations=tool_invocations,
             query=query,
@@ -565,30 +565,30 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
             completed_calls=completed_calls,
         )
         
-        confidence_score = grpo_scores["final_reward"]
+        confidence_score = reward_scores["final_reward"]
         state["confidence"] = confidence_score
-        state["grpo_scores"] = grpo_scores
+        state["reward_scores"] = reward_scores
         state["should_continue"] = False
         state["stop_reason"] = f"success_complete_{confidence_score:.0%}"
         
-        logger.info(f"   GRPO Confidence: {confidence_score:.0%}")
+        logger.info(f"   Reward Scoring Confidence: {confidence_score:.0%}")
         return state
     
     # ============================================================
-    # GRPO-STYLE CONFIDENCE CHECK (Multi-signal reward scoring)
+    # REWARD SCORING CONFIDENCE CHECK (Multi-signal reward scoring)
     # ============================================================
     min_facts = 3
     if len(facts) >= min_facts:
         # Calculate adaptive threshold for this iteration
         current_threshold = get_adaptive_threshold(iteration)
         
-        # Get additional state for GRPO scoring
+        # Get additional state for Reward scoring
         query = state.get("query", "")
         error_feedback = state.get("error_feedback", [])
         completed_calls = state.get("completed_calls", set())
         
-        # Calculate GRPO reward score (replaces simple agreement scoring)
-        grpo_scores = await calculate_grpo_reward(
+        # Calculate reward score (replaces simple agreement scoring)
+        reward_scores = await calculate_reward_score(
             facts=facts,
             tool_invocations=tool_invocations,
             query=query,
@@ -597,10 +597,10 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
         )
         
         # Use final_reward as the confidence metric
-        confidence_score = grpo_scores["final_reward"]
+        confidence_score = reward_scores["final_reward"]
         
-        logger.info(f"Keeper: GRPO confidence {confidence_score:.3f}, threshold {current_threshold:.2f}")
-        state["grpo_scores"] = grpo_scores  # Store detailed breakdown
+        logger.info(f"Keeper: Reward confidence {confidence_score:.3f}, threshold {current_threshold:.2f}")
+        state["reward_scores"] = reward_scores  # Store detailed breakdown
         state["agreement_score"] = confidence_score  # Backward compatibility
         state["confidence_threshold"] = current_threshold
         
@@ -609,7 +609,7 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
         
         # If confidence exceeds threshold, we have confident answer
         if confidence_score >= current_threshold:
-            logger.info(f"Keeper: GRPO Confidence {confidence_score:.3f} >= {current_threshold:.2f} - PASSED")
+            logger.info(f"Keeper: Reward Confidence {confidence_score:.3f} >= {current_threshold:.2f} - PASSED")
             state["should_continue"] = False
             state["stop_reason"] = "confidence_achieved"
             return state
