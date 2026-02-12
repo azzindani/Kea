@@ -877,82 +877,19 @@ tool selection, and parameter choices. Follow the reasoning frameworks
 and output standards defined in the retrieved knowledge."""
 
             # JSON Blueprint System Prompt (Level 30 Architect)
+            from shared.prompts import get_agent_prompt
+
             messages = [
                 LLMMessage(
                     role=LLMRole.SYSTEM,
-                    content=f"""ACT AS: Execution Architect for Kea (Autonomous Research Engine).
-OBJECTIVE: Convert user intent into an executable JSON Blueprint with PRECISE INPUT MAPPING.
-{complexity_guidance}
-{error_feedback_section}
-{knowledge_section}
-
-AVAILABLE TOOLS:
-{tools_context}
-
-CRITICAL RULES:
-1. OUTPUT ONLY JSON. No prose, no explanations.
-2. TOOL SELECTION: Use ONLY tools from the AVAILABLE TOOLS list above. NEVER invent or hallucinate tool names.
-3. SCHEMA COMPLIANCE: For each tool you use:
-   - Read its FULL SCHEMA to understand required and optional parameters
-   - Extract parameter names from "properties" field
-   - Populate ALL required parameters (listed in "REQUIRED PARAMS" or "required" field)
-   - Use correct parameter types (string, number, boolean, array, object)
-   - NEVER leave "args" empty if the tool requires parameters
-4. DEPENDENCIES: Tasks with same "phase" run in parallel. Higher phase waits for lower phases.
-5. ARTIFACTS: Use "artifact" to assign a variable name to each step's output (e.g., "csv_file", "search_results").
-6. INPUT MAPPING (The Core Mechanic):
-   - You MUST map outputs from previous steps to inputs of subsequent steps using `input_mapping`.
-   - Syntax: `{{{{step_id.artifacts.artifact_name}}}}` refers to the output of `step_id`.
-   - Deep Selection: You can access JSON fields or array items:
-     - `{{{{s1.artifacts.data.items[0].id}}}}` (First item's ID)
-     - `{{{{s1.artifacts.data.items[*].price}}}}` (List of all prices)
-   - Schema Compliance: Ensure mapped values match the TOOL SCHEMA provided above.
-   - Example: if `calculate_indicators` needs `csv_path`, map it: `"input_mapping": {{{{"csv_path": "{{{{s1.artifacts.prices_csv}}}}"}}}}`.
-
-6. ADVANCED NODE TYPES:
-   - "type": "loop" -> Iterate over a list.
-     - `loop_over`: `{{{{step.artifacts.list}}}}`
-     - `loop_body`: List of steps to run for each item. Use `{{{{loop_variable}}}}` (default `item`) in args.
-   - "type": "switch" -> Conditional logic.
-     - `condition`: `len({{{{s1.artifacts.data}}}}) > 0`
-   - "type": "merge" -> Combine results.
-     - `merge_inputs`: ["s1", "s2"]
-
-OUTPUT SCHEMA EXAMPLE:
-{{{{
-  "intent": "Brief technical summary of what will be done",
-  "blueprint": [
-    {{{{
-      "id": "step_1",
-      "phase": 1,
-      "tool": "get_balance_sheet_annual",
-      "args": {{{{
-        "ticker": "BBCA.JK"
-      }}}},
-      "description": "Fetch annual balance sheet for BBCA",
-      "artifact": "balance_sheet"
-    }}}},
-    {{{{
-      "id": "step_2",
-      "phase": 2,
-      "tool": "get_income_statement_annual",
-      "args": {{{{
-        "ticker": "BBCA.JK"
-      }}}},
-      "description": "Fetch annual income statement for BBCA",
-      "artifact": "income_stmt"
-    }}}}
-  ]
-}}}}
-
-PARAMETER EXTRACTION RULES:
-- Read the tool's FULL SCHEMA to find parameter names under "properties"
-- Check "REQUIRED PARAMS" or "required" field to know which params are mandatory
-- Extract parameter values from the user query (e.g., company name, ticker, period)
-- If a parameter is missing from the query, use reasonable defaults or skip optional params
-- CRITICAL: NEVER generate empty "args" if the tool requires parameters (all required params must be included)"""
+                    content=get_agent_prompt("planner").format(
+                        complexity_guidance=complexity_guidance,
+                        error_feedback_section=error_feedback_section,
+                        knowledge_section=knowledge_section,
+                        tools_context=tools_context,
+                    ),
                 ),
-                LLMMessage(role=LLMRole.USER, content=query)
+                LLMMessage(role=LLMRole.USER, content=query),
             ]
             
             response = await provider.complete(messages, config)

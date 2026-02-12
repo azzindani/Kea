@@ -32,6 +32,27 @@ from shared.context_pool import get_context_pool, reset_context_pool
 # Data pool for bucket pattern (massive data collection)
 from shared.data_pool import get_data_pool
 from shared.logging import get_logger
+from shared.prompts import get_agent_prompt, get_kernel_config, get_report_template
+from shared.vocab import load_vocab as _load_vocab
+
+# ---------------------------------------------------------------------------
+# Module-level config constants (loaded once, cached via @cache in prompts.py)
+# ---------------------------------------------------------------------------
+_VOCAB = _load_vocab("classification")
+_STANDARD_ERRORS: list[str] = _VOCAB.get("error_keywords", {}).get("standard", [])
+_QUICK_ERRORS: list[str] = _VOCAB.get("error_keywords", {}).get("quick_filter", [])
+_CODE_TOOLS: list[str] = _VOCAB.get("tool_categories", {}).get("code_execution", [])
+_TOOL_ALIASES: dict = _VOCAB.get("tool_aliases", {})
+_AGENTIC_PREFIXES: list[str] = _VOCAB.get("agentic_tool_prefixes", [])
+
+_MIN_LEN: int = get_kernel_config("execution.min_valid_output_length") or 5
+_MAX_REVISIONS_DEFAULT: int = get_kernel_config("defaults.max_revisions") or 2
+_FALLBACK_TOOL: str = get_kernel_config("defaults.fallback_tool") or "web_search"
+_MAX_TOOLS: int = get_kernel_config("execution.max_agentic_tools") or 50
+_REPORT_MAX_FACTS: int = get_kernel_config("execution.report_max_facts") or 10
+_REPORT_MAX_INV: int = get_kernel_config("execution.report_max_invocations") or 25
+_REPORT_MAX_SRC: int = get_kernel_config("execution.report_max_sources_fallback") or 10
+_CITE_PREVIEW: int = get_kernel_config("execution.citation_preview_length") or 500
 
 logger = get_logger(__name__)
 
@@ -272,26 +293,7 @@ async def _llm_correct_tool_parameters(
         messages = [
             LLMMessage(
                 role=LLMRole.SYSTEM,
-                content="""You are an intelligent parameter correction AI. When a tool execution fails, you analyze the error and suggest corrected parameters.
-
-YOUR TASK:
-- Read the error message carefully
-- Understand what went wrong (wrong format, missing data, incorrect value, etc.)
-- Extract the correct parameter values from the user's query
-- Return ONLY valid JSON with the corrected parameters
-
-RULES:
-1. Output ONLY JSON - no explanations, no markdown
-2. Preserve parameter names from failed arguments
-3. Fix values based on error message + user intent
-4. If you can't determine the fix, return empty dict: {}
-5. Be domain-agnostic - works for financial, web scraping, data analysis, any tool
-
-EXAMPLES:
-- Stock ticker error → extract correct ticker from company name
-- URL error → fix malformed URL or extract from query
-- Date format error → convert to expected format
-- Missing required param → extract from query context""",
+                content=get_agent_prompt("parameter_corrector"),
             ),
             LLMMessage(
                 role=LLMRole.USER,
@@ -326,69 +328,6 @@ Return JSON only, matching the parameter names from failed arguments.""",
         logger.error(f"LLM parameter correction failed: {e}")
         return None
 
-
-def _generate_source_url(tool_name: str, arguments: dict, output_text: str) -> str:
-    """
-    Generate source URL for fact citation based on tool and arguments.
-
-    Args:
-        tool_name: Name of the tool that generated the fact
-        arguments: Tool arguments used
-        output_text: Tool output text
-
-    Returns:
-        Source URL for citation
-    """
-    # Financial data tools
-    if "yfinance" in tool_name or "yahooquery" in tool_name:
-        ticker = (
-            arguments.get("ticker")
-            or arguments.get("symbol")
-            or arguments.get("tickers", "").split(",")[0]
-        )
-        if ticker:
-            return f"https://finance.yahoo.com/quote/{ticker.strip()}"
-        return "https://finance.yahoo.com"
-
-    # Crypto tools
-    if "ccxt" in tool_name:
-        symbol = arguments.get("symbol", "BTC/USDT")
-        exchange = arguments.get("exchange", "binance")
-        return f"https://{exchange}.com/trade/{symbol.replace('/', '_')}"
-
-    # Web search
-    if "search" in tool_name.lower():
-        query = arguments.get("query", "")
-        return (
-            f"https://duckduckgo.com/?q={query.replace(' ', '+')}"
-            if query
-            else "https://duckduckgo.com"
-        )
-
-    # Web scraping
-    if "fetch_url" in tool_name or "scrape" in tool_name:
-        url = arguments.get("url")
-        if url and isinstance(url, str) and url.startswith("http"):
-            return url
-        return "web_scrape"
-
-    # SEC/EDGAR
-    if "sec" in tool_name or "edgar" in tool_name:
-        cik = arguments.get("cik") or arguments.get("ticker")
-        if cik:
-            return f"https://www.sec.gov/cgi-bin/browse-edgar?CIK={cik}"
-        return "https://www.sec.gov"
-
-    # Code execution - no external URL
-    if "execute_code" in tool_name or "python" in tool_name:
-        return "internal_computation"
-
-    # Database queries
-    if "duckdb" in tool_name or "sql" in tool_name:
-        return "internal_database"
-
-    # Default: tool name as source
-    return f"tool:{tool_name}"
 
 
 def _build_tool_citation(
@@ -660,16 +599,7 @@ async def researcher_node(state: GraphState) -> GraphState:
 
                     # Strict Error Filtering (same as legacy executor)
                     is_error = False
-                    error_keywords = [
-                        "tool not found",
-                        "not found in registry",
-                        "error:",
-                        "exception",
-                        "failed:",
-                        "schema not found",
-                    ]
-
-                    for keyword in error_keywords:
+                    for keyword in _STANDARD_ERRORS:
                         if keyword in output_text.lower():
                             is_error = True
                             logger.warning(
@@ -759,30 +689,8 @@ async def researcher_node(state: GraphState) -> GraphState:
                             :500
                         ]
 
-                        # Detect ticker-related failures and add suggestions
+                        # Domain-specific suggestions belong in MCP server error messages
                         suggestion = ""
-                        error_lower = error_str.lower()
-                        ticker_error_patterns = [
-                            "data unavailable",
-                            "symbol not found",
-                            "no data returned",
-                            "invalid ticker",
-                            "not found",
-                        ]
-                        if any(pattern in error_lower for pattern in ticker_error_patterns):
-                            # Extract ticker from args if present
-                            args = workflow_node.args or {}
-                            ticker_used = (
-                                args.get("tickers")
-                                or args.get("ticker")
-                                or args.get("symbol")
-                                or ""
-                            )
-                            suggestion = (
-                                f"TICKER ERROR: '{ticker_used}' may be incorrect. "
-                                f"Use search_ticker('{ticker_used}') to find the correct symbol. "
-                                f"For Indonesian stocks, use .JK suffix (e.g., BBCA.JK not BCA.JK)."
-                            )
 
                         error_feedback.append(
                             {
@@ -887,9 +795,8 @@ async def researcher_node(state: GraphState) -> GraphState:
             server_name = registry.get_server_for_tool(name)
 
             if not server_name:
-                # Fallback Mapping (Legacy Support)
-                legacy_map = {"run_python": "execute_code", "fetch_page": "fetch_url"}
-                mapped = legacy_map.get(name)
+                # Fallback Mapping (from configs/vocab/classification.yaml tool_aliases)
+                mapped = _TOOL_ALIASES.get(name)
                 if mapped:
                     server_name = registry.get_server_for_tool(mapped)
                     if server_name:
@@ -935,24 +842,9 @@ async def researcher_node(state: GraphState) -> GraphState:
                             if hasattr(c, "text"):
                                 content_text += c.text
 
-                        # Generic error indicators (not domain-specific)
-                        generic_errors = [
-                            "error",
-                            "exception",
-                            "failed",
-                            "invalid",
-                            "not found",
-                            "unavailable",
-                            "unable to",
-                            "could not",
-                            "cannot",
-                            "no data",
-                            "no results",
-                        ]
-
-                        # Check if output looks like an error
+                        # Check if output looks like an error (keywords from classification.yaml)
                         lower_text = content_text.lower()
-                        for error_term in generic_errors:
+                        for error_term in _STANDARD_ERRORS:
                             if error_term in lower_text:
                                 # Additional check: Is this a substantial error or just mention?
                                 # Real errors are usually short and contain error term early
@@ -1059,10 +951,7 @@ async def researcher_node(state: GraphState) -> GraphState:
                 t_id = task.get("task_id")
 
                 # SMART CODE GENERATION INTERCEPTOR
-                if (
-                    t_name in ["run_python", "execute_code", "parse_document"]
-                    and "code" not in t_inputs
-                ):
+                if t_name in _CODE_TOOLS and "code" not in t_inputs:
                     try:
                         from services.orchestrator.agents.code_generator import generate_python_code
 
@@ -1096,7 +985,7 @@ async def researcher_node(state: GraphState) -> GraphState:
                     if final_inputs is None:
                         from shared.hardware.detector import detect_hardware
 
-                        t_name = "web_search"
+                        t_name = _FALLBACK_TOOL
                         final_inputs = {
                             "query": t_desc,
                             "max_results": detect_hardware().optimal_search_limit(),
@@ -1161,13 +1050,12 @@ async def researcher_node(state: GraphState) -> GraphState:
 
                     # Strict Error Filtering (Prevent "Error is a Fact")
                     # Note: Retry logic is now in unified_tool_handler, not here
-                    error_keywords = ["tool not found", "error:", "exception"]
-                    for keyword in error_keywords:
+                    for keyword in _QUICK_ERRORS:
                         if keyword in content_text.lower():
                             success = False
                             break
 
-                    if len(content_text) < 5:
+                    if len(content_text) < _MIN_LEN:
                         success = False
 
                 # Build citation unconditionally — covers both success and failure paths
@@ -1629,28 +1517,36 @@ async def synthesizer_node(state: GraphState) -> GraphState:
     logger.info("-" * 70)
     logger.info("Generating final report...")
 
-    report = f"# Research Report: {query}\n\n"
-    report += f"**Confidence:** {confidence:.0%}\n"
-    report += f"**Sources:** {len(sources)}\n"
-    report += f"**Facts Extracted:** {len(facts)}\n"
-    report += f"**Judge Verdict:** {verdict}\n\n"
-    report += "---\n\n"
-    report += generator_output
-    report += "\n\n---\n\n"
-    report += "## Facts Collected\n\n"
+    _tmpl = get_report_template()
+    _sec = _tmpl.get("sections", {})
+    _tbl = _tmpl.get("source_table", {})
 
-    for i, fact in enumerate(facts[:10], 1):
+    report = _sec.get("title", "# Research Report: {query}").format(query=query) + "\n\n"
+    report += _sec.get("metadata", "").format(
+        confidence_pct=f"{confidence:.0%}",
+        sources_count=len(sources),
+        facts_count=len(facts),
+        verdict=verdict,
+    ) + "\n\n"
+    report += _sec.get("divider", "---") + "\n\n"
+    report += generator_output + "\n\n" + _sec.get("divider", "---") + "\n\n"
+    report += _sec.get("facts_heading", "## Facts Collected") + "\n\n"
+
+    _fact_row_fmt = _sec.get("fact_row", "{n}. {text}...\n")
+    for i, fact in enumerate(facts[:_REPORT_MAX_FACTS], 1):
         if isinstance(fact, dict):
-            report += f"{i}. {fact.get('text', str(fact))[:150]}...\n"
+            _text = fact.get("text", str(fact))[:150]
         else:
-            report += f"{i}. {str(fact)[:150]}...\n"
+            _text = str(fact)[:150]
+        report += _fact_row_fmt.format(n=i, text=_text)
 
-    report += "\n## Sources\n\n"
-    report += "| # | Tool | Arguments | Server | Duration | URL | Timestamp |\n"
-    report += "|---|------|-----------|--------|----------|-----|----------|\n"
+    report += "\n" + _sec.get("sources_heading", "## Sources") + "\n\n"
+    report += _tbl.get("header", "") + "\n"
+    report += _tbl.get("separator", "") + "\n"
     _seen_citations: set[str] = set()
     _citation_n = 1
-    for _inv in tool_invocations[:25]:
+    _row_fmt = _tbl.get("row", "| {n} | `{tool}` | {args} | {server} | {dur_ms:.0f}ms | {url_cell} | {ts} |\n")
+    for _inv in tool_invocations[:_REPORT_MAX_INV]:
         _tc = _inv.get("tool_citation")
         if not _tc or not isinstance(_tc, dict):
             continue
@@ -1658,24 +1554,25 @@ async def synthesizer_node(state: GraphState) -> GraphState:
         if _dedup in _seen_citations:
             continue
         _seen_citations.add(_dedup)
-        _tc_tool = _tc.get("tool_name", "unknown")
-        _tc_server = _tc.get("server_name", "unknown")
         _tc_url = _tc.get("source_url", "")
-        _tc_dur = _tc.get("duration_ms", 0.0)
-        _tc_ts = _tc.get("invoked_at", "")[:19]
         _tc_args = _tc.get("arguments", {})
         _tc_args_short = (
             "; ".join(f"{k}={str(v)[:30]}" for k, v in list(_tc_args.items())[:3]) or "-"
         )
-        _tc_url_cell = f"[link]({_tc_url})" if _tc_url.startswith("http") else (_tc_url or "-")
-        report += (
-            f"| {_citation_n} | `{_tc_tool}` | {_tc_args_short} | {_tc_server} | "
-            f"{_tc_dur:.0f}ms | {_tc_url_cell} | {_tc_ts} |\n"
+        report += _row_fmt.format(
+            n=_citation_n,
+            tool=_tc.get("tool_name", "unknown"),
+            args=_tc_args_short,
+            server=_tc.get("server_name", "unknown"),
+            dur_ms=_tc.get("duration_ms", 0.0),
+            url_cell=f"[link]({_tc_url})" if _tc_url.startswith("http") else (_tc_url or "-"),
+            ts=_tc.get("invoked_at", "")[:19],
         )
         _citation_n += 1
     if _citation_n == 1:
-        for src in sources[:10]:
-            report += f"- [{src.get('title', 'Unknown')}]({src.get('url', '')})\n"
+        _fb_fmt = _tbl.get("fallback_row", "- [{title}]({url})\n")
+        for src in sources[:_REPORT_MAX_SRC]:
+            report += _fb_fmt.format(title=src.get("title", "Unknown"), url=src.get("url", ""))
 
     logger.info(f"\n✅ Final Report Generated ({len(report)} chars)")
     logger.info("=" * 70)
@@ -1718,7 +1615,7 @@ def should_revise_or_finalize(state: GraphState) -> Literal["generator", "synthe
     """
     verdict = state.get("judge_verdict", "Accept")
     revision_count = state.get("revision_count", 0)
-    max_revisions = state.get("max_revisions", 2)  # Default: allow 2 retries
+    max_revisions = state.get("max_revisions", _MAX_REVISIONS_DEFAULT)
 
     if verdict == "Revise" and revision_count < max_revisions:
         logger.info(f"🔄 Judge requested revision. Attempt {revision_count + 1}/{max_revisions}")
@@ -1799,137 +1696,6 @@ def compile_research_graph():
     return graph.compile()
 
 
-async def smart_fetch_data(args: dict) -> Any:
-    """JIT-Enabled Data Fetcher using MCP session registry."""
-    from services.mcp_host.core.session_registry import get_session_registry
-
-    registry = get_session_registry()
-    query = args.get("query", "")
-
-    async def _call_tool(tool_name: str, tool_args: dict) -> Any:
-        """Resolve tool via registry and call it."""
-        server_name = registry.get_server_for_tool(tool_name)
-        if not server_name:
-            await registry.list_all_tools()
-            server_name = registry.get_server_for_tool(tool_name)
-        if not server_name:
-            raise ValueError(f"Tool {tool_name} not found in SessionRegistry.")
-        session = await registry.get_session(server_name)
-        return await session.call_tool(tool_name, tool_args)
-
-    # 1. AUTONOMOUS SEARCH: Find the data source URL first
-    discovery_query = f"list of companies listed on {query} stock exchange wikipedia"
-    logger.info(f"🔍 Web Search for Data Source: '{discovery_query}'")
-
-    wiki_url = "https://en.wikipedia.org/wiki/LQ45"  # Default fallback
-    try:
-        from shared.hardware.detector import detect_hardware
-
-        search_args = {
-            "query": discovery_query,
-            "max_results": detect_hardware().optimal_search_limit(),
-        }
-        search_results = await _call_tool("web_search", search_args)
-
-        search_text = str(search_results)
-        import re
-
-        match = re.search(r"(https://[a-z]+\.wikipedia\.org/wiki/[^\s\)\"]+)", search_text)
-        if match:
-            wiki_url = match.group(0)
-            logger.info(f"✅ Discovered Data Source: {wiki_url}")
-        else:
-            logger.warning("⚠️ Could not extract Wiki URL from search. Using LQ45 default.")
-    except Exception as e:
-        logger.error(f"❌ Discovery Search Failed: {e}")
-
-    # 2. Dynamic Script Generation with DISCOVERED URL
-    code = f"""
-import pandas as pd
-import yfinance as yf
-import requests
-
-def get_tickers():
-    source_url = "{wiki_url}"
-    print(f"🔍 Scraping tickers from discovered source: {{source_url}}")
-    tickers = []
-
-    try:
-        import html5lib
-        tables = pd.read_html(source_url)
-
-        for df in tables:
-            target_col = None
-            for c in df.columns:
-                c_up = str(c).upper()
-                if "CODE" in c_up or "SYMBOL" in c_up or "TICKER" in c_up:
-                    target_col = c
-                    break
-
-            if target_col:
-                raw_tickers = df[target_col].tolist()
-                suffix = ".JK" if "Indonesia" in "{query}" or "IDX" in "{query}" or "LQ45" in source_url else ""
-                tickers = [f"{{str(t).strip()}}{{suffix}}" for t in raw_tickers if isinstance(t, str)]
-                print(f"   ✅ Found {{len(tickers)}} tickers in table columns: {{df.columns.tolist()}}")
-                break
-
-        if not tickers:
-            print("   ⚠️ No ticker column found in any table.")
-            try:
-                print("   🔄 Falling back to GitHub raw CSV...")
-                url = "https://raw.githubusercontent.com/goapi-io/idx-companies/main/companies.csv"
-                df_gh = pd.read_csv(url)
-                tickers = [f"{{t}}.JK" for t in df_gh.iloc[:, 0].tolist()[:50]]
-                print(f"   ✅ Discovered {{len(tickers)}} tickers from GitHub Fallback")
-            except Exception:
-                pass
-
-    except Exception as e:
-        print(f"Discovery error: {{e}}")
-        tickers = []
-
-    return tickers
-
-try:
-    targets = get_tickers()
-    if not targets:
-        print("No tickers found from source.")
-    else:
-        print(f"📊 Fetching data for {{len(targets)}} companies...")
-        results = []
-        for t in targets[:20]:
-            try:
-                stock = yf.Ticker(t)
-                info = stock.info
-                results.append({{
-                    "Ticker": t,
-                    "Market Cap (IDR T)": round((info.get("marketCap", 0) or 0) / 1_000_000_000_000, 2),
-                    "PE Ratio": round(info.get("trailingPE", 999) or 999, 2),
-                    "Revenue Growth (%)": round((info.get("revenueGrowth", 0) or 0) * 100, 2),
-                    "Sector": info.get("sector", "Unknown"),
-                    "Price": info.get("currentPrice", 0)
-                }})
-                print(f"   ✅ Fetched {{t}}")
-            except Exception as e:
-                print(f"   ❌ Failed {{t}}: {{e}}")
-
-        df = pd.DataFrame(results)
-        print("\\nDATA_START")
-        print(df.to_markdown(index=False))
-        print("DATA_END")
-
-except Exception as e:
-    print(f"Script Error: {{e}}")
-"""
-
-    return await _call_tool(
-        "execute_code",
-        {
-            "code": code,
-            "dependencies": ["yfinance", "pandas", "requests", "html5lib", "lxml", "tabulate"],
-        },
-    )
-
 
 # ============================================================================
 # Agentic Workflow Runner (Autonomous Human-Like Execution)
@@ -2004,13 +1770,13 @@ async def run_agentic_research(
     await registry.list_all_tools()
     all_tools = registry.get_all_tools_list()
 
-    # Filter to relevant tools for financial analysis
-    relevant_prefixes = ["yfinance", "python", "execute", "web_search", "news"]
+    # Filter to relevant tool prefixes (from configs/vocab/classification.yaml)
+    relevant_prefixes = _AGENTIC_PREFIXES
     available_tools = [
         {"name": t.get("name", ""), "description": t.get("description", "")}
         for t in all_tools
         if any(p in t.get("name", "").lower() for p in relevant_prefixes)
-    ][:50]  # Limit to 50 tools for context
+    ][:_MAX_TOOLS]
 
     logger.info(f"📚 Discovered {len(available_tools)} relevant tools")
 

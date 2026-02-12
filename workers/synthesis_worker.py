@@ -114,7 +114,7 @@ class SynthesisWorker:
                     "https://openrouter.ai/api/v1/chat/completions",
                     headers={"Authorization": f"Bearer {api_key}"},
                     json={
-                        "model": "nvidia/nemotron-3-nano-30b-a3b:free",
+                        "model": get_settings().models.default_model,
                         "messages": [{"role": "user", "content": prompt}],
                         "max_tokens": 4000,
                     },

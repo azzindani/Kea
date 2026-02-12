@@ -135,3 +135,68 @@ task_types:
     - analyze
     - analysis
     - examine
+
+# ---------------------------------------------------------------------------
+# Kernel behavioral vocabulary (used by graph.py, router.py, graph.py)
+# ---------------------------------------------------------------------------
+
+error_keywords:
+  standard:
+    - "tool not found"
+    - "not found in registry"
+    - "error:"
+    - "exception"
+    - "failed:"
+    - "schema not found"
+    - "unavailable"
+    - "unable to"
+    - "could not"
+    - "cannot"
+    - "no data"
+    - "no results"
+    - "invalid"
+  quick_filter:
+    - "tool not found"
+    - "error:"
+    - "exception"
+
+tool_categories:
+  code_execution:
+    - execute_code
+    - run_python
+    - parse_document
+  search:
+    - web_search
+    - news_search
+    - brave_search
+  fallback_search:
+    - web_search
+    - news_search
+
+tool_aliases:
+  run_python: execute_code
+  fetch_page: fetch_url
+
+routing_keywords:
+  path_c:
+    - compare
+    - meta-analysis
+    - across
+    - review of studies
+  path_b:
+    - verify
+    - check
+    - validate
+    - recalculate
+  path_a:
+    - follow up
+    - continue
+    - more about
+    - expand on
+
+agentic_tool_prefixes:
+  - yfinance
+  - python
+  - execute
+  - web_search
+  - news

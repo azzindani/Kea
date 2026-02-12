@@ -1,0 +1,29 @@
+# Kernel Behavioral Configuration
+# All numeric thresholds, retry policy, and defaults used by the orchestrator kernel.
+# Edit here to tune behavior without touching Python source.
+
+execution:
+  min_valid_output_length: 5        # Minimum chars for a tool output to count as valid
+  error_short_content_max: 200      # Content shorter than this + error term → treat as error
+  error_early_position_max: 100     # Error term appearing before this char pos → treat as error
+  citation_preview_length: 500      # Max chars kept in tool citation result_preview
+  fact_rerank_truncation: 8000      # Max chars of each fact sent to reranker
+  report_max_facts: 10              # Max facts listed in final synthesizer report
+  report_max_invocations: 25        # Max tool invocations shown in source table
+  report_max_sources_fallback: 10   # Fallback source list length when no citations
+  max_agentic_tools: 50             # Max tools passed to agentic workflow context
+
+retry:
+  base_retries: 5                   # Default max retries for tool execution
+  cpu_scale_min: 3                  # Minimum retries regardless of CPU count
+  cpu_scale_max: 8                  # Maximum retries regardless of CPU count
+  cpu_scale_divisor: 2              # Retries = clamp(cpu_count // divisor, min, max)
+
+defaults:
+  max_revisions: 2                  # Max Generator revision loops before forced finalize
+  max_parallel_fallback: 6          # Parallel workers when complexity info unavailable
+  fallback_tool: web_search         # Default tool when no plan is available
+
+llm_callbacks:
+  planner_temperature: 0.3          # Temperature for internal LLM callbacks (parameter corrector, spawner)
+  planner_max_tokens: 32768         # Max tokens for internal LLM callbacks

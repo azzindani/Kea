@@ -12,6 +12,7 @@ from shared.llm import LLMConfig, OpenRouterProvider
 from shared.llm.provider import LLMMessage, LLMRole
 from shared.logging import get_logger
 from shared.prompts import get_agent_prompt
+from shared.vocab import load_vocab
 
 logger = get_logger(__name__)
 
@@ -100,22 +101,19 @@ class IntentionRouter:
         """Quick heuristic routing."""
         query_lower = query.lower()
 
+        kw = load_vocab("classification").get("routing_keywords", {})
+
         # Path C indicators (meta-analysis)
-        if any(
-            word in query_lower
-            for word in ["compare", "meta-analysis", "across", "review of studies"]
-        ):
+        if any(word in query_lower for word in kw.get("path_c", [])):
             return "C"
 
         # Path B indicators (verification)
-        if any(word in query_lower for word in ["verify", "check", "validate", "recalculate"]):
+        if any(word in query_lower for word in kw.get("path_b", [])):
             return "B"
 
         # Path A indicators (incremental)
         if context and context.get("prior_research"):
-            if any(
-                word in query_lower for word in ["follow up", "continue", "more about", "expand on"]
-            ):
+            if any(word in query_lower for word in kw.get("path_a", [])):
                 return "A"
 
         return None

@@ -1,0 +1,53 @@
+# Complexity Tier Configuration
+# All numeric thresholds and per-tier limits for the query complexity classifier.
+# Edit here to tune research depth without touching Python source.
+
+scoring:
+  trivial_threshold: 0.15           # Composite score below this → TRIVIAL
+  low_threshold: 0.30               # Composite score below this → LOW
+  medium_threshold: 0.50            # Composite score below this → MEDIUM
+  high_threshold: 0.75              # Composite score below this → HIGH
+                                    # Score >= 0.75 → EXTREME
+  entity_factor_divisor: 10         # entity_count / divisor → entity contribution to score
+  ram_baseline_gb: 16.0             # RAM below this → hw_multiplier = 1.0
+  hw_multiplier_cap: 20.0           # Maximum hardware scale factor
+  gpu_bonus_per_device: 0.2         # Score bonus per GPU detected
+  max_subtasks_cap: 1000            # Hard ceiling on max_subtasks regardless of tier
+  max_phases_cap: 200               # Hard ceiling on max_phases regardless of tier
+
+tiers:
+  trivial:
+    max_subtasks_base: 5
+    max_subtasks_per_entity: 2
+    max_phases: 3
+    max_depth: 2
+    max_parallel: 4
+    max_research_iterations: 2
+  low:
+    max_subtasks_base: 10
+    max_subtasks_per_entity: 3
+    max_phases: 6
+    max_depth: 4
+    max_parallel: 8
+    max_research_iterations: 3
+  medium:
+    max_subtasks_base: 20
+    max_subtasks_per_entity: 5
+    max_phases: 10
+    max_depth: 6
+    max_parallel: 12
+    max_research_iterations: 5
+  high:
+    max_subtasks_base: 12
+    max_subtasks_per_entity: 3
+    max_phases: 5
+    max_depth: 5
+    max_parallel: 10
+    max_research_iterations: 4
+  extreme:
+    max_subtasks_base: 25
+    max_subtasks_per_entity: 3
+    max_phases: 8
+    max_depth: 7
+    max_parallel: 15
+    max_research_iterations: 5
