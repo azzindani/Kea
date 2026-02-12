@@ -13,11 +13,18 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from functools import cache
 
 from shared.logging import get_logger
+from shared.prompts import get_complexity_config
 
 logger = get_logger(__name__)
+
+
+@cache
+def _complexity_cfg() -> dict:
+    """Load and cache complexity.yaml config."""
+    return get_complexity_config()
 
 
 class ComplexityTier(str, Enum):
@@ -152,13 +159,14 @@ def classify_complexity(
     # 5. Determine Tier
     # ================================================================
     composite = score.composite
-    if composite < 0.15:
+    sc = _complexity_cfg().get("scoring", {})
+    if composite < sc.get("trivial_threshold", 0.15):
         score.tier = ComplexityTier.TRIVIAL
-    elif composite < 0.30:
+    elif composite < sc.get("low_threshold", 0.30):
         score.tier = ComplexityTier.LOW
-    elif composite < 0.50:
+    elif composite < sc.get("medium_threshold", 0.50):
         score.tier = ComplexityTier.MEDIUM
-    elif composite < 0.75:
+    elif composite < sc.get("high_threshold", 0.75):
         score.tier = ComplexityTier.HIGH
     else:
         score.tier = ComplexityTier.EXTREME
@@ -283,40 +291,21 @@ def _set_dynamic_limits(score: ComplexityScore) -> None:
     except Exception as e:
         logger.debug(f"Hardware detection skipped: {e}")
 
-    if tier == ComplexityTier.TRIVIAL:
-        score.max_subtasks = int(max(5, entities * 2) * hw_multiplier)  # Increased from 2
-        score.max_phases = max(3, int(3 * hw_multiplier))  # Increased from 1
-        score.max_depth = max(2, int(2 * hw_multiplier))  # Increased from 1
-        score.max_parallel = max(4, int(4 * hw_multiplier))  # Increased from 2
-        score.max_research_iterations = max(2, int(2 * hw_multiplier))  # Increased from 1
+    cfg = _complexity_cfg()
+    sc = cfg.get("scoring", {})
+    t = cfg.get("tiers", {}).get(tier.value, cfg.get("tiers", {}).get("medium", {}))
+    base = t.get("max_subtasks_base", 10)
+    per_entity = t.get("max_subtasks_per_entity", 3)
+    max_ph = t.get("max_phases", 6)
+    max_dp = t.get("max_depth", 4)
+    max_par = t.get("max_parallel", 8)
+    max_ri = t.get("max_research_iterations", 3)
 
-    elif tier == ComplexityTier.LOW:
-        score.max_subtasks = int(max(10, entities * 3) * hw_multiplier)  # Increased from 3
-        score.max_phases = max(6, int(6 * hw_multiplier))  # Increased from 2
-        score.max_depth = max(4, int(4 * hw_multiplier))  # Increased from 2
-        score.max_parallel = max(8, int(8 * hw_multiplier))  # Increased from 4
-        score.max_research_iterations = max(3, int(3 * hw_multiplier))  # Increased from 2
-
-    elif tier == ComplexityTier.MEDIUM:
-        score.max_subtasks = int(max(20, entities * 5) * hw_multiplier)  # Increased from 6
-        score.max_phases = max(10, int(10 * hw_multiplier))  # Increased from 3
-        score.max_depth = max(6, int(6 * hw_multiplier))  # Increased from 3
-        score.max_parallel = max(12, int(12 * hw_multiplier))  # Increased from 6
-        score.max_research_iterations = max(5, int(5 * hw_multiplier))  # Increased from 3
-
-    elif tier == ComplexityTier.HIGH:
-        score.max_subtasks = int(max(12, entities * 3) * hw_multiplier)
-        score.max_phases = max(5, int(5 * hw_multiplier))
-        score.max_depth = max(5, int(5 * hw_multiplier))
-        score.max_parallel = max(10, int(10 * hw_multiplier))
-        score.max_research_iterations = max(4, int(4 * hw_multiplier))
-
-    elif tier == ComplexityTier.EXTREME:
-        score.max_subtasks = int(max(25, entities * 3) * hw_multiplier)
-        score.max_phases = max(8, int(8 * hw_multiplier))
-        score.max_depth = max(7, int(7 * hw_multiplier))
-        score.max_parallel = max(15, int(15 * hw_multiplier))
-        score.max_research_iterations = max(5, int(5 * hw_multiplier))
+    score.max_subtasks = int(max(base, entities * per_entity) * hw_multiplier)
+    score.max_phases = max(max_ph, int(max_ph * hw_multiplier))
+    score.max_depth = max(max_dp, int(max_dp * hw_multiplier))
+    score.max_parallel = max(max_par, int(max_par * hw_multiplier))
+    score.max_research_iterations = max(max_ri, int(max_ri * hw_multiplier))
 
     # Apply OOM-safe caps (RAM-aware, prevents crashes)
     try:
@@ -332,8 +321,8 @@ def _set_dynamic_limits(score: ComplexityScore) -> None:
         # - 2000 tools available → need many phases to explore them
         # - 3600s timeout → can handle 200+ phases
         # - RAM-based: more RAM = more tasks (OOM is the real bottleneck, not CPU)
-        score.max_subtasks = min(score.max_subtasks, 1000)  # Increased from 500
-        score.max_phases = min(score.max_phases, 200)       # Increased from 50
+        score.max_subtasks = min(score.max_subtasks, int(sc.get("max_subtasks_cap", 1000)))
+        score.max_phases = min(score.max_phases, int(sc.get("max_phases_cap", 200)))
 
         # Log if memory pressure is high
         if hw.should_queue_tasks():

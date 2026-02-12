@@ -19,19 +19,20 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Awaitable
+from typing import Any
 
 from pydantic import BaseModel, Field
 
-from shared.logging import get_logger
-from shared.llm import OpenRouterProvider, LLMConfig
+from shared.llm import LLMConfig, OpenRouterProvider
 from shared.llm.provider import LLMMessage, LLMRole
-from shared.mcp.schema_registry import get_schema_registry, SchemaRegistry
+from shared.logging import get_logger
 from shared.mcp.schema_inferrer import get_schema_inferrer
-
+from shared.mcp.schema_registry import SchemaRegistry, get_schema_registry
+from shared.prompts import get_agent_prompt
 
 logger = get_logger(__name__)
 
@@ -80,23 +81,23 @@ class AgentState(BaseModel):
     """
     query: str = Field(description="Original user query")
     objective: str = Field(default="", description="Refined objective")
-    
+
     # Reasoning chain
     reasoning_steps: list[dict] = Field(default_factory=list)
     current_step: int = Field(default=0)
     max_steps: int = Field(default=15)
-    
+
     # Tool execution history
     tool_executions: list[dict] = Field(default_factory=list)
-    
+
     # Accumulated data/artifacts
     artifacts: dict[str, Any] = Field(default_factory=dict)
-    
+
     # Status
     status: str = Field(default="thinking")
     final_answer: str = Field(default="")
     error: str | None = Field(default=None)
-    
+
     # Schema learning
     learned_schemas: list[str] = Field(default_factory=list)
 
@@ -123,7 +124,7 @@ class AgenticWorkflow:
         # 5. Call: python_server.execute (analysis code)
         # 6. ... continue until complete
     """
-    
+
     def __init__(
         self,
         tool_executor: Callable[[str, dict], Awaitable[Any]],
@@ -144,13 +145,13 @@ class AgenticWorkflow:
         self.registry = schema_registry or get_schema_registry()
         self.inferrer = get_schema_inferrer()
         self.max_steps = max_steps
-        
+
         # LLM setup
         from shared.config import get_settings
         settings = get_settings()
         self.model = model or settings.models.planner_model
         self.provider = OpenRouterProvider()
-    
+
     async def run(
         self,
         query: str,
@@ -173,24 +174,24 @@ class AgenticWorkflow:
             max_steps=self.max_steps,
             artifacts=initial_context or {}
         )
-        
+
         logger.info(f"🚀 Starting agentic workflow: {query[:100]}")
-        
+
         # Discover available tools if not provided
         if available_tools is None:
             available_tools = await self._discover_tools(query)
-        
+
         # Main reasoning loop
         while state.current_step < state.max_steps:
             state.current_step += 1
-            
+
             try:
                 # Get next action from LLM
                 thought, action, action_input = await self._reason(
-                    state, 
+                    state,
                     available_tools
                 )
-                
+
                 # Record the reasoning step
                 step = {
                     "step": state.current_step,
@@ -200,10 +201,10 @@ class AgenticWorkflow:
                     "observation": "",
                     "timestamp": datetime.utcnow().isoformat()
                 }
-                
+
                 logger.info(f"💭 Step {state.current_step}: {thought[:100]}...")
                 logger.info(f"🎯 Action: {action.value}")
-                
+
                 # Execute the action
                 if action == AgentAction.COMPLETE:
                     state.final_answer = action_input.get("answer", "")
@@ -211,7 +212,7 @@ class AgenticWorkflow:
                     step["observation"] = "Task completed"
                     state.reasoning_steps.append(step)
                     break
-                    
+
                 elif action == AgentAction.CALL_TOOL:
                     observation = await self._execute_tool(
                         state,
@@ -219,20 +220,20 @@ class AgenticWorkflow:
                         action_input.get("arguments", {})
                     )
                     step["observation"] = observation[:500]  # Truncate for logging
-                    
+
                 elif action == AgentAction.ANALYZE:
                     observation = await self._analyze(state, action_input)
                     step["observation"] = observation[:500]
-                    
+
                 elif action == AgentAction.SYNTHESIZE:
                     state.final_answer = await self._synthesize(state, action_input)
                     state.status = "complete"
                     step["observation"] = "Synthesis complete"
                     state.reasoning_steps.append(step)
                     break
-                
+
                 state.reasoning_steps.append(step)
-                
+
             except Exception as e:
                 logger.error(f"❌ Error in step {state.current_step}: {e}")
                 state.reasoning_steps.append({
@@ -243,14 +244,14 @@ class AgenticWorkflow:
                     "timestamp": datetime.utcnow().isoformat()
                 })
                 # Continue to next step, let LLM handle recovery
-        
+
         if state.status != "complete":
             state.status = "max_steps_reached"
             state.final_answer = await self._force_synthesis(state)
-        
+
         logger.info(f"✅ Workflow complete after {state.current_step} steps")
         return state
-    
+
     async def _reason(
         self,
         state: AgentState,
@@ -264,13 +265,13 @@ class AgenticWorkflow:
         """
         # Build context from state
         context = self._build_context(state, available_tools)
-        
+
         config = LLMConfig(
             model=self.model,
             temperature=0.3,
             max_tokens=32768,
         )
-        
+
         messages = [
             LLMMessage(
                 role=LLMRole.SYSTEM,
@@ -281,48 +282,20 @@ class AgenticWorkflow:
                 content=context
             )
         ]
-        
+
         response = await self.provider.complete(messages, config)
-        
+
         # Parse the response
         return self._parse_reasoning(response.content)
-    
+
     def _get_system_prompt(self, available_tools: list[dict]) -> str:
         """Generate system prompt for the agent."""
         tool_descriptions = "\n".join([
             f"- {t.get('name')}: {t.get('description', '')[:100]}"
             for t in available_tools[:50]  # Limit to avoid context overflow
         ])
-        
-        return f"""You are an autonomous research agent executing tasks step by step.
 
-AVAILABLE TOOLS:
-{tool_descriptions}
-
-RESPONSE FORMAT (JSON only):
-{{
-  "thought": "Your reasoning about what to do next",
-  "action": "call_tool|analyze|synthesize|complete",
-  "action_input": {{
-    "tool": "tool_name",  // for call_tool
-    "arguments": {{}},    // for call_tool
-    "answer": "..."       // for complete
-  }}
-}}
-
-RULES:
-1. Think step by step like a human analyst would
-2. Call tools to gather data, then analyze results
-3. After gathering enough data, synthesize findings
-4. Use 'complete' when you have a final answer
-5. ALWAYS output valid JSON, nothing else
-
-EXAMPLE REASONING:
-Step 1: "I need to get TSLA's financial data first" -> call yfinance tool
-Step 2: "Got the income statement. Now analyzing trends..." -> analyze
-Step 3: "Revenue grew 20% YoY. Need balance sheet for full picture" -> call another tool
-Step 4: "Have all data. Creating summary..." -> synthesize
-Step 5: "Analysis complete" -> complete"""
+        return get_agent_prompt("agentic_step").format(tool_descriptions=tool_descriptions)
 
     def _build_context(
         self,
@@ -338,7 +311,7 @@ Step 5: "Analysis complete" -> complete"""
             history += f"Action: {step['action']}\n"
             if step.get('observation'):
                 history += f"Observation: {step['observation'][:300]}...\n"
-        
+
         # Format artifacts
         artifacts_summary = ""
         for key, value in list(state.artifacts.items())[:5]:
@@ -346,7 +319,7 @@ Step 5: "Analysis complete" -> complete"""
                 artifacts_summary += f"\n- {key}: (data with {len(value)} chars)"
             else:
                 artifacts_summary += f"\n- {key}: {str(value)[:100]}"
-        
+
         return f"""OBJECTIVE: {state.query}
 
 STEP: {state.current_step + 1} of {state.max_steps}
@@ -362,26 +335,26 @@ What should I do next? Respond with JSON only."""
         try:
             # Try to extract JSON
             content = content.strip()
-            
+
             # Handle markdown code blocks
             if "```" in content:
                 import re
                 json_match = re.search(r'```(?:json)?\s*(\{[\s\S]*?\})\s*```', content)
                 if json_match:
                     content = json_match.group(1)
-            
+
             # Find JSON object
             start = content.find('{')
             end = content.rfind('}') + 1
             if start >= 0 and end > start:
                 content = content[start:end]
-            
+
             data = json.loads(content)
-            
+
             thought = data.get("thought", "Thinking...")
             action_str = data.get("action", "analyze")
             action_input = data.get("action_input", {})
-            
+
             # Map action string to enum
             action_map = {
                 "call_tool": AgentAction.CALL_TOOL,
@@ -390,14 +363,14 @@ What should I do next? Respond with JSON only."""
                 "complete": AgentAction.COMPLETE,
             }
             action = action_map.get(action_str, AgentAction.ANALYZE)
-            
+
             return thought, action, action_input
-            
+
         except Exception as e:
             logger.warning(f"Failed to parse reasoning: {e}")
             # Default to analysis
             return content[:200], AgentAction.ANALYZE, {}
-    
+
     async def _execute_tool(
         self,
         state: AgentState,
@@ -406,13 +379,13 @@ What should I do next? Respond with JSON only."""
     ) -> str:
         """Execute a tool and learn from the result."""
         logger.info(f"🔧 Executing: {tool_name}")
-        
+
         start_time = datetime.utcnow()
-        
+
         try:
             result = await self.tool_executor(tool_name, arguments)
             duration = (datetime.utcnow() - start_time).total_seconds() * 1000
-            
+
             # Record execution
             execution = {
                 "tool": tool_name,
@@ -422,7 +395,7 @@ What should I do next? Respond with JSON only."""
                 "timestamp": datetime.utcnow().isoformat()
             }
             state.tool_executions.append(execution)
-            
+
             # Learn schema from result
             if "." in tool_name:
                 server, tool = tool_name.rsplit(".", 1)
@@ -430,17 +403,17 @@ What should I do next? Respond with JSON only."""
                 if schema.full_name not in state.learned_schemas:
                     state.learned_schemas.append(schema.full_name)
                     logger.info(f"📊 Learned schema for {schema.full_name}")
-            
+
             # Store result as artifact
             artifact_key = f"result_{len(state.tool_executions)}"
             state.artifacts[artifact_key] = result
-            
+
             # Return observation for LLM
             if isinstance(result, str):
                 return result[:1000]  # Truncate long results
             else:
                 return json.dumps(result, default=str)[:1000]
-                
+
         except Exception as e:
             logger.error(f"Tool execution failed: {e}")
             state.tool_executions.append({
@@ -451,7 +424,7 @@ What should I do next? Respond with JSON only."""
                 "timestamp": datetime.utcnow().isoformat()
             })
             return f"ERROR: {e}"
-    
+
     async def _analyze(self, state: AgentState, input_data: dict) -> str:
         """Have LLM analyze current data."""
         config = LLMConfig(
@@ -459,7 +432,7 @@ What should I do next? Respond with JSON only."""
             temperature=0.2,
             max_tokens=2048,
         )
-        
+
         # Collect data to analyze
         data_to_analyze = input_data.get("data", "")
         if not data_to_analyze:
@@ -469,24 +442,24 @@ What should I do next? Respond with JSON only."""
                 for i in range(len(state.tool_executions))
             ][-3:]  # Last 3 results
             data_to_analyze = "\n---\n".join(str(r)[:500] for r in recent_results if r)
-        
+
         messages = [
             LLMMessage(
                 role=LLMRole.SYSTEM,
-                content="Analyze the following data and extract key insights. Be concise."
+                content=get_agent_prompt("agentic_analyzer")
             ),
             LLMMessage(
                 role=LLMRole.USER,
                 content=f"Query: {state.query}\n\nData:\n{data_to_analyze[:3000]}"
             )
         ]
-        
+
         response = await self.provider.complete(messages, config)
-        
+
         # Store analysis
         state.artifacts["analysis"] = response.content
         return response.content[:500]
-    
+
     async def _synthesize(self, state: AgentState, input_data: dict) -> str:
         """Synthesize final answer from all gathered data."""
         config = LLMConfig(
@@ -494,19 +467,17 @@ What should I do next? Respond with JSON only."""
             temperature=0.3,
             max_tokens=32768,
         )
-        
+
         # Compile all gathered information
         all_data = []
         for key, value in state.artifacts.items():
             if isinstance(value, str) and len(value) > 50:
                 all_data.append(f"[{key}]\n{value[:800]}")
-        
+
         messages = [
             LLMMessage(
                 role=LLMRole.SYSTEM,
-                content="""Synthesize a comprehensive answer from the gathered data.
-Be specific with numbers and facts. Cite sources where possible.
-Format the response clearly with sections if needed."""
+                content=get_agent_prompt("agentic_synthesizer")
             ),
             LLMMessage(
                 role=LLMRole.USER,
@@ -518,37 +489,37 @@ Gathered Data:
 Provide a complete answer:"""
             )
         ]
-        
+
         response = await self.provider.complete(messages, config)
         return response.content
-    
+
     async def _force_synthesis(self, state: AgentState) -> str:
         """Force a synthesis when max steps reached."""
         logger.warning("Max steps reached, forcing synthesis")
         return await self._synthesize(state, {})
-    
+
     async def _discover_tools(self, query: str) -> list[dict]:
         """Discover relevant tools for the query."""
         try:
             from services.mcp_host.core.session_registry import get_session_registry
             registry = get_session_registry()
-            
+
             # Search for relevant tools
             tools = await asyncio.wait_for(
                 registry.search_tools(query, limit=50),
                 timeout=5.0
             )
-            
+
             if tools:
                 return tools
-            
+
             # Fallback to listing all
             all_tools = await asyncio.wait_for(
                 registry.list_all_tools(),
                 timeout=5.0
             )
             return all_tools[:100]
-            
+
         except Exception as e:
             logger.warning(f"Tool discovery failed: {e}")
             # Return empty list, will rely on LLM knowledge

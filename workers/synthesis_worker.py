@@ -10,6 +10,7 @@ import asyncio
 
 from shared.config import get_settings
 from shared.logging import LogConfig, get_logger, setup_logging
+from shared.prompts import get_agent_prompt
 
 logger = get_logger(__name__)
 
@@ -102,20 +103,10 @@ class SynthesisWorker:
             ]
         )
 
-        prompt = f"""You are a research analyst. Synthesize the following facts into a coherent report.
-
-Query: {query}
-
-Facts:
-{facts_text}
-
-Create a well-structured report with:
-1. Executive Summary
-2. Key Findings
-3. Data Analysis
-4. Conclusions
-
-Be concise but comprehensive. Include specific data points."""
+        prompt = get_agent_prompt("synthesis_worker").format(
+            query=query,
+            facts_text=facts_text,
+        )
 
         try:
             async with httpx.AsyncClient(timeout=60) as client:
@@ -123,7 +114,7 @@ Be concise but comprehensive. Include specific data points."""
                     "https://openrouter.ai/api/v1/chat/completions",
                     headers={"Authorization": f"Bearer {api_key}"},
                     json={
-                        "model": "nvidia/nemotron-3-nano-30b-a3b:free",
+                        "model": get_settings().models.default_model,
                         "messages": [{"role": "user", "content": prompt}],
                         "max_tokens": 4000,
                     },

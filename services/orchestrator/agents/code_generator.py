@@ -15,7 +15,9 @@ import os
 import re
 import unicodedata
 from typing import Any
+
 from shared.logging import get_logger
+from shared.prompts import get_code_prompt
 
 logger = get_logger(__name__)
 
@@ -30,79 +32,81 @@ def sanitize_for_code(text: str) -> str:
     Removes non-ASCII characters that cause SyntaxError.
     """
     # Normalize Unicode (convert special chars to ASCII equivalents)
-    text = unicodedata.normalize('NFKD', text)
+    text = unicodedata.normalize("NFKD", text)
     # Remove non-ASCII characters
-    text = text.encode('ascii', 'ignore').decode('ascii')
+    text = text.encode("ascii", "ignore").decode("ascii")
     # Clean up multiple spaces
-    text = re.sub(r'\s+', ' ', text)
+    text = re.sub(r"\s+", " ", text)
     return text.strip()
 
 
 def resolve_placeholders(text: str, context_data: dict[str, Any] | None = None) -> str:
     """
     Resolve {{placeholder}} syntax with actual values from context.
-    
+
     Handles formats like:
         - {{s1.artifact}} -> Looks up task 's1' file in context_pool
         - {{step_1.artifacts.prices_csv}} -> Looks up nested path
         - {{fetch_data.artifact}} -> Converts to actual file path
-    
+
     Args:
         text: String potentially containing placeholders
         context_data: Dict mapping step_id/keys to actual values
-        
+
     Returns:
         String with placeholders replaced by actual values
     """
     # Build comprehensive context from context_pool
     try:
         from shared.context_pool import get_context_pool
+
         ctx = get_context_pool()
-        
+
         # Build lookup dict from context_pool
         context_data = context_data or {}
-        
+
         # Add all stored files (task_id -> path)
         for key in ctx.list_data_keys():
             data = ctx.get_data(key)
             context_data[key] = data
-        
+
         # Add file artifacts
         for path in ctx.list_files():
             # Extract task_id from path if possible (e.g., "/vault/s1_income.csv" -> "s1")
             import os
+
             basename = os.path.basename(path)
             # Try patterns like "s1_...", "task_1_..."
             if "_" in basename:
                 prefix = basename.split("_")[0]
                 if prefix not in context_data:
                     context_data[prefix] = path
-        
+
         # Add explicit file lookups
-        if hasattr(ctx, '_file_store'):
+        if hasattr(ctx, "_file_store"):
             for task_id, info in ctx._file_store.items():
                 if isinstance(info, dict):
                     context_data[task_id] = info.get("path", str(info))
                 else:
                     context_data[task_id] = str(info)
-        
+
         # Add code results
-        if hasattr(ctx, '_code_results'):
+        if hasattr(ctx, "_code_results"):
             for task_id, result in ctx._code_results.items():
                 context_data[f"{task_id}_result"] = result
-                
+
     except Exception as e:
         logger.debug(f"Could not load context_pool: {e}")
         context_data = context_data or {}
-    
+
     if not context_data:
         return text
-    
+
     def replace_placeholder(match: re.Match) -> str:
         path = match.group(1)
         parts = path.split(".")
         task_id = parts[0]  # e.g., "s1" from "s1.artifact"
-        
+
         # Strategy 1: Direct task_id lookup in context
         if task_id in context_data:
             value = context_data[task_id]
@@ -115,128 +119,39 @@ def resolve_placeholders(text: str, context_data: dict[str, Any] | None = None) 
                 elif hasattr(value, part):
                     value = getattr(value, part)
             return repr(str(value))  # Quoted string for Python
-        
+
         # Strategy 2: Try context_pool.get_file() directly
         try:
             from shared.context_pool import get_context_pool
+
             ctx = get_context_pool()
             file_path = ctx.get_file(task_id)
             if file_path:
                 logger.info(f"   ✅ Resolved {{{{task_id}}}} -> {file_path}")
                 return repr(str(file_path))
-                
+
             # Try get_data for non-file artifacts
             data = ctx.get_data(task_id)
             if data is not None:
                 return repr(str(data))
         except Exception:
             pass
-        
+
         # Strategy 3: Full path lookup (e.g., "step_1.artifacts.prices_csv")
         full_key = path.replace(".artifacts.", ".").replace(".artifact", "")
         if full_key in context_data:
             return repr(str(context_data[full_key]))
-        
+
         # Strategy 4: Look for task_output_* keys
         task_output_key = f"task_output_{task_id}"
         if task_output_key in context_data:
             return repr(str(context_data[task_output_key]))
-        
+
         # Return empty string for unresolved (safer than crashing)
         logger.warning(f"⚠️ Could not resolve placeholder: {path}")
         return "''"  # Empty string to prevent syntax errors
-    
+
     return PLACEHOLDER_PATTERN.sub(replace_placeholder, text)
-
-
-# Code generation prompt - instructs LLM to write executable Python
-CODE_PROMPT = """You are a Python code generator for financial analysis.
-
-TASK: {task_description}
-
-COLLECTED FACTS (from prior research):
-{facts_summary}
-
-AVAILABLE FILES (Use these file paths to load data):
-{file_artifacts}
-
-RESOLVED FILE PATHS (Use these exact paths):
-{resolved_data}
-
-AVAILABLE IN SANDBOX:
-- pd (pandas)
-- np (numpy)  
-- duckdb
-- Standard builtins (print, len, sum, etc.)
-
-CRITICAL RULES:
-1. The sandbox starts EMPTY - NO variables are pre-loaded
-2. You MUST load data from files using pd.read_csv() or pd.read_json()
-3. DO NOT assume variables like 'income', 'balance', 'cashflow' exist - LOAD THEM
-4. Use the EXACT file paths from RESOLVED FILE PATHS above
-5. Print results in markdown table format
-
-⚠️ FINANCIAL DATA STRUCTURE WARNING:
-Financial CSVs have METRICS in ROWS and DATES in COLUMNS (transposed from typical format).
-You cannot access metrics like `df['Net Income']` - that's a ROW VALUE, not a column!
-
-To access financial metrics, you MUST either:
-1. TRANSPOSE the dataframe: `df = df.set_index(df.columns[0]).T`
-2. FILTER by row value: `row = df[df.iloc[:, 0].str.contains('Net Income', na=False)]`
-
-⚠️ MARKDOWN TABLE PARSING:
-Data may be formatted as Markdown tables (pipe-separated). 
-DO NOT use `sep='\n'` - this will cause a ValueError!
-
-CORRECT pattern for Markdown tables:
-```python
-from io import StringIO
-df = pd.read_csv(StringIO(data), sep="|", skipinitialspace=True)
-df = df.dropna(axis=1, how='all')
-df.columns = df.columns.str.strip()
-```
-
-⚠️ COLUMN ACCESS - USE POSITION, NOT DATE STRINGS:
-The data may have leading commas, whitespace in headers, or timestamp formats.
-DO NOT access columns by exact date strings (e.g., `df['2025-12-31']`) - this causes KeyError!
-
-ALWAYS use POSITION-BASED access:
-```python
-# Get most recent data (last column)
-latest_value = df.iloc[:, -1]
-
-# Get specific year by index position
-year_2025 = df.iloc[:, 1]  # Usually first data column after index
-
-# Or sort columns and get latest
-df = df.sort_index(axis=1)
-latest = df.iloc[:, -1]
-```
-
-EXAMPLE (Correct approach for financial data):
-```python
-# Load and clean
-income_df = pd.read_csv('/path/to/income.csv')
-income_df.columns = income_df.columns.str.strip()
-
-# TRANSPOSE to make metrics into columns
-income_df = income_df.set_index(income_df.columns[0]).T
-income_df.columns = income_df.columns.str.strip()
-
-# Use FLEXIBLE column matching
-def get_column(df, partial_name):
-    matches = [c for c in df.columns if partial_name.lower() in str(c).lower()]
-    return matches[0] if matches else None
-
-# Access LATEST data by position (not by date string!)
-net_income_col = get_column(income_df, 'Net Income')
-if net_income_col:
-    latest_net_income = income_df[net_income_col].iloc[-1]  # Last row = most recent
-```
-
-Generate Python code that uses position-based access:
-```python
-"""
 
 
 async def generate_python_code(
@@ -250,7 +165,7 @@ async def generate_python_code(
     """
     Use LLM to generate Python code based on task and collected facts.
     Supports self-correction if previous attempt failed.
-    
+
     Args:
         task_description: What the code should accomplish
         facts: List of fact dicts from prior research tasks
@@ -258,7 +173,7 @@ async def generate_python_code(
         previous_code: The code that failed (for retry)
         previous_error: The error message (for retry)
         context_data: Dict mapping step_ids to their output values (for resolving {{placeholders}})
-        
+
     Returns:
         Executable Python code string (no imports)
     """
@@ -266,39 +181,46 @@ async def generate_python_code(
     if context_data is None:
         try:
             from shared.context_pool import get_context_pool
+
             ctx = get_context_pool()
-            context_data = ctx.get_all_data() if hasattr(ctx, 'get_all_data') else {}
-            
+            context_data = ctx.get_all_data() if hasattr(ctx, "get_all_data") else {}
+
             # Also add stored artifacts
-            if hasattr(ctx, '_data_store'):
+            if hasattr(ctx, "_data_store"):
                 context_data.update(ctx._data_store)
         except Exception:
             context_data = {}
-    
+
     # Check if we have API key
     api_key = os.getenv("OPENROUTER_API_KEY", "")
     if not api_key:
         logger.warning("No OPENROUTER_API_KEY, using fallback code generator")
         return generate_fallback_code(task_description, facts)
-    
+
     try:
-        from shared.llm.openrouter import OpenRouterProvider
-        from shared.llm.provider import LLMMessage, LLMConfig, LLMRole
         from shared.config import get_settings
-        
+        from shared.llm.openrouter import OpenRouterProvider
+        from shared.llm.provider import LLMConfig, LLMMessage, LLMRole
+
         # Summarize facts for LLM
         facts_summary = ""
         for i, fact in enumerate(facts[:15], 1):  # Use up to 15 facts
             text = fact.get("text", "")[:500]
             source = fact.get("source", "unknown")
             facts_summary += f"\n[Fact {i}] (from {source}):\n{text}\n"
-        
+
         if not facts_summary:
-            facts_summary = "(No facts collected yet - if task requires data, assume it needs to be fetched)"
-            
+            facts_summary = (
+                "(No facts collected yet - if task requires data, assume it needs to be fetched)"
+            )
+
         # Summarize files
-        files_str = "\n".join(f"- {f}" for f in (file_artifacts or [])) if file_artifacts else "(No files available)"
-        
+        files_str = (
+            "\n".join(f"- {f}" for f in (file_artifacts or []))
+            if file_artifacts
+            else "(No files available)"
+        )
+
         # Build resolved data summary (showing what placeholders would resolve to)
         resolved_data_str = ""
         if context_data:
@@ -309,25 +231,25 @@ async def generate_python_code(
                     resolved_data_str += f"- {key}: {repr(str(value)[:100])}\n"
         if not resolved_data_str:
             resolved_data_str = "(No pre-resolved data available)"
-        
+
         # Resolve any placeholders in the task description
         resolved_task = resolve_placeholders(task_description, context_data)
-        
+
         # Build prompt
-        prompt = CODE_PROMPT.format(
+        prompt = get_code_prompt().format(
             task_description=resolved_task,
             facts_summary=facts_summary,
             file_artifacts=files_str,
-            resolved_data=resolved_data_str
+            resolved_data=resolved_data_str,
         )
-        
+
         # Add Error Context (Self-Correction)
         if previous_error:
             prompt += f"""
 \n\n!!! PREVIOUS ATTEMPT FAILED !!!
 CODE:
 ```python
-{previous_code or 'Unknown'}
+{previous_code or "Unknown"}
 ```
 
 ERROR:
@@ -335,7 +257,7 @@ ERROR:
 
 INSTRUCTION: Fix the code above to resolve the error. Ensure you handle the edge case described in the error.
 """
-        
+
         settings = get_settings()
         provider = OpenRouterProvider(api_key=api_key)
         response = await provider.complete(
@@ -346,30 +268,32 @@ INSTRUCTION: Fix the code above to resolve the error. Ensure you handle the edge
                 max_tokens=32768,
             ),
         )
-        
+
         code = response.content.strip()
-        
+
         # Extract code from markdown block if present
         if "```python" in code:
             code = code.split("```python")[1].split("```")[0]
         elif "```" in code:
             code = code.split("```")[1].split("```")[0]
-        
+
         # Remove any import statements (sandbox has pd/np pre-loaded)
-        lines = code.strip().split('\n')
-        lines = [l for l in lines if not l.strip().startswith('import ')]
-        code = '\n'.join(lines)
-        
+        lines = code.strip().split("\n")
+        lines = [l for l in lines if not l.strip().startswith("import ")]
+        code = "\n".join(lines)
+
         # CRITICAL: Resolve any {{placeholder}} syntax in the generated code
         # The LLM may generate code like: pd.read_csv('{{s1.artifact}}')
         # We need to replace these with actual file paths from context_data
         if context_data and PLACEHOLDER_PATTERN.search(code):
             logger.info("   🔧 Resolving placeholders in generated code...")
             code = resolve_placeholders(code, context_data)
-        
-        logger.info(f"   📝 GENERATED PYTHON CODE (Self-Correction={bool(previous_error)}):\n{'-'*60}\n{code}\n{'-'*60}")
+
+        logger.info(
+            f"   📝 GENERATED PYTHON CODE (Self-Correction={bool(previous_error)}):\n{'-' * 60}\n{code}\n{'-' * 60}"
+        )
         return code.strip()
-        
+
     except Exception as e:
         logger.warning(f"LLM code generation failed: {e}, using fallback")
         return generate_fallback_code(task_description, facts)
@@ -379,13 +303,13 @@ def generate_fallback_code(task_description: str, facts: list[dict] | None = Non
     """
     Generate fallback code when LLM is unavailable.
     Uses facts from prior tasks if available.
-    
+
     NOTE: pd, np, duckdb are pre-loaded in sandbox - NO imports needed.
     """
     # Sanitize description to remove Unicode chars that break Python
     desc = sanitize_for_code(task_description)
     desc_lower = desc.lower()
-    
+
     # Extract any data from facts if available (sanitized)
     data_str = ""
     if facts:
@@ -393,7 +317,7 @@ def generate_fallback_code(task_description: str, facts: list[dict] | None = Non
             text = sanitize_for_code(fact.get("text", ""))
             # Comment out facts to verify execution without relying on them blindly
             data_str += f"# Context: {text[:200]}\n"
-    
+
     # Generic wrapper for data processing
     code = rf'''{data_str}# Task: {desc[:80]}
 # WARNING: Live Logic Required.
