@@ -7,9 +7,11 @@ The Synthesizer - makes final decisions based on Generator and Critic.
 from __future__ import annotations
 
 from typing import Any
-from shared.logging import get_logger
-from shared.llm import OpenRouterProvider, LLMConfig
+
+from shared.llm import LLMConfig, OpenRouterProvider
 from shared.llm.provider import LLMMessage, LLMRole
+from shared.logging import get_logger
+from shared.prompts import get_agent_prompt
 
 logger = get_logger(__name__)
 
@@ -17,29 +19,22 @@ logger = get_logger(__name__)
 class JudgeAgent:
     """
     The Judge (Synthesizer) Agent.
-    
+
     Role: Evaluate Generator and Critic, make final decision.
     Personality: Balanced, fair, decisive.
     """
-    
+
     def __init__(self):
         self.name = "Judge"
         self.role = "The Synthesizer"
-        self.system_prompt = """You are the Judge - a balanced decision-maker.
+        self.system_prompt = get_agent_prompt("judge")
 
-Your role:
-- Weigh the Generator's answer against the Critic's feedback
-- Make a final determination
-- Synthesize the best elements of both perspectives
-- Provide a clear verdict
-
-Be fair and explain your reasoning."""
-    
     async def _get_knowledge_context(self, query: str) -> str:
         """Retrieve domain-specific knowledge for judgment."""
         try:
-            from shared.knowledge.retriever import get_knowledge_retriever
             import asyncio
+
+            from shared.knowledge.retriever import get_knowledge_retriever
 
             retriever = get_knowledge_retriever()
             context = await asyncio.wait_for(
@@ -77,11 +72,13 @@ Be fair and explain your reasoning."""
 
         try:
             import os
+
             if not os.getenv("OPENROUTER_API_KEY"):
                 return self._fallback_judge(generator_output, critic_feedback)
 
             provider = OpenRouterProvider()
             from shared.config import get_settings
+
             config = LLMConfig(
                 model=get_settings().models.critic_model,
                 temperature=0.3,
@@ -93,9 +90,7 @@ Be fair and explain your reasoning."""
             system_prompt = self.system_prompt
             if knowledge_context:
                 system_prompt += f"\n\n{knowledge_context}"
-                logger.info(
-                    f"Judge: Injecting {len(knowledge_context)} chars of domain knowledge"
-                )
+                logger.info(f"Judge: Injecting {len(knowledge_context)} chars of domain knowledge")
 
             messages = [
                 LLMMessage(role=LLMRole.SYSTEM, content=system_prompt),
@@ -113,12 +108,12 @@ Provide:
 1. VERDICT: [Accept/Revise/Reject]
 2. REASONING: [Why this decision]
 3. FINAL ANSWER: [Your synthesized answer incorporating valid critiques]
-4. CONFIDENCE: [0.0-1.0]"""
-                )
+4. CONFIDENCE: [0.0-1.0]""",
+                ),
             ]
-            
+
             response = await provider.complete(messages, config)
-            
+
             # Parse verdict
             content = response.content
             verdict = "Accept"
@@ -133,7 +128,8 @@ Provide:
 
             # Extract confidence if specified by LLM
             import re
-            conf_match = re.search(r'confidence[:\s]+(\d+\.?\d*)', content.lower())
+
+            conf_match = re.search(r"confidence[:\s]+(\d+\.?\d*)", content.lower())
             if conf_match:
                 try:
                     llm_confidence = float(conf_match.group(1))
@@ -158,22 +154,22 @@ Provide:
                     confidence = fact_based_confidence * 0.7 + confidence * 0.3
                     logger.info(
                         f"Judge: Blended confidence {confidence:.2f} "
-                        f"(fact quality: {fact_based_confidence:.2f}, LLM: {confidence*0.3/0.7:.2f})"
+                        f"(fact quality: {fact_based_confidence:.2f}, LLM: {confidence * 0.3 / 0.7:.2f})"
                     )
-            
+
             logger.info(f"Judge: Verdict={verdict}, Confidence={confidence:.2f}")
-            
+
             return {
                 "verdict": verdict,
                 "reasoning": content,
                 "final_answer": content,
                 "confidence": confidence,
             }
-            
+
         except Exception as e:
             logger.error(f"Judge error: {e}")
             return self._fallback_judge(generator_output, critic_feedback)
-    
+
     def _fallback_judge(self, generator_output: str, critic_feedback: str) -> dict:
         """Fallback judgment without LLM."""
         return {
@@ -205,9 +201,11 @@ Provide:
 
         # Try embedding-based scoring (more accurate)
         try:
-            from shared.embedding.qwen3_embedding import create_embedding_provider
             import asyncio
+
             import numpy as np
+
+            from shared.embedding.qwen3_embedding import create_embedding_provider
 
             embedder = create_embedding_provider(use_local=True)
 
@@ -292,7 +290,9 @@ Provide:
             return confidence
 
         except Exception as e:
-            logger.warning(f"Embedding-based scoring failed ({e}), falling back to keyword matching")
+            logger.warning(
+                f"Embedding-based scoring failed ({e}), falling back to keyword matching"
+            )
 
             # Fallback: keyword-based scoring
             error_count = 0
