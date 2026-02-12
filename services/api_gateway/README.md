@@ -8,6 +8,7 @@ The **API Gateway** is the centralized nerve center of the **Kea v4.0 Autonomous
 - **Smart Rate Limiting**: Tiered limiting based on user identity and IP, preventing system abuse via "Sliding Window" algorithm.
 - **Microservice Orchestration**: Seamlessly routes requests to specialized services (Orchestrator, MCP Host, RAG, etc.).
 - **Asynchronous Job Management**: Handles long-running research tasks with status tracking and result retrieval.
+- **Contextual Continuity**: Supports building upon previous research attempts via `seed_facts` and `error_feedback`, enabling iterative knowledge accumulation.
 - **Human-in-the-Loop (HITL)**: Provides endpoints for manual interventions and decision-making during research.
 - **Protocol Proxying**: Translates public REST API calls into internal service-to-service communication.
 - **Production-Ready Observability**: Integrated Prometheus metrics and structured JSON logging.

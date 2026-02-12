@@ -7,6 +7,8 @@ It coordinates between the API Gateway (Input), MCP Host (Tool Execution), and R
 ## ✨ Features
 
 - **LangGraph State Machine**: Implements a cyclic research flow with checkpointing, enabling backtracking, iterative refinement, and human-in-the-loop interactions.
+- **True Dependency Execution**: Replaces phase-based execution with a dynamic system where tasks fire as soon as their specific dependencies are satisfied, maximizing hardware utilization.
+- **Advanced DAG Logic**: Native support for complex control flow within the research graph, including `LoopNode` (parallel iteration), `SwitchNode` (conditional branching), and `MergeNode` (multi-path aggregation).
 - **Phased Fractal Spawning**: Dynamically groups research tasks into topological phases, executing independent tasks in parallel "swarms" while respecting strict dependencies (DAG Execution).
 - **The "Bucket Pattern"**: Automatically expands massive tasks (e.g., "Analyze 10k files") into parallel shards to maximize throughput.
 - **Cognitive Agent Personas**: Utilizes specialized agents (Planner, Researcher, Critic, Judge) with distinct prompts and reasoning styles defined in `templates/`.

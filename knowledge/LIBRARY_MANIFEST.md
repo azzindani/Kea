@@ -38,85 +38,85 @@ This document is an automatically generated index of all available 'Pure Context
 ## Ai <a name='ai'></a>
 | Skill Name | Description | Tags |
 |---|---|---|
-| **[Generative Adversarial Network (GAN) Specialist](skills/ai/gan_specialist.md)** | Expertise in generating synthetic data, images, and creative AI. | `ai, gan, generative, deep-learning` |
-| **[Image Segmentation Expert](skills/ai/computer_vision_segmentation.md)** | Expertise in U-Net, Mask R-CNN, and pixel-level classification. | `cv, segmentation, images, medical-imaging` |
-| **[MLOps Engineer](skills/ai/mlops_engineer.md)** | Expertise in model deployment, monitoring, experiment tracking (MLflow). | `mlops, devops, ml, deployment` |
-| **[Reinforcement Learning Researcher](skills/ai/reinforcement_learning.md)** | Expertise in agents, environments, rewards, and policy optimization. | `ai, rl, ml, agents` |
-| **[Transformer Architecture Expert](skills/ai/nlp_transformer_expert.md)** | Expertise in Attention mechanisms, BERT, GPT, and fine-tuning. | `nlp, transformers, bert, gpt` |
+| **[Senior Generative AI Researcher (GAN Specialist)](skills/ai/gan_specialist.md)** | Deep expertise in adversarial learning, latent space manifold manipulation, and high-fidelity synthetic data generation. | `ai, gan, generative, deep-learning` |
+| **[Principal CV Engineer (Image Segmentation)](skills/ai/computer_vision_segmentation.md)** | Expertise in pixel-level classification across semantic, instance, and panoptic domains. | `cv, segmentation, images, medical-imaging` |
+| **[Senior MLOps Architect](skills/ai/mlops_engineer.md)** | Expertise in operationalizing the ML lifecycle (DevOps for ML). Mastery of CI/CD/CT and drift monitoring. | `mlops, devops, ml, deployment` |
+| **[Senior AI Research Scientist (RL)](skills/ai/reinforcement_learning.md)** | Expertise in designing autonomous agents for complex sequential decision-making. | `ai, rl, ml, agents` |
+| **[Principal AI Researcher (Transformer Architect)](skills/ai/nlp_transformer_expert.md)** | Expertise in self-attention mechanisms, LLM scaling laws, and parameter-efficient fine-tuning (PEFT/LoRA). | `nlp, transformers, bert, gpt` |
 
 ## Aviation <a name='aviation'></a>
 | Skill Name | Description | Tags |
 |---|---|---|
-| **[Aerospace Systems Engineer](skills/aviation/aerospace_engineer.md)** | Expertise in aerodynamics, propulsion, and redundancy. | `aerospace, engineering, space, physics` |
-| **[Air Traffic Controller](skills/aviation/air_traffic_controller.md)** | Expertise in spatial awareness, sequencing, and separation. | `atc, aviation, logistics, safety` |
-| **[Airline Transport Pilot](skills/aviation/commercial_pilot.md)** | Expertise in checklist discipline, CRM, and systems management. | `aviation, pilot, safety, transport` |
+| **[Senior Aerospace Systems Architect](skills/aviation/aerospace_engineer.md)** | Expertise in the full lifecycle development of complex aerospace vehicles and safety-critical standards. | `aerospace, engineering, aviation, safety-critical, mbse` |
+| **[Senior Radar Controller (Air Traffic Control)](skills/aviation/air_traffic_controller.md)** | Expertise in safe, orderly, and expeditious air traffic management and ICAO protocols. | `atc, aviation, air-traffic-management, safety, radar-control` |
+| **[Senior Airline Captain (Airline Transport Pilot)](skills/aviation/commercial_pilot.md)** | Expertise in multi-crew flight operations, CRM, and high-reliability safety management. | `aviation, pilot, atpl, safety, crm, transport` |
 
 ## Business <a name='business'></a>
 | Skill Name | Description | Tags |
 |---|---|---|
-| **[Actuary](skills/business/actuary.md)** | Expertise in risk probability, mortality tables, and financial modeling. | `math, statistics, insurance, risk` |
-| **[Change Management Consultant](skills/business/change_manager.md)** | Expertise in organizational transformation and adoption. | `business, management, consulting, hr` |
-| **[Crisis Management Expert](skills/business/crisis_manager.md)** | Expertise in PR disasters, damage control, and reputation management. | `crisis, pr, management, strategy` |
-| **[ERP Consultant (SAP/Oracle)](skills/business/erp_consultant.md)** | Expertise in enterprise resource planning, business process mapping, and migration. | `erp, sap, oracle, business` |
-| **[Enterprise Sales Engineer](skills/business/sales_engineer.md)** | Expertise in technical demos, RFI/RFP responses, and value selling. | `sales, presales, tech, business` |
-| **[Forensic Accountant](skills/business/forensic_accountant.md)** | Expertise in detecting fraud, embezzlement, and cooking books. | `accounting, fraud, investigation, audit` |
-| **[Game Theory Strategist](skills/business/game_theory.md)** | Expertise in strategic interaction, payoffs, and equilibrium. | `strategy, game-theory, economics, math` |
-| **[Procurement Specialist](skills/business/supply_procurement.md)** | Expertise in vendor management, sourcing, and contract negotiation. | `procurement, supply-chain, business, negotiation` |
-| **[Professional Poker Player](skills/business/poker_pro.md)** | Expertise in probability, psychology, and risk assessment. | `poker, game-theory, risk, psychology` |
-| **[Salesforce Administrator](skills/business/crm_admin.md)** | Expertise in CRM configuration, flows, and permission sets. | `crm, salesforce, business, admin` |
+| **[Senior Risk Actuary (FSA/FCAS)](skills/business/actuary.md)** | Expert in IFRS 17, Solvency II, and actuarial risk modeling for insurance and finance. | `math, statistics, insurance, risk` |
+| **[Senior Change Management Strategist (CCMP/Prosci)](skills/business/change_manager.md)** | Expert in Prosci ADKAR, ACMP standards, and organizational transformation dynamics. | `business, management, consulting, hr` |
+| **[Senior CRM Solutions Administrator (Salesforce)](skills/business/crm_admin.md)** | Expert in Salesforce architecture, declarative automation (Flows), and data governance. | `crm, salesforce, business, admin` |
+| **[Senior Crisis Management Architect](skills/business/crisis_manager.md)** | Expert in ISO 22301, incident command systems (ICS), and business continuity planning. | `crisis, pr, management, strategy` |
+| **[Principal ERP Solutions Architect (SAP/Oracle)](skills/business/erp_consultant.md)** | Expert in SAP Activate, Oracle OUM, and large-scale ERP transformation lifecycles. | `erp, sap, oracle, business` |
+| **[Senior Forensic Financial Investigator (CFE/CFF)](skills/business/forensic_accountant.md)** | Expert in fraud detection, fund tracing, and legally defensible litigation support. | `accounting, fraud, investigation, audit` |
+| **[Senior Strategic Game Theorist](skills/business/game_theory.md)** | Expert in Nash Equilibrium, mechanism design, and mathematical modeling of strategic interactions. | `strategy, game-theory, economics, math` |
+| **[Elite Professional Poker Strategist (GTO Specialist)](skills/business/poker_pro.md)** | Expert in Game Theory Optimal play, risk-adjusted bankroll management, and range analysis. | `poker, game-theory, risk, psychology` |
+| **[Senior Enterprise Sales Engineer (MEDDPICC Master)](skills/business/sales_engineer.md)** | Expert in complex B2B technical sales, MEDDPICC framework, and POC architecture. | `sales, presales, tech, business` |
+| **[Senior Strategic Procurement Architect (MCIPS)](skills/business/supply_procurement.md)** | Expert in global supply chain optimization, Kraljic Matrix, and Total Cost of Ownership (TCO). | `procurement, supply-chain, business, negotiation` |
 
 ## Cloud <a name='cloud'></a>
 | Skill Name | Description | Tags |
 |---|---|---|
-| **[Azure Solutions Architect](skills/cloud/azure_architect.md)** | Expertise in Microsoft Cloud, Active Directory, and Hybrid setups. | `cloud, azure, microsoft, architecture` |
-| **[Cloud Cost Optimization Expert](skills/cloud/finops_cost_manager.md)** | Expertise in spotting waste, reserved instances, and tagging strategies. | `cloud, finops, cost, aws` |
-| **[GCP Data Engineer](skills/cloud/gcp_engineer.md)** | Expertise in Google Cloud, BigQuery, and Dataflow. | `cloud, gcp, data, google` |
-| **[Serverless Architect](skills/cloud/serverless_architect.md)** | Expertise in Lambda, API Gateway, and Event-Driven Design. | `cloud, serverless, aws, architecture` |
+| **[Lead Azure Solutions Architect (AZ-305)](skills/cloud/azure_architect.md)** | Expert in enterprise-scale Azure infrastructure, Microsoft CAF, and Landing Zone design. | `cloud, azure, microsoft, architecture` |
+| **[Senior FinOps Strategy Specialist](skills/cloud/finops_cost_manager.md)** | Expert in cloud financial management, unit economics, and cost optimization lifecycles (Inform, Optimize, Operate). | `cloud, finops, cost, aws` |
+| **[Principal Google Cloud Architect (PCA)](skills/cloud/gcp_engineer.md)** | Expert in planet-scale infrastructure, SRE principles, and multi-cloud strategy (Anthos). | `cloud, gcp, data, google` |
+| **[Expert Serverless Architect](skills/cloud/serverless_architect.md)** | Expert in architecting planet-scale, event-driven systems using AWS Lambda, Step Functions, and DynamoDB. | `cloud, serverless, aws, architecture` |
 
 ## Coding <a name='coding'></a>
 | Skill Name | Description | Tags |
 |---|---|---|
-| **[Android Developer](skills/coding/android_developer.md)** | Expertise in Kotlin, Jetpack Compose, and fragmentation management. | `mobile, android, kotlin, google` |
-| **[AppSec Specialist](skills/coding/security_auditor.md)** | Expertise in finding vulnerabilities (OWASP Top 10) in code. | `security, owasp, hacking, audit` |
-| **[CI/CD Pipeline Engineer](skills/coding/github_actions_pro.md)** | Expertise in automating build, test, and deploy workflows specifically with GitHub Actions. | `ci-cd, github-actions, automation, devops` |
-| **[Compiler Engineer (LLVM)](skills/coding/compiler_engineer.md)** | Expertise in lexing, parsing, IR optimization, and code generation. | `compiler, llvm, pl-theory, c++` |
-| **[Developer Relations (DevRel)](skills/coding/devrel_engineer.md)** | Expertise in documentation, community building, and SDK design. | `devrel, community, docs, advocacy` |
-| **[Distributed Systems Architect](skills/coding/system_architect.md)** | Expertise in high-scale system design, CAP theorem, and consistency models. | `architecture, distributed-systems, scalability, design` |
-| **[Domain-Driven Design (DDD) Expert](skills/coding/ddd_expert.md)** | Expertise in bounded contexts, ubiquitous language, and aggregates. | `architecture, ddd, design, patterns` |
+| **[Senior Android Solutions Architect (MAD)](skills/coding/android_developer.md)** | Expert in Modern Android Development, Jetpack Compose, and MVI architecture. | `mobile, android, kotlin, mvi` |
+| **[Principal Security Auditor (AppSec)](skills/coding/security_auditor.md)** | Expert in application security, vulnerability research, and threat modeling. | `security, audit, owasp, red-team` |
+| **[Principal DevOps & CI/CD Architect (GitHub Actions)](skills/coding/github_actions_pro.md)** | Expert in automating the software development lifecycle and pipeline security. | `ci-cd, github-actions, automation, devops` |
+| **[Principal Compiler Architect (LLVM/SSA)](skills/coding/compiler_engineer.md)** | Expert in language engineering, LLVM toolchains, SSA form, and optimization passes. | `compiler, llvm, ssa, optimization` |
+| **[Senior Developer Experience (DX) Engineer (DevRel)](skills/coding/devrel_engineer.md)** | Expert in optimizing the developer journey, community building, and SDK design. | `devrel, dx, community, docs` |
+| **[Principal Systems Architect (CAP/Paxos)](skills/coding/system_architect.md)** | Expert in large-scale distributed systems, consensus, and fault tolerance. | `distributed-systems, architecture, consensus` |
+| **[Principal DDD Architect (Strategic Design)](skills/coding/ddd_expert.md)** | Expert in Domain-Driven Design, complex modeling, and business alignment. | `ddd, architecture, domain-modeling` |
 | **[Embedded Firmware Engineer](skills/coding/embedded_engineer.md)** | Expertise in C/C++, RTOS, and hardware-software integration. | `embedded, firmware, iot, c++` |
-| **[Event Sourcing Expert](skills/coding/event_sourcing_expert.md)** | Expertise in event stores, CQRS, and replayability. | `architecture, events, cqrs, temporal` |
+| **[Principal Event Sourcing Strategist (CQRS/Sagas)](skills/coding/event_sourcing_expert.md)** | Expert in event-driven architectures, immutable audit logs, and consistency. | `event-sourcing, cqrs, architecture` |
 | **[Game Engine Developer](skills/coding/game_engine_dev.md)** | Expertise in graphics pipelines, physics engines, and optimization. | `gamedev, rendering, physics, optimization` |
-| **[Golang Backend Engineer](skills/coding/golang_expert.md)** | Expertise in microservices, concurrency with goroutines, and simple interfaces. | `go, backend, microservices, concurrency` |
+| **[Senior Go Backend Architect (Clean Arch)](skills/coding/golang_expert.md)** | Expert in high-performance concurrent systems using Go and Clean Architecture. | `go, golang, backend, clean-architecture` |
 | **[High Performance Computing (HPC) Engineer](skills/coding/hpc_engineer.md)** | Expertise in MPI, OpenMP, and supercomputer clusters. | `hpc, supercomputing, c++, mpi` |
 | **[Kernel/Driver Developer](skills/coding/driver_developer.md)** | Expertise in Linux Kernel modules, Windows drivers, and DMA. | `kernel, driver, c, low-level` |
-| **[L1 Blockchain Developer](skills/coding/blockchain_protocol_dev.md)** | Expertise in consensus algorithms, P2P networking, and cryptography. | `blockchain, crypto, consensus, p2p` |
-| **[Legacy Code Refactorer](skills/coding/legacy_refactorer.md)** | Expertise in improving code structure without breaking functionality. | `refactoring, legacy, testing, maintenance` |
+| **[Principal Blockchain Protocol Architect (Solidity/EVM)](skills/coding/blockchain_protocol_dev.md)** | Expert in decentralized protocol design, EVM execution, and security. | `blockchain, solidity, evm, consensus` |
+| **[Principal Legacy Systems Modernization Architect](skills/coding/legacy_refactorer.md)** | Expert in transforming mission-critical legacy debt into modern architectures. | `legacy, modernization, refactoring` |
 | **[Mainframe COBOL Engineer](skills/coding/mainframe_engineer.md)** | Expertise in legacy banking systems, JCL, and transaction processing. | `mainframe, cobol, legacy, banking` |
-| **[Microservices Architect](skills/coding/microservices_architect.md)** | Expertise in decomposition, service mesh, and distributed tracing. | `architecture, microservices, distributed, system-design` |
-| **[Python Engineering Expert](skills/coding/python_expert.md)** | Expertise in writing production-grade, type-safe, and performant Python code. | `python, software-engineering, clean-code, refactoring` |
-| **[REST API Architect](skills/coding/api_designer.md)** | Expertise in designing clean, idempotent, and versioned APIs. | `api, rest, design, architecture` |
-| **[React Frontend Architect](skills/coding/react_architect.md)** | Expertise in building scalable, performant UI with React ecosystem. | `react, javascript, frontend, ui` |
-| **[Regex Master](skills/coding/regex_master.md)** | Expertise in pattern matching using Regular Expressions. | `regex, parsing, text, patterns` |
+| **[Principal Microservices Architect (Envoy/Istio)](skills/coding/microservices_architect.md)** | Expert in cloud-native microservices, service mesh, and resilience. | `microservices, architecture, istio` |
+| **[Senior Python Systems Architect (PEP/Ruff)](skills/coding/python_expert.md)** | Expert in production-grade Python systems, type safety, and asynchronous concurrency. | `python, pydantic, asyncio, software-engineering` |
+| **[Senior API Solutions Architect (Spectree/OAS)](skills/coding/api_designer.md)** | Expert in designing elegant, scalable, and secure API ecosystems. | `api, rest, oas, architecture` |
+| **[Principal React Solutions Architect (Next.js/RSC)](skills/coding/react_architect.md)** | Expert in full-stack React applications using Next.js App Router and Server Components. | `react, nextjs, javascript, architecture` |
+| **[Principal Regex & Parsing Specialist (PCRE)](skills/coding/regex_master.md)** | Expert in advanced pattern matching, lexical analysis, and text transformation. | `regex, parsing, pcre, patterns` |
 | **[Robotics Software Engineer](skills/coding/robotics_engineer.md)** | Expertise in ROS (Robot Operating System), kinematics, and sensors. | `robotics, ros, python, cpp` |
-| **[Rust Systems Engineer](skills/coding/rust_expert.md)** | Expertise in memory safety, concurrency, and high-performance systems. | `rust, systems, performance, memory-safe` |
-| **[SQL Performance Expert](skills/coding/sql_optimizer.md)** | Expertise in query optimization, indexing, and database schema design. | `sql, database, performance, postgres` |
-| **[Test Automation Engineer](skills/coding/qa_automation.md)** | Expertise in writing reliable end-to-end and integration tests. | `qa, testing, automation, playwright` |
-| **[Web Accessibility Expert (A11y)](skills/coding/frontend_accessibility.md)** | Expertise in making web apps usable for everyone (WCAG compliance). | `a11y, accessibility, frontend, wcag` |
-| **[iOS Mobile Developer](skills/coding/ios_developer.md)** | Expertise in Swift, SwiftUI, and the Apple ecosystem. | `mobile, ios, swift, apple` |
+| **[Senior Rust Systems Architect (Tokio/Safety)](skills/coding/rust_expert.md)** | Expert in mission-critical systems programming, memory safety, and async runtimes. | `rust, systems, performance, memory-safe` |
+| **[Principal SQL Performance Engineer (Index/Execution)](skills/coding/sql_optimizer.md)** | Expert in database optimization, query tuning, and index architecture. | `sql, database, performance, optimization` |
+| **[Principal SDET & Quality Architect (Playwright/CI)](skills/coding/qa_automation.md)** | Expert in quality strategy, automated testing frameworks, and CI/CD integration. | `qa, testing, automation, playwright` |
+| **[Senior Web Accessibility Strategist (CPWA)](skills/coding/frontend_accessibility.md)** | Expert in digital inclusivity, WCAG 2.2 compliance, and WAI-ARIA implementation. | `a11y, accessibility, frontend, wcag` |
+| **[Senior iOS Solutions Engineer (SwiftUI/TCA)](skills/coding/ios_developer.md)** | Expert in modern iOS development using SwiftUI and The Composable Architecture (TCA). | `mobile, ios, swift, apple` |
 
 ## Creative <a name='creative'></a>
 | Skill Name | Description | Tags |
 |---|---|---|
-| **[Building Architect](skills/creative/architect.md)** | Expertise in spatial design, blueprints, and building codes. | `architecture, design, buildings, construction` |
-| **[Fashion Designer](skills/creative/fashion_designer.md)** | Expertise in textiles, silhouette, and trend forecasting. | `fashion, design, art, style` |
-| **[Film Editor](skills/creative/video_editor.md)** | Expertise in pacing, montage, and narrative construction. | `video, editing, film, storytelling` |
-| **[Fine Art Photographer](skills/creative/photographer.md)** | Expertise in composition, lighting, and exposure. | `photography, art, visual, light` |
-| **[Goldsmith / Jeweler](skills/creative/jeweler.md)** | Expertise in soldering, stone setting, and metallurgy. | `art, craft, jewelry, metals` |
-| **[Interior Designer](skills/creative/interior_designer.md)** | Expertise in lighting, ergonomics, and spatial psychology. | `interior, design, space, decor` |
-| **[Master Potter (Ceramist)](skills/creative/potter.md)** | Expertise in wheel throwing, glazing chemistry, and kiln firing. | `art, craft, ceramics, pottery` |
-| **[Music Producer](skills/creative/music_producer.md)** | Expertise in arrangement, mixing, and sound design. | `music, audio, production, mixing` |
-| **[Professional Screenwriter](skills/creative/screenwriter.md)** | Expertise in narrative structure, dialogue, and character arcs. | `writing, storytelling, screenplay, film` |
-| **[Visual Brand Designer](skills/creative/graphic_designer.md)** | Expertise in typography, color theory, and layout hierarchy. | `design, branding, ui, art` |
+| **[Building Architect](skills/creative/architect.md)** | Principal Architect specializing in high-performance spatial design, sustainability (LEED), and IBC compliance. | `architecture, design, urban-planning, sustainability` |
+| **[Fashion Designer](skills/creative/fashion_designer.md)** | Creative Director specializing in haute couture, textile science, and trend forecasting (WGSN). | `fashion, design, textiles, creative-direction` |
+| **[Senior Film Editor (ACE)](skills/creative/video_editor.md)** | Prioritizing emotional narrative, Murch's Rule of Six, and frame-accurate pacing. | `video-editing, post-production, narrative, film` |
+| **[Master Fine Art Photographer](skills/creative/photographer.md)** | Specializing in the Zone System, narrative lighting (Chiaroscuro), and archival output. | `photography, fine-art, lighting, visual-storytelling` |
+| **[Master Goldsmith / Jeweler](skills/creative/jeweler.md)** | Focusing on precious metallurgy, precision soldering, and high-security stone settings. | `jewelry, goldsmithing, metallurgy, gemology` |
+| **[Senior Interior Architect (NCIDQ)](skills/creative/interior_designer.md)** | Focusing on spatial psychology, ergonomics, and layered lighting systems. | `interior-design, ergonomics, spatial-psychology, lighting` |
+| **[Master Ceramist (Potter)](skills/creative/potter.md)** | Specializing in wheel throwing, glaze chemistry (flux/silica), and kiln management. | `ceramics, pottery, craft, material-science` |
+| **[Principal Music Producer](skills/creative/music_producer.md)** | Specializing in spatial audio (Atmos), signal flow, and streaming-standard mastering. | `music-production, audio-engineering, mixing, mastering` |
+| **[Professional Screenwriter (WGA)](skills/creative/screenwriter.md)** | Specializing in 3-Act structure, 'Save the Cat' beats, and subtextual dialogue. | `screenwriting, storytelling, script, film` |
+| **[Principal Visual Brand Architect](skills/creative/graphic_designer.md)** | Specializing in semiotics, modular design systems, and multi-channel visual governance. | `branding, typography, visual-identity, design-systems` |
 
 ## Data <a name='data'></a>
 | Skill Name | Description | Tags |
