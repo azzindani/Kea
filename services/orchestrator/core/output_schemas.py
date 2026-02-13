@@ -282,3 +282,69 @@ class RoleResolution(BaseModel):
         default="professional",
         description="Expected output quality from this role",
     )
+# ============================================================================
+# Artifact Models (Phase 5)
+# ============================================================================
+
+
+class ArtifactType(str, Enum):
+    """Types of work products produced by the kernel."""
+
+    REPORT = "report"           # Formal written report
+    ANALYSIS = "analysis"       # Analytical finding or evaluation
+    DATASET = "dataset"         # Structured data (CSV, JSON, etc.)
+    SUMMARY = "summary"         # Executive or technical summary
+    CODE = "code"               # Scripts, queries, or snippets
+    RECOMMENDATION = "recommendation"  # Actionable recommendation
+    MEMO = "memo"               # Internal or informal communication
+
+
+class ArtifactStatus(str, Enum):
+    """Lifecycle states of an artifact."""
+
+    DRAFT = "draft"             # Work in progress
+    REVIEW = "review"           # Pending parent/peer review
+    REVISION = "revision"       # Sent back for improvement
+    APPROVED = "approved"       # Quality gate passed
+    PUBLISHED = "published"     # Final version ready for delivery
+
+
+class ArtifactMetadata(BaseModel):
+    """Metadata for a single artifact."""
+
+    sources: list[str] = Field(default_factory=list)
+    citations: list[str] = Field(default_factory=list)
+    data_gaps: list[str] = Field(default_factory=list)
+    assumptions: list[str] = Field(default_factory=list)
+    tools_used: list[str] = Field(default_factory=list)
+    confidence_breakdown: dict[str, float] = Field(default_factory=list)
+
+
+class Artifact(BaseModel):
+    """A structured work product with a lifecycle."""
+
+    id: str = Field(description="Unique artifact identifier")
+    type: ArtifactType = Field(description="Artifact category")
+    title: str = Field(description="Display title")
+    summary: str = Field(default="", description="Short summary/abstract")
+    content: str = Field(description="The actual work product content")
+    status: ArtifactStatus = Field(default=ArtifactStatus.DRAFT)
+    version: int = Field(default=1)
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    metadata: ArtifactMetadata = Field(default_factory=ArtifactMetadata)
+
+    # Lineage
+    parent_id: str | None = Field(default=None, description="ID of artifact this was derived from")
+    cell_id: str | None = Field(default=None, description="ID of the cell that produced this")
+    produced_at: str | None = Field(default=None, description="ISO timestamp")
+
+
+class WorkPackage(BaseModel):
+    """The final structured output from a kernel cell."""
+
+    summary: str = Field(description="Executive summary of the entire work package")
+    artifacts: list[Artifact] = Field(default_factory=list)
+    overall_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    key_findings: list[str] = Field(default_factory=list)
+    recommendations: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)

@@ -106,3 +106,175 @@ kernel_cell:
     medium: solo
     high: delegate
     extreme: hierarchy
+
+  # Communication Network (v2.0)
+  communication:
+    budget_pct: 0.15                    # Fraction of task budget for messaging
+    max_messages_per_cell: 20           # Hard cap on messages a cell can send
+    clarify_timeout_seconds: 15         # How long to wait for clarification answer
+    progress_interval_steps: 3          # Report progress every N execution steps
+    channel_costs:                      # Token cost per message by channel
+      clarify: 150
+      progress: 50
+      escalate: 500
+      partial: 200
+      blocked: 300
+      consult: 300
+      share: 100
+      coordinate: 200
+      feedback: 200
+      alert: 100
+
+  # Iterative Delegation Protocol (v2.0, Phase 3)
+  delegation:
+    max_review_rounds: 2                 # Max revision cycles before accepting
+    review_cost_per_subtask: 300         # Token cost for LLM-based quality review
+    conflict_resolution_cost: 400        # Token cost per conflict resolved
+    min_budget_for_review: 2000          # Skip review if budget below this
+    # Quality acceptance thresholds by parent level
+    quality_thresholds:
+      staff: 0.5                         # Staff accepts more readily
+      senior_staff: 0.6
+      manager: 0.7                       # Managers are pickier
+      senior_manager: 0.75
+      director: 0.8
+      vp: 0.85
+
+# ==============================================================================
+# Cognitive Profiles v2.0 — Level-Aware Thinking
+#
+# Each profile defines HOW a kernel cell thinks at that organizational level.
+# These override the hardcoded defaults in cognitive_profiles.py.
+#
+# Keys:
+#   primary_modes      — CognitiveMode values this level spends most time on
+#   execution_pct      — Fraction of work done by self (vs. delegated)
+#   delegation_pct     — Fraction of work delegated to subordinates
+#   review_depth       — How deeply this level reviews work (none|checklist|self_review|detailed|thorough|moderate|light)
+#   reasoning_style    — Cognitive approach shaping the LLM prompt
+#   time_horizon       — How far ahead this level plans
+#   max_reasoning_steps — Budget for the cognitive cycle's execute loop
+#   max_tool_calls     — Max tool calls before forced synthesis
+#   max_self_monitor_checks — Mid-execution quality checks
+#   can_delegate       — Whether this level can delegate to subordinates
+#   can_escalate       — Whether this level can escalate to parent
+#   can_consult_peers  — Whether this level can consult sibling cells
+#
+# Reasoning styles: direct_lookup | procedural | deep_analytical |
+#                   task_oriented | structured_analysis | cross_functional |
+#                   strategic_pattern
+# ==============================================================================
+
+cognitive_profiles:
+
+  board:
+    primary_modes: [strategize, frame, prioritize]
+    execution_pct: 0.05
+    delegation_pct: 0.80
+    review_depth: light
+    reasoning_style: strategic_pattern
+    time_horizon: years
+    max_reasoning_steps: 4
+    max_tool_calls: 0
+    max_self_monitor_checks: 1
+    can_delegate: true
+    can_escalate: false
+    can_consult_peers: true
+
+  ceo:
+    primary_modes: [frame, decompose, strategize, synthesize]
+    execution_pct: 0.10
+    delegation_pct: 0.70
+    review_depth: moderate
+    reasoning_style: cross_functional
+    time_horizon: quarters_to_years
+    max_reasoning_steps: 6
+    max_tool_calls: 1
+    max_self_monitor_checks: 2
+    can_delegate: true
+    can_escalate: true
+    can_consult_peers: true
+
+  vp:
+    primary_modes: [decompose, prioritize, synthesize, self_assess]
+    execution_pct: 0.15
+    delegation_pct: 0.55
+    review_depth: moderate
+    reasoning_style: structured_analysis
+    time_horizon: months_to_quarters
+    max_reasoning_steps: 8
+    max_tool_calls: 2
+    max_self_monitor_checks: 3
+    can_delegate: true
+    can_escalate: true
+    can_consult_peers: true
+
+  director:
+    primary_modes: [decompose, prioritize, analyze, synthesize]
+    execution_pct: 0.20
+    delegation_pct: 0.50
+    review_depth: thorough
+    reasoning_style: structured_analysis
+    time_horizon: weeks_to_months
+    max_reasoning_steps: 10
+    max_tool_calls: 3
+    max_self_monitor_checks: 3
+    can_delegate: true
+    can_escalate: true
+    can_consult_peers: true
+
+  manager:
+    primary_modes: [decompose, research, analyze, self_assess]
+    execution_pct: 0.30
+    delegation_pct: 0.40
+    review_depth: detailed
+    reasoning_style: task_oriented
+    time_horizon: days_to_weeks
+    max_reasoning_steps: 12
+    max_tool_calls: 5
+    max_self_monitor_checks: 4
+    can_delegate: true
+    can_escalate: true
+    can_consult_peers: true
+
+  senior_staff:
+    primary_modes: [research, analyze, synthesize, create]
+    execution_pct: 0.70
+    delegation_pct: 0.10
+    review_depth: self_review
+    reasoning_style: deep_analytical
+    time_horizon: hours_to_days
+    max_reasoning_steps: 15
+    max_tool_calls: 8
+    max_self_monitor_checks: 5
+    can_delegate: false
+    can_escalate: true
+    can_consult_peers: true
+
+  staff:
+    primary_modes: [research, analyze, create]
+    execution_pct: 0.85
+    delegation_pct: 0.0
+    review_depth: checklist
+    reasoning_style: procedural
+    time_horizon: minutes_to_hours
+    max_reasoning_steps: 10
+    max_tool_calls: 5
+    max_self_monitor_checks: 2
+    can_delegate: false
+    can_escalate: true
+    can_consult_peers: false
+
+  intern:
+    primary_modes: [research, create]
+    execution_pct: 0.95
+    delegation_pct: 0.0
+    review_depth: none
+    reasoning_style: direct_lookup
+    time_horizon: immediate
+    max_reasoning_steps: 5
+    max_tool_calls: 3
+    max_self_monitor_checks: 1
+    can_delegate: false
+    can_escalate: true
+    can_consult_peers: false

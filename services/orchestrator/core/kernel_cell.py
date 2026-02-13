@@ -1,9 +1,9 @@
 """
 The Kernel Cell — Universal Recursive Processing Unit.
 
-Every level of the corporate hierarchy — from CEO to intern — runs this
+Every level of the corporate hierarchy — from Board to Intern — runs this
 exact same code. Only the configuration differs: identity, tools, knowledge,
-budget, quality bar.
+budget, quality bar, and now **cognitive profile**.
 
 This is the CORE module of Kea's kernel. It wires together:
 - KnowledgeEnhancedInference → for context engineering per inference
@@ -14,13 +14,28 @@ This is the CORE module of Kea's kernel. It wires together:
 - ScoreCard → for multi-dimensional quality scoring
 - StdioEnvelope → for structured I/O contracts
 - Output Schemas → for validated LLM output parsing
+- CognitiveCycle → for the full perceive→frame→plan→execute↔monitor→package loop
+- WorkingMemory → for structured, human-inspired state tracking
+- CognitiveProfile → for level-aware reasoning styles
+- CellCommunicator → for multi-directional inter-cell messaging
+- MessageBus → for async message routing between cells
+- DelegationProtocol → for iterative, review-driven delegation
 
-Features:
+Features (v2.0.1 — Brain + Communication + Iterative Delegation):
+- Full cognitive cycle replaces flat ReAct loop
+- Structured working memory per cell (focus, hypotheses, decisions)
+- Level-aware cognitive profiles (intern → board)
+- Continuous self-monitoring during execution (not just post-hoc)
 - Recursive delegation: spawn_child() creates child cells
 - Budget-controlled execution: TokenBudget prevents infinite recursion
-- Solo execution: ReAct loop with tool calls for simple tasks
 - Quality gates: per-level thresholds with configurable failure actions
 - Contribution tracking: who produced what in the final output
+- Multi-directional communication: clarification, progress, sharing, escalation
+- Peer-to-peer data exchange between sibling cells
+- Communication budget: token-controlled messaging (15% of task budget)
+- Iterative delegation: multi-round review→feedback→revision loop
+- Conflict detection: contradictions between sibling outputs found and resolved
+- Synthesis notes: reviewer instructions carried into final synthesis
 """
 
 from __future__ import annotations
@@ -42,6 +57,20 @@ from shared.llm.provider import LLMMessage, LLMRole
 from shared.logging import get_logger
 from shared.prompts import get_agent_prompt, get_kernel_config
 
+from services.orchestrator.core.cognitive_cycle import CognitiveCycle, CycleOutput
+from services.orchestrator.core.cognitive_profiles import (
+    CognitiveProfile,
+    child_level_for,
+    get_cognitive_profile,
+)
+from services.orchestrator.core.working_memory import WorkingMemory
+from services.orchestrator.core.cell_communicator import CellCommunicator
+from services.orchestrator.core.message_bus import (
+    MessageChannel,
+    get_message_bus,
+    reset_message_bus,
+)
+
 from services.orchestrator.core.inference_context import (
     AgentIdentity,
     InferenceContext,
@@ -49,15 +78,29 @@ from services.orchestrator.core.inference_context import (
     get_inference_engine,
 )
 from services.orchestrator.core.complexity import classify_complexity
+from services.orchestrator.core.delegation_protocol import (
+    DelegationProtocol,
+    DelegationState,
+)
+from services.orchestrator.core.resource_governor import (
+    EscalationSeverity,
+    ExecutionGuard,
+    ResourceGovernor,
+)
 from services.orchestrator.core.output_schemas import (
     ActionType,
     ComplexityAssessment,
+    CriticOutput,
     PlannerOutput,
     ProcessingMode,
     ReasoningOutput,
     RoleResolution,
     SubTask,
     SynthesisOutput,
+    WorkPackage,
+    Artifact,
+    ArtifactStatus,
+    ArtifactMetadata,
 )
 from services.orchestrator.core.score_card import (
     ContributionLedger,
@@ -90,6 +133,7 @@ from services.orchestrator.core.stdio_envelope import (
     Warning,
     WarningSeverity,
 )
+from services.orchestrator.core.degradation import get_degrader
 
 logger = get_logger(__name__)
 
@@ -186,17 +230,24 @@ class CellState(BaseModel):
 
 class KernelCell:
     """
-    The Universal Employee — recursive kernel processing unit.
+    The Universal Employee — recursive kernel processing unit (v2.0).
 
-    Every level of the hierarchy runs this exact same code. Only the
-    configuration differs: identity, tools, knowledge, budget, quality bar.
+    Every level of the hierarchy runs this exact same code. The
+    **cognitive profile** modulates HOW the cell thinks:
+    - Interns do direct lookups with minimal reasoning
+    - Staff follow procedures with self-checks
+    - Senior Staff do deep analysis with hypothesis tracking
+    - Managers plan, delegate, and review
+    - Directors/VPs orchestrate multi-team work
+    - C-Suite synthesizes across domains
 
-    Phases:
+    Phases (v2.0 Cognitive Cycle):
         1. INTAKE — Parse instruction, load context and knowledge
-        2. ASSESS — Determine complexity → solo vs. delegation
-        3. EXECUTE — ReAct loop (solo) or spawn children (delegation)
-        4. QUALITY — Run consensus/self-review quality gate
-        5. OUTPUT — Package result as StdioEnvelope
+        2. ASSESS — Heuristic-first complexity → solo vs. delegation
+        3. EXECUTE — Full cognitive cycle (perceive→frame→plan→execute↔monitor→package)
+                     or spawn children (delegation)
+        4. QUALITY — Continuous monitoring + post-hoc quality gate
+        5. OUTPUT — Package result as StdioEnvelope with working memory metadata
 
     Usage:
         cell = KernelCell(
@@ -235,7 +286,31 @@ class KernelCell:
         settings = get_settings()
         self.model = model or settings.models.planner_model
 
-        # State
+        # ── Brain Upgrade (v2.0) ──────────────────────────────────────
+        # Cognitive profile: HOW this cell thinks (level-aware)
+        self.cognitive_profile: CognitiveProfile = get_cognitive_profile(
+            identity.level,
+        )
+
+        # Working memory: structured state instead of flat strings
+        self.working_memory = WorkingMemory(
+            cell_id=self.cell_id,
+            max_focus=self.cognitive_profile.max_reasoning_steps,
+        )
+
+        # ── Communication Network (v2.0) ──────────────────────────────
+        # Communicator: multi-directional messaging to parent/peers/children
+        self.comm = CellCommunicator(
+            cell_id=self.cell_id,
+            memory=self.working_memory,
+            total_budget=budget.max_tokens if budget else 30_000,
+            parent_id=parent.cell_id if parent else "",
+            peer_group="",  # Set by parent during _spawn_child
+        )
+
+        self.last_work_package: WorkPackage | None = None
+
+        # State (legacy, kept for backward compatibility)
         self.state = CellState()
         self.score_card = ScoreCard(
             cell_id=self.cell_id,
@@ -256,6 +331,26 @@ class KernelCell:
         # Config cache (avoid repeated YAML loads)
         self._complexity_modes: dict[str, str] | None = None
 
+        # ── Resource Governance (Phase 4) ─────────────────────────────
+        # Governor: manages budgets and escalations for children
+        async def _governor_llm_call(system_prompt: str, user_prompt: str) -> str:
+            messages = [
+                LLMMessage(role=LLMRole.SYSTEM, content=system_prompt),
+                LLMMessage(role=LLMRole.USER, content=user_prompt),
+            ]
+            response = await self.engine.complete(
+                messages,
+                LLMConfig(model=self.model, temperature=0.3, max_tokens=1000),
+            )
+            return response.content
+
+        self.governor = ResourceGovernor(
+            parent_cell_id=self.cell_id,
+            total_budget=self.budget.remaining,
+            llm_call=_governor_llm_call,
+            bus=get_message_bus(),
+        )
+
     # ================================================================== #
     # Phase 0: Main Entry Point
     # ================================================================== #
@@ -265,6 +360,9 @@ class KernelCell:
         The Universal Processing Loop.
 
         Every employee — CEO to intern — runs this exact loop.
+
+        v2.0.1 (Phase 4): Wrapped with ExecutionGuard for pre-flight
+        validation, execution tracking, and post-execution audit.
         """
         self._start_time = datetime.utcnow()
 
@@ -287,38 +385,76 @@ class KernelCell:
         self._work_unit.assign(agent_id=self.cell_id)
         self._work_unit.start()
 
+        # ── Execution Guard (Phase 4) ────────────────────────────────
+        guard = ExecutionGuard(
+            cell_id=self.cell_id,
+            budget_max=self.budget.max_tokens,
+            budget_remaining=self.budget.remaining,
+            max_execution_ms=60_000,
+            depth=self.budget.depth,
+            max_depth=self.budget.max_depth,
+        )
+
+        if not guard.can_execute():
+            logger.warning(
+                f"Cell {self.cell_id}: ExecutionGuard rejected — "
+                f"{guard._warnings}"
+            )
+            if self._work_unit:
+                self._work_unit.fail("Pre-flight check failed")
+            return self._package_error(
+                f"Pre-flight check failed: {'; '.join(guard._warnings)}",
+                task_title,
+            )
+
+        # ── Graceful Degradation (Phase 4) ───────────────────────────
+        degrader = get_degrader()
+
         try:
-            # Phase 1: INTAKE
-            task_text, context = await self._intake(envelope)
+            async with degrader.throttle():
+                async with guard:
+                    # Phase 1: INTAKE
+                    task_text, context = await self._intake(envelope)
 
-            # Phase 2: ASSESS complexity (heuristic-first, saves LLM calls)
-            processing_mode = await self._assess_complexity(task_text, context)
+                    # Phase 2: ASSESS complexity (heuristic-first, saves LLM calls)
+                    processing_mode = await self._assess_complexity(task_text, context)
 
-            # Phase 3: EXECUTE
-            if processing_mode in (ProcessingMode.DIRECT, ProcessingMode.SOLO):
-                result_content = await self._execute_solo(task_text, context, envelope)
-            elif self.budget.can_delegate:
-                result_content = await self._execute_delegation(task_text, context, envelope)
-            else:
-                # Budget exhausted, fall back to solo
-                logger.warning(
-                    f"Cell {self.cell_id}: Budget too low for delegation, "
-                    f"falling back to solo execution"
-                )
-                result_content = await self._execute_solo(task_text, context, envelope)
+                    # Phase 3: EXECUTE
+                    if processing_mode in (ProcessingMode.DIRECT, ProcessingMode.SOLO):
+                        result_content = await self._execute_solo(task_text, context, envelope)
+                    elif self.budget.can_delegate:
+                        result_content = await self._execute_delegation(task_text, context, envelope)
+                    else:
+                        # Budget exhausted, fall back to solo
+                        logger.warning(
+                            f"Cell {self.cell_id}: Budget too low for delegation, "
+                            f"falling back to solo execution"
+                        )
+                        result_content = await self._execute_solo(task_text, context, envelope)
 
-            # Phase 4: QUALITY ASSURANCE
-            scored_result = await self._quality_check(result_content, task_text)
+                    # Phase 4: QUALITY ASSURANCE
+                    scored_result = await self._quality_check(result_content, task_text)
 
-            # Phase 5: OUTPUT
-            self._work_unit.complete(result="Quality gate passed")
-            return self._package_output(scored_result, task_text)
+                    # Phase 5: OUTPUT
+                    self._work_unit.complete("Quality gate passed")
+
+                    # Store execution audit in working memory
+                    self.working_memory.store_fact(
+                        "execution_audit",
+                        str(guard.get_audit()),
+                    )
+
+                    return self._package_output(scored_result, task_text)
 
         except Exception as e:
             logger.error(f"Cell {self.cell_id} failed: {e}")
             if self._work_unit:
                 self._work_unit.fail(str(e))
             return self._package_error(str(e), task_title)
+
+        finally:
+            # Clean up communication registration
+            self.comm.cleanup()
 
     # ================================================================== #
     # Phase 1: INTAKE
@@ -458,7 +594,7 @@ class KernelCell:
         return ProcessingMode(fallback_str)
 
     # ================================================================== #
-    # Phase 3a: SOLO Execution (ReAct Loop)
+    # Phase 3a: SOLO Execution (Full Cognitive Cycle)
     # ================================================================== #
 
     async def _execute_solo(
@@ -467,117 +603,141 @@ class KernelCell:
         context: InferenceContext,
         envelope: StdioEnvelope,
     ) -> str:
-        """Execute task using a ReAct-style reasoning loop with tools."""
-        logger.info(f"Cell {self.cell_id}: Solo execution (ReAct loop)")
+        """
+        Execute task using the full cognitive cycle.
 
-        max_steps = min(self.state.max_steps, 15)
-        accumulated_content = ""
+        Replaces the flat ReAct loop with:
+            Perceive → Frame → Plan → [Execute ↔ Monitor → Adapt] → Package
 
-        for step_num in range(max_steps):
-            if not self.budget.has_remaining:
-                logger.warning(f"Cell {self.cell_id}: Budget exhausted at step {step_num}")
-                break
+        The cognitive profile (based on organizational level) modulates
+        how many phases are executed and how deeply:
+        - Interns skip framing, use direct lookup
+        - Senior staff do full deep analysis with hypothesis tracking
+        - Managers plan and review more than they execute
+        """
+        logger.info(
+            f"Cell {self.cell_id}: Solo execution via CognitiveCycle "
+            f"(profile={self.cognitive_profile.level}, "
+            f"style={self.cognitive_profile.reasoning_style.value})"
+        )
 
-            self.state.current_step = step_num + 1
+        # Build the cognitive cycle with level-aware profile
+        cycle = CognitiveCycle(
+            profile=self.cognitive_profile,
+            memory=self.working_memory,
+            llm_call=self._cognitive_llm_call,
+            tool_call=self._execute_tool_for_cycle,
+            task_id=self.cell_id,
+            communicator=self.comm,
+        )
 
-            try:
-                # Build reasoning context
-                reasoning_prompt = self._build_reasoning_prompt(
-                    task_text, step_num, accumulated_content,
-                )
+        # Extract available tool descriptions (if any)
+        available_tools: list[dict[str, Any]] = []
+        # Tools are discovered dynamically; we pass empty list and
+        # the cycle's execute step will use tool_call directly.
 
-                messages = [
-                    LLMMessage(role=LLMRole.SYSTEM, content=self._get_solo_system_prompt()),
-                    LLMMessage(role=LLMRole.USER, content=reasoning_prompt),
-                ]
+        # Build context string from envelope
+        context_str = ""
+        if envelope.stdin and envelope.stdin.context:
+            ctx = envelope.stdin.context
+            if ctx.domain_hints:
+                context_str += f"Domain: {', '.join(ctx.domain_hints)}\n"
+            if ctx.parent_task_id:
+                context_str += f"Parent task: {ctx.parent_task_id}\n"
 
-                config = LLMConfig(
-                    model=self.model,
-                    temperature=0.3,
-                    max_tokens=4096,
-                )
+        # Run the full cognitive cycle
+        cycle_output: CycleOutput = await cycle.run(
+            task=task_text,
+            context=context_str,
+            available_tools=available_tools,
+        )
 
-                # Get next action with structured output
-                result = await self.engine.structured_complete(
-                    messages, config, context,
-                    output_schema=ReasoningOutput,
-                )
-
-                if not isinstance(result, ReasoningOutput):
-                    # Fallback: treat as text analysis
-                    accumulated_content += f"\n{result.content}"
-                    continue
-
-                reasoning = result
-                self.budget.consume(100)  # Approximate cost per step
-
-                # Record step
-                step_record = {
-                    "step": step_num + 1,
-                    "thought": reasoning.thought,
-                    "action": reasoning.action.value,
-                    "confidence": reasoning.confidence,
-                    "timestamp": datetime.utcnow().isoformat(),
-                }
-
-                logger.info(
-                    f"Cell {self.cell_id} step {step_num + 1}: "
-                    f"{reasoning.action.value} (conf={reasoning.confidence:.2f})"
-                )
-
-                # Execute the action
-                if reasoning.action == ActionType.COMPLETE:
-                    accumulated_content = reasoning.action_input.get(
-                        "answer", accumulated_content,
-                    )
-                    step_record["observation"] = "Task completed"
-                    self.state.reasoning_steps.append(step_record)
-                    break
-
-                elif reasoning.action == ActionType.CALL_TOOL:
-                    tool_name = reasoning.action_input.get("tool", "")
-                    tool_args = reasoning.action_input.get("arguments", {})
-                    observation = await self._execute_tool(tool_name, tool_args)
-                    step_record["observation"] = observation[:500]
-                    accumulated_content += f"\n[Tool: {tool_name}]\n{observation[:1000]}"
-
-                elif reasoning.action == ActionType.ANALYZE:
-                    step_record["observation"] = reasoning.thought
-                    accumulated_content += f"\n[Analysis]\n{reasoning.thought}"
-
-                elif reasoning.action == ActionType.SYNTHESIZE:
-                    synthesis = await self._synthesize(task_text, accumulated_content, context)
-                    accumulated_content = synthesis
-                    step_record["observation"] = "Synthesis complete"
-                    self.state.reasoning_steps.append(step_record)
-                    break
-
-                elif reasoning.action in (ActionType.DELEGATE, ActionType.ESCALATE):
-                    # Can't delegate in solo mode, treat as escalation note
-                    accumulated_content += (
-                        f"\n[Note: Recommended {reasoning.action.value} "
-                        f"to {reasoning.delegate_to or 'parent'}]"
-                    )
-                    step_record["observation"] = f"Cannot {reasoning.action.value} in solo mode"
-
-                self.state.reasoning_steps.append(step_record)
-
-            except Exception as e:
-                logger.error(f"Cell {self.cell_id} step {step_num} error: {e}")
-                self.state.reasoning_steps.append({
-                    "step": step_num + 1,
-                    "thought": f"Error: {e}",
-                    "action": "error",
-                    "timestamp": datetime.utcnow().isoformat(),
-                })
-
-        # Force synthesis if we ran out of steps
-        if not accumulated_content or self.state.status != "complete":
-            accumulated_content = await self._synthesize(
-                task_text, accumulated_content, context,
+        # Handle delegation signal from the cognitive cycle
+        if cycle_output.needs_delegation and self.budget.can_delegate:
+            logger.info(
+                f"Cell {self.cell_id}: Cognitive cycle recommends delegation"
             )
+            return await self._execute_delegation(task_text, context, envelope)
 
-        return accumulated_content
+        # Transfer working memory signals to the score card
+        wm_state = cycle_output.memory_state
+        self.score_card.self_confidence = wm_state.get("overall_confidence", 0.5)
+        self.score_card.facts_contributed = wm_state.get("facts_count", 0)
+        if cycle_output.framing:
+            self.score_card.assumptions = cycle_output.framing.assumptions[:5]
+            self.score_card.data_gaps = cycle_output.framing.unknown_gaps[:5]
+
+        # Record step count in legacy state
+        self.state.current_step = wm_state.get("step_count", 0)
+
+        # Record tool calls in legacy state
+        for tool_result in cycle_output.tool_results:
+            self.state.tool_executions.append({
+                "tool": tool_result.get("tool", ""),
+                "arguments": tool_result.get("args", {}),
+                "success": True,
+                "timestamp": datetime.utcnow().isoformat(),
+            })
+
+        # Budget accounting (approximate)
+        estimated_tokens = int(cycle_output.elapsed_ms / 10)  # Rough heuristic
+        self.budget.consume(max(estimated_tokens, 200))
+
+        # Store work package for later packaging (v2.0)
+        if cycle_output.work_package:
+            self.last_work_package = cycle_output.work_package
+
+        # If cycle produced content, use it; otherwise fall back to synthesis
+        if cycle_output.content:
+            return cycle_output.content
+
+        # Fallback synthesis if cognitive cycle produced no content
+        logger.warning(
+            f"Cell {self.cell_id}: Cognitive cycle produced no content, "
+            f"falling back to synthesis"
+        )
+        return await self._synthesize(
+            task_text,
+            "\n".join(
+                f"- {k}: {v}" for k, v in self.working_memory.all_facts.items()
+            ) or "No data gathered",
+            context,
+        )
+
+    async def _cognitive_llm_call(
+        self,
+        system_prompt: str = "",
+        user_prompt: str = "",
+    ) -> Any:
+        """
+        LLM call adapter for the CognitiveCycle.
+
+        Bridges the cycle's simple (system_prompt, user_prompt) → str
+        interface to the engine's full message-based API.
+        """
+        messages = [
+            LLMMessage(role=LLMRole.SYSTEM, content=system_prompt),
+            LLMMessage(role=LLMRole.USER, content=user_prompt),
+        ]
+        config = LLMConfig(
+            model=self.model,
+            temperature=0.3,
+            max_tokens=4096,
+        )
+        response = await self.engine.complete(messages, config)
+        return response.content
+
+    async def _execute_tool_for_cycle(
+        self,
+        tool_name: str,
+        tool_args: dict[str, Any],
+    ) -> Any:
+        """
+        Tool execution adapter for the CognitiveCycle.
+
+        Wraps the existing tool_executor to also record in CellState.
+        """
+        return await self._execute_tool(tool_name, tool_args)
 
     # ================================================================== #
     # Phase 3b: DELEGATION Execution (Recursive)
@@ -589,7 +749,18 @@ class KernelCell:
         context: InferenceContext,
         envelope: StdioEnvelope,
     ) -> str:
-        """Execute task by planning and delegating to child cells."""
+        """
+        Execute task by planning and delegating to child cells.
+
+        v2.0: Children are registered as peers on the message bus.
+        Incoming messages (CLARIFY, PROGRESS, etc.) are processed
+        between phases, allowing the parent to course-correct.
+
+        v2.0.1 (Phase 3): Uses the DelegationProtocol for iterative
+        review — parent reviews child outputs, sends feedback for
+        revisions, and resolves conflicts between siblings before
+        final synthesis.
+        """
         logger.info(f"Cell {self.cell_id}: Delegation execution")
 
         # Step 1: Plan the delegation
@@ -599,56 +770,152 @@ class KernelCell:
             logger.warning(f"Cell {self.cell_id}: Empty plan, falling back to solo")
             return await self._execute_solo(task_text, context, envelope)
 
-        # Step 2: Execute each phase
-        all_results: list[StdioEnvelope] = []
+        # Create a peer group for all children in this delegation
+        peer_group = f"delegation-{self.cell_id}"
 
-        for phase_idx, phase in enumerate(plan.execution_order):
+        # ── Load delegation config ────────────────────────────────────
+        kernel_cfg = get_kernel_config()
+        delegation_cfg = kernel_cfg.get("delegation", {})
+        max_review_rounds = delegation_cfg.get("max_review_rounds", 2)
+        min_budget_for_review = delegation_cfg.get(
+            "min_budget_for_review", 2000,
+        )
+
+        # Scale review rounds by budget — no reviews if budget is thin
+        if self.budget.remaining < min_budget_for_review:
+            max_review_rounds = 0
             logger.info(
-                f"Cell {self.cell_id}: Phase {phase_idx + 1}/{len(plan.execution_order)} "
-                f"— {len(phase)} parallel subtasks"
+                f"Cell {self.cell_id}: Budget too low for review rounds "
+                f"({self.budget.remaining} < {min_budget_for_review})"
             )
 
-            # Find subtasks for this phase
-            phase_subtasks = [
-                st for st in plan.subtasks if st.id in phase
+        # ── Respect Graceful Degradation ──────────────────────────────
+        degrader = get_degrader()
+        if degrader.should_skip_optional():
+            max_review_rounds = 0
+            logger.warning(
+                f"Cell {self.cell_id}: Degradation active, skipping optional reviews"
+            )
+        elif degrader.get_current_level().level > 0:
+            max_review_rounds = max(1, max_review_rounds // 2)
+            logger.info(
+                f"Cell {self.cell_id}: Degradation active, reducing review rounds to {max_review_rounds}"
+            )
+
+        # ── Step 2: Run the Delegation Protocol ──────────────────────
+        # Wrap the inference engine for the protocol's llm_call interface
+        async def _delegation_llm_call(
+            system_prompt: str = "",
+            user_prompt: str = "",
+        ) -> str:
+            messages = [
+                LLMMessage(role=LLMRole.SYSTEM, content=system_prompt),
+                LLMMessage(role=LLMRole.USER, content=user_prompt),
             ]
+            config = LLMConfig(
+                model=self.model,
+                temperature=0.3,
+                max_tokens=2048,
+            )
+            response = await self.engine.complete(messages, config)
+            self.budget.consume(300)
+            return response.content
 
-            # Spawn children in parallel
-            child_coros = [
-                self._spawn_child(subtask) for subtask in phase_subtasks
-            ]
-            phase_results = await asyncio.gather(*child_coros, return_exceptions=True)
+        protocol = DelegationProtocol(
+            parent_cell_id=self.cell_id,
+            llm_call=_delegation_llm_call,
+            budget_remaining=self.budget.remaining,
+        )
 
-            for result in phase_results:
-                if isinstance(result, StdioEnvelope):
-                    all_results.append(result)
-                    self.state.child_results.append(result)
-                elif isinstance(result, Exception):
-                    logger.error(f"Child cell failed: {result}")
-                    all_results.append(self._package_error(
-                        str(result), "Child cell execution",
-                    ))
+        # Wrap _spawn_child for the protocol's interface
+        async def _spawn_wrapper(
+            subtask: SubTask, pg: str,
+        ) -> StdioEnvelope:
+            result = await self._spawn_child(subtask, peer_group=pg)
+            self.state.child_results.append(result)
+            return result
 
-        # Step 3: Aggregate child score cards
-        child_cards = [
-            ScoreCard(**r.metadata.model_dump())
-            for r in all_results
-            if r.metadata.confidence > 0
-        ]
-        if child_cards:
-            self.score_card = aggregate_scores(self.score_card, child_cards)
+        delegation_state: DelegationState = await protocol.run(
+            plan=plan,
+            spawn_fn=_spawn_wrapper,
+            max_rounds=max(1, max_review_rounds),
+            peer_group=peer_group,
+            govern_fn=self.governor.govern,
+        )
 
-        # Step 4: Synthesize all child outputs
+        # ── Process trailing messages from children ──────────────────
+        await self._process_delegation_messages()
+
+        # ── Step 3: Record delegation metrics ────────────────────────
+        self.working_memory.store_fact(
+            "delegation_summary",
+            f"{len(delegation_state.rounds)} rounds, "
+            f"{len(delegation_state.accepted_outputs)} accepted, "
+            f"{len(delegation_state.failed_subtasks)} failed, "
+            f"{delegation_state.conflicts_detected} conflicts "
+            f"({delegation_state.conflicts_resolved} resolved), "
+            f"{delegation_state.total_revisions} revisions",
+        )
+
+        # ── Step 4: Synthesize accepted outputs ──────────────────────
         child_outputs = []
-        for i, result in enumerate(all_results):
-            child_outputs.append(
-                f"[Subtask {i + 1}]\n{result.stdout.content[:2000]}"
+        all_artifacts: list[Artifact] = []
+
+        # Collect artifacts from delegation_state
+        for st_id, artifacts in delegation_state.accepted_artifacts.items():
+            for art in artifacts:
+                # Re-register artifacts in our own manager for the final package
+                new_art = self.working_memory.artifacts.create_artifact(
+                    id=f"{st_id}_{art.id}",
+                    type=art.type,
+                    title=art.title,
+                    content=art.content,
+                    summary=art.summary,
+                    confidence=art.confidence,
+                    metadata=art.metadata,
+                )
+                new_art.status = ArtifactStatus.PUBLISHED
+                all_artifacts.append(new_art)
+
+        for i, (st_id, content) in enumerate(
+            delegation_state.accepted_outputs.items(),
+        ):
+            if content:
+                child_outputs.append(
+                    f"[Subtask {st_id}]\n{content[:2000]}"
+                )
+
+        # Include synthesis notes from the review if available
+        synthesis_notes = ""
+        if delegation_state.rounds:
+            last_review = delegation_state.rounds[-1].review
+            if last_review and last_review.synthesis_notes:
+                synthesis_notes = (
+                    f"\n\n[REVIEWER NOTES]: {last_review.synthesis_notes}"
+                )
+
+        if not child_outputs:
+            logger.warning(
+                f"Cell {self.cell_id}: No accepted outputs, "
+                f"falling back to solo"
             )
+            return await self._execute_solo(task_text, context, envelope)
+
+        gathered = "\n\n---\n\n".join(child_outputs) + synthesis_notes
 
         synthesis = await self._synthesize(
             task_text,
-            "\n\n---\n\n".join(child_outputs),
+            gathered,
             context,
+        )
+
+        # Create a WorkPackage for the delegation result
+        self.last_work_package = WorkPackage(
+            summary=synthesis,
+            artifacts=all_artifacts,
+            overall_confidence=sum(a.confidence for a in all_artifacts) / max(len(all_artifacts), 1),
+            key_findings=[f"Synthesis of {len(delegation_state.accepted_outputs)} work products"],
+            metadata={"produced_by": "delegation", "rounds": len(delegation_state.rounds)}
         )
 
         return synthesis
@@ -706,12 +973,23 @@ class KernelCell:
 
         return None
 
-    async def _spawn_child(self, subtask: SubTask) -> StdioEnvelope:
-        """Spawn a child kernel cell — THIS IS THE RECURSION."""
-        # Resolve role for this subtask
+    async def _spawn_child(
+        self,
+        subtask: SubTask,
+        peer_group: str = "",
+    ) -> StdioEnvelope:
+        """
+        Spawn a child kernel cell — THIS IS THE RECURSION.
+
+        v2.0: Children are registered with the message bus. If a
+        peer_group is provided, all children in the same delegation
+        are connected as peers for lateral communication.
+        """
+        # Resolve role for this subtask using cognitive profile hierarchy
+        child_lvl = child_level_for(self.identity.level)
         child_identity = AgentIdentity(
             role=subtask.domain + "_analyst",
-            level=self._child_level(),
+            level=child_lvl,
             domain=subtask.domain,
         )
 
@@ -721,7 +999,7 @@ class KernelCell:
             min_tokens=1000,
         )
 
-        # Create child cell
+        # Create child cell (its __init__ registers with the bus)
         child = KernelCell(
             identity=child_identity,
             tool_executor=self.tool_executor,
@@ -732,6 +1010,24 @@ class KernelCell:
             model=self.model,
         )
         self.children.append(child)
+
+        # ── Register child in peer group for lateral messaging ────────
+        if peer_group:
+            bus = get_message_bus()
+            bus.register(
+                cell_id=child.cell_id,
+                parent_id=self.cell_id,
+                peer_group=peer_group,
+            )
+            # Update the child's communicator with the peer group
+            child.comm._peer_group = peer_group
+
+        # ── Register child with Resource Governor ────────────────────
+        self.governor.register_child(
+            child_id=child.cell_id,
+            subtask_id=subtask.id,
+            allocated=child_budget.max_tokens,
+        )
 
         # Build instruction envelope for child
         child_envelope = StdioEnvelope(
@@ -751,11 +1047,21 @@ class KernelCell:
 
         logger.info(
             f"Cell {self.cell_id} → spawned child {child.cell_id} "
-            f"({child_identity.role}, budget={child_budget.remaining})"
+            f"({child_identity.role}, budget={child_budget.remaining}, "
+            f"peers={'yes' if peer_group else 'no'})"
         )
 
         # RECURSIVE CALL — child runs the same process() loop
-        return await child.process(child_envelope)
+        result = await child.process(child_envelope)
+
+        # ── Record completion and reclaim surplus ────────────────────
+        # In a real async system, this would be an event, but here we await
+        tokens_used = result.stdout.metadata.get("tokens_used", 0) if hasattr(result, "stdout") else 0
+        surplus = self.governor.child_completed(child.cell_id, tokens_used=tokens_used)
+        if surplus > 0:
+            logger.debug(f"Cell {self.cell_id}: Reclaimed {surplus} tokens from {child.cell_id}")
+
+        return result
 
     # ================================================================== #
     # Phase 4: QUALITY ASSURANCE
@@ -912,7 +1218,13 @@ class KernelCell:
     # ================================================================== #
 
     def _package_output(self, content: str, task_text: str) -> StdioEnvelope:
-        """Package result as a StdioEnvelope."""
+        """
+        Package result as a StdioEnvelope.
+
+        v2.0: Enriched with working memory signals — confirmed hypotheses,
+        low-confidence areas, decisions made, and assumptions are surfaced
+        in the envelope's warnings and metadata.
+        """
         elapsed_ms = 0.0
         if self._start_time:
             elapsed_ms = (datetime.utcnow() - self._start_time).total_seconds() * 1000
@@ -926,21 +1238,54 @@ class KernelCell:
         self.score_card.children_spawned = len(self.children)
         self.score_card.delegation_depth = self.budget.depth
 
+        # ── Build warnings from working memory signals ────────────────
+        warnings: list[Warning] = []
+
+        # Data gaps
+        for gap in self.score_card.data_gaps:
+            warnings.append(Warning(
+                type="data_gap",
+                message=gap,
+                severity=WarningSeverity.MEDIUM,
+            ))
+
+        # Low-confidence areas from working memory
+        for topic, conf in self.working_memory.low_confidence_topics:
+            warnings.append(Warning(
+                type="low_confidence",
+                message=f"Low confidence ({conf:.2f}) on: {topic}",
+                severity=WarningSeverity.LOW,
+            ))
+
+        # Unanswered questions
+        for q in self.working_memory.unanswered_questions[:3]:
+            warnings.append(Warning(
+                type="unanswered_question",
+                message=f"Unanswered: {q.question[:100]}",
+                severity=WarningSeverity.LOW,
+            ))
+
+        # Assumptions from working memory
+        for assumption in self.score_card.assumptions:
+            warnings.append(Warning(
+                type="assumption",
+                message=f"Assumed: {assumption[:100]}",
+                severity=WarningSeverity.LOW,
+            ))
+
+        # Published artifacts from memory
+        published_artifacts = self.working_memory.artifacts.get_published()
+
         return StdioEnvelope(
             stdout=StdoutEnvelope(
                 content=content,
                 summary=content[:200] if content else "",
+                work_package=self.last_work_package,
             ),
             stderr=StderrEnvelope(
-                warnings=[
-                    Warning(
-                        type="data_gap",
-                        message=gap,
-                        severity=WarningSeverity.MEDIUM,
-                    )
-                    for gap in self.score_card.data_gaps
-                ],
+                warnings=warnings,
             ),
+            artifacts=published_artifacts,
             metadata=EnvelopeMetadata(
                 cell_id=self.cell_id,
                 level=self.identity.level,
@@ -951,6 +1296,11 @@ class KernelCell:
                 tokens_remaining=self.budget.remaining,
                 duration_ms=elapsed_ms,
                 children_count=len(self.children),
+                # Communication stats (v2.0)
+                messages_sent=self.comm.stats.get("messages_sent", 0) if self.comm else 0,
+                messages_received=self.comm.stats.get("messages_received", 0) if self.comm else 0,
+                comm_tokens_spent=self.comm.stats.get("comm_budget_spent", 0) if self.comm else 0,
+                clarifications_resolved=self.comm.stats.get("clarifications_answered", 0) if self.comm else 0,
             ),
             message_type=MessageType.REPORT,
         )
@@ -1013,26 +1363,160 @@ class KernelCell:
             })
             return f"ERROR: {e}"
 
+    async def _process_delegation_messages(self) -> None:
+        """
+        Process messages from children during delegation.
+
+        Handles CLARIFY, PROGRESS, PARTIAL, ESCALATE, and BLOCKED
+        messages from child cells. This is the "two-way street" that
+        was missing in v1 — children can now talk back to the parent.
+
+        For CLARIFY messages, we use the LLM to generate a contextual
+        answer. For PROGRESS and PARTIAL messages, we log them. For
+        ESCALATE and BLOCKED, we record in working memory.
+        """
+        async def _handle_child_message(msg):
+            """Auto-handle common message types from children."""
+            if msg.channel == MessageChannel.CLARIFY:
+                # Use the LLM to answer the child's question
+                answer = await self._answer_child_clarification(msg)
+                return answer
+
+            elif msg.channel == MessageChannel.PROGRESS:
+                pct = msg.payload.get("progress_pct", 0)
+                logger.info(
+                    f"Cell {self.cell_id} ← progress from {msg.sender_id}: "
+                    f"{pct:.0%} — {msg.content[:80]}"
+                )
+                return None  # No response needed
+
+            elif msg.channel == MessageChannel.PARTIAL:
+                logger.info(
+                    f"Cell {self.cell_id} ← partial from {msg.sender_id}: "
+                    f"{msg.content[:80]}"
+                )
+                if msg.payload.get("needs_feedback"):
+                    return "Continue with current approach."
+                return None
+
+            elif msg.channel == MessageChannel.ESCALATE:
+                severity_str = msg.payload.get("severity", "medium")
+                try:
+                    severity = EscalationSeverity(severity_str)
+                except ValueError:
+                    severity = EscalationSeverity.MEDIUM
+
+                record = await self.governor.handle_escalation(
+                    child_id=msg.sender_id,
+                    reason=msg.content,
+                    severity=severity,
+                    context=msg.payload.get("context", ""),
+                )
+
+                # Record in memory
+                self.working_memory.focus_observation(
+                    f"escalation-{msg.sender_id}",
+                    f"Child {msg.sender_id} escalated ({severity.value}): {msg.content[:200]} "
+                    f"— Resolution Strategy: {record.strategy.value}",
+                    source=f"child:{msg.sender_id}",
+                )
+                return record.response
+
+            elif msg.channel == MessageChannel.BLOCKED:
+                # Treat BLOCKED as high-severity escalation
+                record = await self.governor.handle_escalation(
+                    child_id=msg.sender_id,
+                    reason=msg.content,
+                    severity=EscalationSeverity.HIGH,
+                    context=msg.payload.get("context", ""),
+                )
+                return record.response
+
+            return None
+
+        await self.comm.process_incoming_messages(handler=_handle_child_message)
+
+    async def _answer_child_clarification(self, msg) -> str:
+        """
+        Generate an answer to a child's clarification question.
+
+        Uses the parent's working memory context and the original task
+        to provide a relevant answer.
+        """
+        try:
+            wm_context = self.working_memory.compress(max_chars=1000)
+            options = msg.payload.get("options", [])
+            options_str = ""
+            if options:
+                options_str = f"\nOptions provided: {', '.join(options)}"
+
+            messages = [
+                LLMMessage(
+                    role=LLMRole.SYSTEM,
+                    content=(
+                        "You are a manager answering a subordinate's question. "
+                        "Be concise, specific, and actionable. If you don't know, "
+                        "say so and provide your best guidance."
+                    ),
+                ),
+                LLMMessage(
+                    role=LLMRole.USER,
+                    content=(
+                        f"My subordinate ({msg.sender_id}) asks:\n"
+                        f"{msg.content}\n"
+                        f"{options_str}\n\n"
+                        f"Context from my own work:\n{wm_context}\n\n"
+                        f"Provide a clear, actionable answer."
+                    ),
+                ),
+            ]
+
+            config = LLMConfig(
+                model=self.model,
+                temperature=0.2,
+                max_tokens=256,
+            )
+
+            response = await self.engine.complete(messages, config)
+            self.budget.consume(30)  # Clarification cost
+            return response.content
+
+        except Exception as e:
+            logger.warning(f"Failed to answer clarification: {e}")
+            return "Proceed with your best judgment."
+
     async def _synthesize(
         self,
         task_text: str,
         gathered_data: str,
         context: InferenceContext,
     ) -> str:
-        """Synthesize final answer from gathered data."""
+        """
+        Synthesize final answer from gathered data.
+
+        v2.0.1: Updated to handle [CONFLICT RESOLUTION] notes and [REVIEWER NOTES]
+        produced by the iterative delegation protocol.
+        """
         synthesizer_prompt = get_agent_prompt("kernel_synthesizer")
 
         messages = [
             LLMMessage(
                 role=LLMRole.SYSTEM,
-                content=synthesizer_prompt,
+                content=(
+                    f"{synthesizer_prompt}\n\n"
+                    "Note: The gathered data may contain [CONFLICT RESOLUTION NOTE] markers "
+                    "where contradictions between analysts were resolved. Prioritize the "
+                    "content of these notes when reconciling differences."
+                ),
             ),
             LLMMessage(
                 role=LLMRole.USER,
                 content=(
                     f"Original Task: {task_text}\n\n"
-                    f"Gathered Data:\n{gathered_data[:6000]}\n\n"
-                    "Synthesize a complete answer."
+                    f"Gathered Data:\n{gathered_data[:8000]}\n\n"
+                    "Instructions: Synthesize a single, cohesive response that integrates all "
+                    "gathered data. If contradictions were noted in the data markers, use the "
+                    "resolution provided in the marker."
                 ),
             ),
         ]
@@ -1073,8 +1557,16 @@ class KernelCell:
         )
 
     def _get_solo_system_prompt(self) -> str:
-        """System prompt for solo ReAct execution."""
-        return get_agent_prompt("agentic_step")
+        """
+        System prompt for solo execution.
+
+        v2.0: Combines the base agentic step prompt with the cognitive
+        profile's system prompt modifier and reasoning instruction.
+        """
+        base = get_agent_prompt("agentic_step")
+        modifier = self.cognitive_profile.system_prompt_modifier
+        reasoning = self.cognitive_profile.get_reasoning_instruction()
+        return f"{base}\n\n{modifier}\n\nREASONING APPROACH:\n{reasoning}"
 
     def _get_quality_bar(self, envelope: StdioEnvelope) -> str:
         """Extract quality bar from envelope constraints."""
@@ -1083,13 +1575,13 @@ class KernelCell:
         return "professional"
 
     def _child_level(self) -> str:
-        """Determine the level for a child cell."""
-        hierarchy = ["ceo", "vp", "director", "manager", "staff", "intern"]
-        try:
-            current_idx = hierarchy.index(self.identity.level)
-            return hierarchy[min(current_idx + 1, len(hierarchy) - 1)]
-        except ValueError:
-            return "staff"
+        """
+        Determine the level for a child cell.
+
+        v2.0: Delegates to cognitive_profiles.child_level_for() which
+        uses the full board→intern hierarchy chain.
+        """
+        return child_level_for(self.identity.level)
 
 
 # ============================================================================
@@ -1110,6 +1602,9 @@ async def run_kernel(
 
     This is the primary entry point for the entire Kea kernel.
 
+    v2.0: Resets the message bus at session start so each query
+    gets a clean communication slate.
+
     Args:
         query: User's query/objective.
         tool_executor: Async function to execute tools: (name, args) -> result.
@@ -1129,6 +1624,9 @@ async def run_kernel(
         )
         print(result.stdout.content)
     """
+    # Reset communication network for this session
+    reset_message_bus()
+
     identity = AgentIdentity(role="orchestrator", level=level, domain=domain)
     token_budget = TokenBudget(
         max_tokens=budget, remaining=budget, max_depth=max_depth,

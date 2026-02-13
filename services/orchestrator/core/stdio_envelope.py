@@ -12,8 +12,8 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 from typing import Any
-
 from pydantic import BaseModel, Field
+from services.orchestrator.core.output_schemas import Artifact, WorkPackage
 
 
 # ============================================================================
@@ -167,6 +167,7 @@ class StdoutEnvelope(BaseModel):
     sections: list[DeliverableSection] = Field(default_factory=list)
     summary: str = Field(default="", description="One-paragraph executive summary")
     key_findings: list[KeyFinding] = Field(default_factory=list)
+    work_package: WorkPackage | None = Field(default=None, description="Structured work package (v2.0)")
 
 
 # ============================================================================
@@ -254,6 +255,12 @@ class EnvelopeMetadata(BaseModel):
     children_count: int = Field(default=0)
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
+    # Communication stats (v2.0)
+    messages_sent: int = Field(default=0)
+    messages_received: int = Field(default=0)
+    comm_tokens_spent: int = Field(default=0)
+    clarifications_resolved: int = Field(default=0)
+
 
 # ============================================================================
 # The Complete Envelope
@@ -286,7 +293,7 @@ class StdioEnvelope(BaseModel):
     stdin: StdinEnvelope | None = Field(default=None, description="Input instruction")
     stdout: StdoutEnvelope = Field(default_factory=StdoutEnvelope, description="Primary output")
     stderr: StderrEnvelope = Field(default_factory=StderrEnvelope, description="Warnings/errors")
-    artifacts: list[ArtifactReference] = Field(default_factory=list, description="Produced artifacts")
+    artifacts: list[Artifact] = Field(default_factory=list, description="Produced artifacts (v2.0)")
     metadata: EnvelopeMetadata = Field(default_factory=EnvelopeMetadata, description="Processing metadata")
 
     # Communication
