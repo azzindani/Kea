@@ -10,56 +10,38 @@ import uuid
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+import httpx
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from services.orchestrator.core.graph import compile_research_graph, GraphState
-from services.mcp_host.core.session_registry import get_session_registry
+from services.orchestrator.core.graph import GraphState, compile_research_graph
 from shared.config import get_settings
 from shared.logging import get_logger
 from shared.logging.middleware import RequestLoggingMiddleware
 from shared.schemas import ResearchStatus
+from shared.service_registry import ServiceName, ServiceRegistry
 
 logger = get_logger(__name__)
 
 # Global state
-registry = None
 research_graph = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle manager for the FastAPI app."""
-    global registry, research_graph
-    
-    settings = get_settings()
-    
+    global research_graph
+
     logger.info("Starting Orchestrator service")
-    
-    # Initialize Registry (Auto-Discovery)
-    registry = get_session_registry()
-    
-    # Static RAG Population (Background)
-    # This pushes the ~660 discovered tools (name+docstring) to Postgres
-    # so the Planner can find them via semantic search.
-    import asyncio
-    asyncio.create_task(registry.register_discovered_tools())
-    
-    # await registry.list_all_tools() # DISABLED: Warmup causes hangs in threaded startup. Rely on JIT.
-    logger.info(f"Registry initialized (Lazy Mode + Static RAG)")
 
     # =========================================================================
-    # Initialize Enterprise Subsystems
+    # Initialize Orchestrator-owned subsystems only.
+    # Other services (MCP Host, Vault, SwarmManager) are accessed via REST API.
     # =========================================================================
     try:
-        from services.vault.core.audit_trail import configure_audit_trail, AuditBackend
-        from services.swarm_manager.core.compliance import get_compliance_engine
-        
-        # 2. Compliance Engine (Guardrails)
-        compliance = get_compliance_engine()
-        logger.info(f"Compliance Engine initialized with {len(compliance.rules)} rule sets")
-        
-        # 3. Organization (The Corporate Structure)
-        from services.orchestrator.core.organization import get_organization, Domain
+        # Organization structure (owned by Orchestrator)
+        from services.orchestrator.core.organization import Domain, get_organization
+
         org = get_organization()
         if not org.list_departments():
             org.create_department("Research", Domain.RESEARCH)
@@ -67,24 +49,21 @@ async def lifespan(app: FastAPI):
             org.create_department("Legal", Domain.LEGAL)
             logger.info("Organization structure initialized: Research, Finance, Legal")
 
-        # 4. Memory (The Mind)
+        # Conversation memory (owned by Orchestrator)
         from services.orchestrator.core.conversation import get_conversation_manager
-        memory = get_conversation_manager()
+
+        get_conversation_manager()
         logger.info("Conversation Memory initialized")
-        
+
     except Exception as e:
-        logger.error(f"Failed to initialize enterprise systems: {e}")
-    
+        logger.error(f"Failed to initialize orchestrator subsystems: {e}")
+
     # Compile research graph
     research_graph = compile_research_graph()
     logger.info("Research graph compiled")
-    
+
     yield
-    
-    # Cleanup
-    if registry:
-        await registry.shutdown()
-    
+
     logger.info("Orchestrator service stopped")
 
 
@@ -104,26 +83,33 @@ app.add_middleware(RequestLoggingMiddleware)
 # Request/Response Models
 # ============================================================================
 
+
 class ResearchRequest(BaseModel):
     """Research job request."""
+
     query: str = Field(..., min_length=1, description="Research query")
     depth: int = Field(default=2, ge=1, le=5, description="Research depth")
     max_sources: int = Field(default=10, ge=1, le=50, description="Max sources")
-    
+
     # Cross-attempt context sharing (for retry scenarios)
-    seed_facts: list[dict] | None = Field(default=None, description="Facts from previous attempt to build upon")
-    error_feedback: list[dict] | None = Field(default=None, description="Errors from previous attempt to avoid")
+    seed_facts: list[dict] | None = Field(
+        default=None, description="Facts from previous attempt to build upon"
+    )
+    error_feedback: list[dict] | None = Field(
+        default=None, description="Errors from previous attempt to avoid"
+    )
 
 
 class ResearchResponse(BaseModel):
     """Research job response."""
+
     job_id: str
     status: str
     report: str | None = None
     confidence: float = 0.0
     sources_count: int = 0
     facts_count: int = 0
-    
+
     # Cross-attempt context (for retry scenarios)
     facts: list[dict] = []  # Actual facts for passing to next attempt
     errors: list[dict] = []  # Errors encountered for next attempt to avoid
@@ -133,45 +119,63 @@ class ResearchResponse(BaseModel):
 # Routes
 # ============================================================================
 
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
+    # Proxy active session count from MCP Host via its REST API
+    active_sessions = 0
+    try:
+        mcp_url = ServiceRegistry.get_url(ServiceName.MCP_HOST)
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            resp = await client.get(f"{mcp_url}/health")
+            if resp.status_code == 200:
+                active_sessions = resp.json().get("active_sessions", 0)
+    except Exception:
+        pass  # MCP Host may not be up yet; non-fatal
+
     return {
         "status": "healthy",
         "service": "orchestrator",
-        "active_sessions": len(registry.active_sessions) if registry else 0,
+        "active_sessions": active_sessions,
     }
 
 
 @app.get("/tools")
 async def list_tools():
-    """List all available MCP tools."""
-    if not registry:
-        return {"tools": []}
-    
-    tools = await registry.list_all_tools()
-    return {"tools": tools}
+    """List all available MCP tools via MCP Host service."""
+    try:
+        mcp_url = ServiceRegistry.get_url(ServiceName.MCP_HOST)
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(f"{mcp_url}/tools")
+            if resp.status_code == 200:
+                return resp.json()
+    except Exception as e:
+        logger.warning(f"Could not reach MCP Host for tool list: {e}")
+    return {"tools": []}
 
 
 @app.post("/research", response_model=ResearchResponse)
 async def start_research(request: ResearchRequest):
     """
     Start a synchronous research job.
-    
+
     For async jobs, use POST /jobs instead.
     """
     global research_graph
-    
+
     if not research_graph:
         raise HTTPException(status_code=503, detail="Research graph not initialized")
-    
+
     job_id = f"job-{uuid.uuid4().hex[:8]}"
-    
+
     seed_count = len(request.seed_facts) if request.seed_facts else 0
     error_count = len(request.error_feedback) if request.error_feedback else 0
-    logger.info(f"Starting research job {job_id} (seed_facts={seed_count}, errors={error_count})", 
-                extra={"query": request.query[:100]})
-    
+    logger.info(
+        f"Starting research job {job_id} (seed_facts={seed_count}, errors={error_count})",
+        extra={"query": request.query[:100]},
+    )
+
     # Build initial state with seed context (for cross-attempt sharing)
     initial_state: GraphState = {
         "job_id": job_id,
@@ -194,11 +198,11 @@ async def start_research(request: ResearchRequest):
         "error": None,
         "error_feedback": request.error_feedback or [],  # Initialize with previous errors
     }
-    
+
     try:
         # Execute the research graph
         final_state = await research_graph.ainvoke(initial_state)
-        
+
         return ResearchResponse(
             job_id=job_id,
             status=final_state.get("status", "completed"),
@@ -209,7 +213,7 @@ async def start_research(request: ResearchRequest):
             facts=final_state.get("facts", []),  # Return facts for cross-attempt sharing
             errors=final_state.get("error_feedback", []),  # Return errors for next attempt
         )
-        
+
     except Exception as e:
         error_msg = str(e) or f"Unknown error ({type(e).__name__})"
         logger.error(f"Research job {job_id} failed: {error_msg}", exc_info=True)
@@ -218,28 +222,21 @@ async def start_research(request: ResearchRequest):
 
 @app.post("/tools/{tool_name}")
 async def call_tool(tool_name: str, arguments: dict[str, Any]):
-    """Call a specific MCP tool directly."""
-    if not registry:
-        raise HTTPException(status_code=503, detail="Registry not initialized")
-    
-    server_name = registry.get_server_for_tool(tool_name)
-    if not server_name:
-        # JIT
-        await registry.list_all_tools()
-        server_name = registry.get_server_for_tool(tool_name)
-        
-    if not server_name:
-         raise HTTPException(status_code=404, detail=f"Tool {tool_name} not found")
-
+    """Call a specific MCP tool via MCP Host service."""
     try:
-        session = await registry.get_session(server_name)
-        result = await session.call_tool(tool_name, arguments)
-        
-        return {
-            "tool": tool_name,
-            "is_error": result.isError,
-            "content": [c.model_dump() for c in result.content],
-        }
+        mcp_url = ServiceRegistry.get_url(ServiceName.MCP_HOST)
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                f"{mcp_url}/tools/execute",
+                json={"tool_name": tool_name, "arguments": arguments},
+            )
+            if resp.status_code == 404:
+                raise HTTPException(status_code=404, detail=f"Tool {tool_name} not found")
+            if resp.status_code != 200:
+                raise HTTPException(status_code=resp.status_code, detail=resp.text)
+            return resp.json()
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -248,17 +245,19 @@ async def call_tool(tool_name: str, arguments: dict[str, Any]):
 # Pipeline Endpoint (Chat)
 # ============================================================================
 
+
 class ChatMessageRequest(BaseModel):
     conversation_id: str
     content: str
     user_id: str
     attachments: list[str] = []
 
+
 @app.post("/chat/message")
 async def process_chat_message(request: ChatMessageRequest):
     """
     Process a chat message through the research pipeline.
-    
+
     This endpoint:
     1. Classifies the query
     2. Checks cache
@@ -267,10 +266,10 @@ async def process_chat_message(request: ChatMessageRequest):
     5. Returns the result (content, sources, etc.)
     """
     from services.orchestrator.core.pipeline import get_research_pipeline
-    
+
     try:
         pipeline = await get_research_pipeline()
-        
+
         # Note: pipeline.process_message does NOT store to DB if called directly.
         # But pipeline.process_and_store DOES.
         # However, Gateway's conversation route typically adds the User message first,
@@ -282,14 +281,14 @@ async def process_chat_message(request: ChatMessageRequest):
         # So we should return the Result, and let Gateway save the Assistant msg (or Orchestrator).
         # To keep Gateway as the "Interface Layer", it handles DB interaction for the conversation view.
         # Orchestrator provides the "Result".
-        
+
         result = await pipeline.process_message(
             conversation_id=request.conversation_id,
             content=request.content,
             user_id=request.user_id,
             attachments=request.attachments,
         )
-        
+
         return {
             "content": result.content,
             "confidence": result.confidence,
@@ -300,48 +299,48 @@ async def process_chat_message(request: ChatMessageRequest):
             "query_type": result.query_type,
             "was_cached": result.was_cached,
         }
-        
+
     except Exception as e:
         logger.error(f"Pipeline processing failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
-
 
 
 # ============================================================================
 # Streaming Endpoints (SSE)
 # ============================================================================
 
-from fastapi.responses import StreamingResponse
 import json
+
+from fastapi.responses import StreamingResponse
 
 
 @app.get("/research/stream")
 async def stream_research(query: str, depth: int = 2, max_sources: int = 10):
     """
     Stream research results via Server-Sent Events (SSE).
-    
+
     This endpoint provides real-time updates as the research progresses:
     - Planning phase updates
     - Tool call results
     - LLM streaming output
     - Final report
-    
+
     Example:
         curl -N "http://localhost:8000/research/stream?query=What%20is%20AI"
     """
-    
+
     async def event_generator():
         global research_graph
-        
+
         if not research_graph:
             yield f"data: {json.dumps({'event': 'error', 'message': 'Research graph not initialized'})}\n\n"
             return
-        
+
         job_id = f"stream-{uuid.uuid4().hex[:8]}"
-        
+
         # Send start event
         yield f"data: {json.dumps({'event': 'start', 'job_id': job_id, 'query': query})}\n\n"
-        
+
         # Build initial state
         initial_state: GraphState = {
             "job_id": job_id,
@@ -363,71 +362,80 @@ async def stream_research(query: str, depth: int = 2, max_sources: int = 10):
             "should_continue": True,
             "error": None,
         }
-        
+
         try:
             # Stream LLM if available
             import os
+
             if os.getenv("OPENROUTER_API_KEY"):
-                from shared.llm import OpenRouterProvider, LLMConfig
+                from shared.llm import LLMConfig, OpenRouterProvider
                 from shared.llm.provider import LLMMessage, LLMRole
-                
+
                 provider = OpenRouterProvider()
                 config = LLMConfig(temperature=0.7, max_tokens=32768)
-                
+
                 # Phase 1: Planning
                 yield f"data: {json.dumps({'event': 'phase', 'phase': 'planning'})}\n\n"
-                
+
                 messages = [
-                    LLMMessage(role=LLMRole.SYSTEM, content="You are a research planner. Be concise."),
-                    LLMMessage(role=LLMRole.USER, content=f"Plan research for: {query}")
+                    LLMMessage(
+                        role=LLMRole.SYSTEM, content="You are a research planner. Be concise."
+                    ),
+                    LLMMessage(role=LLMRole.USER, content=f"Plan research for: {query}"),
                 ]
-                
+
                 async for chunk in provider.stream(messages, config):
                     if chunk.content:
                         yield f"data: {json.dumps({'event': 'chunk', 'phase': 'planning', 'content': chunk.content})}\n\n"
-                
+
                 # Phase 2: Research (using graph)
                 yield f"data: {json.dumps({'event': 'phase', 'phase': 'research'})}\n\n"
-                
+
                 final_state = await research_graph.ainvoke(initial_state)
-                
+
                 # Phase 3: Synthesis with streaming
                 yield f"data: {json.dumps({'event': 'phase', 'phase': 'synthesis'})}\n\n"
-                
+
                 facts_text = "\n".join([str(f)[:100] for f in final_state.get("facts", [])[:5]])
-                
+
                 messages = [
-                    LLMMessage(role=LLMRole.SYSTEM, content="You are a research synthesizer. Create concise reports."),
-                    LLMMessage(role=LLMRole.USER, content=f"Synthesize research on: {query}\n\nFacts:\n{facts_text}")
+                    LLMMessage(
+                        role=LLMRole.SYSTEM,
+                        content="You are a research synthesizer. Create concise reports.",
+                    ),
+                    LLMMessage(
+                        role=LLMRole.USER,
+                        content=f"Synthesize research on: {query}\n\nFacts:\n{facts_text}",
+                    ),
                 ]
-                
+
                 report_chunks = []
                 async for chunk in provider.stream(messages, config):
                     if chunk.content:
                         report_chunks.append(chunk.content)
                         yield f"data: {json.dumps({'event': 'chunk', 'phase': 'synthesis', 'content': chunk.content})}\n\n"
-                
+
                 final_report = "".join(report_chunks) or final_state.get("report", "")
-                
+
             else:
                 # Fallback without streaming
                 final_state = await research_graph.ainvoke(initial_state)
                 final_report = final_state.get("report", "Research completed without LLM.")
-            
+
             # Send completion
             yield f"data: {json.dumps({'event': 'complete', 'job_id': job_id, 'report': final_report, 'confidence': final_state.get('confidence', 0.5), 'facts_count': len(final_state.get('facts', [])), 'sources_count': len(final_state.get('sources', []))})}\n\n"
-            
+
         except Exception as e:
             logger.error(f"Stream research error: {e}")
             yield f"data: {json.dumps({'event': 'error', 'message': str(e)})}\n\n"
-    
+
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-        }
+        },
     )
 
 
@@ -436,24 +444,26 @@ async def stream_research(query: str, depth: int = 2, max_sources: int = 10):
 # ============================================================================
 
 # Force Proactor loop for Windows subprocess support
-import sys
 import asyncio
+import sys
+
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
 
 def main():
     """Run the orchestrator service."""
     import uvicorn
-    
+
     settings = get_settings()
-    
-    from shared.service_registry import ServiceRegistry, ServiceName
-    
+
+    from shared.service_registry import ServiceName, ServiceRegistry
+
     uvicorn.run(
         "services.orchestrator.main:app",
         host=settings.api_host,
         port=ServiceRegistry.get_port(ServiceName.ORCHESTRATOR),
-        reload=False, 
+        reload=False,
         loop="asyncio",
     )
 

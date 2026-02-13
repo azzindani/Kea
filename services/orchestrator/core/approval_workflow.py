@@ -6,16 +6,14 @@ Provides structured approval workflows for enterprise use.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Callable, Awaitable
 from uuid import uuid4
 
+from shared.audit import AuditEventType, log_audit_event
 from shared.logging import get_logger
-
-from services.vault.core.audit_trail import AuditEventType, get_audit_trail
-
 
 logger = get_logger(__name__)
 
@@ -24,15 +22,18 @@ logger = get_logger(__name__)
 # Types
 # ============================================================================
 
+
 class ApprovalType(Enum):
     """Type of approval required."""
-    OPTIONAL = "optional"       # Can proceed without approval
-    REQUIRED = "required"       # Must wait for approval
-    BLOCKING = "blocking"       # Blocks all related work
+
+    OPTIONAL = "optional"  # Can proceed without approval
+    REQUIRED = "required"  # Must wait for approval
+    BLOCKING = "blocking"  # Blocks all related work
 
 
 class ApprovalStatus(Enum):
     """Status of approval request."""
+
     PENDING = "pending"
     APPROVED = "approved"
     REJECTED = "rejected"
@@ -42,49 +43,51 @@ class ApprovalStatus(Enum):
 
 class ApprovalCategory(Enum):
     """Category of approval."""
-    DECISION = "decision"           # Decision that needs human input
-    DATA_ACCESS = "data_access"     # Access to sensitive data
-    EXTERNAL_ACTION = "external"    # External API/action
-    COST = "cost"                   # High cost operation
-    COMPLIANCE = "compliance"       # Compliance-related
-    QUALITY = "quality"             # Quality review
-    SECURITY = "security"           # Security-related
+
+    DECISION = "decision"  # Decision that needs human input
+    DATA_ACCESS = "data_access"  # Access to sensitive data
+    EXTERNAL_ACTION = "external"  # External API/action
+    COST = "cost"  # High cost operation
+    COMPLIANCE = "compliance"  # Compliance-related
+    QUALITY = "quality"  # Quality review
+    SECURITY = "security"  # Security-related
 
 
 @dataclass
 class ApprovalRequest:
     """Request for human approval."""
+
     request_id: str
     category: ApprovalCategory
     approval_type: ApprovalType
-    
+
     # Context
-    requester: str          # Agent or system requesting
-    work_id: str = ""       # Related work unit
-    session_id: str = ""    # Session context
-    
+    requester: str  # Agent or system requesting
+    work_id: str = ""  # Related work unit
+    session_id: str = ""  # Session context
+
     # Details
     title: str = ""
     description: str = ""
     context: dict = field(default_factory=dict)
     options: list[str] = field(default_factory=list)  # Available choices
-    
+
     # Access control
-    required_role: str = ""     # Role required to approve
-    assignee: str = ""          # Specific assignee (optional)
-    
+    required_role: str = ""  # Role required to approve
+    assignee: str = ""  # Specific assignee (optional)
+
     # Timing
     created_at: datetime = field(default_factory=datetime.utcnow)
     deadline: datetime | None = None
     expires_at: datetime | None = None
-    
+
     # Result
     status: ApprovalStatus = ApprovalStatus.PENDING
     decision: str = ""
     decided_by: str = ""
     decided_at: datetime | None = None
     comments: str = ""
-    
+
     def is_expired(self) -> bool:
         """Check if request is expired."""
         if self.expires_at is None:
@@ -95,6 +98,7 @@ class ApprovalRequest:
 @dataclass
 class WorkflowStep:
     """Single step in approval workflow."""
+
     step_id: str
     name: str
     required_role: str
@@ -105,11 +109,12 @@ class WorkflowStep:
 @dataclass
 class ApprovalWorkflowDefinition:
     """Definition of approval workflow."""
+
     workflow_id: str
     name: str
     description: str
     steps: list[WorkflowStep] = field(default_factory=list)
-    
+
     def add_step(self, role: str, name: str = "", timeout_hours: int = 24):
         """Add step to workflow."""
         step = WorkflowStep(
@@ -125,19 +130,20 @@ class ApprovalWorkflowDefinition:
 # Approval Workflow Manager
 # ============================================================================
 
+
 class ApprovalWorkflow:
     """
     Manages approval workflows.
-    
+
     Features:
     - Multi-step approval chains
     - Role-based access control
     - Timeout and expiration
     - Audit trail integration
-    
+
     Example:
         workflow = ApprovalWorkflow()
-        
+
         # Create request
         request_id = await workflow.create_request(
             category=ApprovalCategory.DECISION,
@@ -145,27 +151,27 @@ class ApprovalWorkflow:
             description="Need approval for external API call",
             required_role="manager",
         )
-        
+
         # Wait for approval
         result = await workflow.wait_for_approval(request_id, timeout_seconds=300)
-        
+
         # Or approve programmatically
         await workflow.approve(request_id, approver="manager@company.com")
     """
-    
+
     def __init__(self):
         self._requests: dict[str, ApprovalRequest] = {}
         self._workflows: dict[str, ApprovalWorkflowDefinition] = {}
         self._callbacks: dict[str, Callable] = {}
-        
+
         # Register default workflows
         self._register_default_workflows()
-        
+
         logger.debug("ApprovalWorkflow initialized")
-    
+
     def _register_default_workflows(self):
         """Register default approval workflows."""
-        
+
         # High-value decision workflow
         high_value = ApprovalWorkflowDefinition(
             "high_value_decision",
@@ -175,7 +181,7 @@ class ApprovalWorkflow:
         high_value.add_step("team_lead", "Team Lead Review")
         high_value.add_step("manager", "Manager Approval")
         self.register_workflow(high_value)
-        
+
         # Compliance workflow
         compliance = ApprovalWorkflowDefinition(
             "compliance_review",
@@ -185,7 +191,7 @@ class ApprovalWorkflow:
         compliance.add_step("compliance_officer", "Compliance Officer Review")
         compliance.add_step("legal", "Legal Approval", timeout_hours=48)
         self.register_workflow(compliance)
-        
+
         # Security workflow
         security = ApprovalWorkflowDefinition(
             "security_review",
@@ -195,7 +201,7 @@ class ApprovalWorkflow:
         security.add_step("security_team", "Security Team Review")
         security.add_step("ciso", "CISO Approval")
         self.register_workflow(security)
-        
+
         # Simple approval
         simple = ApprovalWorkflowDefinition(
             "simple",
@@ -204,12 +210,12 @@ class ApprovalWorkflow:
         )
         simple.add_step("approver", "Approval Required")
         self.register_workflow(simple)
-    
+
     def register_workflow(self, workflow: ApprovalWorkflowDefinition):
         """Register approval workflow definition."""
         self._workflows[workflow.workflow_id] = workflow
         logger.debug(f"Registered workflow: {workflow.workflow_id}")
-    
+
     async def create_request(
         self,
         category: ApprovalCategory,
@@ -226,7 +232,7 @@ class ApprovalWorkflow:
     ) -> str:
         """
         Create approval request.
-        
+
         Returns:
             Request ID
         """
@@ -244,12 +250,11 @@ class ApprovalWorkflow:
             assignee=assignee,
             expires_at=datetime.utcnow() + timedelta(hours=expires_in_hours),
         )
-        
+
         self._requests[request.request_id] = request
-        
-        # Audit log
-        audit = get_audit_trail()
-        await audit.log(
+
+        # Audit log via Vault API
+        await log_audit_event(
             AuditEventType.APPROVAL_REQUESTED,
             action=f"Approval requested: {title}",
             actor=requester,
@@ -259,11 +264,11 @@ class ApprovalWorkflow:
                 "required_role": required_role,
             },
         )
-        
+
         logger.info(f"Created approval request: {request.request_id} - {title}")
-        
+
         return request.request_id
-    
+
     async def approve(
         self,
         request_id: str,
@@ -273,7 +278,7 @@ class ApprovalWorkflow:
     ) -> bool:
         """
         Approve a request.
-        
+
         Returns:
             True if approved successfully
         """
@@ -281,24 +286,23 @@ class ApprovalWorkflow:
         if not request:
             logger.warning(f"Approval request not found: {request_id}")
             return False
-        
+
         if request.status != ApprovalStatus.PENDING:
             logger.warning(f"Request not pending: {request_id}")
             return False
-        
+
         if request.is_expired():
             request.status = ApprovalStatus.EXPIRED
             return False
-        
+
         request.status = ApprovalStatus.APPROVED
         request.decision = decision
         request.decided_by = approver
         request.decided_at = datetime.utcnow()
         request.comments = comments
-        
-        # Audit log
-        audit = get_audit_trail()
-        await audit.log(
+
+        # Audit log via Vault API
+        await log_audit_event(
             AuditEventType.APPROVAL_GRANTED,
             action=f"Request approved: {request.title}",
             actor=approver,
@@ -308,17 +312,17 @@ class ApprovalWorkflow:
                 "comments": comments,
             },
         )
-        
+
         # Trigger callback if registered
         if request_id in self._callbacks:
             try:
                 await self._callbacks[request_id](request)
             except Exception as e:
                 logger.error(f"Approval callback error: {e}")
-        
+
         logger.info(f"Approved: {request_id} by {approver}")
         return True
-    
+
     async def reject(
         self,
         request_id: str,
@@ -327,26 +331,25 @@ class ApprovalWorkflow:
     ) -> bool:
         """
         Reject a request.
-        
+
         Returns:
             True if rejected successfully
         """
         request = self._requests.get(request_id)
         if not request:
             return False
-        
+
         if request.status != ApprovalStatus.PENDING:
             return False
-        
+
         request.status = ApprovalStatus.REJECTED
         request.decision = "rejected"
         request.decided_by = approver
         request.decided_at = datetime.utcnow()
         request.comments = reason
-        
-        # Audit log
-        audit = get_audit_trail()
-        await audit.log(
+
+        # Audit log via Vault API
+        await log_audit_event(
             AuditEventType.APPROVAL_DENIED,
             action=f"Request rejected: {request.title}",
             actor=approver,
@@ -355,10 +358,10 @@ class ApprovalWorkflow:
                 "reason": reason,
             },
         )
-        
+
         logger.info(f"Rejected: {request_id} by {approver} - {reason}")
         return True
-    
+
     async def wait_for_approval(
         self,
         request_id: str,
@@ -367,35 +370,35 @@ class ApprovalWorkflow:
     ) -> ApprovalRequest | None:
         """
         Wait for approval with timeout.
-        
+
         Returns:
             Approved request or None if timeout/rejected
         """
         import asyncio
-        
+
         request = self._requests.get(request_id)
         if not request:
             return None
-        
+
         start_time = datetime.utcnow()
         timeout_delta = timedelta(seconds=timeout_seconds)
-        
+
         while request.status == ApprovalStatus.PENDING:
             if datetime.utcnow() - start_time > timeout_delta:
                 logger.warning(f"Approval timeout: {request_id}")
                 return None
-            
+
             if request.is_expired():
                 request.status = ApprovalStatus.EXPIRED
                 return None
-            
+
             await asyncio.sleep(poll_interval)
-        
+
         if request.status == ApprovalStatus.APPROVED:
             return request
-        
+
         return None
-    
+
     def get_pending(
         self,
         role: str = None,
@@ -403,29 +406,29 @@ class ApprovalWorkflow:
     ) -> list[ApprovalRequest]:
         """Get pending approval requests."""
         pending = []
-        
+
         for request in self._requests.values():
             if request.status != ApprovalStatus.PENDING:
                 continue
-            
+
             if request.is_expired():
                 request.status = ApprovalStatus.EXPIRED
                 continue
-            
+
             if role and request.required_role and request.required_role != role:
                 continue
-            
+
             if assignee and request.assignee and request.assignee != assignee:
                 continue
-            
+
             pending.append(request)
-        
+
         return sorted(pending, key=lambda r: r.created_at, reverse=True)
-    
+
     def get_request(self, request_id: str) -> ApprovalRequest | None:
         """Get request by ID."""
         return self._requests.get(request_id)
-    
+
     def register_callback(
         self,
         request_id: str,
@@ -433,19 +436,19 @@ class ApprovalWorkflow:
     ):
         """Register callback for when request is approved."""
         self._callbacks[request_id] = callback
-    
+
     @property
     def pending_count(self) -> int:
         """Get count of pending requests."""
         return len(self.get_pending())
-    
+
     @property
     def stats(self) -> dict:
         """Get workflow statistics."""
         pending = sum(1 for r in self._requests.values() if r.status == ApprovalStatus.PENDING)
         approved = sum(1 for r in self._requests.values() if r.status == ApprovalStatus.APPROVED)
         rejected = sum(1 for r in self._requests.values() if r.status == ApprovalStatus.REJECTED)
-        
+
         return {
             "total": len(self._requests),
             "pending": pending,
@@ -459,46 +462,61 @@ class ApprovalWorkflow:
 # HITL Configuration
 # ============================================================================
 
+
 @dataclass
 class HITLConfig:
     """
     Configuration for when human intervention is required.
-    
+
     Automatic triggers:
     - Low confidence responses
     - High risk keywords
     - Sensitive domains
-    
+
     Example:
         config = HITLConfig(
             confidence_threshold=0.7,
             high_risk_keywords=["delete", "execute", "transfer"],
         )
-        
+
         if config.requires_review(confidence=0.5, query="delete all files"):
             await request_human_review(...)
     """
-    
+
     # Confidence-based triggers
     confidence_threshold: float = 0.7
-    
+
     # Keyword triggers
-    high_risk_keywords: list[str] = field(default_factory=lambda: [
-        "delete", "remove", "execute", "transfer", "payment",
-        "password", "credential", "sensitive",
-    ])
-    
+    high_risk_keywords: list[str] = field(
+        default_factory=lambda: [
+            "delete",
+            "remove",
+            "execute",
+            "transfer",
+            "payment",
+            "password",
+            "credential",
+            "sensitive",
+        ]
+    )
+
     # Domain triggers
-    sensitive_domains: list[str] = field(default_factory=lambda: [
-        "finance", "legal", "medical", "security", "compliance",
-    ])
-    
+    sensitive_domains: list[str] = field(
+        default_factory=lambda: [
+            "finance",
+            "legal",
+            "medical",
+            "security",
+            "compliance",
+        ]
+    )
+
     # Cost thresholds
     cost_threshold: float = 100.0  # Trigger review for operations > $100
-    
+
     # Manual request settings
     allow_user_request: bool = True
-    
+
     def requires_review(
         self,
         confidence: float = 1.0,
@@ -508,30 +526,30 @@ class HITLConfig:
         user_requested: bool = False,
     ) -> bool:
         """Check if human review is required."""
-        
+
         # User explicitly requested review
         if user_requested and self.allow_user_request:
             return True
-        
+
         # Low confidence
         if confidence < self.confidence_threshold:
             return True
-        
+
         # High risk keywords
         query_lower = query.lower()
         if any(kw in query_lower for kw in self.high_risk_keywords):
             return True
-        
+
         # Sensitive domain
         if domain.lower() in [d.lower() for d in self.sensitive_domains]:
             return True
-        
+
         # Cost threshold
         if cost >= self.cost_threshold:
             return True
-        
+
         return False
-    
+
     def get_trigger_reason(
         self,
         confidence: float = 1.0,
@@ -540,21 +558,21 @@ class HITLConfig:
         cost: float = 0.0,
     ) -> str | None:
         """Get reason for triggering review."""
-        
+
         if confidence < self.confidence_threshold:
             return f"Low confidence ({confidence:.0%})"
-        
+
         query_lower = query.lower()
         for kw in self.high_risk_keywords:
             if kw in query_lower:
                 return f"High risk keyword: {kw}"
-        
+
         if domain.lower() in [d.lower() for d in self.sensitive_domains]:
             return f"Sensitive domain: {domain}"
-        
+
         if cost >= self.cost_threshold:
             return f"High cost: ${cost:.2f}"
-        
+
         return None
 
 
