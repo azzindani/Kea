@@ -44,6 +44,17 @@ class ResourceGovernor:
         # State
         self._last_state: SystemState | None = None
         
+    async def get_system_state(self) -> SystemState:
+        """Alias for check_health to match public API expectations."""
+        return await self.check_health()
+
+    @property
+    def _active_agents(self) -> int:
+        """Return the active agent count from the last health check."""
+        if self._last_state:
+            return self._last_state.active_agents
+        return 0
+
     async def check_health(self) -> SystemState:
         """Get current system health snapshot."""
         # 1. Hardware Metrics

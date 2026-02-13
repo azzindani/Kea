@@ -165,7 +165,7 @@ class EscalateRequest(BaseModel):
 async def list_agent_escalations() -> dict:
     """List pending escalations from the supervisor."""
     supervisor = get_supervisor()
-    count = supervisor.pending_escalation_count()
+    count = supervisor.pending_escalation_count
     escalations = (
         list(supervisor._pending_escalations.values())
         if hasattr(supervisor, "_pending_escalations")
@@ -219,8 +219,11 @@ async def resource_status() -> dict:
     governor = get_governor()
     state = await governor.get_system_state()
     return {
-        "state": state.value if hasattr(state, "value") else str(state),
-        "active_agents": governor._active_agents,
+        "status": state.status,
+        "active_agents": state.active_agents,
+        "cpu_percent": state.cpu_percent,
+        "ram_percent": state.ram_percent,
+        "db_connections": state.db_connections,
     }
 
 
