@@ -1,7 +1,11 @@
 
 import httpx
 import os
-import pandas as pd
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
+
 import io
 import json
 from shared.logging.structured import get_logger
@@ -10,6 +14,8 @@ logger = get_logger(__name__)
 
 async def parse_excel(url: str, sheet_name: str = None, preview_rows: int = 10) -> str:
     """Parse Excel file."""
+    if pd is None:
+        return "Error: pandas is not installed. Excel parsing is unavailable."
     try:
         if url.startswith(("http://", "https://")):
             async with httpx.AsyncClient(timeout=60) as client:

@@ -1,7 +1,11 @@
 
 import httpx
 import json
-from bs4 import BeautifulSoup
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
+
 from shared.logging.structured import get_logger
 
 logger = get_logger(__name__)
@@ -11,6 +15,8 @@ async def parse_html(url: str, extract: str = "text", selector: str = None) -> s
     Parse HTML page.
     extract: 'text', 'links', 'tables', 'images'
     """
+    if BeautifulSoup is None:
+        return "Error: beautifulsoup4 is not installed. HTML parsing is unavailable."
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",

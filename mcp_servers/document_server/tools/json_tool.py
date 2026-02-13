@@ -1,13 +1,19 @@
 
 import httpx
 import json
-import pandas as pd
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
+
 from shared.logging.structured import get_logger
 
 logger = get_logger(__name__)
 
 async def parse_json(url: str, flatten: bool = False, path: str = None) -> str:
     """Parse JSON file."""
+    if flatten and pd is None:
+        return "Error: pandas is not installed. JSON flattening is unavailable."
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.get(url)

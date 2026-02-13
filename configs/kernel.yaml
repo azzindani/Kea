@@ -27,3 +27,82 @@ defaults:
 llm_callbacks:
   planner_temperature: 0.3          # Temperature for internal LLM callbacks (parameter corrector, spawner)
   planner_max_tokens: 32768         # Max tokens for internal LLM callbacks
+
+# ==============================================================================
+# Kernel Cell v1.0 Configuration
+# ==============================================================================
+
+kernel_cell:
+  # Token Budget Defaults
+  budget:
+    default_max_tokens: 30000
+    simple_query_budget: 5000
+    complex_query_budget: 50000
+    min_child_budget: 1000
+    reserve_for_synthesis: 2000
+
+  # Recursion Limits
+  recursion:
+    max_depth: 5
+    max_children_per_cell: 8
+    max_steps_per_cell: 15
+
+  # Quality Gates Per Level
+  quality_gates:
+    intern:   { min_accuracy: 0.55, min_composite: 0.45, max_retries: 3 }
+    staff:    { min_accuracy: 0.65, min_composite: 0.55, max_retries: 2 }
+    manager:  { min_accuracy: 0.70, min_composite: 0.60, max_retries: 1 }
+    director: { min_accuracy: 0.75, min_composite: 0.65, max_retries: 1 }
+    vp:       { min_accuracy: 0.80, min_composite: 0.70, max_retries: 1 }
+    ceo:      { min_accuracy: 0.85, min_composite: 0.75, max_retries: 0 }
+
+  # Score Dimension Weights
+  scoring:
+    accuracy: 0.25
+    completeness: 0.18
+    relevance: 0.18
+    depth: 0.13
+    novelty: 0.06
+    coherence: 0.10
+    actionability: 0.10
+
+  # Aggregation Weights for Hierarchical Roll-up
+  aggregation:
+    children_weight: 0.50
+    review_weight: 0.30
+    integration_weight: 0.20
+
+  # Knowledge Retrieval
+  knowledge:
+    default_skill_limit: 3
+    default_rule_limit: 2
+    default_procedure_limit: 2
+
+  # Consensus Rounds Per Level
+  consensus:
+    staff_rounds: 0
+    manager_rounds: 1
+    director_rounds: 2
+    vp_rounds: 2
+    ceo_rounds: 3
+
+  # Quality Bar Instructions (injected into every LLM call by inference engine)
+  quality_instructions:
+    draft: >
+      QUALITY: DRAFT — Prioritize speed and coverage over polish.
+      Incomplete data is acceptable — flag gaps clearly.
+    professional: >
+      QUALITY: PROFESSIONAL — Deliver thorough, well-structured, verified output.
+      Cross-reference data points. Cite sources.
+    executive: >
+      QUALITY: EXECUTIVE — Deliver boardroom-ready output: precise language,
+      no filler, actionable insights, quantified claims,
+      risk-aware recommendations with confidence levels.
+
+  # Maps existing ComplexityTier → ProcessingMode (used by _assess_complexity)
+  complexity_mode_mapping:
+    trivial: direct
+    low: solo
+    medium: solo
+    high: delegate
+    extreme: hierarchy
