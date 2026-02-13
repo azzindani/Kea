@@ -20,12 +20,14 @@ sys.path.append(str(Path(__file__).parent))
 
 from shared.mcp.fastmcp import FastMCP
 from session_manager import BrowserSession
-from mcp_servers.playwright_server.tools import (
-    nav_ops, input_ops, dom_ops, network_ops, state_ops, chain_ops, scraper_ops,
-    frame_ops, dialog_ops, device_ops, extract_ops,
-    audit_ops, perf_ops, mock_ops, context_ops, clipboard_ops,
-    visual_ops, gesture_ops, wait_ops, assert_ops, browser_ops
-)
+# from mcp_servers.playwright_server.tools import (
+#     nav_ops, input_ops, dom_ops, network_ops, state_ops, chain_ops, scraper_ops,
+#     frame_ops, dialog_ops, device_ops, extract_ops,
+#     audit_ops, perf_ops, mock_ops, context_ops, clipboard_ops,
+#     visual_ops, gesture_ops, wait_ops, assert_ops, browser_ops
+# )
+# Note: Tools will be imported lazily inside each tool function to speed up startup.
+
 import structlog
 import asyncio
 from typing import List, Dict, Any, Optional, Union
@@ -62,6 +64,7 @@ async def goto_page(url: str, timeout: int = 30000, wait_until: str = "domconten
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import nav_ops
     return await nav_ops.goto_page(url, timeout, wait_until)
 
 @mcp.tool()
@@ -70,6 +73,7 @@ async def go_back() -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import nav_ops
     return await nav_ops.go_back()
 
 @mcp.tool()
@@ -78,6 +82,7 @@ async def go_forward() -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import nav_ops
     return await nav_ops.go_forward()
 
 @mcp.tool()
@@ -86,6 +91,7 @@ async def reload_page() -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import nav_ops
     return await nav_ops.reload_page()
 
 @mcp.tool()
@@ -94,6 +100,7 @@ async def create_tab() -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import nav_ops
     return await nav_ops.create_tab()
 
 @mcp.tool()
@@ -102,6 +109,7 @@ async def close_tab() -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import nav_ops
     return await nav_ops.close_tab()
 
 @mcp.tool()
@@ -110,6 +118,7 @@ async def set_viewport(width: int, height: int) -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import nav_ops
     return await nav_ops.set_viewport(width, height)
 
 @mcp.tool()
@@ -118,6 +127,7 @@ async def get_url() -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import nav_ops
     return await nav_ops.get_current_url()
 
 # ==========================================
@@ -129,6 +139,7 @@ async def click_element(selector: str, timeout: int = 5000) -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import input_ops
     return await input_ops.click_element(selector, timeout)
 
 @mcp.tool()
@@ -138,6 +149,7 @@ async def type_text(selector: str, text: str, delay: int = 0) -> str:
     [RAG Context]
     Types char by char.
     """
+    from mcp_servers.playwright_server.tools import input_ops
     return await input_ops.type_text(selector, text, delay)
 
 @mcp.tool()
@@ -147,6 +159,7 @@ async def fill_input(selector: str, value: str) -> str:
     [RAG Context]
     Fast fill.
     """
+    from mcp_servers.playwright_server.tools import input_ops
     return await input_ops.fill_input(selector, value)
 
 @mcp.tool()
@@ -156,6 +169,7 @@ async def press_key(key: str) -> str:
     [RAG Context]
     Enter, Tab, Escape, etc.
     """
+    from mcp_servers.playwright_server.tools import input_ops
     return await input_ops.press_key(key)
 
 @mcp.tool()
@@ -164,6 +178,7 @@ async def hover_element(selector: str) -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import input_ops
     return await input_ops.hover_element(selector)
 
 @mcp.tool()
@@ -172,6 +187,7 @@ async def check_checkbox(selector: str, checked: bool = True) -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import input_ops
     return await input_ops.check_checkbox(selector, checked)
 
 @mcp.tool()
@@ -180,6 +196,7 @@ async def select_option(selector: str, value: str) -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import input_ops
     return await input_ops.select_option(selector, value)
 
 @mcp.tool()
@@ -188,6 +205,7 @@ async def drag_and_drop(source: str, target: str) -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import input_ops
     return await input_ops.drag_and_drop(source, target)
 
 # ==========================================
@@ -202,6 +220,7 @@ async def get_page_content() -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import dom_ops
     return await dom_ops.get_page_content()
 
 @mcp.tool()
@@ -210,6 +229,7 @@ async def get_element_text(selector: str) -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import dom_ops
     return await dom_ops.get_element_text(selector)
 
 @mcp.tool()
@@ -218,6 +238,7 @@ async def get_all_text(selector: str) -> List[str]:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import dom_ops
     return await dom_ops.get_all_text(selector)
 
 @mcp.tool()
@@ -226,6 +247,7 @@ async def get_attribute(selector: str, attribute: str) -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import dom_ops
     return await dom_ops.get_element_attribute(selector, attribute)
 
 @mcp.tool()
@@ -234,6 +256,7 @@ async def get_all_attributes(selector: str, attribute: str) -> List[str]:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import dom_ops
     return await dom_ops.get_all_attributes(selector, attribute)
 
 @mcp.tool()
@@ -243,6 +266,7 @@ async def get_table_data(selector: str) -> List[Dict[str, str]]:
     [RAG Context]
     Returns list of dicts (row headers).
     """
+    from mcp_servers.playwright_server.tools import dom_ops
     return await dom_ops.get_table_data(selector)
 
 @mcp.tool()
@@ -252,6 +276,7 @@ async def evaluate_js(script: str, arg: Any = None) -> Any:
     [RAG Context]
     Runs within page context.
     """
+    from mcp_servers.playwright_server.tools import dom_ops
     return await dom_ops.evaluate_js(script, arg)
 
 @mcp.tool()
@@ -260,6 +285,7 @@ async def screenshot(selector: str, path: str) -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import dom_ops
     return await dom_ops.screenshot_element(selector, path)
 
 @mcp.tool()
@@ -268,6 +294,7 @@ async def screenshot_page(path: str) -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import dom_ops
     return await dom_ops.screenshot_page(path)
 
 # ==========================================
@@ -280,6 +307,7 @@ async def block_resources(resource_types: List[str] = ["image", "stylesheet", "f
     [RAG Context]
     Speeds up scraping.
     """
+    from mcp_servers.playwright_server.tools import network_ops
     return await network_ops.block_resources(resource_types)
 
 @mcp.tool()
@@ -288,6 +316,7 @@ async def get_cookies() -> List[Dict[str, Any]]:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import state_ops
     return await state_ops.get_cookies()
 
 @mcp.tool()
@@ -296,6 +325,7 @@ async def set_cookies(cookies: List[Dict[str, Any]]) -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import state_ops
     return await state_ops.set_cookies(cookies)
 
 @mcp.tool()
@@ -304,6 +334,7 @@ async def clear_cookies() -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import state_ops
     return await state_ops.clear_cookies()
 
 # ==========================================
@@ -318,6 +349,7 @@ async def frame_click(selector: str, frame_name: Optional[str] = None) -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import frame_ops
     return await frame_ops.frame_click(selector, frame_name)
 
 @mcp.tool()
@@ -326,6 +358,7 @@ async def frame_fill(selector: str, value: str, frame_name: Optional[str] = None
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import frame_ops
     return await frame_ops.frame_fill(selector, value, frame_name)
 
 @mcp.tool()
@@ -334,6 +367,7 @@ async def handle_dialog(action: str = "accept", prompt_text: Optional[str] = Non
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import dialog_ops
     return await dialog_ops.handle_dialog(action, prompt_text)
 
 @mcp.tool()
@@ -342,6 +376,7 @@ async def enable_console() -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import dialog_ops
     return await dialog_ops.enable_console_capture()
 
 @mcp.tool()
@@ -350,6 +385,7 @@ async def get_console() -> List[str]:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import dialog_ops
     return await dialog_ops.get_console_logs()
 
 # ==========================================
@@ -361,6 +397,7 @@ async def set_geolocation(latitude: float, longitude: float) -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import device_ops
     return await device_ops.set_geolocation(latitude, longitude)
 
 @mcp.tool()
@@ -369,6 +406,7 @@ async def grant_permissions(permissions: List[str]) -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import device_ops
     return await device_ops.grant_permissions(permissions)
 
 @mcp.tool()
@@ -377,6 +415,7 @@ async def extract_links(selector: str = "a", match_pattern: Optional[str] = None
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import extract_ops
     return await extract_ops.extract_links(selector, match_pattern)
 
 @mcp.tool()
@@ -385,6 +424,7 @@ async def get_computed_style(selector: str, property: str) -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import extract_ops
     return await extract_ops.get_computed_style(selector, property)
 
 # ==========================================
@@ -400,6 +440,7 @@ async def audit_accessibility(selector: str = "body") -> Dict[str, Any]:
     [RAG Context]
     Uses Axe-core.
     """
+    from mcp_servers.playwright_server.tools import audit_ops
     return await audit_ops.check_accessibility(selector)
 
 @mcp.tool()
@@ -408,6 +449,7 @@ async def audit_seo() -> Dict[str, Any]:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import audit_ops
     return await audit_ops.audit_seo()
 
 @mcp.tool()
@@ -417,6 +459,7 @@ async def get_performance() -> Dict[str, float]:
     [RAG Context]
     Navigation timing, etc.
     """
+    from mcp_servers.playwright_server.tools import perf_ops
     return await perf_ops.get_performance_metrics()
 
 @mcp.tool()
@@ -426,6 +469,7 @@ async def start_tracing(path: str = "trace.zip") -> str:
     [RAG Context]
     Debugging tool.
     """
+    from mcp_servers.playwright_server.tools import perf_ops
     return await perf_ops.start_tracing(path)
 
 @mcp.tool()
@@ -434,6 +478,7 @@ async def stop_tracing(path: str = "trace.zip") -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import perf_ops
     return await perf_ops.stop_tracing(path)
 
 # ==========================================
@@ -446,6 +491,7 @@ async def mock_api(url_pattern: str, body: Dict[str, Any]) -> str:
     [RAG Context]
     Intersects requests.
     """
+    from mcp_servers.playwright_server.tools import mock_ops
     return await mock_ops.mock_api_response(url_pattern, body)
 
 @mcp.tool()
@@ -454,6 +500,7 @@ async def abort_requests(url_pattern: str) -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import mock_ops
     return await mock_ops.route_abort(url_pattern)
 
 @mcp.tool()
@@ -462,6 +509,7 @@ async def save_session(path: str) -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import context_ops
     return await context_ops.save_storage_state(path)
 
 @mcp.tool()
@@ -471,6 +519,7 @@ async def load_session(path: str) -> str:
     [RAG Context]
     Restores cookies/localStorage.
     """
+    from mcp_servers.playwright_server.tools import context_ops
     return await context_ops.load_storage_state(path)
 
 @mcp.tool()
@@ -479,6 +528,7 @@ async def get_clipboard() -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import clipboard_ops
     return await clipboard_ops.read_clipboard()
 
 @mcp.tool()
@@ -487,6 +537,7 @@ async def set_clipboard(text: str) -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import clipboard_ops
     return await clipboard_ops.write_clipboard(text)
 
 # ==========================================
@@ -501,6 +552,7 @@ async def print_to_pdf(path: str, format: str = "A4") -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import visual_ops
     return await visual_ops.print_to_pdf(path, format)
 
 @mcp.tool()
@@ -510,6 +562,7 @@ async def screenshot_mask(path: str, mask_selector: str) -> str:
     [RAG Context]
     Hides sensitive data.
     """
+    from mcp_servers.playwright_server.tools import visual_ops
     return await visual_ops.screenshot_mask(path, mask_selector)
 
 @mcp.tool()
@@ -519,6 +572,7 @@ async def tap_point(x: float, y: float) -> str:
     [RAG Context]
     Mobile emulation.
     """
+    from mcp_servers.playwright_server.tools import gesture_ops
     return await gesture_ops.tap_point(x, y)
 
 @mcp.tool()
@@ -528,6 +582,7 @@ async def swipe(x_start: float, y_start: float, x_end: float, y_end: float) -> s
     [RAG Context]
     Mobile emulation.
     """
+    from mcp_servers.playwright_server.tools import gesture_ops
     return await gesture_ops.swipe(x_start, y_start, x_end, y_end)
 
 # ==========================================
@@ -539,6 +594,7 @@ async def wait_for_selector(selector: str, state: str = "visible", timeout: int 
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import wait_ops
     return await wait_ops.wait_for_selector(selector, state, timeout)
 
 @mcp.tool()
@@ -547,6 +603,7 @@ async def wait_for_url(url_regex: str, timeout: int = 30000) -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import wait_ops
     return await wait_ops.wait_for_url(url_regex, timeout)
 
 @mcp.tool()
@@ -555,6 +612,7 @@ async def wait_for_function(function_body: str, arg: Any = None) -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import wait_ops
     return await wait_ops.wait_for_function(function_body, arg)
 
 @mcp.tool()
@@ -564,6 +622,7 @@ async def assert_title(expected: str) -> str:
     [RAG Context]
     Test assertion.
     """
+    from mcp_servers.playwright_server.tools import assert_ops
     return await assert_ops.assert_title(expected)
 
 @mcp.tool()
@@ -573,6 +632,7 @@ async def assert_text(text: str) -> str:
     [RAG Context]
     Test assertion.
     """
+    from mcp_servers.playwright_server.tools import assert_ops
     return await assert_ops.assert_text_present(text)
 
 @mcp.tool()
@@ -582,6 +642,7 @@ async def assert_count(selector: str, min_count: int) -> str:
     [RAG Context]
     Test assertion.
     """
+    from mcp_servers.playwright_server.tools import assert_ops
     return await assert_ops.assert_element_count(selector, min_count)
 
 # ==========================================
@@ -593,6 +654,7 @@ async def launch_browser(browser_type: str = "chromium") -> str:
     
     [RAG Context]
     """
+    from mcp_servers.playwright_server.tools import browser_ops
     return await browser_ops.launch_browser(browser_type)
 
 @mcp.tool()
@@ -602,6 +664,7 @@ async def get_browser_info() -> Dict[str, str]:
     [RAG Context]
     Version, user agent.
     """
+    from mcp_servers.playwright_server.tools import browser_ops
     return await browser_ops.get_browser_info()
 
 @mcp.tool()
@@ -623,6 +686,7 @@ async def execute_browser_chain(steps: List[Dict[str, Any]]) -> List[Dict[str, A
     [RAG Context]
     Batched execution.
     """
+    from mcp_servers.playwright_server.tools import chain_ops
     return await chain_ops.execute_browser_chain(steps)
 
 @mcp.tool()
@@ -632,6 +696,7 @@ async def scrape_infinite_scroll(item_selector: str, max_scrolls: int = 10) -> s
     [RAG Context]
     Auto-scrolls and collects items.
     """
+    from mcp_servers.playwright_server.tools import scraper_ops
     return await scraper_ops.scrape_infinite_scroll(item_selector, max_scrolls)
 
 @mcp.tool()
@@ -641,6 +706,7 @@ async def scrape_pagination(next_button_selector: str, item_selector: str, max_p
     [RAG Context]
     Clicks 'Next' automatically.
     """
+    from mcp_servers.playwright_server.tools import scraper_ops
     return await scraper_ops.scrape_pagination(next_button_selector, item_selector, max_pages)
 
 

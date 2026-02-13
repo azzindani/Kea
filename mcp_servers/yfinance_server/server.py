@@ -18,9 +18,11 @@ os.environ.pop('MPLBACKEND', None)
 sys.path.append(str(Path(__file__).parent))
 
 from shared.mcp.fastmcp import FastMCP, Image
-from mcp_servers.yfinance_server.tools import (
-    charts, market, financials, holders, analysis, options, discovery, aggregators
-)
+# from mcp_servers.yfinance_server.tools import (
+#     charts, market, financials, holders, analysis, options, discovery, aggregators
+# )
+# Note: Tools will be imported lazily inside each tool function to speed up startup.
+
 import structlog
 from typing import List, Dict, Any, Optional
 import yfinance as yf
@@ -42,6 +44,7 @@ async def get_current_price(ticker: str) -> str:
     Returns a realtime snapshot including current price, day high/low, and volume.
     Use this for single-point price checks.
     """
+    from mcp_servers.yfinance_server.tools import market
     return await market.get_current_price(ticker)
 
 @mcp.tool()
@@ -52,6 +55,7 @@ async def get_market_cap(ticker: str) -> str:
     Returns the total value of all outstanding shares.
     Useful for comparing company size (Large Cap vs Small Cap).
     """
+    from mcp_servers.yfinance_server.tools import market
     return await market.get_market_cap(ticker)
 
 @mcp.tool()
@@ -62,6 +66,7 @@ async def get_pe_ratio(ticker: str) -> str:
     Price-to-Earnings ratio is a key valuation metric.
     High P/E suggests growth expectations; Low P/E suggests value or distress.
     """
+    from mcp_servers.yfinance_server.tools import market
     return await market.get_pe_ratio(ticker)
 
 @mcp.tool()
@@ -72,6 +77,7 @@ async def get_volume(ticker: str) -> str:
     Volume indicates trading activity and liquidity. 
     High volume often confirms price trends.
     """
+    from mcp_servers.yfinance_server.tools import market
     return await market.get_volume(ticker)
 
 @mcp.tool()
@@ -83,6 +89,7 @@ async def get_beta(ticker: str) -> str:
     - Beta > 1.0: More volatile than market (High Risk/High Reward)
     - Beta < 1.0: Less volatile (Defensive)
     """
+    from mcp_servers.yfinance_server.tools import market
     return await market.get_beta(ticker)
 
 @mcp.tool()
@@ -93,6 +100,7 @@ async def get_quote_metadata(ticker: str) -> str:
     Returns low-level market data: Bid, Ask, Currency, Exchange Timezone.
     Essential for executing precise trades or currency conversion.
     """
+    from mcp_servers.yfinance_server.tools import market
     return await market.get_quote_metadata(ticker)
 
 @mcp.tool()
@@ -108,6 +116,7 @@ async def get_bulk_historical_data(tickers: str = None, ticker: str = None, peri
         
     Returns CSV string with Open/High/Low/Close/Volume for all tickers.
     """
+    from mcp_servers.yfinance_server.tools import market
     return await market.get_bulk_historical_data(tickers, ticker, period, interval)
 
 # --- Financials ---
@@ -120,6 +129,7 @@ async def get_income_statement_annual(ticker: str) -> str:
     Key lines: Total Revenue, Gross Profit, operatingIncome, Net Income.
     Use for long-term fundamental analysis.
     """
+    from mcp_servers.yfinance_server.tools import financials
     return await financials.get_income_statement_annual(ticker)
 
 @mcp.tool()
@@ -130,6 +140,7 @@ async def get_income_statement_quarterly(ticker: str) -> str:
     Latest quarterly performance (Q1/Q2/Q3/Q4).
     Use for catching recent trends or seasonality.
     """
+    from mcp_servers.yfinance_server.tools import financials
     return await financials.get_income_statement_quarterly(ticker)
 
 @mcp.tool()
@@ -140,6 +151,7 @@ async def get_balance_sheet_annual(ticker: str) -> str:
     Snapshot of financial health at year-end.
     Key lines: Total Assets, Total Debt, Stockholders Equity, Cash & Equivalents.
     """
+    from mcp_servers.yfinance_server.tools import financials
     return await financials.get_balance_sheet_annual(ticker)
 
 @mcp.tool()
@@ -150,6 +162,7 @@ async def get_balance_sheet_quarterly(ticker: str) -> str:
     Most recent snapshot of Assets vs Liabilities.
     Critical for debt-ratio analysis (e.g. Current Ratio).
     """
+    from mcp_servers.yfinance_server.tools import financials
     return await financials.get_balance_sheet_quarterly(ticker)
 
 @mcp.tool()
@@ -160,6 +173,7 @@ async def get_cash_flow_statement_annual(ticker: str) -> str:
     Tracks actual cash movement (Operating, Investing, Financing).
     "Free Cash Flow" must be derived from this.
     """
+    from mcp_servers.yfinance_server.tools import financials
     return await financials.get_cash_flow_statement_annual(ticker)
 
 @mcp.tool()
@@ -169,6 +183,7 @@ async def get_cash_flow_statement_quarterly(ticker: str) -> str:
     [RAG Context]
     Recent cash burn or generation.
     """
+    from mcp_servers.yfinance_server.tools import financials
     return await financials.get_cash_flow_statement_quarterly(ticker)
 
 # --- Holders ---
@@ -179,6 +194,7 @@ async def get_major_holders(ticker: str) -> str:
     [RAG Context]
     Returns % held by insiders and % held by institutions.
     """
+    from mcp_servers.yfinance_server.tools import holders
     return await holders.get_major_holders_breakdown(ticker)
 
 @mcp.tool()
@@ -188,6 +204,7 @@ async def get_institutional_holders(ticker: str) -> str:
     [RAG Context]
     Shows which big players own the stock (e.g. BlackRock, Vanguard).
     """
+    from mcp_servers.yfinance_server.tools import holders
     return await holders.get_institutional_holders(ticker)
 
 @mcp.tool()
@@ -197,6 +214,7 @@ async def get_mutual_funds(ticker: str) -> str:
     [RAG Context]
     Shows exposure via Mutual Funds.
     """
+    from mcp_servers.yfinance_server.tools import holders
     return await holders.get_mutual_fund_holders(ticker)
 
 @mcp.tool()
@@ -207,6 +225,7 @@ async def get_insider_transactions(ticker: str) -> str:
     Tracks if executives (CEO/CFO) are buying or dumping stock.
     Strong buy signal if insiders are buying.
     """
+    from mcp_servers.yfinance_server.tools import holders
     return await holders.get_insider_transactions(ticker)
 
 @mcp.tool()
@@ -216,6 +235,7 @@ async def get_insider_roster(ticker: str) -> str:
     [RAG Context]
     Names and Titles of insiders.
     """
+    from mcp_servers.yfinance_server.tools import holders
     return await holders.get_insider_roster(ticker)
 
 # --- Analysis ---
@@ -226,6 +246,7 @@ async def get_analyst_ratings(ticker: str) -> str:
     [RAG Context]
     Analyst recommendations (Strong Buy, Buy, Hold, Sell).
     """
+    from mcp_servers.yfinance_server.tools import analysis
     return await analysis.get_analyst_recommendations(ticker)
 
 @mcp.tool()
@@ -235,6 +256,7 @@ async def get_price_targets(ticker: str) -> str:
     [RAG Context]
     Future price predictions from Wall St analysts.
     """
+    from mcp_servers.yfinance_server.tools import analysis
     return await analysis.get_price_targets(ticker)
 
 @mcp.tool()
@@ -244,6 +266,7 @@ async def get_upgrades_downgrades(ticker: str) -> str:
     [RAG Context]
     Changes in analyst sentiment (e.g. JP Morgan Upgrades to Overweight).
     """
+    from mcp_servers.yfinance_server.tools import analysis
     return await analysis.get_upgrades_downgrades(ticker)
 
 @mcp.tool()
@@ -253,6 +276,7 @@ async def get_earnings_calendar(ticker: str) -> str:
     [RAG Context]
     Next earnings call date and EPS estimates.
     """
+    from mcp_servers.yfinance_server.tools import analysis
     return await analysis.get_earnings_calendar(ticker)
 
 @mcp.tool()
@@ -263,6 +287,7 @@ async def get_dividends_history(ticker: str) -> str:
     Date and amount of past dividends.
     Used to calculate yield consistency.
     """
+    from mcp_servers.yfinance_server.tools import analysis
     return await analysis.get_dividends_history(ticker)
 
 @mcp.tool()
@@ -272,6 +297,7 @@ async def get_splits_history(ticker: str) -> str:
     [RAG Context]
     Dates of stock splits (e.g. 1:4).
     """
+    from mcp_servers.yfinance_server.tools import analysis
     return await analysis.get_splits_history(ticker)
 
 @mcp.tool()
@@ -285,6 +311,7 @@ async def calculate_indicators(ticker: str, indicators: List[str] = ["sma", "rsi
         period: Timeframe ("1y", "6mo")
         interval: Data interval ("1d", "1h")
     """
+    from mcp_servers.yfinance_server.tools import analysis
     return await analysis.calculate_indicators(ticker, indicators, period=period, interval=interval)
 
 # --- Charts ---
@@ -297,6 +324,7 @@ async def get_price_chart(ticker: str, period: str = "1y") -> Image:
     Args:
         period: "1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "max"
     """
+    from mcp_servers.yfinance_server.tools import charts
     return await charts.get_price_chart(ticker, period)
 
 # --- Options ---
@@ -310,6 +338,7 @@ async def get_options_chain(ticker: str, date: str = "", limit: int = 10) -> str
         date: Expiration date "YYYY-MM-DD" (use get_option_expirations first)
         limit: Number of rows to return (default: 10)
     """
+    from mcp_servers.yfinance_server.tools import options
     return await options.get_options_chain(ticker, date, limit=limit)
 
 @mcp.tool()
@@ -320,6 +349,7 @@ async def get_option_expirations(ticker: str) -> str:
     Returns list of "YYYY-MM-DD" strings.
     REQUIRED before calling get_options_chain().
     """
+    from mcp_servers.yfinance_server.tools import options
     return await options.get_option_expirations(ticker)
 
 # --- Aggregators ---
@@ -333,6 +363,7 @@ async def get_tickers_by_country(country_code: str, limit: int = 50) -> str:
         country_code: ISO code (e.g. "ID" for Indonesia, "US" for USA).
         limit: Number of tickers to sample for the report (default: 50).
     """
+    from mcp_servers.yfinance_server.tools import discovery
     return await discovery.get_tickers_by_country(country_code, limit=limit)
 
 @mcp.tool()
@@ -343,6 +374,7 @@ async def get_full_report(ticker: str) -> str:
     Aggregates Profile, Price, Financials, and Holders into one large text.
     Use this for "Deep Dive" or "Full Analysis" requests to save tool calls.
     """
+    from mcp_servers.yfinance_server.tools import aggregators
     return await aggregators.get_full_ticker_report(ticker)
 
 # --- Dynamic Info Tool ---

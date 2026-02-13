@@ -23,11 +23,13 @@ from shared.mcp.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from mcp_servers.plotly_server.tools import (
-    basic_ops, distribution_ops, finance_ops, 
-    map_ops, hierarchical_ops, three_d_ops, super_ops,
-    animation_ops, parallel_ops, network_ops, polar_ops
-)
+# from mcp_servers.plotly_server.tools import (
+#     basic_ops, distribution_ops, finance_ops, 
+#     map_ops, hierarchical_ops, three_d_ops, super_ops,
+#     animation_ops, parallel_ops, network_ops, polar_ops
+# )
+# Note: Tools will be imported lazily inside each tool function to speed up startup.
+
 import structlog
 from typing import List, Dict, Any, Optional, Union
 
@@ -51,6 +53,7 @@ async def plot_scatter(data: DataInput, x: Optional[str] = None, y: Optional[str
     Interactive scatter plot.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import basic_ops
     return await basic_ops.plot_scatter(data, x, y, color, size, title, format)
 
 @mcp.tool()
@@ -61,6 +64,7 @@ async def plot_line(data: DataInput, x: Optional[str] = None, y: Optional[str] =
     Interactive line plot.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import basic_ops
     return await basic_ops.plot_line(data, x, y, color, markers, title, format)
 
 @mcp.tool()
@@ -71,6 +75,7 @@ async def plot_bar(data: DataInput, x: Optional[str] = None, y: Optional[str] = 
     Interactive bar chart.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import basic_ops
     return await basic_ops.plot_bar(data, x, y, color, barmode, title, format)
 
 @mcp.tool()
@@ -81,6 +86,7 @@ async def plot_pie(data: DataInput, names: str, values: str, hole: float = 0.0, 
     Interactive pie chart.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import basic_ops
     return await basic_ops.plot_pie(data, names, values, hole, title, format)
 
 # ==========================================
@@ -94,6 +100,7 @@ async def plot_histogram(data: DataInput, x: Optional[str] = None, y: Optional[s
     Interactive histogram with marginals.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import distribution_ops
     return await distribution_ops.plot_histogram(data, x, y, color, nbins, marginal, title, format)
 
 @mcp.tool()
@@ -104,6 +111,7 @@ async def plot_box(data: DataInput, x: Optional[str] = None, y: Optional[str] = 
     Interactive boxplot.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import distribution_ops
     return await distribution_ops.plot_box(data, x, y, color, points, title, format)
 
 @mcp.tool()
@@ -114,6 +122,7 @@ async def plot_violin(data: DataInput, x: Optional[str] = None, y: Optional[str]
     Interactive violin plot.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import distribution_ops
     return await distribution_ops.plot_violin(data, x, y, color, box, points, title, format)
 
 @mcp.tool()
@@ -124,6 +133,7 @@ async def plot_strip(data: DataInput, x: Optional[str] = None, y: Optional[str] 
     Interactive strip plot.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import distribution_ops
     return await distribution_ops.plot_strip(data, x, y, color, stripmode, title, format)
 
 @mcp.tool()
@@ -134,6 +144,7 @@ async def plot_ecdf(data: DataInput, x: Optional[str] = None, color: Optional[st
     Interactive ECDF plot.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import distribution_ops
     return await distribution_ops.plot_ecdf(data, x, color, markers, title, format)
 
 # ==========================================
@@ -147,6 +158,7 @@ async def plot_candlestick(data: DataInput, x: str, open: str, high: str, low: s
     Financial candlestick chart.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import finance_ops
     return await finance_ops.plot_candlestick(data, x, open, high, low, close, title, format)
 
 @mcp.tool()
@@ -157,6 +169,7 @@ async def plot_ohlc(data: DataInput, x: str, open: str, high: str, low: str, clo
     Financial OHLC chart.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import finance_ops
     return await finance_ops.plot_ohlc(data, x, open, high, low, close, title, format)
 
 @mcp.tool()
@@ -167,6 +180,7 @@ async def plot_waterfall(data: DataInput, x: str, y: str, measure: Optional[str]
     Financial waterfall chart.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import finance_ops
     return await finance_ops.plot_waterfall(data, x, y, measure, text, title, format)
 
 @mcp.tool()
@@ -177,6 +191,7 @@ async def plot_funnel(data: DataInput, x: str, y: str, title: Optional[str] = No
     Funnel chart for conversion pipelines.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import finance_ops
     return await finance_ops.plot_funnel(data, x, y, title, format)
 
 @mcp.tool()
@@ -187,6 +202,7 @@ async def plot_indicator(value: float, delta_ref: Optional[float] = None, title:
     KPI gauge/indicator.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import finance_ops
     return await finance_ops.plot_indicator(value, delta_ref, title, mode, format)
 
 # ==========================================
@@ -200,6 +216,7 @@ async def plot_scatter_map(data: DataInput, lat: str, lon: str, color: Optional[
     Scatter plot on a geographic map.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import map_ops
     return await map_ops.plot_scatter_map(data, lat, lon, color, size, hover_name, zoom, title, format)
 
 @mcp.tool()
@@ -210,6 +227,7 @@ async def plot_choropleth(data: DataInput, locations: str, color: str, locationm
     Geographic heat map (choropleth).
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import map_ops
     return await map_ops.plot_choropleth(data, locations, color, locationmode, hover_name, title, format)
 
 @mcp.tool()
@@ -220,6 +238,7 @@ async def plot_density_map(data: DataInput, lat: str, lon: str, z: Optional[str]
     Geographic density heatmap.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import map_ops
     return await map_ops.plot_density_map(data, lat, lon, z, radius, title, format)
 
 # ==========================================
@@ -233,6 +252,7 @@ async def plot_sunburst(data: DataInput, path: List[str], values: Optional[str] 
     Hierarchical sunburst chart.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import hierarchical_ops
     return await hierarchical_ops.plot_sunburst(data, path, values, color, title, format)
 
 @mcp.tool()
@@ -243,6 +263,7 @@ async def plot_treemap(data: DataInput, path: List[str], values: Optional[str] =
     Hierarchical treemap chart.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import hierarchical_ops
     return await hierarchical_ops.plot_treemap(data, path, values, color, title, format)
 
 @mcp.tool()
@@ -253,6 +274,7 @@ async def plot_icicle(data: DataInput, path: List[str], values: Optional[str] = 
     Hierarchical icicle chart.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import hierarchical_ops
     return await hierarchical_ops.plot_icicle(data, path, values, color, title, format)
 
 @mcp.tool()
@@ -263,6 +285,7 @@ async def plot_scatter3d(data: DataInput, x: str, y: str, z: str, color: Optiona
     Interactive 3D scatter plot.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import three_d_ops
     return await three_d_ops.plot_scatter3d(data, x, y, z, color, size, title, format)
 
 @mcp.tool()
@@ -273,6 +296,7 @@ async def plot_surface(z: List[List[float]], x: Optional[List[Any]] = None, y: O
     Interactive 3D surface plot.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import three_d_ops
     return await three_d_ops.plot_surface(z, x, y, title, format)
 
 @mcp.tool()
@@ -283,6 +307,7 @@ async def plot_mesh3d(data: DataInput, x: str, y: str, z: str, alphahull: int = 
     Interactive 3D molecular/mesh plot.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import three_d_ops
     return await three_d_ops.plot_mesh3d(data, x, y, z, alphahull, title, format)
 
 # ==========================================
@@ -296,6 +321,7 @@ async def plot_animated_scatter(data: DataInput, x: str, y: str, animation_frame
     Scatter plot with time slider.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import animation_ops
     return await animation_ops.plot_animated_scatter(data, x, y, animation_frame, animation_group, color, size, range_x, range_y, title, format)
 
 @mcp.tool()
@@ -306,6 +332,7 @@ async def plot_animated_bar(data: DataInput, x: str, y: str, animation_frame: st
     Bar chart with time slider.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import animation_ops
     return await animation_ops.plot_animated_bar(data, x, y, animation_frame, color, range_y, title, format)
 
 @mcp.tool()
@@ -316,6 +343,7 @@ async def plot_animated_choropleth(data: DataInput, locations: str, color: str, 
     Map with time slider.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import animation_ops
     return await animation_ops.plot_animated_choropleth(data, locations, color, animation_frame, locationmode, title, format)
 
 # ==========================================
@@ -332,6 +360,7 @@ async def plot_parallel_coordinates(data: DataInput, dimensions: Optional[List[s
     Multivariate data visualization.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import parallel_ops
     return await parallel_ops.plot_parallel_coordinates(data, dimensions, color, title, format)
 
 @mcp.tool()
@@ -342,6 +371,7 @@ async def plot_parallel_categories(data: DataInput, dimensions: Optional[List[st
     Multivariate categorical visualization.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import parallel_ops
     return await parallel_ops.plot_parallel_categories(data, dimensions, color, title, format)
 
 @mcp.tool()
@@ -352,6 +382,7 @@ async def plot_sankey(labels: List[str], source: List[int], target: List[int], v
     Flow visualization (Sankey diagram).
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import network_ops
     return await network_ops.plot_sankey(labels, source, target, value, title, format)
 
 @mcp.tool()
@@ -362,6 +393,7 @@ async def plot_table(header: List[str], cells: List[List[Any]], title: Optional[
     Renders data as a static table image.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import network_ops
     return await network_ops.plot_table(header, cells, title, format)
 
 # ==========================================
@@ -375,6 +407,7 @@ async def plot_scatter_polar(data: DataInput, r: str, theta: str, color: Optiona
     Polar coordinate scatter plot.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import polar_ops
     return await polar_ops.plot_scatter_polar(data, r, theta, color, size, title, format)
 
 @mcp.tool()
@@ -385,6 +418,7 @@ async def plot_line_polar(data: DataInput, r: str, theta: str, color: Optional[s
     Polar coordinate line plot (radar chart).
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import polar_ops
     return await polar_ops.plot_line_polar(data, r, theta, color, line_close, title, format)
 
 @mcp.tool()
@@ -395,6 +429,7 @@ async def plot_bar_polar(data: DataInput, r: str, theta: str, color: Optional[st
     Polar coordinate bar plot.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import polar_ops
     return await polar_ops.plot_bar_polar(data, r, theta, color, title, format)
 
 # ==========================================
@@ -408,6 +443,7 @@ async def auto_plot(data: DataInput, x: str, y: Optional[str] = None, color: Opt
     Infers best plotly chart type from data.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import super_ops
     return await super_ops.auto_plot(data, x, y, color, format)
 
 @mcp.tool()
@@ -418,6 +454,7 @@ async def create_dashboard(plots: List[Dict[str, Any]], layout: List[int] = [2, 
     Combines multiple plotly charts into a dashboard image.
     Returns path to saved image.
     """
+    from mcp_servers.plotly_server.tools import super_ops
     return await super_ops.create_dashboard(plots, layout, width, height, format)
 
 if __name__ == "__main__":

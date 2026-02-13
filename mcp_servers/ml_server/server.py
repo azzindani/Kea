@@ -20,9 +20,11 @@ from shared.mcp.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from mcp_servers.ml_server.tools import (
-    automl, importance, clustering, anomaly, forecast
-)
+# from mcp_servers.ml_server.tools import (
+#     automl, importance, clustering, anomaly, forecast
+# )
+# Note: Tools will be imported lazily inside each tool function to speed up startup.
+
 import structlog
 from typing import Optional, Dict, List, Any, Union
 
@@ -42,6 +44,7 @@ async def auto_ml(data_url: str, target_column: str, task_type: str = "auto", te
     Automatically select and train the best ML model.
     Returns model metrics and path.
     """
+    from mcp_servers.ml_server.tools import automl
     return await automl.auto_ml(data_url, target_column, task_type, test_size)
 
 @mcp.tool()
@@ -52,6 +55,7 @@ async def feature_importance(data_url: str, target_column: str, method: str = "t
     Analyze feature importance for prediction.
     Returns importance scores.
     """
+    from mcp_servers.ml_server.tools import importance
     return await importance.feature_importance(data_url, target_column, method)
 
 @mcp.tool()
@@ -62,6 +66,7 @@ async def convert_clustering(data_url: Optional[str] = None, data: Optional[Unio
     Perform unsupervised clustering (KMeans, DBSCAN, etc).
     Returns cluster labels.
     """
+    from mcp_servers.ml_server.tools import clustering
     return await clustering.clustering(data_url, data, n_clusters, method)
 
 @mcp.tool()
@@ -72,6 +77,7 @@ async def anomaly_detection(data_url: Optional[str] = None, data: Optional[Union
     Detect anomalies/outliers in data.
     Returns outlier indices.
     """
+    from mcp_servers.ml_server.tools import anomaly
     return await anomaly.anomaly_detection(data_url, data, method, contamination)
 
 @mcp.tool()
@@ -82,6 +88,7 @@ async def time_series_forecast(data_url: str, value_column: str, date_column: Op
     Forecast time series data.
     Returns forecast values.
     """
+    from mcp_servers.ml_server.tools import forecast
     return await forecast.time_series_forecast(data_url, value_column, date_column, periods)
 
 if __name__ == "__main__":
