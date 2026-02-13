@@ -423,16 +423,22 @@ class AgentSpawner:
         progress_callback: Callable[[int, int], None] | None = None,
     ) -> SwarmResult:
         """Execute agent swarm based on plan."""
-        # Resource gate — deny spawn when system is overloaded
+        # Resource gate — deny spawn when SwarmManager reports system overload
         try:
-            from services.swarm_manager.core.resource_governor import get_governor
+            import httpx
 
-            governor = get_governor()
-            if not await governor.can_spawn_agent(requested_count=len(plan.subtasks)):
-                raise RuntimeError(
-                    f"GOVERNOR: Spawn denied for {len(plan.subtasks)} agents — "
-                    "system is at capacity. Retry after load reduces."
-                )
+            from shared.service_registry import ServiceName, ServiceRegistry
+
+            swarm_url = ServiceRegistry.get_url(ServiceName.SWARM_MANAGER)
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get(f"{swarm_url}/resource/status")
+                if resp.status_code == 200:
+                    resource_state = resp.json()
+                    if resource_state.get("status") == "CRITICAL":
+                        raise RuntimeError(
+                            f"GOVERNOR: Spawn denied for {len(plan.subtasks)} agents — "
+                            "system is at capacity. Retry after load reduces."
+                        )
         except RuntimeError:
             raise
         except Exception as _gov_err:

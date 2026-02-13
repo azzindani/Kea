@@ -396,10 +396,7 @@ class KernelCell:
         )
 
         if not guard.can_execute():
-            logger.warning(
-                f"Cell {self.cell_id}: ExecutionGuard rejected — "
-                f"{guard._warnings}"
-            )
+            logger.warning(f"Cell {self.cell_id}: ExecutionGuard rejected — {guard._warnings}")
             if self._work_unit:
                 self._work_unit.fail("Pre-flight check failed")
             return self._package_error(
@@ -423,7 +420,9 @@ class KernelCell:
                     if processing_mode in (ProcessingMode.DIRECT, ProcessingMode.SOLO):
                         result_content = await self._execute_solo(task_text, context, envelope)
                     elif self.budget.can_delegate:
-                        result_content = await self._execute_delegation(task_text, context, envelope)
+                        result_content = await self._execute_delegation(
+                            task_text, context, envelope
+                        )
                     else:
                         # Budget exhausted, fall back to solo
                         logger.warning(
@@ -483,8 +482,7 @@ class KernelCell:
         )
 
         logger.info(
-            f"Cell {self.cell_id} intake: "
-            f"task='{task_text[:60]}...' domain={self.identity.domain}"
+            f"Cell {self.cell_id} intake: task='{task_text[:60]}...' domain={self.identity.domain}"
         )
 
         return task_text, context
@@ -515,9 +513,7 @@ class KernelCell:
 
         # Load the tier→mode mapping from config (cached)
         if self._complexity_modes is None:
-            self._complexity_modes = (
-                get_kernel_config("kernel_cell.complexity_mode_mapping") or {}
-            )
+            self._complexity_modes = get_kernel_config("kernel_cell.complexity_mode_mapping") or {}
 
         mapped_mode_str = self._complexity_modes.get(tier_name)
 
@@ -572,7 +568,9 @@ class KernelCell:
             )
 
             result = await self.engine.structured_complete(
-                messages, config, context,
+                messages,
+                config,
+                context,
                 output_schema=ComplexityAssessment,
             )
 
@@ -654,9 +652,7 @@ class KernelCell:
 
         # Handle delegation signal from the cognitive cycle
         if cycle_output.needs_delegation and self.budget.can_delegate:
-            logger.info(
-                f"Cell {self.cell_id}: Cognitive cycle recommends delegation"
-            )
+            logger.info(f"Cell {self.cell_id}: Cognitive cycle recommends delegation")
             return await self._execute_delegation(task_text, context, envelope)
 
         # Transfer working memory signals to the score card
@@ -672,12 +668,14 @@ class KernelCell:
 
         # Record tool calls in legacy state
         for tool_result in cycle_output.tool_results:
-            self.state.tool_executions.append({
-                "tool": tool_result.get("tool", ""),
-                "arguments": tool_result.get("args", {}),
-                "success": True,
-                "timestamp": datetime.utcnow().isoformat(),
-            })
+            self.state.tool_executions.append(
+                {
+                    "tool": tool_result.get("tool", ""),
+                    "arguments": tool_result.get("args", {}),
+                    "success": True,
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+            )
 
         # Budget accounting (approximate)
         estimated_tokens = int(cycle_output.elapsed_ms / 10)  # Rough heuristic
@@ -693,14 +691,12 @@ class KernelCell:
 
         # Fallback synthesis if cognitive cycle produced no content
         logger.warning(
-            f"Cell {self.cell_id}: Cognitive cycle produced no content, "
-            f"falling back to synthesis"
+            f"Cell {self.cell_id}: Cognitive cycle produced no content, falling back to synthesis"
         )
         return await self._synthesize(
             task_text,
-            "\n".join(
-                f"- {k}: {v}" for k, v in self.working_memory.all_facts.items()
-            ) or "No data gathered",
+            "\n".join(f"- {k}: {v}" for k, v in self.working_memory.all_facts.items())
+            or "No data gathered",
             context,
         )
 
@@ -778,7 +774,8 @@ class KernelCell:
         delegation_cfg = kernel_cfg.get("delegation", {})
         max_review_rounds = delegation_cfg.get("max_review_rounds", 2)
         min_budget_for_review = delegation_cfg.get(
-            "min_budget_for_review", 2000,
+            "min_budget_for_review",
+            2000,
         )
 
         # Scale review rounds by budget — no reviews if budget is thin
@@ -793,9 +790,7 @@ class KernelCell:
         degrader = get_degrader()
         if degrader.should_skip_optional():
             max_review_rounds = 0
-            logger.warning(
-                f"Cell {self.cell_id}: Degradation active, skipping optional reviews"
-            )
+            logger.warning(f"Cell {self.cell_id}: Degradation active, skipping optional reviews")
         elif degrader.get_current_level().level > 0:
             max_review_rounds = max(1, max_review_rounds // 2)
             logger.info(
@@ -829,7 +824,8 @@ class KernelCell:
 
         # Wrap _spawn_child for the protocol's interface
         async def _spawn_wrapper(
-            subtask: SubTask, pg: str,
+            subtask: SubTask,
+            pg: str,
         ) -> StdioEnvelope:
             result = await self._spawn_child(subtask, peer_group=pg)
             self.state.child_results.append(result)
@@ -881,24 +877,17 @@ class KernelCell:
             delegation_state.accepted_outputs.items(),
         ):
             if content:
-                child_outputs.append(
-                    f"[Subtask {st_id}]\n{content[:2000]}"
-                )
+                child_outputs.append(f"[Subtask {st_id}]\n{content[:2000]}")
 
         # Include synthesis notes from the review if available
         synthesis_notes = ""
         if delegation_state.rounds:
             last_review = delegation_state.rounds[-1].review
             if last_review and last_review.synthesis_notes:
-                synthesis_notes = (
-                    f"\n\n[REVIEWER NOTES]: {last_review.synthesis_notes}"
-                )
+                synthesis_notes = f"\n\n[REVIEWER NOTES]: {last_review.synthesis_notes}"
 
         if not child_outputs:
-            logger.warning(
-                f"Cell {self.cell_id}: No accepted outputs, "
-                f"falling back to solo"
-            )
+            logger.warning(f"Cell {self.cell_id}: No accepted outputs, falling back to solo")
             return await self._execute_solo(task_text, context, envelope)
 
         gathered = "\n\n---\n\n".join(child_outputs) + synthesis_notes
@@ -913,9 +902,10 @@ class KernelCell:
         self.last_work_package = WorkPackage(
             summary=synthesis,
             artifacts=all_artifacts,
-            overall_confidence=sum(a.confidence for a in all_artifacts) / max(len(all_artifacts), 1),
+            overall_confidence=sum(a.confidence for a in all_artifacts)
+            / max(len(all_artifacts), 1),
             key_findings=[f"Synthesis of {len(delegation_state.accepted_outputs)} work products"],
-            metadata={"produced_by": "delegation", "rounds": len(delegation_state.rounds)}
+            metadata={"produced_by": "delegation", "rounds": len(delegation_state.rounds)},
         )
 
         return synthesis
@@ -955,7 +945,9 @@ class KernelCell:
 
         try:
             result = await self.engine.structured_complete(
-                messages, config, context,
+                messages,
+                config,
+                context,
                 output_schema=PlannerOutput,
             )
             self.budget.consume(200)  # Planning cost
@@ -984,7 +976,28 @@ class KernelCell:
         v2.0: Children are registered with the message bus. If a
         peer_group is provided, all children in the same delegation
         are connected as peers for lateral communication.
+        Before spawning, checks SwarmManager's resource status via REST API
+        to respect system-level governance without importing SwarmManager code.
         """
+        # Resource gate — check with SwarmManager before spawning child cells
+        try:
+            import httpx
+            from shared.service_registry import ServiceName, ServiceRegistry
+
+            swarm_url = ServiceRegistry.get_url(ServiceName.SWARM_MANAGER)
+            async with httpx.AsyncClient(timeout=3.0) as _client:
+                _resp = await _client.get(f"{swarm_url}/resource/status")
+                if _resp.status_code == 200 and _resp.json().get("status") == "CRITICAL":
+                    logger.warning(
+                        f"Cell {self.cell_id}: SwarmManager reports CRITICAL load — "
+                        "falling back to solo execution instead of spawning child."
+                    )
+                    return await self._execute_solo(subtask.description, {}, StdioEnvelope())
+        except Exception as _gate_err:
+            logger.debug(
+                f"Cell {self.cell_id}: SwarmManager gate skipped (non-blocking): {_gate_err}"
+            )
+
         # Resolve role for this subtask using cognitive profile hierarchy
         child_lvl = child_level_for(self.identity.level)
         child_identity = AgentIdentity(
@@ -1056,7 +1069,9 @@ class KernelCell:
 
         # ── Record completion and reclaim surplus ────────────────────
         # In a real async system, this would be an event, but here we await
-        tokens_used = result.stdout.metadata.get("tokens_used", 0) if hasattr(result, "stdout") else 0
+        tokens_used = (
+            result.stdout.metadata.get("tokens_used", 0) if hasattr(result, "stdout") else 0
+        )
         surplus = self.governor.child_completed(child.cell_id, tokens_used=tokens_used)
         if surplus > 0:
             logger.debug(f"Cell {self.cell_id}: Reclaimed {surplus} tokens from {child.cell_id}")
@@ -1104,9 +1119,7 @@ class KernelCell:
         # Check quality gate
         if not gate.passes(self.score_card):
             failures = gate.get_failures(self.score_card)
-            logger.warning(
-                f"Cell {self.cell_id} failed quality gate: {failures}"
-            )
+            logger.warning(f"Cell {self.cell_id} failed quality gate: {failures}")
 
             # Try to revise if budget allows
             if self.score_card.retries < gate.max_retries and self.budget.has_remaining:
@@ -1131,10 +1144,7 @@ class KernelCell:
                 ),
                 LLMMessage(
                     role=LLMRole.USER,
-                    content=(
-                        f"Task: {task_text}\n\n"
-                        f"Output:\n{content[:2000]}"
-                    ),
+                    content=(f"Task: {task_text}\n\nOutput:\n{content[:2000]}"),
                 ),
             ]
 
@@ -1195,9 +1205,9 @@ class KernelCell:
                 content=(
                     f"Original task: {task_text}\n\n"
                     f"Current output:\n{content[:3000]}\n\n"
-                    f"Quality failures:\n" +
-                    "\n".join(f"- {f}" for f in failures) +
-                    "\n\nRevise the output to address these failures."
+                    f"Quality failures:\n"
+                    + "\n".join(f"- {f}" for f in failures)
+                    + "\n\nRevise the output to address these failures."
                 ),
             ),
         ]
@@ -1243,35 +1253,43 @@ class KernelCell:
 
         # Data gaps
         for gap in self.score_card.data_gaps:
-            warnings.append(Warning(
-                type="data_gap",
-                message=gap,
-                severity=WarningSeverity.MEDIUM,
-            ))
+            warnings.append(
+                Warning(
+                    type="data_gap",
+                    message=gap,
+                    severity=WarningSeverity.MEDIUM,
+                )
+            )
 
         # Low-confidence areas from working memory
         for topic, conf in self.working_memory.low_confidence_topics:
-            warnings.append(Warning(
-                type="low_confidence",
-                message=f"Low confidence ({conf:.2f}) on: {topic}",
-                severity=WarningSeverity.LOW,
-            ))
+            warnings.append(
+                Warning(
+                    type="low_confidence",
+                    message=f"Low confidence ({conf:.2f}) on: {topic}",
+                    severity=WarningSeverity.LOW,
+                )
+            )
 
         # Unanswered questions
         for q in self.working_memory.unanswered_questions[:3]:
-            warnings.append(Warning(
-                type="unanswered_question",
-                message=f"Unanswered: {q.question[:100]}",
-                severity=WarningSeverity.LOW,
-            ))
+            warnings.append(
+                Warning(
+                    type="unanswered_question",
+                    message=f"Unanswered: {q.question[:100]}",
+                    severity=WarningSeverity.LOW,
+                )
+            )
 
         # Assumptions from working memory
         for assumption in self.score_card.assumptions:
-            warnings.append(Warning(
-                type="assumption",
-                message=f"Assumed: {assumption[:100]}",
-                severity=WarningSeverity.LOW,
-            ))
+            warnings.append(
+                Warning(
+                    type="assumption",
+                    message=f"Assumed: {assumption[:100]}",
+                    severity=WarningSeverity.LOW,
+                )
+            )
 
         # Published artifacts from memory
         published_artifacts = self.working_memory.artifacts.get_published()
@@ -1300,7 +1318,9 @@ class KernelCell:
                 messages_sent=self.comm.stats.get("messages_sent", 0) if self.comm else 0,
                 messages_received=self.comm.stats.get("messages_received", 0) if self.comm else 0,
                 comm_tokens_spent=self.comm.stats.get("comm_budget_spent", 0) if self.comm else 0,
-                clarifications_resolved=self.comm.stats.get("clarifications_answered", 0) if self.comm else 0,
+                clarifications_resolved=self.comm.stats.get("clarifications_answered", 0)
+                if self.comm
+                else 0,
             ),
             message_type=MessageType.REPORT,
         )
@@ -1336,13 +1356,15 @@ class KernelCell:
             result = await self.tool_executor(tool_name, arguments)
             duration = (datetime.utcnow() - start_time).total_seconds() * 1000
 
-            self.state.tool_executions.append({
-                "tool": tool_name,
-                "arguments": arguments,
-                "success": True,
-                "duration_ms": duration,
-                "timestamp": datetime.utcnow().isoformat(),
-            })
+            self.state.tool_executions.append(
+                {
+                    "tool": tool_name,
+                    "arguments": arguments,
+                    "success": True,
+                    "duration_ms": duration,
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+            )
 
             # Store as artifact
             key = f"tool_{len(self.state.tool_executions)}"
@@ -1354,13 +1376,15 @@ class KernelCell:
 
         except Exception as e:
             logger.error(f"Tool {tool_name} failed: {e}")
-            self.state.tool_executions.append({
-                "tool": tool_name,
-                "arguments": arguments,
-                "success": False,
-                "error": str(e),
-                "timestamp": datetime.utcnow().isoformat(),
-            })
+            self.state.tool_executions.append(
+                {
+                    "tool": tool_name,
+                    "arguments": arguments,
+                    "success": False,
+                    "error": str(e),
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+            )
             return f"ERROR: {e}"
 
     async def _process_delegation_messages(self) -> None:
@@ -1375,6 +1399,7 @@ class KernelCell:
         answer. For PROGRESS and PARTIAL messages, we log them. For
         ESCALATE and BLOCKED, we record in working memory.
         """
+
         async def _handle_child_message(msg):
             """Auto-handle common message types from children."""
             if msg.channel == MessageChannel.CLARIFY:
@@ -1392,8 +1417,7 @@ class KernelCell:
 
             elif msg.channel == MessageChannel.PARTIAL:
                 logger.info(
-                    f"Cell {self.cell_id} ← partial from {msg.sender_id}: "
-                    f"{msg.content[:80]}"
+                    f"Cell {self.cell_id} ← partial from {msg.sender_id}: {msg.content[:80]}"
                 )
                 if msg.payload.get("needs_feedback"):
                     return "Continue with current approach."
@@ -1629,7 +1653,9 @@ async def run_kernel(
 
     identity = AgentIdentity(role="orchestrator", level=level, domain=domain)
     token_budget = TokenBudget(
-        max_tokens=budget, remaining=budget, max_depth=max_depth,
+        max_tokens=budget,
+        remaining=budget,
+        max_depth=max_depth,
     )
 
     cell = KernelCell(

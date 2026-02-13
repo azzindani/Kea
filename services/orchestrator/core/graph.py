@@ -24,7 +24,7 @@ from services.orchestrator.nodes.keeper import keeper_node as real_keeper_node
 
 # Import real implementations
 from services.orchestrator.nodes.planner import planner_node as real_planner_node
-from services.vault.core.audit_trail import AuditEventType, audited
+from shared.audit import AuditEventType, audited
 
 # NEW: Context pool and code generator for dynamic data flow
 from shared.context_pool import get_context_pool, reset_context_pool
@@ -327,7 +327,6 @@ Return JSON only, matching the parameter names from failed arguments.""",
     except Exception as e:
         logger.error(f"LLM parameter correction failed: {e}")
         return None
-
 
 
 def _build_tool_citation(
@@ -1522,12 +1521,15 @@ async def synthesizer_node(state: GraphState) -> GraphState:
     _tbl = _tmpl.get("source_table", {})
 
     report = _sec.get("title", "# Research Report: {query}").format(query=query) + "\n\n"
-    report += _sec.get("metadata", "").format(
-        confidence_pct=f"{confidence:.0%}",
-        sources_count=len(sources),
-        facts_count=len(facts),
-        verdict=verdict,
-    ) + "\n\n"
+    report += (
+        _sec.get("metadata", "").format(
+            confidence_pct=f"{confidence:.0%}",
+            sources_count=len(sources),
+            facts_count=len(facts),
+            verdict=verdict,
+        )
+        + "\n\n"
+    )
     report += _sec.get("divider", "---") + "\n\n"
     report += generator_output + "\n\n" + _sec.get("divider", "---") + "\n\n"
     report += _sec.get("facts_heading", "## Facts Collected") + "\n\n"
@@ -1545,7 +1547,9 @@ async def synthesizer_node(state: GraphState) -> GraphState:
     report += _tbl.get("separator", "") + "\n"
     _seen_citations: set[str] = set()
     _citation_n = 1
-    _row_fmt = _tbl.get("row", "| {n} | `{tool}` | {args} | {server} | {dur_ms:.0f}ms | {url_cell} | {ts} |\n")
+    _row_fmt = _tbl.get(
+        "row", "| {n} | `{tool}` | {args} | {server} | {dur_ms:.0f}ms | {url_cell} | {ts} |\n"
+    )
     for _inv in tool_invocations[:_REPORT_MAX_INV]:
         _tc = _inv.get("tool_citation")
         if not _tc or not isinstance(_tc, dict):
@@ -1694,7 +1698,6 @@ def compile_research_graph():
     """Compile the research graph for execution."""
     graph = build_research_graph()
     return graph.compile()
-
 
 
 # ============================================================================
