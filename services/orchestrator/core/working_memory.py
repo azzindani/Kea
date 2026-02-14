@@ -21,22 +21,19 @@ Version: 2.0.0 — Part of Kernel Brain Upgrade (Phase 1)
 
 from __future__ import annotations
 
-import json
-from collections import deque
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field
-
-from shared.logging import get_logger
 from services.orchestrator.core.output_schemas import (
     Artifact,
+    ArtifactMetadata,
     ArtifactStatus,
     ArtifactType,
-    ArtifactMetadata,
 )
+from shared.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -46,7 +43,7 @@ logger = get_logger(__name__)
 # ============================================================================
 
 
-class FocusItemType(str, Enum):
+class FocusItemType(StrEnum):
     """What kind of thing is occupying attention."""
 
     FACT = "fact"
@@ -58,7 +55,7 @@ class FocusItemType(str, Enum):
     DECISION = "decision"
 
 
-class HypothesisStatus(str, Enum):
+class HypothesisStatus(StrEnum):
     """Hypothesis lifecycle."""
 
     PROPOSED = "proposed"
@@ -68,13 +65,13 @@ class HypothesisStatus(str, Enum):
     REJECTED = "rejected"
 
 
-class QuestionTarget(str, Enum):
+class QuestionTarget(StrEnum):
     """Who is the question directed at."""
 
     PARENT = "parent"
     PEER = "peer"
-    SELF = "self"          # Rhetorical / needs-more-thought
-    TOOL = "tool"          # Can be answered by a tool call
+    SELF = "self"  # Rhetorical / needs-more-thought
+    TOOL = "tool"  # Can be answered by a tool call
 
 
 # ============================================================================
@@ -93,9 +90,9 @@ class FocusItem:
     id: str
     item_type: FocusItemType
     content: str
-    relevance: float = 1.0      # 0–1, decays over time
+    relevance: float = 1.0  # 0–1, decays over time
     created_at: datetime = field(default_factory=datetime.utcnow)
-    source: str = ""            # Where it came from (tool, step, cell)
+    source: str = ""  # Where it came from (tool, step, cell)
 
     def decay(self, factor: float = 0.9) -> None:
         """Reduce relevance over time (items age out of focus)."""
@@ -109,7 +106,7 @@ class Hypothesis:
     id: str
     statement: str
     status: HypothesisStatus = HypothesisStatus.PROPOSED
-    confidence: float = 0.5     # 0–1
+    confidence: float = 0.5  # 0–1
     supporting_evidence: list[str] = field(default_factory=list)
     contradicting_evidence: list[str] = field(default_factory=list)
     created_at: datetime = field(default_factory=datetime.utcnow)
@@ -156,7 +153,7 @@ class PendingQuestion:
     question: str
     target: QuestionTarget
     context: str = ""
-    priority: int = 1           # 1 = normal, 2 = important, 3 = blocking
+    priority: int = 1  # 1 = normal, 2 = important, 3 = blocking
     answered: bool = False
     answer: str = ""
     created_at: datetime = field(default_factory=datetime.utcnow)
@@ -241,7 +238,9 @@ class ArtifactManager:
 
             self._artifacts[id] = updated
             self._versions[id].append(updated)
-            logger.info(f"📝 Updated artifact {id} to version {updated.version} (status: {updated.status.value})")
+            logger.info(
+                f"📝 Updated artifact {id} to version {updated.version} (status: {updated.status.value})"
+            )
             return updated
         else:
             # Update in-place
@@ -377,21 +376,25 @@ class WorkingMemory:
 
     def focus_fact(self, fact_id: str, content: str, source: str = "") -> None:
         """Convenience: add a fact to focus."""
-        self.focus(FocusItem(
-            id=fact_id,
-            item_type=FocusItemType.FACT,
-            content=content,
-            source=source,
-        ))
+        self.focus(
+            FocusItem(
+                id=fact_id,
+                item_type=FocusItemType.FACT,
+                content=content,
+                source=source,
+            )
+        )
 
     def focus_observation(self, obs_id: str, content: str, source: str = "") -> None:
         """Convenience: add an observation to focus."""
-        self.focus(FocusItem(
-            id=obs_id,
-            item_type=FocusItemType.OBSERVATION,
-            content=content,
-            source=source,
-        ))
+        self.focus(
+            FocusItem(
+                id=obs_id,
+                item_type=FocusItemType.OBSERVATION,
+                content=content,
+                source=source,
+            )
+        )
 
     @property
     def current_focus(self) -> list[FocusItem]:
@@ -404,9 +407,7 @@ class WorkingMemory:
         items = self.current_focus
         if not items:
             return "Nothing in focus"
-        return " | ".join(
-            f"[{i.item_type.value}] {i.content[:60]}" for i in items[:5]
-        )
+        return " | ".join(f"[{i.item_type.value}] {i.content[:60]}" for i in items[:5])
 
     # ================================================================ #
     # Scratch Pad
@@ -446,11 +447,13 @@ class WorkingMemory:
             confidence=initial_confidence,
         )
         self._hypotheses[hypothesis_id] = h
-        self.focus(FocusItem(
-            id=f"hyp_{hypothesis_id}",
-            item_type=FocusItemType.HYPOTHESIS,
-            content=statement,
-        ))
+        self.focus(
+            FocusItem(
+                id=f"hyp_{hypothesis_id}",
+                item_type=FocusItemType.HYPOTHESIS,
+                content=statement,
+            )
+        )
         return h
 
     def support_hypothesis(self, hypothesis_id: str, evidence: str) -> None:
@@ -467,17 +470,16 @@ class WorkingMemory:
     def active_hypotheses(self) -> list[Hypothesis]:
         """Hypotheses that are still being evaluated."""
         return [
-            h for h in self._hypotheses.values()
-            if h.status in (HypothesisStatus.PROPOSED, HypothesisStatus.SUPPORTED, HypothesisStatus.WEAKENED)
+            h
+            for h in self._hypotheses.values()
+            if h.status
+            in (HypothesisStatus.PROPOSED, HypothesisStatus.SUPPORTED, HypothesisStatus.WEAKENED)
         ]
 
     @property
     def confirmed_hypotheses(self) -> list[Hypothesis]:
         """Hypotheses that have been confirmed."""
-        return [
-            h for h in self._hypotheses.values()
-            if h.status == HypothesisStatus.CONFIRMED
-        ]
+        return [h for h in self._hypotheses.values() if h.status == HypothesisStatus.CONFIRMED]
 
     # ================================================================ #
     # Decision Recording
@@ -530,10 +532,7 @@ class WorkingMemory:
     @property
     def low_confidence_topics(self) -> list[tuple[str, float]]:
         """Topics where confidence is below 0.5."""
-        return [
-            (topic, conf) for topic, conf in self._confidence_map.items()
-            if conf < 0.5
-        ]
+        return [(topic, conf) for topic, conf in self._confidence_map.items() if conf < 0.5]
 
     # ================================================================ #
     # Pending Questions
@@ -574,10 +573,7 @@ class WorkingMemory:
     @property
     def blocking_questions(self) -> list[PendingQuestion]:
         """High-priority unanswered questions that may block progress."""
-        return [
-            q for q in self._pending_questions
-            if not q.answered and q.priority >= 3
-        ]
+        return [q for q in self._pending_questions if not q.answered and q.priority >= 3]
 
     # ================================================================ #
     # Facts Store
@@ -778,7 +774,7 @@ class WorkingMemory:
         recent = fact_values[-last_n_facts:]
         # Check pairwise similarity of recent facts
         for i, a in enumerate(recent):
-            for b in recent[i + 1:]:
+            for b in recent[i + 1 :]:
                 a_words = set(a.lower().split())
                 b_words = set(b.lower().split())
                 if a_words and b_words:
