@@ -267,7 +267,7 @@ def detect_hardware() -> HardwareProfile:
     except Exception:
         pass
     
-    logger.info(
+    logger.debug(
         f"Hardware detected: {profile.cpu_threads} threads, "
         f"{profile.ram_total_gb:.1f}GB RAM, "
         f"{profile.gpu_count} GPU(s), "

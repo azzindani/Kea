@@ -70,7 +70,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             except Exception:
                 start_log_data["body"] = "<error reading body>"
 
-        logger.info("Request started", extra=start_log_data)
+        logger.debug("Request started", extra=start_log_data)
         
         start_time = time.perf_counter()
         
@@ -79,7 +79,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             duration = time.perf_counter() - start_time
             
             # Log request completion
-            logger.info(
+            logger.debug(
                 "Request completed",
                 extra={
                     "method": request.method,
