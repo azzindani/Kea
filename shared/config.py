@@ -215,10 +215,34 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
         extra = "ignore"
+        env_nested_delimiter = "_"
 
     def __init__(self, **data: Any) -> None:
         super().__init__(**data)
         self._load_yaml_config()
+
+    def _update_nested_config(self, field_name: str, yaml_data: dict[str, Any], model_class: type[BaseModel]) -> None:
+        """
+        Merge YAML config with existing Env-loaded config.
+        Priority: Env > YAML > Defaults
+        """
+        if field_name not in yaml_data:
+            return
+
+        current_val = getattr(self, field_name)
+        if isinstance(current_val, BaseModel):
+            # Get values explicitly set by Env/Init (not defaults)
+            # Note: This relies on pydantic tracking 'set' fields.
+            env_overrides = current_val.model_dump(exclude_unset=True)
+            
+            # Start with YAML (overrides defaults)
+            new_data = yaml_data[field_name].copy()
+            
+            # Apply Env overrides (overrides YAML)
+            new_data.update(env_overrides)
+            
+            # Re-instantiate
+            setattr(self, field_name, model_class(**new_data))
 
     def _load_yaml_config(self) -> None:
         """Load additional configuration from settings.yaml."""
@@ -233,29 +257,18 @@ class Settings(BaseSettings):
             if not yaml_config:
                 return
 
-            # Load nested configs
-            if "llm" in yaml_config:
-                self.llm = LLMSettings(**yaml_config["llm"])
-            if "logging" in yaml_config:
-                self.logging = LoggingSettings(**yaml_config["logging"])
-            if "mcp" in yaml_config:
-                self.mcp = MCPSettings(**yaml_config["mcp"])
-            if "research" in yaml_config:
-                self.research = ResearchSettings(**yaml_config["research"])
-            if "embedding" in yaml_config:
-                self.embedding = EmbeddingSettings(**yaml_config["embedding"])
-            if "reranker" in yaml_config:
-                self.reranker = RerankerSettings(**yaml_config["reranker"])
-            if "confidence" in yaml_config:
-                self.confidence = ConfidenceSettings(**yaml_config["confidence"])
-            if "loop_safety" in yaml_config:
-                self.loop_safety = LoopSafetySettings(**yaml_config["loop_safety"])
-            if "timeouts" in yaml_config:
-                self.timeouts = TimeoutSettings(**yaml_config["timeouts"])
-            if "models" in yaml_config:
-                self.models = ModelDefaults(**yaml_config["models"])
-            if "governance" in yaml_config:
-                self.governance = GovernanceSettings(**yaml_config["governance"])
+            # Update nested configs with merge logic
+            self._update_nested_config("llm", yaml_config, LLMSettings)
+            self._update_nested_config("logging", yaml_config, LoggingSettings)
+            self._update_nested_config("mcp", yaml_config, MCPSettings)
+            self._update_nested_config("research", yaml_config, ResearchSettings)
+            self._update_nested_config("embedding", yaml_config, EmbeddingSettings)
+            self._update_nested_config("reranker", yaml_config, RerankerSettings)
+            self._update_nested_config("confidence", yaml_config, ConfidenceSettings)
+            self._update_nested_config("loop_safety", yaml_config, LoopSafetySettings)
+            self._update_nested_config("timeouts", yaml_config, TimeoutSettings)
+            self._update_nested_config("models", yaml_config, ModelDefaults)
+            self._update_nested_config("governance", yaml_config, GovernanceSettings)
 
         except Exception:
             # Silently fail if YAML loading fails

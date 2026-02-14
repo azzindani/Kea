@@ -35,7 +35,7 @@ llm_callbacks:
 kernel_cell:
   # Token Budget Defaults
   budget:
-    default_max_tokens: 30000
+    default_max_tokens: 32768
     simple_query_budget: 5000
     complex_query_budget: 50000
     min_child_budget: 1000
@@ -185,8 +185,8 @@ kernel_cell:
   # Iterative Delegation Protocol (v2.0, Phase 3)
   delegation:
     max_review_rounds: 2                 # Max revision cycles before accepting
-    review_cost_per_subtask: 300         # Token cost for LLM-based quality review
-    conflict_resolution_cost: 400        # Token cost per conflict resolved
+    review_cost_per_subtask: 32768         # Token cost for LLM-based quality review
+    conflict_resolution_cost: 32768        # Token cost per conflict resolved
     min_budget_for_review: 2000          # Skip review if budget below this
     # Quality acceptance thresholds by parent level
     quality_thresholds:
