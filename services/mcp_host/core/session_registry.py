@@ -405,6 +405,52 @@ class SessionRegistry:
                 
         return all_tools_dict
 
+    async def list_tools_for_server(self, server_name: str) -> List[dict]:
+        """
+        List tools for a specific server, spawning it JIT if needed.
+        """
+        try:
+            session = await self.get_session(server_name)
+            tools = await session.list_tools()
+            
+            tool_dicts = []
+            for tool in tools:
+                t = tool.model_dump()
+                t['server'] = server_name
+                tool_dicts.append(t)
+                
+                # Update cache
+                self.tool_to_server[tool.name] = server_name
+                
+            return tool_dicts
+        except Exception as e:
+            logger.warning(f"Failed to list tools for {server_name}: {e}")
+            return []
+
+    async def stop_server(self, server_name: str) -> bool:
+        """
+        Stop a specific server to free resources.
+        """
+        if server_name in self.active_sessions:
+            try:
+                await self.active_sessions[server_name].close()
+                del self.active_sessions[server_name]
+            except Exception as e:
+                logger.warning(f"Error closing session for {server_name}: {e}")
+
+        if server_name in self.active_processes:
+            try:
+                proc = self.active_processes[server_name]
+                proc.terminate()
+                await proc.wait()
+                del self.active_processes[server_name]
+                logger.info(f"🛑 Stopped server: {server_name}")
+                return True
+            except Exception as e:
+                logger.error(f"Error terminating process for {server_name}: {e}")
+                
+        return False
+
     def get_server_for_tool(self, tool_name: str) -> str | None:
         """Get the server name that provides a tool."""
         return self.tool_to_server.get(tool_name)

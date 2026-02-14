@@ -52,12 +52,32 @@ async def health():
 
 
 @app.get("/tools")
-async def list_tools():
-    """List all available tools."""
+async def list_tools(server: str | None = None):
+    """List available tools, optionally filtered by server (JIT)."""
     from services.mcp_host.core.session_registry import get_session_registry
     registry = get_session_registry()
-    tools = await registry.list_all_tools()
+    
+    if server:
+        # JIT: Only list tools for this specific server
+        tools = await registry.list_tools_for_server(server)
+    else:
+        # Full scan (legacy behavior, wakes all servers)
+        tools = await registry.list_all_tools()
+        
     return {"tools": tools}
+
+
+@app.post("/server/{server_name}/stop")
+async def stop_server(server_name: str):
+    """Stop a specific server to free resources."""
+    from services.mcp_host.core.session_registry import get_session_registry
+    registry = get_session_registry()
+    
+    success = await registry.stop_server(server_name)
+    if success:
+        return {"status": "stopped", "server": server_name}
+    else:
+        return {"status": "not_running", "server": server_name}
 
 
 @app.post("/tools/execute", response_model=ToolResponse)

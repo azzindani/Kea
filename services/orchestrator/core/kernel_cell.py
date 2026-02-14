@@ -645,25 +645,34 @@ class KernelCell:
             communicator=self.comm,
         )
 
-        # Discover available tools via MCP Host REST API
+        # Build context string and extract domain from envelope
+        context_str = ""
+        domain_hints = []
+        if envelope.stdin and envelope.stdin.context:
+            ctx = envelope.stdin.context
+            domain_hints = ctx.domain_hints or []
+            if domain_hints:
+                context_str += f"Domain: {', '.join(domain_hints)}\n"
+            if ctx.parent_task_id:
+                context_str += f"Parent task: {ctx.parent_task_id}\n"
+
+        # Discover available tools via MCP Host REST API (JIT)
         available_tools: list[dict[str, Any]] = []
         try:
             from services.orchestrator.core.tool_bridge import discover_tools
-
-            available_tools = await discover_tools(timeout=5.0)
+            
+            # Use query (task_text) and domain to filter JIT loading
+            primary_domain = domain_hints[0] if domain_hints else self.identity.domain
+            
+            available_tools = await discover_tools(
+                timeout=5.0,
+                query=task_text,
+                domain=primary_domain
+            )
             if available_tools:
-                logger.info(f"Cell {self.cell_id}: Discovered {len(available_tools)} tools")
+                logger.info(f"Cell {self.identity.role}: Discovered {len(available_tools)} tools for domain {primary_domain}")
         except Exception as e:
-            logger.debug(f"Cell {self.cell_id}: Tool discovery skipped: {e}")
-
-        # Build context string from envelope
-        context_str = ""
-        if envelope.stdin and envelope.stdin.context:
-            ctx = envelope.stdin.context
-            if ctx.domain_hints:
-                context_str += f"Domain: {', '.join(ctx.domain_hints)}\n"
-            if ctx.parent_task_id:
-                context_str += f"Parent task: {ctx.parent_task_id}\n"
+            logger.debug(f"Cell {self.identity.role}: Tool discovery skipped: {e}")
 
         # Extract seed facts and error feedback (if any)
         seed_facts: list[dict[str, Any]] = []
