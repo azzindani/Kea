@@ -27,6 +27,12 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
+from services.orchestrator.core.error_journal import (
+    ErrorEntry,
+    ErrorJournal,
+    FixAttempt,
+    FixResult,
+)
 from services.orchestrator.core.output_schemas import (
     Artifact,
     ArtifactMetadata,
@@ -278,6 +284,26 @@ class ArtifactManager:
 
 
 # ============================================================================
+# Fix Pattern (Cross-Iteration Learning)
+# ============================================================================
+
+
+@dataclass
+class FixPattern:
+    """A learned pattern: 'when you see error X, try fix Y'.
+
+    Persists across healing iterations and can be stored in Vault
+    for cross-session learning.
+    """
+
+    error_signature: str  # Generalised error pattern
+    successful_fix: str  # Strategy that worked
+    frequency: int = 1  # How often this pattern has succeeded
+    last_seen: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    domains: set[str] = field(default_factory=set)
+
+
+# ============================================================================
 # Working Memory
 # ============================================================================
 
@@ -354,6 +380,12 @@ class WorkingMemory:
 
         # ── Artifact Manager (Phase 5) ───────────────────────────────
         self.artifacts = ArtifactManager(cell_id)
+
+        # ── Error Journal (Recursive Self-Healing) ─────────────────
+        self.error_journal = ErrorJournal()
+
+        # ── Fix Patterns (Cross-Iteration Learning) ────────────────
+        self._fix_patterns: list[FixPattern] = []
 
         # ── Step counter ──────────────────────────────────────────────
         self._step_count: int = 0
@@ -692,6 +724,12 @@ class WorkingMemory:
             lines = [f"- [{q.target.value}] {q.question[:80]}" for q in unanswered[:3]]
             section = "OPEN QUESTIONS:\n" + "\n".join(lines)
             sections.append(section)
+            budget -= len(section)
+
+        # ── Error Journal (Recursive Self-Healing) ─────────────────
+        error_summary = self.error_journal.compress_for_llm(max_chars=min(500, budget))
+        if error_summary:
+            sections.append(error_summary)
 
         return "\n\n".join(sections)
 
@@ -714,6 +752,8 @@ class WorkingMemory:
             "confidence_map": dict(self._confidence_map),
             "unanswered_questions": len(self.unanswered_questions),
             "overall_confidence": self.overall_confidence,
+            "error_journal": self.error_journal.to_dict(),
+            "fix_patterns_count": len(self._fix_patterns),
         }
 
     # ================================================================ #
@@ -762,6 +802,68 @@ class WorkingMemory:
 
         overlap = len(task_words & focus_words) / len(task_words)
         return max(0.0, 1.0 - overlap)
+
+    # ================================================================ #
+    # Fix Pattern Learning (Recursive Self-Healing)
+    # ================================================================ #
+
+    def learn_fix(self, error: ErrorEntry, fix: FixAttempt) -> None:
+        """Learn a successful fix pattern for future use."""
+        if fix.result != FixResult.SUCCESS:
+            return
+
+        signature = self._generalise_error(error)
+        # Check for existing pattern
+        for pattern in self._fix_patterns:
+            if pattern.error_signature == signature:
+                pattern.frequency += 1
+                pattern.last_seen = datetime.utcnow().isoformat()
+                return
+
+        self._fix_patterns.append(
+            FixPattern(
+                error_signature=signature,
+                successful_fix=fix.strategy,
+                frequency=1,
+            )
+        )
+
+    def suggest_fix(self, error: ErrorEntry) -> str | None:
+        """Suggest a fix based on learned patterns."""
+        signature = self._generalise_error(error)
+        for pattern in sorted(self._fix_patterns, key=lambda p: p.frequency, reverse=True):
+            if self._signatures_match(signature, pattern.error_signature):
+                return pattern.successful_fix
+        return None
+
+    @property
+    def fix_patterns(self) -> list[FixPattern]:
+        """All learned fix patterns."""
+        return list(self._fix_patterns)
+
+    @staticmethod
+    def _generalise_error(error: ErrorEntry) -> str:
+        """Generalise an error into a reusable signature."""
+        parts = [error.source.value, error.error_type]
+        # Strip specifics (UUIDs, numbers) from message
+        msg = error.message[:100]
+        for char in "0123456789":
+            msg = msg.replace(char, "#")
+        parts.append(msg)
+        return "|".join(parts)
+
+    @staticmethod
+    def _signatures_match(a: str, b: str) -> bool:
+        """Check if two error signatures are similar enough."""
+        if a == b:
+            return True
+        # Split into parts and check component overlap
+        parts_a = set(a.split("|"))
+        parts_b = set(b.split("|"))
+        if not parts_a or not parts_b:
+            return False
+        overlap = len(parts_a & parts_b) / max(len(parts_a), len(parts_b))
+        return overlap >= 0.6
 
     def detect_stagnation(self, last_n_facts: int = 3) -> bool:
         """

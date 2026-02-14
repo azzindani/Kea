@@ -16,7 +16,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-
 # ============================================================================
 # Planner Output
 # ============================================================================
@@ -211,7 +210,9 @@ class SynthesisOutput(BaseModel):
     executive_summary: str = Field(description="2-3 sentence executive summary")
     sections: list[SectionOutput] = Field(description="Report sections")
     key_findings: list[str] = Field(description="Top findings")
-    recommendations: list[str] = Field(default_factory=list, description="Actionable recommendations")
+    recommendations: list[str] = Field(
+        default_factory=list, description="Actionable recommendations"
+    )
     overall_confidence: float = Field(
         default=0.0,
         ge=0.0,
@@ -230,10 +231,11 @@ class SynthesisOutput(BaseModel):
 class ProcessingMode(str, Enum):
     """How a kernel cell should process a task."""
 
-    DIRECT = "direct"       # Trivial: respond immediately, no tools
-    SOLO = "solo"           # Simple/Moderate: single agent with tools
-    DELEGATE = "delegate"   # Complex: spawn child cells
+    DIRECT = "direct"  # Trivial: respond immediately, no tools
+    SOLO = "solo"  # Simple/Moderate: single agent with tools
+    DELEGATE = "delegate"  # Complex: spawn child cells
     HIERARCHY = "hierarchy"  # Enterprise: multi-level hierarchy
+    HEAL = "heal"  # Recursive self-healing after errors
 
 
 class ComplexityAssessment(BaseModel):
@@ -282,6 +284,8 @@ class RoleResolution(BaseModel):
         default="professional",
         description="Expected output quality from this role",
     )
+
+
 # ============================================================================
 # Artifact Models (Phase 5)
 # ============================================================================
@@ -290,23 +294,23 @@ class RoleResolution(BaseModel):
 class ArtifactType(str, Enum):
     """Types of work products produced by the kernel."""
 
-    REPORT = "report"           # Formal written report
-    ANALYSIS = "analysis"       # Analytical finding or evaluation
-    DATASET = "dataset"         # Structured data (CSV, JSON, etc.)
-    SUMMARY = "summary"         # Executive or technical summary
-    CODE = "code"               # Scripts, queries, or snippets
+    REPORT = "report"  # Formal written report
+    ANALYSIS = "analysis"  # Analytical finding or evaluation
+    DATASET = "dataset"  # Structured data (CSV, JSON, etc.)
+    SUMMARY = "summary"  # Executive or technical summary
+    CODE = "code"  # Scripts, queries, or snippets
     RECOMMENDATION = "recommendation"  # Actionable recommendation
-    MEMO = "memo"               # Internal or informal communication
+    MEMO = "memo"  # Internal or informal communication
 
 
 class ArtifactStatus(str, Enum):
     """Lifecycle states of an artifact."""
 
-    DRAFT = "draft"             # Work in progress
-    REVIEW = "review"           # Pending parent/peer review
-    REVISION = "revision"       # Sent back for improvement
-    APPROVED = "approved"       # Quality gate passed
-    PUBLISHED = "published"     # Final version ready for delivery
+    DRAFT = "draft"  # Work in progress
+    REVIEW = "review"  # Pending parent/peer review
+    REVISION = "revision"  # Sent back for improvement
+    APPROVED = "approved"  # Quality gate passed
+    PUBLISHED = "published"  # Final version ready for delivery
 
 
 class ArtifactMetadata(BaseModel):
@@ -348,3 +352,35 @@ class WorkPackage(BaseModel):
     key_findings: list[str] = Field(default_factory=list)
     recommendations: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+# ============================================================================
+# Issue Report (Recursive Self-Healing)
+# ============================================================================
+
+
+class IssueReport(BaseModel):
+    """An issue discovered during recursive self-healing."""
+
+    issue_id: str = Field(default="", description="Unique issue identifier")
+    parent_error_id: str | None = Field(
+        default=None,
+        description="The error that led to discovering this issue",
+    )
+    description: str = Field(default="", description="What the issue is")
+    category: str = Field(
+        default="unknown",
+        description="Category: missing_import, broken_reference, config_mismatch, etc.",
+    )
+    affected_components: list[str] = Field(
+        default_factory=list,
+        description="File paths, service names, or components affected",
+    )
+    estimated_complexity: Literal["trivial", "simple", "moderate", "complex"] = Field(
+        default="moderate",
+        description="Estimated complexity to fix",
+    )
+    suggested_fix: str | None = Field(
+        default=None,
+        description="LLM-suggested fix strategy",
+    )

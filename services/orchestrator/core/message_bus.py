@@ -84,6 +84,10 @@ class MessageChannel(str, Enum):
     # Insight propagation (bottom-up discovery)
     INSIGHT = "insight"  # "I discovered something important"
 
+    # Self-healing (recursive fix coordination)
+    HEAL_REQUEST = "heal_request"  # "Investigate and fix this error"
+    HEAL_RESULT = "heal_result"  # "Here's what I found and fixed"
+
 
 class MessagePriority(str, Enum):
     """How urgently this message should be processed."""

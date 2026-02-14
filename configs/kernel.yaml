@@ -146,6 +146,26 @@ kernel_cell:
       feedback: 200
       alert: 100
 
+  # Recursive Self-Healing (v2.1 — Claude Code Recursion)
+  # Enables detect → diagnose → fix → cascade-check → converge loop
+  healing:
+    enabled: true
+    max_iterations: 3              # Max recursive heal loops per cell
+    max_cascade_depth: 3           # Max depth of error causality chain
+    budget_fraction: 0.25          # Max fraction of remaining budget for healing
+    min_budget_for_heal: 1000      # Don't heal if budget below this
+    diminishing_returns_threshold: 0.1  # Stop if <10% improvement per iteration
+    max_new_errors_per_iteration: 5     # Abort if fix introduces too many new errors
+    # Per-level overrides
+    levels:
+      intern:       { enabled: false }
+      staff:        { max_iterations: 1, max_cascade_depth: 1 }
+      senior_staff: { max_iterations: 2, max_cascade_depth: 2 }
+      manager:      { max_iterations: 3, max_cascade_depth: 3 }
+      director:     { max_iterations: 3, max_cascade_depth: 3 }
+      vp:           { max_iterations: 3, max_cascade_depth: 3 }
+      ceo:          { max_iterations: 2, max_cascade_depth: 2 }
+
   # Iterative Delegation Protocol (v2.0, Phase 3)
   delegation:
     max_review_rounds: 2                 # Max revision cycles before accepting
