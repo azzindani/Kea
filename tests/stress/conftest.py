@@ -60,9 +60,15 @@ def pytest_configure(config):
             "shared.hardware.detector",
             "shared.logging.middleware",
             "services.client.runner",
+            "uvicorn.access",
         ]
+        
+        # Set explicitly for current process
         for name in noisy_loggers:
             logging.getLogger(name).setLevel(logging.WARNING)
+            
+        # Set env var for subprocesses (API Gateway, etc.)
+        os.environ["QUIET_LOGGERS"] = ",".join(noisy_loggers)
 
     
     # Register markers
