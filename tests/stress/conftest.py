@@ -355,12 +355,52 @@ async def wait_for_service(url: str, name: str, timeout: int = 30) -> bool:
     logging.error(f"❌ {name} failed to start at {url} within {timeout}s")
     return False
 
+def kill_processes_on_ports(ports):
+    """Kill processes listening on specified ports (Windows/Linux compat)."""
+    import subprocess
+    import platform
+    
+    system = platform.system().lower()
+    
+    for port in ports:
+        try:
+            if system == "windows":
+                cmd = f"netstat -ano | findstr :{port}"
+                try:
+                    output = subprocess.check_output(cmd, shell=True).decode()
+                    pids = set()
+                    for line in output.strip().split('\n'):
+                        parts = line.strip().split()
+                        if len(parts) > 4:
+                            pid = parts[-1]
+                            if pid and pid != "0":
+                                pids.add(pid)
+                    
+                    for pid in pids:
+                        subprocess.run(f"taskkill /F /PID {pid}", shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                        logging.info(f"Killed stale process {pid} on port {port}")
+                except subprocess.CalledProcessError:
+                    pass
+            else:
+                # Linux/Mac
+                subprocess.run(f"fuser -k {port}/tcp", shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+        except Exception as e:
+            logging.warning(f"Failed to kill process on port {port}: {e}")
+
 @pytest.fixture(scope="session", autouse=True)
-async def bootstrap_services():
+async def bootstrap_services(request):
     """
     Ensure all microservices are running. 
     Auto-starts them as subprocesses if not detected.
     """
+    # 0. Cleanup ports if requesting quiet mode (force restart)
+    # This ensures we pick up the new QUIET_LOGGERS env var
+    if request.config.getoption("--quiet-stress"):
+        logging.info("🧹 Killing existing services to enforce quiet mode...")
+        kill_processes_on_ports([8000, 8001, 8003])
+        # Give OS a moment to release ports
+        await asyncio.sleep(2)
+
     # 1. Check if already running (e.g. Docker or manual)
     api_ok = await wait_for_service(API_GATEWAY_URL, "API Gateway", timeout=1)
     orch_ok = await wait_for_service(ORCHESTRATOR_URL, "Orchestrator", timeout=1)
