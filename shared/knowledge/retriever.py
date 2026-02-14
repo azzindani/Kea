@@ -86,6 +86,9 @@ class KnowledgeRetriever:
         if tags:
             payload["tags"] = tags
 
+        label = f"category={category or 'all'} domain={domain or 'any'}"
+        logger.debug(f"KnowledgeRetriever: querying RAG Service [{label}] q='{query[:60]}'")
+
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.post(
@@ -93,25 +96,34 @@ class KnowledgeRetriever:
                     json=payload,
                 )
                 if resp.status_code != 200:
-                    logger.warning(f"KnowledgeRetriever: RAG Service returned {resp.status_code}")
+                    logger.warning(
+                        f"KnowledgeRetriever: RAG Service returned {resp.status_code} [{label}]"
+                    )
                     return ""
                 results: list[dict[str, Any]] = resp.json()
 
             if not results:
+                logger.debug(f"KnowledgeRetriever: no items found [{label}]")
                 return ""
 
             log_items = [
                 f"{r.get('knowledge_id', '?')} ({r.get('similarity', 0.0):.2f})" for r in results
             ]
-            logger.info(
-                f"Knowledge Retrieved ({category or 'all'}): {len(results)} items -> {log_items}"
-            )
+            logger.info(f"KnowledgeRetriever: {len(results)} items [{label}] -> {log_items}")
 
             relevant = [r for r in results if r.get("similarity", 0) >= min_similarity]
             if not relevant:
+                logger.debug(
+                    f"KnowledgeRetriever: all {len(results)} items below "
+                    f"similarity threshold {min_similarity} [{label}]"
+                )
                 return ""
 
             formatted = self._format_context(relevant)
+            logger.info(
+                f"KnowledgeRetriever: injecting {len(relevant)} knowledge items "
+                f"({len(formatted)} chars) into system prompt [{label}]"
+            )
             self._cache[cache_key] = (now, formatted)
             return formatted
 

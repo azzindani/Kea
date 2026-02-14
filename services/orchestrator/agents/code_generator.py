@@ -16,6 +16,7 @@ import re
 import unicodedata
 from typing import Any
 
+from shared.knowledge.retriever import get_knowledge_retriever
 from shared.logging import get_logger
 from shared.prompts import get_code_prompt
 
@@ -235,6 +236,19 @@ async def generate_python_code(
         # Resolve any placeholders in the task description
         resolved_task = resolve_placeholders(task_description, context_data)
 
+        # Retrieve coding-relevant domain knowledge (skills/procedures)
+        knowledge_context = ""
+        try:
+            knowledge_context = await get_knowledge_retriever().retrieve_skills(task_description)
+            if knowledge_context:
+                logger.info(
+                    f"CodeGenerator: injected {len(knowledge_context)} chars of domain knowledge"
+                )
+            else:
+                logger.debug("CodeGenerator: No domain knowledge retrieved — using base prompt")
+        except Exception as _kr_err:
+            logger.debug(f"CodeGenerator: knowledge retrieval skipped ({_kr_err})")
+
         # Build prompt
         prompt = get_code_prompt().format(
             task_description=resolved_task,
@@ -242,6 +256,8 @@ async def generate_python_code(
             file_artifacts=files_str,
             resolved_data=resolved_data_str,
         )
+        if knowledge_context:
+            prompt += f"\n\nDOMAIN KNOWLEDGE FOR THIS TASK:\n{knowledge_context}"
 
         # Add Error Context (Self-Correction)
         if previous_error:

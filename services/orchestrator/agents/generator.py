@@ -78,8 +78,10 @@ class GeneratorAgent:
             knowledge_context = await self._get_knowledge_context(query)
             if knowledge_context:
                 logger.info(
-                    f"Generator: Injecting {len(knowledge_context)} chars of domain knowledge"
+                    f"Generator: Injecting {len(knowledge_context)} chars of domain knowledge into system prompt"
                 )
+            else:
+                logger.debug("Generator: No domain knowledge retrieved — using base system prompt")
 
             # Format facts with full tool call schema as citation
             facts_text = ""

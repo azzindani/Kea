@@ -27,6 +27,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from shared.knowledge.retriever import get_knowledge_retriever
 from shared.llm import LLMConfig, OpenRouterProvider
 from shared.llm.provider import LLMMessage, LLMRole
 from shared.logging import get_logger
@@ -39,16 +40,18 @@ logger = get_logger(__name__)
 
 class AgentAction(str, Enum):
     """Actions the agent can take."""
-    CALL_TOOL = "call_tool"       # Execute a tool
-    ANALYZE = "analyze"           # Analyze current data
-    SYNTHESIZE = "synthesize"     # Create final output
+
+    CALL_TOOL = "call_tool"  # Execute a tool
+    ANALYZE = "analyze"  # Analyze current data
+    SYNTHESIZE = "synthesize"  # Create final output
     ASK_CLARIFICATION = "ask_clarification"  # Need more info
-    COMPLETE = "complete"         # Task done
+    COMPLETE = "complete"  # Task done
 
 
 @dataclass
 class ToolExecution:
     """Record of a single tool execution."""
+
     tool_name: str
     arguments: dict[str, Any]
     result: Any
@@ -61,24 +64,26 @@ class ToolExecution:
 @dataclass
 class ReasoningStep:
     """A single step in the agent's reasoning chain."""
+
     step_number: int
-    thought: str              # What the agent is thinking
-    action: AgentAction       # What it decided to do
-    action_input: dict        # Input to the action
-    observation: str          # Result/observation
+    thought: str  # What the agent is thinking
+    action: AgentAction  # What it decided to do
+    action_input: dict  # Input to the action
+    observation: str  # Result/observation
     timestamp: datetime = field(default_factory=datetime.utcnow)
 
 
 class AgentState(BaseModel):
     """
     State for the agentic workflow.
-    
+
     Tracks the full context including:
     - Original query
     - Reasoning chain
     - Tool executions
     - Accumulated data
     """
+
     query: str = Field(description="Original user query")
     objective: str = Field(default="", description="Refined objective")
 
@@ -105,17 +110,17 @@ class AgentState(BaseModel):
 class AgenticWorkflow:
     """
     Autonomous workflow engine with human-like reasoning.
-    
+
     Implements a ReAct-style loop:
     1. Thought: Reason about current state
     2. Action: Decide what to do
     3. Observation: Execute and observe result
     4. Repeat until done
-    
+
     Example:
         workflow = AgenticWorkflow(tool_executor)
         result = await workflow.run("Analyze TSLA financials")
-        
+
         # The agent will:
         # 1. Think: "I need to get TSLA's financial data..."
         # 2. Call: yfinance_server.get_income_statement_quarterly
@@ -130,11 +135,11 @@ class AgenticWorkflow:
         tool_executor: Callable[[str, dict], Awaitable[Any]],
         schema_registry: SchemaRegistry | None = None,
         model: str | None = None,
-        max_steps: int = 15
+        max_steps: int = 15,
     ):
         """
         Initialize the agentic workflow.
-        
+
         Args:
             tool_executor: Async function to execute tools (name, args) -> result
             schema_registry: Registry for schema learning
@@ -148,6 +153,7 @@ class AgenticWorkflow:
 
         # LLM setup
         from shared.config import get_settings
+
         settings = get_settings()
         self.model = model or settings.models.planner_model
         self.provider = OpenRouterProvider()
@@ -156,24 +162,20 @@ class AgenticWorkflow:
         self,
         query: str,
         available_tools: list[dict] | None = None,
-        initial_context: dict | None = None
+        initial_context: dict | None = None,
     ) -> AgentState:
         """
         Run the agentic workflow for a query.
-        
+
         Args:
             query: User's query/objective
             available_tools: List of available tool definitions
             initial_context: Optional starting context
-            
+
         Returns:
             Final AgentState with results
         """
-        state = AgentState(
-            query=query,
-            max_steps=self.max_steps,
-            artifacts=initial_context or {}
-        )
+        state = AgentState(query=query, max_steps=self.max_steps, artifacts=initial_context or {})
 
         logger.info(f"🚀 Starting agentic workflow: {query[:100]}")
 
@@ -187,10 +189,7 @@ class AgenticWorkflow:
 
             try:
                 # Get next action from LLM
-                thought, action, action_input = await self._reason(
-                    state,
-                    available_tools
-                )
+                thought, action, action_input = await self._reason(state, available_tools)
 
                 # Record the reasoning step
                 step = {
@@ -199,7 +198,7 @@ class AgenticWorkflow:
                     "action": action.value,
                     "action_input": action_input,
                     "observation": "",
-                    "timestamp": datetime.utcnow().isoformat()
+                    "timestamp": datetime.utcnow().isoformat(),
                 }
 
                 logger.info(f"💭 Step {state.current_step}: {thought[:100]}...")
@@ -215,9 +214,7 @@ class AgenticWorkflow:
 
                 elif action == AgentAction.CALL_TOOL:
                     observation = await self._execute_tool(
-                        state,
-                        action_input.get("tool"),
-                        action_input.get("arguments", {})
+                        state, action_input.get("tool"), action_input.get("arguments", {})
                     )
                     step["observation"] = observation[:500]  # Truncate for logging
 
@@ -236,13 +233,15 @@ class AgenticWorkflow:
 
             except Exception as e:
                 logger.error(f"❌ Error in step {state.current_step}: {e}")
-                state.reasoning_steps.append({
-                    "step": state.current_step,
-                    "thought": "Error occurred",
-                    "action": "error",
-                    "observation": str(e),
-                    "timestamp": datetime.utcnow().isoformat()
-                })
+                state.reasoning_steps.append(
+                    {
+                        "step": state.current_step,
+                        "thought": "Error occurred",
+                        "action": "error",
+                        "observation": str(e),
+                        "timestamp": datetime.utcnow().isoformat(),
+                    }
+                )
                 # Continue to next step, let LLM handle recovery
 
         if state.status != "complete":
@@ -253,18 +252,29 @@ class AgenticWorkflow:
         return state
 
     async def _reason(
-        self,
-        state: AgentState,
-        available_tools: list[dict]
+        self, state: AgentState, available_tools: list[dict]
     ) -> tuple[str, AgentAction, dict]:
         """
         LLM reasoning step to decide next action.
-        
+
         Returns:
             (thought, action, action_input)
         """
         # Build context from state
         context = self._build_context(state, available_tools)
+
+        # Retrieve domain knowledge to enrich reasoning
+        knowledge_context = ""
+        try:
+            knowledge_context = await get_knowledge_retriever().retrieve_skills(state.query)
+            if knowledge_context:
+                logger.info(
+                    f"AgenticWorkflow._reason: injected {len(knowledge_context)} chars of domain knowledge"
+                )
+            else:
+                logger.debug("AgenticWorkflow._reason: No domain knowledge retrieved")
+        except Exception as _kr_err:
+            logger.debug(f"AgenticWorkflow._reason: knowledge retrieval skipped ({_kr_err})")
 
         config = LLMConfig(
             model=self.model,
@@ -275,12 +285,9 @@ class AgenticWorkflow:
         messages = [
             LLMMessage(
                 role=LLMRole.SYSTEM,
-                content=self._get_system_prompt(available_tools)
+                content=self._get_system_prompt(available_tools, knowledge_context),
             ),
-            LLMMessage(
-                role=LLMRole.USER,
-                content=context
-            )
+            LLMMessage(role=LLMRole.USER, content=context),
         ]
 
         response = await self.provider.complete(messages, config)
@@ -288,20 +295,21 @@ class AgenticWorkflow:
         # Parse the response
         return self._parse_reasoning(response.content)
 
-    def _get_system_prompt(self, available_tools: list[dict]) -> str:
+    def _get_system_prompt(self, available_tools: list[dict], knowledge_context: str = "") -> str:
         """Generate system prompt for the agent."""
-        tool_descriptions = "\n".join([
-            f"- {t.get('name')}: {t.get('description', '')[:100]}"
-            for t in available_tools[:50]  # Limit to avoid context overflow
-        ])
+        tool_descriptions = "\n".join(
+            [
+                f"- {t.get('name')}: {t.get('description', '')[:100]}"
+                for t in available_tools[:50]  # Limit to avoid context overflow
+            ]
+        )
 
-        return get_agent_prompt("agentic_step").format(tool_descriptions=tool_descriptions)
+        prompt = get_agent_prompt("agentic_step").format(tool_descriptions=tool_descriptions)
+        if knowledge_context:
+            prompt += f"\n\n{knowledge_context}"
+        return prompt
 
-    def _build_context(
-        self,
-        state: AgentState,
-        available_tools: list[dict]
-    ) -> str:
+    def _build_context(self, state: AgentState, available_tools: list[dict]) -> str:
         """Build context string for the LLM."""
         # Format previous steps
         history = ""
@@ -309,7 +317,7 @@ class AgenticWorkflow:
             history += f"\n[Step {step['step']}]\n"
             history += f"Thought: {step['thought']}\n"
             history += f"Action: {step['action']}\n"
-            if step.get('observation'):
+            if step.get("observation"):
                 history += f"Observation: {step['observation'][:300]}...\n"
 
         # Format artifacts
@@ -339,13 +347,14 @@ What should I do next? Respond with JSON only."""
             # Handle markdown code blocks
             if "```" in content:
                 import re
-                json_match = re.search(r'```(?:json)?\s*(\{[\s\S]*?\})\s*```', content)
+
+                json_match = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", content)
                 if json_match:
                     content = json_match.group(1)
 
             # Find JSON object
-            start = content.find('{')
-            end = content.rfind('}') + 1
+            start = content.find("{")
+            end = content.rfind("}") + 1
             if start >= 0 and end > start:
                 content = content[start:end]
 
@@ -371,12 +380,7 @@ What should I do next? Respond with JSON only."""
             # Default to analysis
             return content[:200], AgentAction.ANALYZE, {}
 
-    async def _execute_tool(
-        self,
-        state: AgentState,
-        tool_name: str,
-        arguments: dict
-    ) -> str:
+    async def _execute_tool(self, state: AgentState, tool_name: str, arguments: dict) -> str:
         """Execute a tool and learn from the result."""
         logger.info(f"🔧 Executing: {tool_name}")
 
@@ -392,7 +396,7 @@ What should I do next? Respond with JSON only."""
                 "arguments": arguments,
                 "success": True,
                 "duration_ms": duration,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
             state.tool_executions.append(execution)
 
@@ -416,13 +420,15 @@ What should I do next? Respond with JSON only."""
 
         except Exception as e:
             logger.error(f"Tool execution failed: {e}")
-            state.tool_executions.append({
-                "tool": tool_name,
-                "arguments": arguments,
-                "success": False,
-                "error": str(e),
-                "timestamp": datetime.utcnow().isoformat()
-            })
+            state.tool_executions.append(
+                {
+                    "tool": tool_name,
+                    "arguments": arguments,
+                    "success": False,
+                    "error": str(e),
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+            )
             return f"ERROR: {e}"
 
     async def _analyze(self, state: AgentState, input_data: dict) -> str:
@@ -438,20 +444,34 @@ What should I do next? Respond with JSON only."""
         if not data_to_analyze:
             # Use recent artifacts
             recent_results = [
-                state.artifacts.get(f"result_{i+1}", "")
+                state.artifacts.get(f"result_{i + 1}", "")
                 for i in range(len(state.tool_executions))
             ][-3:]  # Last 3 results
             data_to_analyze = "\n---\n".join(str(r)[:500] for r in recent_results if r)
 
+        # Retrieve analysis-relevant knowledge
+        knowledge_context = ""
+        try:
+            knowledge_context = await get_knowledge_retriever().retrieve_skills(state.query)
+            if knowledge_context:
+                logger.info(
+                    f"AgenticWorkflow._analyze: injected {len(knowledge_context)} chars of domain knowledge"
+                )
+            else:
+                logger.debug("AgenticWorkflow._analyze: No domain knowledge retrieved")
+        except Exception as _kr_err:
+            logger.debug(f"AgenticWorkflow._analyze: knowledge retrieval skipped ({_kr_err})")
+
+        analyzer_prompt = get_agent_prompt("agentic_analyzer")
+        if knowledge_context:
+            analyzer_prompt += f"\n\n{knowledge_context}"
+
         messages = [
-            LLMMessage(
-                role=LLMRole.SYSTEM,
-                content=get_agent_prompt("agentic_analyzer")
-            ),
+            LLMMessage(role=LLMRole.SYSTEM, content=analyzer_prompt),
             LLMMessage(
                 role=LLMRole.USER,
-                content=f"Query: {state.query}\n\nData:\n{data_to_analyze[:3000]}"
-            )
+                content=f"Query: {state.query}\n\nData:\n{data_to_analyze[:3000]}",
+            ),
         ]
 
         response = await self.provider.complete(messages, config)
@@ -474,11 +494,25 @@ What should I do next? Respond with JSON only."""
             if isinstance(value, str) and len(value) > 50:
                 all_data.append(f"[{key}]\n{value[:800]}")
 
+        # Retrieve synthesis-relevant knowledge
+        knowledge_context = ""
+        try:
+            knowledge_context = await get_knowledge_retriever().retrieve_skills(state.query)
+            if knowledge_context:
+                logger.info(
+                    f"AgenticWorkflow._synthesize: injected {len(knowledge_context)} chars of domain knowledge"
+                )
+            else:
+                logger.debug("AgenticWorkflow._synthesize: No domain knowledge retrieved")
+        except Exception as _kr_err:
+            logger.debug(f"AgenticWorkflow._synthesize: knowledge retrieval skipped ({_kr_err})")
+
+        synthesizer_prompt = get_agent_prompt("agentic_synthesizer")
+        if knowledge_context:
+            synthesizer_prompt += f"\n\n{knowledge_context}"
+
         messages = [
-            LLMMessage(
-                role=LLMRole.SYSTEM,
-                content=get_agent_prompt("agentic_synthesizer")
-            ),
+            LLMMessage(role=LLMRole.SYSTEM, content=synthesizer_prompt),
             LLMMessage(
                 role=LLMRole.USER,
                 content=f"""Original Query: {state.query}
@@ -486,8 +520,8 @@ What should I do next? Respond with JSON only."""
 Gathered Data:
 {chr(10).join(all_data[:10])}
 
-Provide a complete answer:"""
-            )
+Provide a complete answer:""",
+            ),
         ]
 
         response = await self.provider.complete(messages, config)
@@ -502,22 +536,17 @@ Provide a complete answer:"""
         """Discover relevant tools for the query."""
         try:
             from services.mcp_host.core.session_registry import get_session_registry
+
             registry = get_session_registry()
 
             # Search for relevant tools
-            tools = await asyncio.wait_for(
-                registry.search_tools(query, limit=50),
-                timeout=5.0
-            )
+            tools = await asyncio.wait_for(registry.search_tools(query, limit=50), timeout=5.0)
 
             if tools:
                 return tools
 
             # Fallback to listing all
-            all_tools = await asyncio.wait_for(
-                registry.list_all_tools(),
-                timeout=5.0
-            )
+            all_tools = await asyncio.wait_for(registry.list_all_tools(), timeout=5.0)
             return all_tools[:100]
 
         except Exception as e:
@@ -528,18 +557,16 @@ Provide a complete answer:"""
 
 # Convenience function
 async def run_agentic_workflow(
-    query: str,
-    tool_executor: Callable[[str, dict], Awaitable[Any]],
-    **kwargs
+    query: str, tool_executor: Callable[[str, dict], Awaitable[Any]], **kwargs
 ) -> AgentState:
     """
     Run an agentic workflow for a query.
-    
+
     Example:
         async def execute_tool(name: str, args: dict) -> str:
             # Your tool execution logic
             return await mcp_host.call_tool(name, args)
-        
+
         result = await run_agentic_workflow(
             "Analyze TSLA financials",
             tool_executor=execute_tool
