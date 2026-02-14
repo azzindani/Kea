@@ -12,22 +12,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 
+from services.orchestrator.core.organization import Domain
 from shared.logging import get_logger
 
 logger = get_logger(__name__)
-
-
-class Domain(str, Enum):
-    """Research domains."""
-
-    RESEARCH = "research"
-    FINANCE = "finance"
-    MEDICAL = "medical"
-    LEGAL = "legal"
-    ENGINEERING = "engineering"
-    ACADEMIC = "academic"
-    DATA = "data"
-    GENERAL = "general"
 
 
 class TaskType(str, Enum):

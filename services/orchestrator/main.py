@@ -26,7 +26,7 @@ from services.orchestrator.core.graph import GraphState, compile_research_graph
 from shared.config import get_settings
 from shared.logging import get_logger
 from shared.logging.middleware import RequestLoggingMiddleware
-from shared.prompts import get_kernel_config
+from shared.prompts import get_agent_prompt, get_kernel_config
 from shared.schemas import ResearchStatus
 from shared.service_registry import ServiceName, ServiceRegistry
 
@@ -40,38 +40,48 @@ USE_KERNEL = os.getenv("USE_KERNEL_PIPELINE", "true").lower() in ("true", "1", "
 
 
 def _kernel_level_from_complexity(query: str, depth: int) -> str:
-    """Determine starting kernel level from query complexity."""
+    """Determine starting kernel level from query complexity.
+
+    Mapping is loaded from ``kernel.yaml`` ``kernel_cell.complexity_level_mapping``
+    and depth escalation from ``kernel_cell.depth_escalation``.
+    """
     try:
         from services.orchestrator.core.complexity import classify_complexity
 
         score = classify_complexity(query)
         tier = score.tier.value
-        mapping = {
-            "trivial": "staff",
-            "low": "senior_staff",
-            "medium": "manager",
-            "high": "director",
-            "extreme": "ceo",
-        }
+
+        # Load tier→level mapping from config
+        mapping = get_kernel_config("kernel_cell.complexity_level_mapping") or {}
         level = mapping.get(tier, "manager")
-        # Depth param can escalate: depth >= 4 → at least director
-        if depth >= 4 and level in ("staff", "senior_staff", "manager"):
-            level = "director"
+
+        # Depth escalation from config
+        escalation = get_kernel_config("kernel_cell.depth_escalation") or {}
+        esc_threshold = escalation.get("threshold", 4)
+        esc_min_level = escalation.get("min_level", "director")
+        esc_from = escalation.get("escalate_from", ["staff", "senior_staff", "manager"])
+
+        if depth >= esc_threshold and level in esc_from:
+            level = esc_min_level
+
         return level
     except Exception:
         return "manager"
 
 
 def _domain_from_query(query: str) -> str:
-    """Quick heuristic to detect primary domain from query text."""
-    q = query.lower()
-    if any(kw in q for kw in ("stock", "financ", "revenue", "earnings", "profit", "valuation")):
-        return "finance"
-    if any(kw in q for kw in ("legal", "regulat", "compliance", "patent", "lawsuit")):
-        return "legal"
-    if any(kw in q for kw in ("code", "program", "algorithm", "software", "api")):
-        return "technology"
-    return "research"
+    """Detect primary domain from query text using vocab-backed classification.
+
+    Delegates to ``PromptFactory.detect_domain()`` which loads keywords from
+    ``configs/vocab/classification.yaml``.
+    """
+    try:
+        from services.orchestrator.core.prompt_factory import PromptFactory
+
+        factory = PromptFactory()
+        return factory.detect_domain(query).value
+    except Exception:
+        return "research"
 
 
 @asynccontextmanager
@@ -87,15 +97,17 @@ async def lifespan(app: FastAPI):
     # Other services (MCP Host, Vault, SwarmManager) are accessed via REST API.
     # =========================================================================
     try:
-        # Organization structure (owned by Orchestrator)
-        from services.orchestrator.core.organization import Domain, get_organization
+        # Organization structure (owned by Orchestrator, loaded from kernel.yaml)
+        from services.orchestrator.core.organization import (
+            get_organization,
+            initialize_from_config,
+        )
 
         org = get_organization()
         if not org.list_departments():
-            org.create_department("Research", Domain.RESEARCH)
-            org.create_department("Finance", Domain.FINANCE)
-            org.create_department("Legal", Domain.LEGAL)
-            logger.info("Organization structure initialized: Research, Finance, Legal")
+            initialize_from_config(org)
+            dept_names = [d.name for d in org.list_departments()]
+            logger.info(f"Organization initialized from config: {dept_names}")
 
         # Conversation memory (owned by Orchestrator)
         from services.orchestrator.core.conversation import get_conversation_manager
@@ -497,10 +509,11 @@ async def stream_research(query: str, depth: int = 2, max_sources: int = 10):
 
                 yield f"data: {json.dumps({'event': 'phase', 'phase': 'planning'})}\n\n"
 
+                planner_prompt = (
+                    get_agent_prompt("planner") or "You are a research planner. Be concise."
+                )
                 messages = [
-                    LLMMessage(
-                        role=LLMRole.SYSTEM, content="You are a research planner. Be concise."
-                    ),
+                    LLMMessage(role=LLMRole.SYSTEM, content=planner_prompt),
                     LLMMessage(role=LLMRole.USER, content=f"Plan research for: {query}"),
                 ]
 
@@ -515,11 +528,12 @@ async def stream_research(query: str, depth: int = 2, max_sources: int = 10):
 
                 facts_text = "\n".join([str(f)[:100] for f in final_state.get("facts", [])[:5]])
 
+                synth_prompt = (
+                    get_agent_prompt("synthesizer")
+                    or "You are a research synthesizer. Create concise reports."
+                )
                 messages = [
-                    LLMMessage(
-                        role=LLMRole.SYSTEM,
-                        content="You are a research synthesizer. Create concise reports.",
-                    ),
+                    LLMMessage(role=LLMRole.SYSTEM, content=synth_prompt),
                     LLMMessage(
                         role=LLMRole.USER,
                         content=f"Synthesize research on: {query}\n\nFacts:\n{facts_text}",

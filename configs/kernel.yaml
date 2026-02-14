@@ -107,6 +107,22 @@ kernel_cell:
     high: delegate
     extreme: hierarchy
 
+  # Maps ComplexityTier → starting kernel level (organizational hierarchy entry point)
+  # Used by main.py _kernel_level_from_complexity() to decide which org level handles a query
+  complexity_level_mapping:
+    trivial: staff
+    low: senior_staff
+    medium: manager
+    high: director
+    extreme: ceo
+
+  # Depth escalation: when depth >= threshold, promote level to at least min_level
+  # Only applies if current level is in escalate_from list
+  depth_escalation:
+    threshold: 4
+    min_level: director
+    escalate_from: [staff, senior_staff, manager]
+
   # Output formatting (Phase 3)
   output:
     default_format: report

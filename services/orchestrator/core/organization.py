@@ -13,27 +13,32 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable
 
 from shared.logging import get_logger
-
 
 logger = get_logger(__name__)
 
 
 class Domain(str, Enum):
-    """Department domains."""
+    """Department domains — canonical superset used across all modules."""
+
     RESEARCH = "research"
     FINANCE = "finance"
     LEGAL = "legal"
     ENGINEERING = "engineering"
     ANALYTICS = "analytics"
     OPERATIONS = "operations"
+    MEDICAL = "medical"
+    ACADEMIC = "academic"
+    DATA = "data"
+    STRATEGY = "strategy"
+    TECHNOLOGY = "technology"
     GENERAL = "general"
 
 
 class RoleType(str, Enum):
     """Agent role types."""
+
     RESEARCHER = "researcher"
     ANALYST = "analyst"
     REVIEWER = "reviewer"
@@ -47,17 +52,18 @@ class RoleType(str, Enum):
 class Role:
     """
     Agent role with specific capabilities.
-    
+
     Defines what an agent can do and how it behaves.
     """
+
     name: str
     role_type: RoleType
     system_prompt: str
     allowed_tools: list[str] = field(default_factory=list)
-    can_spawn: bool = False      # Can create sub-agents?
-    can_escalate: bool = True    # Can escalate to supervisor?
-    max_concurrent: int = 1      # Max parallel tasks
-    
+    can_spawn: bool = False  # Can create sub-agents?
+    can_escalate: bool = True  # Can escalate to supervisor?
+    max_concurrent: int = 1  # Max parallel tasks
+
     def to_dict(self) -> dict:
         """Serialize role."""
         return {
@@ -72,15 +78,16 @@ class Role:
 @dataclass
 class AgentInstance:
     """Running agent instance."""
+
     agent_id: str
     role: Role
     team_id: str
     status: str = "idle"  # idle, working, blocked, completed
     current_task_id: str | None = None
     created_at: datetime = field(default_factory=datetime.utcnow)
-    
+
     @classmethod
-    def create(cls, role: Role, team_id: str) -> "AgentInstance":
+    def create(cls, role: Role, team_id: str) -> AgentInstance:
         """Create new agent instance."""
         return cls(
             agent_id=f"agent_{uuid.uuid4().hex[:8]}",
@@ -93,21 +100,22 @@ class AgentInstance:
 class Team:
     """
     Group of agents working on related tasks.
-    
+
     Teams provide:
     - Work queue management
     - Agent pooling
     - Local coordination
     """
+
     team_id: str
     name: str
     department_id: str
     max_agents: int = 10
     agents: list[AgentInstance] = field(default_factory=list)
     active_tasks: int = 0
-    
+
     @classmethod
-    def create(cls, name: str, department_id: str, max_agents: int = 10) -> "Team":
+    def create(cls, name: str, department_id: str, max_agents: int = 10) -> Team:
         """Create new team."""
         return cls(
             team_id=f"team_{uuid.uuid4().hex[:8]}",
@@ -115,18 +123,18 @@ class Team:
             department_id=department_id,
             max_agents=max_agents,
         )
-    
+
     def add_agent(self, role: Role) -> AgentInstance | None:
         """Add agent to team if capacity allows."""
         if len(self.agents) >= self.max_agents:
             logger.warning(f"Team {self.name} at capacity ({self.max_agents})")
             return None
-        
+
         agent = AgentInstance.create(role, self.team_id)
         self.agents.append(agent)
         logger.debug(f"Added agent {agent.agent_id} to team {self.name}")
         return agent
-    
+
     def remove_agent(self, agent_id: str) -> bool:
         """Remove agent from team."""
         for i, agent in enumerate(self.agents):
@@ -135,11 +143,11 @@ class Team:
                 logger.debug(f"Removed agent {agent_id} from team {self.name}")
                 return True
         return False
-    
+
     def get_idle_agents(self) -> list[AgentInstance]:
         """Get agents available for work."""
         return [a for a in self.agents if a.status == "idle"]
-    
+
     @property
     def utilization(self) -> float:
         """Team utilization (0-1)."""
@@ -153,21 +161,22 @@ class Team:
 class Department:
     """
     Virtual department with domain specialization.
-    
+
     Departments provide:
     - Domain-specific tools and prompts
     - Team management
     - Shared memory namespace
     """
+
     dept_id: str
     name: str
     domain: Domain
     teams: list[Team] = field(default_factory=list)
     default_tools: list[str] = field(default_factory=list)
     max_teams: int = 10
-    
+
     @classmethod
-    def create(cls, name: str, domain: Domain, max_teams: int = 10) -> "Department":
+    def create(cls, name: str, domain: Domain, max_teams: int = 10) -> Department:
         """Create new department."""
         return cls(
             dept_id=f"dept_{uuid.uuid4().hex[:8]}",
@@ -175,30 +184,30 @@ class Department:
             domain=domain,
             max_teams=max_teams,
         )
-    
+
     def add_team(self, name: str, max_agents: int = 10) -> Team | None:
         """Add team to department."""
         if len(self.teams) >= self.max_teams:
             logger.warning(f"Department {self.name} at team capacity")
             return None
-        
+
         team = Team.create(name, self.dept_id, max_agents)
         self.teams.append(team)
         logger.info(f"Created team '{name}' in department '{self.name}'")
         return team
-    
+
     def get_team(self, team_id: str) -> Team | None:
         """Get team by ID."""
         for team in self.teams:
             if team.team_id == team_id:
                 return team
         return None
-    
+
     @property
     def total_agents(self) -> int:
         """Total agents across all teams."""
         return sum(len(t.agents) for t in self.teams)
-    
+
     @property
     def total_capacity(self) -> int:
         """Total agent capacity."""
@@ -208,27 +217,27 @@ class Department:
 class Organization:
     """
     Top-level organizational structure.
-    
+
     Manages departments, provides global coordination.
-    
+
     Example:
         org = Organization()
-        
+
         # Create department
         research = org.create_department("Research", Domain.RESEARCH)
-        
+
         # Add team
         team = research.add_team("Market Analysis", max_agents=5)
-        
+
         # Add agent
         role = Role("Analyst", RoleType.ANALYST, "You analyze data...")
         agent = team.add_agent(role)
     """
-    
+
     def __init__(self):
         self._departments: dict[str, Department] = {}
         self._created_at = datetime.utcnow()
-    
+
     def create_department(
         self,
         name: str,
@@ -240,37 +249,34 @@ class Organization:
         self._departments[dept.dept_id] = dept
         logger.info(f"Created department '{name}' ({domain.value})")
         return dept
-    
+
     def get_department(self, dept_id: str) -> Department | None:
         """Get department by ID."""
         return self._departments.get(dept_id)
-    
+
     def get_department_by_domain(self, domain: Domain) -> Department | None:
         """Get first department matching domain."""
         for dept in self._departments.values():
             if dept.domain == domain:
                 return dept
         return None
-    
+
     def list_departments(self) -> list[Department]:
         """List all departments."""
         return list(self._departments.values())
-    
+
     @property
     def total_agents(self) -> int:
         """Total agents across organization."""
         return sum(d.total_agents for d in self._departments.values())
-    
+
     @property
     def stats(self) -> dict:
         """Organization statistics."""
         return {
             "departments": len(self._departments),
             "total_agents": self.total_agents,
-            "by_domain": {
-                d.domain.value: d.total_agents
-                for d in self._departments.values()
-            },
+            "by_domain": {d.domain.value: d.total_agents for d in self._departments.values()},
         }
 
 
@@ -284,3 +290,33 @@ def get_organization() -> Organization:
     if _organization is None:
         _organization = Organization()
     return _organization
+
+
+def initialize_from_config(org: Organization) -> None:
+    """Initialize organization departments from kernel.yaml config.
+
+    Reads ``organization.default_departments`` from ``configs/kernel.yaml``
+    and creates each department in the given :class:`Organization`.
+    Falls back to a single Research department if config is missing.
+    """
+    from shared.prompts import get_kernel_config
+
+    org_config = get_kernel_config("organization") or {}
+    departments: list[dict] = org_config.get("default_departments", [])
+
+    if not departments:
+        logger.warning(
+            "No departments in kernel.yaml organization config, creating Research fallback"
+        )
+        org.create_department("Research", Domain.RESEARCH)
+        return
+
+    for dept_cfg in departments:
+        name = dept_cfg.get("name", "Unknown")
+        domain_str = dept_cfg.get("domain", "general")
+        try:
+            domain = Domain(domain_str)
+        except ValueError:
+            logger.warning(f"Unknown domain '{domain_str}' for department '{name}', using GENERAL")
+            domain = Domain.GENERAL
+        org.create_department(name, domain)

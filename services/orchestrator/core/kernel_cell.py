@@ -142,12 +142,27 @@ class TokenBudget:
 
     Prevents infinite delegation by tracking token consumption
     and enforcing depth limits. Parent allocates fractions to children.
+
+    Defaults are loaded from ``kernel.yaml`` when sentinel values (0) are used.
+    When explicit non-zero values are provided (e.g. by ``run_kernel()`` or
+    ``allocate_fraction()``), those values take precedence.
     """
 
-    max_tokens: int = 10_000
-    remaining: int = 10_000
+    max_tokens: int = 0
+    remaining: int = 0
     depth: int = 0
-    max_depth: int = 5
+    max_depth: int = 0
+
+    def __post_init__(self) -> None:
+        """Load defaults from kernel.yaml for any fields left at sentinel value."""
+        if self.max_tokens == 0:
+            cfg = get_kernel_config("kernel_cell.budget.default_max_tokens")
+            self.max_tokens = int(cfg) if cfg else 30_000
+        if self.remaining == 0:
+            self.remaining = self.max_tokens
+        if self.max_depth == 0:
+            cfg = get_kernel_config("kernel_cell.recursion.max_depth")
+            self.max_depth = int(cfg) if cfg else 5
 
     def allocate_fraction(
         self,
