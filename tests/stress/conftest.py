@@ -53,6 +53,17 @@ def pytest_configure(config):
     
     # Make sure stress test logger outputs everything
     logging.getLogger("tests.stress").setLevel(logging.DEBUG)
+
+    # Handle --quiet-stress
+    if config.getoption("--quiet-stress"):
+        noisy_loggers = [
+            "shared.hardware.detector",
+            "shared.logging.middleware",
+            "services.client.runner",
+        ]
+        for name in noisy_loggers:
+            logging.getLogger(name).setLevel(logging.WARNING)
+
     
     # Register markers
     config.addinivalue_line("markers", "stress: Stress/load tests")
@@ -76,6 +87,16 @@ def pytest_addoption(parser):
             action="store",
             default="tests/stress/results",
             help="Output directory for results",
+        )
+    except ValueError:
+        pass
+
+    try:
+        parser.addoption(
+            "--quiet-stress",
+            action="store_true",
+            default=False,
+            help="Suppress noisy loggers during stress tests",
         )
     except ValueError:
         pass
