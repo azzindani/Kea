@@ -107,6 +107,27 @@ kernel_cell:
     high: delegate
     extreme: hierarchy
 
+  # Output formatting (Phase 3)
+  output:
+    default_format: report
+    min_artifacts: 1
+    max_artifacts: 10
+    formats:
+      report:
+        min_sections: 2
+        required: [overview, conclusion]
+      executive_brief:
+        max_words: 500
+        required: [key_findings, recommendations]
+      data_analysis:
+        required: [methodology, findings, data_tables]
+
+  # Reranking configuration (Phase 2.5)
+  reranking:
+    enabled: false              # Set true when reranker model is available
+    top_k: 10                   # Keep top-K facts after reranking
+    min_facts_for_rerank: 3     # Only rerank if this many facts exist
+
   # Communication Network (v2.0)
   communication:
     budget_pct: 0.15                    # Fraction of task budget for messaging
@@ -278,3 +299,38 @@ cognitive_profiles:
     can_delegate: false
     can_escalate: true
     can_consult_peers: false
+
+# ==============================================================================
+# Convergence Detection (Phase 2.2)
+# Stops execution when new steps aren't adding meaningful information.
+# ==============================================================================
+
+convergence:
+  min_new_info_pct: 0.10           # New step must add >10% new words
+  consecutive_stagnant_steps: 2    # Stop after this many stagnant steps
+  confidence_threshold_multiplier: 1.1  # Stop if confidence > quality_gate * this
+
+# ==============================================================================
+# Organization Structure (Phase 4)
+# Defines default departments and role resolution for corporation simulation.
+# ==============================================================================
+
+organization:
+  default_departments:
+    - name: Research
+      domain: research
+      default_roles: [market_researcher, data_scientist]
+    - name: Finance
+      domain: finance
+      default_roles: [financial_analyst]
+    - name: Legal
+      domain: legal
+      default_roles: [legal_analyst]
+    - name: Strategy
+      domain: strategy
+      default_roles: [strategist]
+    - name: Technology
+      domain: technology
+      default_roles: [data_scientist]
+  skip_levels_for_simple: true
+  budget_allocation: equal         # equal | weighted | priority

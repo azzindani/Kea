@@ -31,10 +31,10 @@ Version: 2.0.1 — Brain Upgrade + Communication Network
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from collections.abc import Awaitable, Callable
 from datetime import datetime
 from enum import Enum
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -43,16 +43,15 @@ from shared.prompts import get_agent_prompt
 
 from .cognitive_profiles import CognitiveProfile, ReasoningStyle
 from .output_schemas import (
-    WorkPackage,
     Artifact,
-    ArtifactType,
-    ArtifactStatus,
     ArtifactMetadata,
+    ArtifactStatus,
+    ArtifactType,
+    WorkPackage,
 )
 from .working_memory import (
     FocusItem,
     FocusItemType,
-    QuestionTarget,
     WorkingMemory,
 )
 
@@ -67,13 +66,13 @@ logger = get_logger(__name__)
 class CyclePhase(str, Enum):
     """Current phase in the cognitive cycle."""
 
-    PERCEIVE = "perceive"       # Understand the instruction
-    FRAME = "frame"             # Restate the problem, identify assumptions
-    PLAN = "plan"               # Choose approach, estimate effort
-    EXECUTE = "execute"         # Do the work (tool calls, analysis)
-    MONITOR = "monitor"         # Self-check: am I on track?
-    ADAPT = "adapt"             # Change approach if needed
-    PACKAGE = "package"         # Format results for consumer
+    PERCEIVE = "perceive"  # Understand the instruction
+    FRAME = "frame"  # Restate the problem, identify assumptions
+    PLAN = "plan"  # Choose approach, estimate effort
+    EXECUTE = "execute"  # Do the work (tool calls, analysis)
+    MONITOR = "monitor"  # Self-check: am I on track?
+    ADAPT = "adapt"  # Change approach if needed
+    PACKAGE = "package"  # Format results for consumer
 
 
 # ============================================================================
@@ -139,7 +138,9 @@ class MonitorResult(BaseModel):
 
     on_track: bool = Field(default=True)
     progress_pct: float = Field(
-        default=0.0, ge=0.0, le=1.0,
+        default=0.0,
+        ge=0.0,
+        le=1.0,
         description="Estimated progress 0.0–1.0",
     )
     quality_so_far: str = Field(
@@ -234,12 +235,18 @@ class CognitiveCycle:
         self.current_phase = CyclePhase.PERCEIVE
         self.monitor_count = 0
         self.tool_call_count = 0
-        self.accumulated_content: list[str] = []       # Draft sections
-        self.tool_results: list[dict[str, Any]] = []   # Raw tool outputs
+        self.accumulated_content: list[str] = []  # Draft sections
+        self.tool_results: list[dict[str, Any]] = []  # Raw tool outputs
 
         # Communication tracking
         self._progress_report_interval: int = 3  # Report every N steps
         self._last_progress_report: int = 0
+
+        # Convergence tracking
+        self._stagnant_steps: int = 0
+
+        # Mid-execution delegation signal
+        self._delegation_signal: dict[str, str] | None = None
 
     # ================================================================ #
     # Main Entry Point
@@ -329,6 +336,26 @@ class CognitiveCycle:
         self.current_phase = CyclePhase.EXECUTE
         await self._execute_loop(task, context, plan, available_tools)
 
+        # ── Check for mid-execution delegation signal ─────────────────
+        if self._delegation_signal:
+            logger.info(
+                f"🧠 CognitiveCycle: mid-execution delegation signal — "
+                f"{self._delegation_signal['description'][:80]}"
+            )
+            return CycleOutput(
+                content="\n\n".join(self.accumulated_content),
+                needs_delegation=True,
+                plan=plan,
+                framing=framing,
+                perception=perception,
+                quality="partial",
+                tool_results=self.tool_results,
+                memory_state=self.memory.to_dict(),
+                elapsed_ms=_elapsed_ms(start_time),
+                facts_gathered=self.memory.fact_count,
+                decisions_made=len(self.memory.decisions),
+            )
+
         # ── Phase 7: PACKAGE ──────────────────────────────────────────
         self.current_phase = CyclePhase.PACKAGE
         work_package = await self._package(perception, framing)
@@ -395,7 +422,8 @@ class CognitiveCycle:
 
         try:
             raw = await self.llm_call(
-                system_prompt=get_agent_prompt("kernel_perceiver") or (
+                system_prompt=get_agent_prompt("kernel_perceiver")
+                or (
                     "You are a task comprehension expert. Analyze tasks to "
                     "identify exactly what is being asked, including implicit "
                     "expectations. Respond only in JSON."
@@ -470,7 +498,8 @@ class CognitiveCycle:
 
         try:
             raw = await self.llm_call(
-                system_prompt=get_agent_prompt("kernel_framer") or (
+                system_prompt=get_agent_prompt("kernel_framer")
+                or (
                     "You are an analytical thinker. Restate problems clearly, "
                     "identify assumptions and gaps. Be precise. Respond in JSON."
                 ),
@@ -499,12 +528,14 @@ class CognitiveCycle:
 
         # Record gaps as focus items
         for gap in result.unknown_gaps[:5]:
-            self.memory.focus(FocusItem(
-                id=f"gap_{gap[:20]}",
-                item_type=FocusItemType.QUESTION,
-                content=f"Need to find: {gap}",
-                source="frame",
-            ))
+            self.memory.focus(
+                FocusItem(
+                    id=f"gap_{gap[:20]}",
+                    item_type=FocusItemType.QUESTION,
+                    content=f"Need to find: {gap}",
+                    source="frame",
+                )
+            )
 
         return result
 
@@ -563,7 +594,8 @@ class CognitiveCycle:
 
         try:
             raw = await self.llm_call(
-                system_prompt=get_agent_prompt("kernel_planner") or (
+                system_prompt=get_agent_prompt("kernel_planner")
+                or (
                     "You are an execution planner. Create actionable plans "
                     "with clear steps. Be realistic about effort. Respond in JSON."
                 ),
@@ -641,8 +673,7 @@ class CognitiveCycle:
                 redirect = self.comm.check_for_redirect()
                 if redirect:
                     logger.info(
-                        f"  📨 Redirect received at step {step_idx}: "
-                        f"{redirect.content[:80]}"
+                        f"  📨 Redirect received at step {step_idx}: {redirect.content[:80]}"
                     )
                     self.memory.focus_observation(
                         f"redirect-{step_idx}",
@@ -651,6 +682,7 @@ class CognitiveCycle:
                     )
                     # If it's a cancel, stop immediately
                     from .message_bus import MessageChannel
+
                     if redirect.channel == MessageChannel.CANCEL:
                         logger.info("  Execution cancelled by parent")
                         break
@@ -660,15 +692,10 @@ class CognitiveCycle:
                 # Incorporate peer-shared data
                 shared = self.comm.check_for_shared_data()
                 if shared:
-                    logger.info(
-                        f"  📨 Received {len(shared)} shared item(s) from peers"
-                    )
+                    logger.info(f"  📨 Received {len(shared)} shared item(s) from peers")
 
                 # Report progress at intervals
-                if (
-                    step_idx - self._last_progress_report
-                    >= self._progress_report_interval
-                ):
+                if step_idx - self._last_progress_report >= self._progress_report_interval:
                     progress = step_idx / max_steps if max_steps > 0 else 0.0
                     await self._report_progress(progress, task, step_idx)
                     self._last_progress_report = step_idx
@@ -686,8 +713,7 @@ class CognitiveCycle:
                 # Redirect from parent overrides everything
                 if monitor.redirect_received:
                     logger.info(
-                        f"  Monitor detected redirect, adapting: "
-                        f"{monitor.redirect_content[:80]}"
+                        f"  Monitor detected redirect, adapting: {monitor.redirect_content[:80]}"
                     )
                     self.current_phase = CyclePhase.ADAPT
                     adapt = await self._adapt(task, monitor, plan)
@@ -741,10 +767,7 @@ class CognitiveCycle:
             action_input = data.get("action_input", {})
             confidence = data.get("confidence", 0.5)
 
-            logger.debug(
-                f"  Step {step_idx}: action={action} "
-                f"confidence={confidence:.2f}"
-            )
+            logger.debug(f"  Step {step_idx}: action={action} confidence={confidence:.2f}")
 
             # Record thinking in working memory
             if thought:
@@ -795,9 +818,71 @@ class CognitiveCycle:
                 logger.info(f"  Execution complete at step {step_idx}")
                 break
 
+            # ── Convergence detection ──────────────────────────────
+            # If new content isn't adding meaningful value, stop early.
+            if action in ("analyze", "synthesize") and len(self.accumulated_content) >= 3:
+                if self._check_convergence(step_idx):
+                    logger.info(
+                        f"  Convergence detected at step {step_idx} — "
+                        f"new content adds <10% information"
+                    )
+                    break
+
+            # ── Mid-execution delegation signal ───────────────────────
+            if action == "delegate":
+                subtask_desc = action_input.get("subtask", "")
+                subtask_domain = action_input.get("domain", "general")
+                if subtask_desc:
+                    self._delegation_signal = {
+                        "description": subtask_desc,
+                        "domain": subtask_domain,
+                    }
+                    logger.info(
+                        f"  Mid-execution delegation signal at step {step_idx}: {subtask_desc[:80]}"
+                    )
+
             # Update confidence
             topic = f"step_{step_idx}"
             self.memory.set_confidence(topic, confidence)
+
+    def _check_convergence(self, step_idx: int) -> bool:
+        """
+        Check if recent content is converging (diminishing returns).
+
+        Compares the last two accumulated entries. If word overlap exceeds
+        90%, we consider the content stagnant.
+        """
+        if len(self.accumulated_content) < 2:
+            return False
+
+        recent = self.accumulated_content[-1].lower().split()
+        previous = self.accumulated_content[-2].lower().split()
+
+        if not recent or not previous:
+            return False
+
+        recent_set = set(recent)
+        previous_set = set(previous)
+        overlap = len(recent_set & previous_set) / max(len(recent_set | previous_set), 1)
+
+        if overlap > 0.9:
+            self._stagnant_steps += 1
+        else:
+            self._stagnant_steps = 0
+
+        convergence_cfg = self._get_convergence_config()
+        consecutive_threshold = convergence_cfg.get("consecutive_stagnant_steps", 2)
+
+        return self._stagnant_steps >= consecutive_threshold
+
+    def _get_convergence_config(self) -> dict:
+        """Load convergence config from kernel.yaml."""
+        try:
+            from shared.prompts import get_kernel_config
+
+            return get_kernel_config("convergence") or {}
+        except Exception:
+            return {}
 
     async def _execute_tool(
         self,
@@ -812,23 +897,27 @@ class CognitiveCycle:
 
             # Record in working memory
             result_str = str(result)[:1000] if result else "No output"
-            self.tool_results.append({
-                "tool": tool_name,
-                "args": tool_args,
-                "result": result_str,
-                "step": step_idx,
-            })
+            self.tool_results.append(
+                {
+                    "tool": tool_name,
+                    "args": tool_args,
+                    "result": result_str,
+                    "step": step_idx,
+                }
+            )
 
             self.memory.store_fact(
                 f"tool_{tool_name}_{step_idx}",
                 result_str[:500],
             )
-            self.memory.focus(FocusItem(
-                id=f"tool_result_{step_idx}",
-                item_type=FocusItemType.TOOL_RESULT,
-                content=f"{tool_name}: {result_str[:200]}",
-                source=tool_name,
-            ))
+            self.memory.focus(
+                FocusItem(
+                    id=f"tool_result_{step_idx}",
+                    item_type=FocusItemType.TOOL_RESULT,
+                    content=f"{tool_name}: {result_str[:200]}",
+                    source=tool_name,
+                )
+            )
 
             logger.debug(f"  Tool {tool_name}: {len(result_str)} chars")
 
@@ -913,9 +1002,7 @@ class CognitiveCycle:
                     f"Overall confidence: {self.memory.overall_confidence:.2f}\n"
                 )
                 if shared_data_count > 0:
-                    prompt += (
-                        f"Peer data received: {shared_data_count} item(s)\n"
-                    )
+                    prompt += f"Peer data received: {shared_data_count} item(s)\n"
                 prompt += (
                     "\nAssess:\n"
                     "1. quality_so_far: poor/adequate/good/excellent\n"
@@ -942,7 +1029,7 @@ class CognitiveCycle:
         # Combine heuristic + LLM signals
         should_continue = True
         if not has_content and progress > 0.5:
-            should_continue = False    # Half budget spent, no content = stalled
+            should_continue = False  # Half budget spent, no content = stalled
         if drift > 0.7:
             should_change = True
             suggested_adjustment = "Refocus on original task — output is drifting"
@@ -1060,17 +1147,14 @@ class CognitiveCycle:
         if not self.accumulated_content and not self.memory.all_facts:
             return WorkPackage(
                 summary="No data was gathered or analysis produced for this task.",
-                overall_confidence=0.0
+                overall_confidence=0.0,
             )
 
         # Gather all material for the LLM
         all_content = "\n\n".join(self.accumulated_content)
-        facts_text = "\n".join(
-            f"- {k}: {v[:500]}" for k, v in self.memory.all_facts.items()
-        )
+        facts_text = "\n".join(f"- {k}: {v[:500]}" for k, v in self.memory.all_facts.items())
         tool_summary = "\n".join(
-            f"- {t['tool']}({t.get('args', {})}): {t['result'][:200]}"
-            for t in self.tool_results
+            f"- {t['tool']}({t.get('args', {})}): {t['result'][:200]}" for t in self.tool_results
         )
 
         prompt = (
@@ -1088,19 +1172,19 @@ class CognitiveCycle:
             f"Divide the work into 2-5 distinct artifacts (e.g., a formal report, a dataset summary, recommendations).\n\n"
             f"JSON STRUCTURE:\n"
             f"{{\n"
-            f"  \"summary\": \"Executive summary of the whole package\",\n"
-            f"  \"artifacts\": [\n"
+            f'  "summary": "Executive summary of the whole package",\n'
+            f'  "artifacts": [\n'
             f"    {{\n"
-            f"      \"id\": \"unique_id\",\n"
-            f"      \"type\": \"report|analysis|dataset|recommendation\",\n"
-            f"      \"title\": \"Title of artifact\",\n"
-            f"      \"content\": \"Full markdown content\",\n"
-            f"      \"confidence\": 0.9,\n"
-            f"      \"metadata\": {{ \"sources\": [...], \"data_gaps\": [...] }}\n"
+            f'      "id": "unique_id",\n'
+            f'      "type": "report|analysis|dataset|recommendation",\n'
+            f'      "title": "Title of artifact",\n'
+            f'      "content": "Full markdown content",\n'
+            f'      "confidence": 0.9,\n'
+            f'      "metadata": {{ "sources": [...], "data_gaps": [...] }}\n'
             f"    }}\n"
             f"  ],\n"
-            f"  \"overall_confidence\": 0.85,\n"
-            f"  \"key_findings\": [\"finding 1\", ...]\n"
+            f'  "overall_confidence": 0.85,\n'
+            f'  "key_findings": ["finding 1", ...]\n'
             f"}}\n"
         )
 
@@ -1125,7 +1209,7 @@ class CognitiveCycle:
                     citations=meta_data.get("citations", []),
                     assumptions=meta_data.get("assumptions", []),
                 )
-                
+
                 art = self.memory.artifacts.create_artifact(
                     id=art_data.get("id", f"art_{datetime.utcnow().timestamp()}"),
                     type=ArtifactType(art_data.get("type", "report")),
@@ -1145,7 +1229,7 @@ class CognitiveCycle:
                 overall_confidence=data.get("overall_confidence", 0.5),
                 key_findings=data.get("key_findings", []),
                 recommendations=data.get("recommendations", []),
-                metadata={"produced_by": self.profile.level, "steps": self.monitor_count}
+                metadata={"produced_by": self.profile.level, "steps": self.monitor_count},
             )
             return package
 
@@ -1154,13 +1238,15 @@ class CognitiveCycle:
             # Fallback to a simple package
             return WorkPackage(
                 summary=f"Analysis encountered error during packaging: {e}",
-                artifacts=[self.memory.artifacts.create_artifact(
-                    id="fallback_report",
-                    type=ArtifactType.REPORT,
-                    title="Incomplete Report",
-                    content=all_content or "No content available."
-                )],
-                overall_confidence=0.1
+                artifacts=[
+                    self.memory.artifacts.create_artifact(
+                        id="fallback_report",
+                        type=ArtifactType.REPORT,
+                        title="Incomplete Report",
+                        content=all_content or "No content available.",
+                    )
+                ],
+                overall_confidence=0.1,
             )
 
     # ================================================================ #
@@ -1211,15 +1297,13 @@ class CognitiveCycle:
 
         force_synthesis = self.memory.get_note("force_synthesis")
         if force_synthesis:
-            prompt_parts.append(
-                f"\n⚠️ {force_synthesis}. Move to synthesis/complete."
-            )
+            prompt_parts.append(f"\n⚠️ {force_synthesis}. Move to synthesis/complete.")
 
         prompt_parts.append(
-            '\n=== RESPOND ===\n'
-            'JSON with keys: thought, action '
-            '(call_tool|analyze|synthesize|complete), '
-            'action_input, confidence (0.0-1.0)'
+            "\n=== RESPOND ===\n"
+            "JSON with keys: thought, action "
+            "(call_tool|analyze|synthesize|complete), "
+            "action_input, confidence (0.0-1.0)"
         )
 
         return "\n".join(prompt_parts)
@@ -1276,14 +1360,9 @@ class CognitiveCycle:
             if answer:
                 answers.append(answer)
                 # The communicator already stores in working memory
-                logger.info(
-                    f"  Clarification answered: {question[:50]} → "
-                    f"{answer[:50]}"
-                )
+                logger.info(f"  Clarification answered: {question[:50]} → {answer[:50]}")
             else:
-                logger.info(
-                    f"  Clarification unanswered: {question[:50]}"
-                )
+                logger.info(f"  Clarification unanswered: {question[:50]}")
 
         return answers
 
