@@ -142,12 +142,27 @@ class TokenBudget:
 
     Prevents infinite delegation by tracking token consumption
     and enforcing depth limits. Parent allocates fractions to children.
+
+    Defaults are loaded from ``kernel.yaml`` when sentinel values (0) are used.
+    When explicit non-zero values are provided (e.g. by ``run_kernel()`` or
+    ``allocate_fraction()``), those values take precedence.
     """
 
-    max_tokens: int = 10_000
-    remaining: int = 10_000
+    max_tokens: int = 0
+    remaining: int = 0
     depth: int = 0
-    max_depth: int = 5
+    max_depth: int = 0
+
+    def __post_init__(self) -> None:
+        """Load defaults from kernel.yaml for any fields left at sentinel value."""
+        if self.max_tokens == 0:
+            cfg = get_kernel_config("kernel_cell.budget.default_max_tokens")
+            self.max_tokens = int(cfg) if cfg else 30_000
+        if self.remaining == 0:
+            self.remaining = self.max_tokens
+        if self.max_depth == 0:
+            cfg = get_kernel_config("kernel_cell.recursion.max_depth")
+            self.max_depth = int(cfg) if cfg else 5
 
     def allocate_fraction(
         self,
@@ -2148,14 +2163,18 @@ async def run_kernel(
     domain: str = "general",
     budget: int = 30_000,
     max_depth: int = 3,
+    seed_facts: list[dict] | None = None,
+    error_feedback: list[dict] | None = None,
 ) -> StdioEnvelope:
     """
     Run the kernel for a query.
 
     This is the primary entry point for the entire Kea kernel.
 
-    v4.1: Now wired into /research and /chat/message routes.
+    v4.2: Accepts seed_facts and error_feedback for cross-attempt learning.
     - Retrieves prior knowledge from Vault (cross-session)
+    - Injects seed_facts into context for continuity across retries
+    - Injects error_feedback so the kernel avoids repeating mistakes
     - Stores results in Vault after completion
     - Resets the message bus for clean communication
 
@@ -2166,6 +2185,8 @@ async def run_kernel(
         domain: Primary domain for the query.
         budget: Total token budget.
         max_depth: Maximum delegation depth.
+        seed_facts: Facts from previous attempts to build upon.
+        error_feedback: Errors from previous attempts to avoid repeating.
 
     Returns:
         StdioEnvelope with the complete result.
@@ -2183,6 +2204,10 @@ async def run_kernel(
 
     # Retrieve prior knowledge from Vault (cross-session facts)
     prior_findings = await _retrieve_prior_knowledge(query, domain)
+
+    # Merge seed_facts from previous attempts with Vault knowledge
+    if seed_facts:
+        prior_findings = prior_findings + seed_facts
 
     identity = AgentIdentity(role="orchestrator", level=level, domain=domain)
     token_budget = TokenBudget(
@@ -2203,6 +2228,7 @@ async def run_kernel(
             context=TaskContext(
                 domain_hints=[domain],
                 prior_findings=prior_findings,
+                error_feedback=error_feedback or [],
             ),
             constraints=Constraints(token_budget=budget),
         ),

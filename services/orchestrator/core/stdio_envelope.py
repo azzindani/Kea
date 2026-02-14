@@ -94,6 +94,10 @@ class TaskContext(BaseModel):
         default_factory=list,
         description="Previously collected facts/findings",
     )
+    error_feedback: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Errors from previous attempts to avoid repeating",
+    )
     domain_hints: list[str] = Field(
         default_factory=list,
         description="Domains relevant to this task",
