@@ -99,8 +99,12 @@ async def execute_tool(request: ToolRequest):
         if not server_name:
              raise ValueError(f"Tool {request.tool_name} not found in any server")
 
-        session = await registry.get_session(server_name)
-        result = await session.call_tool(request.tool_name, request.arguments)
+        # Ephemeral Execution (Spawn -> Run -> Stop)
+        result = await registry.execute_tool_ephemeral(
+            server_name, 
+            request.tool_name, 
+            request.arguments
+        )
         
         return ToolResponse.from_mcp_result(request.tool_name, result)
         
@@ -145,8 +149,12 @@ async def execute_batch(request: BatchToolRequest):
             if not server_name:
                 raise ValueError(f"Tool {task.tool_name} not found")
                 
-            session = await registry.get_session(server_name)
-            res = await session.call_tool(task.tool_name, task.arguments)
+            # Ephemeral Execution
+            res = await registry.execute_tool_ephemeral(
+                server_name, 
+                task.tool_name, 
+                task.arguments
+            )
             return ToolResponse.from_mcp_result(task.tool_name, res)
         except Exception as e:
             return ToolResponse(

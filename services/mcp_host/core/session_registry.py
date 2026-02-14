@@ -358,52 +358,24 @@ class SessionRegistry:
 
     async def list_all_tools(self) -> List[dict]:
         """
-        Aggregates tools from ALL registered servers.
-        Syncs them to Postgres for RAG.
-        Parallelized for faster startup.
+        Lists all available tools using STATIC metadata to avoid spawning servers.
+        JIT servers are only spawned when a tool is actually executed.
         """
-        all_tools_dict = []
-        all_tools_objs = []
-        
-        async def _fetch_server_tools(name: str):
-            try:
-                session = await self.get_session(name)
-                return name, await session.list_tools()
-            except Exception as e:
-                logger.warning(f"⚠️ Could not fetch tools from {name}: {e}")
-                return name, []
+        # Optimized: Use pre-calculated static tools if available
+        if self.discovered_tools:
+            logger.debug(f"⚡ Returning {len(self.discovered_tools)} statically discovered tools (No Spawn)")
+            return [
+                {
+                    **t.model_dump(), 
+                    "server": self.tool_to_server.get(t.name, "unknown")
+                }
+                for t in self.discovered_tools
+            ]
 
-        # Gather all tools concurrently
-        # Limit concurrency to 5 to avoid CPU/IO storm if starting fresh
-        # But for 'list_tools' calls on active sessions, it's fast.
-        # For fresh JIT spawns, we want some parallelism but not 50.
-        
-        semaphore = asyncio.Semaphore(5)
-        
-        async def _bounded_fetch(name):
-            async with semaphore:
-                return await _fetch_server_tools(name)
-
-        tasks = [_bounded_fetch(name) for name in self.server_configs.keys()]
-        results = await asyncio.gather(*tasks)
-        
-        for name, tools in results:
-             for tool in tools:
-                tool_dict = tool.model_dump()
-                tool_dict['server'] = name
-                all_tools_dict.append(tool_dict)
-                
-                self.tool_to_server[tool.name] = name
-                all_tools_objs.append(tool)
-                
-        # Sync to RAG (Backgroundable, but fast enough for small sets)
-        if self.pg_registry and all_tools_objs:
-            try:
-                await self.pg_registry.sync_tools(all_tools_objs)
-            except Exception as e:
-                logger.error(f"Failed to sync tools to RAG: {e}")
-                
-        return all_tools_dict
+        # Fallback: If no static tools found, strictly avoid spawning everything.
+        # Just return empty, forcing rely on manual registration or explicit static scan.
+        logger.warning("⚠️ No tools found in static registry. Check MCP directory structure.")
+        return []
 
     async def list_tools_for_server(self, server_name: str) -> List[dict]:
         """
@@ -427,14 +399,39 @@ class SessionRegistry:
             logger.warning(f"Failed to list tools for {server_name}: {e}")
             return []
 
+    async def execute_tool_ephemeral(self, server_name: str, tool_name: str, arguments: dict) -> Any:
+        """
+        Executes a tool with a strictly ephemeral lifecycle:
+        1. Spawn Server (JIT)
+        2. Execute Tool
+        3. Terminate Server (Immediate Unload)
+        
+        This satisfies the 'Artifact Mode' requirement where resources are freed immediately.
+        """
+        try:
+            # 1. Spawn/Get Session
+            session = await self.get_session(server_name)
+            
+            # 2. Execute
+            logger.info(f"▶️ Executing {tool_name} on {server_name}...")
+            result = await session.call_tool(tool_name, arguments)
+            
+            return result
+        finally:
+            # 3. Unload/Terminate immediately
+            logger.info(f"🛑 Ephemeral cleanup: Stopping {server_name}...")
+            await self.stop_server(server_name)
+            
     async def stop_server(self, server_name: str) -> bool:
         """
         Stop a specific server to free resources.
         """
+        stopped = False
         if server_name in self.active_sessions:
             try:
                 await self.active_sessions[server_name].close()
                 del self.active_sessions[server_name]
+                stopped = True
             except Exception as e:
                 logger.warning(f"Error closing session for {server_name}: {e}")
 
@@ -444,12 +441,12 @@ class SessionRegistry:
                 proc.terminate()
                 await proc.wait()
                 del self.active_processes[server_name]
-                logger.info(f"🛑 Stopped server: {server_name}")
-                return True
+                logger.info(f"🛑 Stopped server process: {server_name}")
+                stopped = True
             except Exception as e:
                 logger.error(f"Error terminating process for {server_name}: {e}")
                 
-        return False
+        return stopped
 
     def get_server_for_tool(self, tool_name: str) -> str | None:
         """Get the server name that provides a tool."""
