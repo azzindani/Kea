@@ -44,86 +44,61 @@ import asyncio
 import json
 import uuid
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
 
-from shared.config import get_settings
-from shared.knowledge.retriever import KnowledgeRetriever, get_knowledge_retriever
-from shared.llm import LLMConfig, OpenRouterProvider
-from shared.llm.provider import LLMMessage, LLMRole
-from shared.logging import get_logger
-from shared.prompts import get_agent_prompt, get_kernel_config
-
+from services.orchestrator.core.cell_communicator import CellCommunicator
 from services.orchestrator.core.cognitive_cycle import CognitiveCycle, CycleOutput
 from services.orchestrator.core.cognitive_profiles import (
     CognitiveProfile,
     child_level_for,
     get_cognitive_profile,
 )
-from services.orchestrator.core.working_memory import WorkingMemory
-from services.orchestrator.core.cell_communicator import CellCommunicator
-from services.orchestrator.core.message_bus import (
-    MessageChannel,
-    get_message_bus,
-    reset_message_bus,
+from services.orchestrator.core.complexity import classify_complexity
+from services.orchestrator.core.degradation import get_degrader
+from services.orchestrator.core.delegation_protocol import (
+    DelegationProtocol,
+    DelegationState,
 )
-
 from services.orchestrator.core.inference_context import (
     AgentIdentity,
     InferenceContext,
     KnowledgeEnhancedInference,
     get_inference_engine,
 )
-from services.orchestrator.core.complexity import classify_complexity
-from services.orchestrator.core.delegation_protocol import (
-    DelegationProtocol,
-    DelegationState,
+from services.orchestrator.core.message_bus import (
+    MessageChannel,
+    get_message_bus,
+    reset_message_bus,
+)
+from services.orchestrator.core.output_schemas import (
+    Artifact,
+    ArtifactMetadata,
+    ArtifactStatus,
+    ComplexityAssessment,
+    PlannerOutput,
+    ProcessingMode,
+    SubTask,
+    WorkPackage,
 )
 from services.orchestrator.core.resource_governor import (
     EscalationSeverity,
     ExecutionGuard,
     ResourceGovernor,
 )
-from services.orchestrator.core.output_schemas import (
-    ActionType,
-    ComplexityAssessment,
-    CriticOutput,
-    PlannerOutput,
-    ProcessingMode,
-    ReasoningOutput,
-    RoleResolution,
-    SubTask,
-    SynthesisOutput,
-    WorkPackage,
-    Artifact,
-    ArtifactStatus,
-    ArtifactMetadata,
-)
 from services.orchestrator.core.score_card import (
     ContributionLedger,
-    ContributionRecord,
-    QualityGate,
     ScoreCard,
-    aggregate_scores,
     get_quality_gate,
 )
-from services.orchestrator.core.work_unit import (
-    WorkUnit,
-    WorkType,
-    get_work_board,
-)
 from services.orchestrator.core.stdio_envelope import (
-    ArtifactReference,
     Constraints,
-    DeliverableSection,
     EnvelopeMetadata,
-    Escalation,
     Failure,
     Instruction,
-    KeyFinding,
     MessageType,
     StderrEnvelope,
     StdinEnvelope,
@@ -133,7 +108,19 @@ from services.orchestrator.core.stdio_envelope import (
     Warning,
     WarningSeverity,
 )
-from services.orchestrator.core.degradation import get_degrader
+from services.orchestrator.core.work_unit import (
+    WorkType,
+    WorkUnit,
+    get_work_board,
+)
+from services.orchestrator.core.working_memory import WorkingMemory
+from shared.config import get_settings
+from shared.knowledge.retriever import KnowledgeRetriever, get_knowledge_retriever
+from shared.llm import LLMConfig
+from shared.llm.provider import LLMMessage, LLMRole
+from shared.logging import get_logger
+from shared.prompts import get_agent_prompt, get_kernel_config
+from shared.service_registry import ServiceName, ServiceRegistry
 
 logger = get_logger(__name__)
 
@@ -629,10 +616,16 @@ class KernelCell:
             communicator=self.comm,
         )
 
-        # Extract available tool descriptions (if any)
+        # Discover available tools via MCP Host REST API
         available_tools: list[dict[str, Any]] = []
-        # Tools are discovered dynamically; we pass empty list and
-        # the cycle's execute step will use tool_call directly.
+        try:
+            from services.orchestrator.core.tool_bridge import discover_tools
+
+            available_tools = await discover_tools(timeout=5.0)
+            if available_tools:
+                logger.info(f"Cell {self.cell_id}: Discovered {len(available_tools)} tools")
+        except Exception as e:
+            logger.debug(f"Cell {self.cell_id}: Tool discovery skipped: {e}")
 
         # Build context string from envelope
         context_str = ""
@@ -684,6 +677,9 @@ class KernelCell:
         # Store work package for later packaging (v2.0)
         if cycle_output.work_package:
             self.last_work_package = cycle_output.work_package
+
+        # ── Rerank facts by relevance to original query ───────────────
+        await self._rerank_facts(task_text)
 
         # If cycle produced content, use it; otherwise fall back to synthesis
         if cycle_output.content:
@@ -982,6 +978,7 @@ class KernelCell:
         # Resource gate — check with SwarmManager before spawning child cells
         try:
             import httpx
+
             from shared.service_registry import ServiceName, ServiceRegistry
 
             swarm_url = ServiceRegistry.get_url(ServiceName.SWARM_MANAGER)
@@ -998,10 +995,36 @@ class KernelCell:
                 f"Cell {self.cell_id}: SwarmManager gate skipped (non-blocking): {_gate_err}"
             )
 
-        # Resolve role for this subtask using cognitive profile hierarchy
+        # Resolve role for this subtask using Organization + roles.yaml
         child_lvl = child_level_for(self.identity.level)
+        child_role = subtask.domain + "_analyst"  # Default fallback
+
+        try:
+            from services.orchestrator.core.organization import get_organization
+
+            org = get_organization()
+            dept = (
+                org.resolve_department(subtask.domain)
+                if hasattr(org, "resolve_department")
+                else None
+            )
+            if dept:
+                child_role = getattr(dept, "default_role", child_role) or child_role
+
+            # Match from roles.yaml for better specificity
+            roles_cfg = self._load_roles_config()
+            if roles_cfg:
+                matched = self._match_role(subtask.domain, subtask.description, roles_cfg)
+                if matched:
+                    child_role = matched.get("name", child_role)
+                    role_level = matched.get("level")
+                    if role_level:
+                        child_lvl = role_level
+        except Exception as e:
+            logger.debug(f"Cell {self.cell_id}: Role resolution fallback: {e}")
+
         child_identity = AgentIdentity(
-            role=subtask.domain + "_analyst",
+            role=child_role,
             level=child_lvl,
             domain=subtask.domain,
         )
@@ -1294,11 +1317,49 @@ class KernelCell:
         # Published artifacts from memory
         published_artifacts = self.working_memory.artifacts.get_published()
 
+        # Ensure work package always exists with at least one artifact
+        work_package = self.last_work_package
+        if not work_package and content:
+            work_package = WorkPackage(
+                summary=content[:500],
+                artifacts=[
+                    Artifact(
+                        id=f"report_{self.cell_id}",
+                        type="report",
+                        title=f"Research Report: {task_text[:60]}",
+                        content=content,
+                        summary=content[:200],
+                        confidence=self.score_card.self_confidence,
+                        metadata=ArtifactMetadata(
+                            sources=[],
+                            data_gaps=self.score_card.data_gaps,
+                        ),
+                    )
+                ],
+                overall_confidence=self.score_card.self_confidence,
+                key_findings=[f"Produced by {self.identity.level}/{self.identity.role}"],
+            )
+        elif work_package and not work_package.artifacts and content:
+            work_package.artifacts = [
+                Artifact(
+                    id=f"report_{self.cell_id}",
+                    type="report",
+                    title=f"Research Report: {task_text[:60]}",
+                    content=content,
+                    summary=content[:200],
+                    confidence=self.score_card.self_confidence,
+                    metadata=ArtifactMetadata(
+                        sources=[],
+                        data_gaps=self.score_card.data_gaps,
+                    ),
+                )
+            ]
+
         return StdioEnvelope(
             stdout=StdoutEnvelope(
                 content=content,
                 summary=content[:200] if content else "",
-                work_package=self.last_work_package,
+                work_package=work_package,
             ),
             stderr=StderrEnvelope(
                 warnings=warnings,
@@ -1346,6 +1407,48 @@ class KernelCell:
     # ================================================================== #
     # Helper Methods
     # ================================================================== #
+
+    async def _rerank_facts(self, query: str) -> None:
+        """
+        Rerank accumulated facts by relevance to the original query.
+
+        Uses the shared reranker provider if available. Falls back to
+        keeping original order if reranker is unavailable.
+        Config-driven: kernel_cell.reranking.enabled in kernel.yaml.
+        """
+        reranking_cfg = get_kernel_config("kernel_cell.reranking") or {}
+        if not reranking_cfg.get("enabled", False):
+            return
+
+        facts = self.working_memory.all_facts
+        if len(facts) < 3:
+            return  # Not enough facts to bother reranking
+
+        try:
+            from shared.embedding.model_manager import get_reranker_provider
+
+            reranker = get_reranker_provider()
+            if not reranker:
+                return
+
+            top_k = reranking_cfg.get("top_k", 10)
+            fact_texts = [f"{k}: {v}" for k, v in facts.items()]
+
+            ranked = await reranker.rerank(
+                query=query,
+                documents=fact_texts[:50],
+                top_k=min(top_k, len(fact_texts)),
+            )
+
+            # Store reranked order as metadata in working memory
+            if ranked:
+                self.working_memory.store_fact(
+                    "reranked_top_facts",
+                    " | ".join(ranked[:5]),
+                )
+
+        except Exception as e:
+            logger.debug(f"Cell {self.cell_id}: Reranking skipped: {e}")
 
     async def _execute_tool(self, tool_name: str, arguments: dict) -> str:
         """Execute a tool and record the result."""
@@ -1455,6 +1558,32 @@ class KernelCell:
                     context=msg.payload.get("context", ""),
                 )
                 return record.response
+
+            elif msg.channel == MessageChannel.INSIGHT:
+                # Bottom-up insight propagation
+                urgency = msg.payload.get("urgency", "normal")
+                logger.info(
+                    f"Cell {self.cell_id} ← INSIGHT from {msg.sender_id} "
+                    f"(urgency={urgency}): {msg.content[:80]}"
+                )
+                # Store in working memory
+                self.working_memory.store_fact(
+                    f"insight_{msg.sender_id}",
+                    msg.content[:500],
+                )
+                # If high urgency, share with peer group (sibling cells)
+                if urgency in ("high", "critical") and self.comm:
+                    await self.comm.share_with_peers(
+                        content=f"[INSIGHT from sibling] {msg.content[:300]}",
+                        subject="Insight Propagation",
+                    )
+                # If the insight changes strategic direction, propagate further up
+                if urgency == "critical" and self.comm:
+                    await self.comm.share_upward(
+                        content=msg.content,
+                        urgency="high",
+                    )
+                return None
 
             return None
 
@@ -1607,10 +1736,129 @@ class KernelCell:
         """
         return child_level_for(self.identity.level)
 
+    def _load_roles_config(self) -> dict | None:
+        """Load roles from configs/roles.yaml. Cached after first load."""
+        if not hasattr(self, "_roles_cache"):
+            try:
+                from pathlib import Path
+
+                import yaml
+
+                roles_path = Path(__file__).parent.parent.parent.parent / "configs" / "roles.yaml"
+                if roles_path.exists():
+                    with open(roles_path) as f:
+                        self._roles_cache = yaml.safe_load(f) or {}
+                else:
+                    self._roles_cache = None
+            except Exception:
+                self._roles_cache = None
+        return self._roles_cache
+
+    def _match_role(
+        self,
+        domain: str,
+        description: str,
+        roles_cfg: dict,
+    ) -> dict | None:
+        """Match a subtask to the best role from roles.yaml."""
+        roles = roles_cfg.get("roles", {})
+        matching_cfg = roles_cfg.get("matching", {})
+        fallback = matching_cfg.get("fallback_role", "general_analyst")
+
+        best_match: dict | None = None
+        best_score = 0.0
+
+        for role_name, role_def in roles.items():
+            role_domains = role_def.get("domains", [])
+            role_skills = role_def.get("skills", [])
+
+            # Domain match score
+            domain_score = 1.0 if domain in role_domains else 0.0
+
+            # Skill keyword overlap with description
+            desc_lower = description.lower()
+            skill_hits = sum(1 for s in role_skills if s.replace("_", " ") in desc_lower)
+            skill_score = skill_hits / max(len(role_skills), 1)
+
+            # Combined score
+            total = (domain_score * 0.7) + (skill_score * 0.3)
+
+            if total > best_score:
+                best_score = total
+                best_match = {**role_def, "name": role_name}
+
+        min_match = matching_cfg.get("min_domain_match", 0.3)
+        if best_match and best_score >= min_match:
+            return best_match
+
+        # Return fallback role
+        if fallback in roles:
+            return {**roles[fallback], "name": fallback}
+
+        return None
+
 
 # ============================================================================
 # Convenience Functions
 # ============================================================================
+
+
+async def _retrieve_prior_knowledge(query: str, domain: str) -> list[dict]:
+    """
+    Retrieve relevant facts from Vault for cross-session knowledge.
+
+    Non-blocking: if Vault is unavailable, returns empty list.
+    """
+    try:
+        import httpx
+
+        vault_url = ServiceRegistry.get_url(ServiceName.VAULT)
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            resp = await client.get(
+                f"{vault_url}/research/query",
+                params={"q": query[:200], "limit": 5, "domain": domain},
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                return data.get("facts", [])
+    except Exception:
+        pass  # Vault not available — non-fatal
+    return []
+
+
+async def _store_result_in_vault(
+    query: str,
+    envelope: StdioEnvelope,
+    job_id: str = "",
+) -> None:
+    """
+    Persist StdioEnvelope result to Vault for cross-session knowledge.
+
+    Fire-and-forget: errors are logged but don't block the response.
+    """
+    try:
+        import httpx
+
+        vault_url = ServiceRegistry.get_url(ServiceName.VAULT)
+
+        payload = {
+            "query": query[:500],
+            "job_id": job_id,
+            "content": envelope.stdout.content[:5000] if envelope.stdout else "",
+            "confidence": envelope.metadata.confidence,
+            "facts": [
+                {"text": kf.finding, "confidence": kf.confidence}
+                for kf in (envelope.stdout.key_findings if envelope.stdout else [])
+            ],
+        }
+
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.post(
+                f"{vault_url}/research/sessions",
+                json=payload,
+            )
+    except Exception as e:
+        logger.debug(f"Vault storage skipped: {e}")
 
 
 async def run_kernel(
@@ -1626,8 +1874,10 @@ async def run_kernel(
 
     This is the primary entry point for the entire Kea kernel.
 
-    v2.0: Resets the message bus at session start so each query
-    gets a clean communication slate.
+    v4.1: Now wired into /research and /chat/message routes.
+    - Retrieves prior knowledge from Vault (cross-session)
+    - Stores results in Vault after completion
+    - Resets the message bus for clean communication
 
     Args:
         query: User's query/objective.
@@ -1651,6 +1901,9 @@ async def run_kernel(
     # Reset communication network for this session
     reset_message_bus()
 
+    # Retrieve prior knowledge from Vault (cross-session facts)
+    prior_findings = await _retrieve_prior_knowledge(query, domain)
+
     identity = AgentIdentity(role="orchestrator", level=level, domain=domain)
     token_budget = TokenBudget(
         max_tokens=budget,
@@ -1667,9 +1920,18 @@ async def run_kernel(
     envelope = StdioEnvelope(
         stdin=StdinEnvelope(
             instruction=Instruction(text=query),
-            context=TaskContext(domain_hints=[domain]),
+            context=TaskContext(
+                domain_hints=[domain],
+                prior_findings=prior_findings,
+            ),
             constraints=Constraints(token_budget=budget),
         ),
     )
 
-    return await cell.process(envelope)
+    result = await cell.process(envelope)
+
+    # Store result in Vault for future cross-session knowledge (non-blocking)
+
+    asyncio.create_task(_store_result_in_vault(query, result))
+
+    return result

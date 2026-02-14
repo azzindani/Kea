@@ -2,22 +2,31 @@
 Orchestrator Main Service.
 
 FastAPI entrypoint for the research orchestrator.
+
+v4.1: Dual-mode — kernel-first with legacy graph fallback.
+The USE_KERNEL_PIPELINE env var / config controls which engine runs.
 """
 
 from __future__ import annotations
 
+import asyncio
+import json
+import os
+import sys
 import uuid
 from contextlib import asynccontextmanager
 from typing import Any
 
 import httpx
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from services.orchestrator.core.graph import GraphState, compile_research_graph
 from shared.config import get_settings
 from shared.logging import get_logger
 from shared.logging.middleware import RequestLoggingMiddleware
+from shared.prompts import get_kernel_config
 from shared.schemas import ResearchStatus
 from shared.service_registry import ServiceName, ServiceRegistry
 
@@ -26,6 +35,44 @@ logger = get_logger(__name__)
 # Global state
 research_graph = None
 
+# Feature flag: kernel vs legacy graph
+USE_KERNEL = os.getenv("USE_KERNEL_PIPELINE", "true").lower() in ("true", "1", "yes")
+
+
+def _kernel_level_from_complexity(query: str, depth: int) -> str:
+    """Determine starting kernel level from query complexity."""
+    try:
+        from services.orchestrator.core.complexity import classify_complexity
+
+        score = classify_complexity(query)
+        tier = score.tier.value
+        mapping = {
+            "trivial": "staff",
+            "low": "senior_staff",
+            "medium": "manager",
+            "high": "director",
+            "extreme": "ceo",
+        }
+        level = mapping.get(tier, "manager")
+        # Depth param can escalate: depth >= 4 → at least director
+        if depth >= 4 and level in ("staff", "senior_staff", "manager"):
+            level = "director"
+        return level
+    except Exception:
+        return "manager"
+
+
+def _domain_from_query(query: str) -> str:
+    """Quick heuristic to detect primary domain from query text."""
+    q = query.lower()
+    if any(kw in q for kw in ("stock", "financ", "revenue", "earnings", "profit", "valuation")):
+        return "finance"
+    if any(kw in q for kw in ("legal", "regulat", "compliance", "patent", "lawsuit")):
+        return "legal"
+    if any(kw in q for kw in ("code", "program", "algorithm", "software", "api")):
+        return "technology"
+    return "research"
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -33,6 +80,7 @@ async def lifespan(app: FastAPI):
     global research_graph
 
     logger.info("Starting Orchestrator service")
+    logger.info(f"Kernel mode: {'KERNEL' if USE_KERNEL else 'LEGACY GRAPH'}")
 
     # =========================================================================
     # Initialize Orchestrator-owned subsystems only.
@@ -58,9 +106,22 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to initialize orchestrator subsystems: {e}")
 
-    # Compile research graph
+    # Compile research graph (always available as fallback)
     research_graph = compile_research_graph()
     logger.info("Research graph compiled")
+
+    # Verify MCP Host connectivity (non-blocking)
+    if USE_KERNEL:
+        try:
+            from services.orchestrator.core.tool_bridge import verify_mcp_connectivity
+
+            connected = await verify_mcp_connectivity()
+            if connected:
+                logger.info("MCP Host connectivity verified for kernel mode")
+            else:
+                logger.warning("MCP Host not reachable — kernel will retry on first request")
+        except Exception as e:
+            logger.warning(f"MCP Host connectivity check failed: {e}")
 
     yield
 
@@ -71,7 +132,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Kea Orchestrator",
     description="Research orchestration service with MCP tool integration",
-    version="0.1.0",
+    version="4.1.0",
     lifespan=lifespan,
 )
 
@@ -138,6 +199,7 @@ async def health_check():
         "status": "healthy",
         "service": "orchestrator",
         "active_sessions": active_sessions,
+        "kernel_mode": USE_KERNEL,
     }
 
 
@@ -160,12 +222,11 @@ async def start_research(request: ResearchRequest):
     """
     Start a synchronous research job.
 
-    For async jobs, use POST /jobs instead.
+    Uses the kernel pipeline (KernelCell with cognitive cycle, corporate
+    hierarchy, working memory) by default. Falls back to legacy LangGraph
+    pipeline when USE_KERNEL_PIPELINE=false.
     """
     global research_graph
-
-    if not research_graph:
-        raise HTTPException(status_code=503, detail="Research graph not initialized")
 
     job_id = f"job-{uuid.uuid4().hex[:8]}"
 
@@ -176,7 +237,62 @@ async def start_research(request: ResearchRequest):
         extra={"query": request.query[:100]},
     )
 
-    # Build initial state with seed context (for cross-attempt sharing)
+    # ── Kernel Pipeline ───────────────────────────────────────────────────
+    if USE_KERNEL:
+        try:
+            from services.orchestrator.core.kernel_cell import run_kernel
+            from services.orchestrator.core.response_formatter import (
+                envelope_to_research_response,
+            )
+            from services.orchestrator.core.tool_bridge import create_tool_executor
+
+            # Determine starting level and domain
+            level = _kernel_level_from_complexity(request.query, request.depth)
+            domain = _domain_from_query(request.query)
+
+            # Budget scales with depth
+            base_budget = int(get_kernel_config("kernel_cell.budget.default_max_tokens") or 30000)
+            budget = base_budget * max(1, request.depth)
+
+            logger.info(
+                f"Kernel mode: level={level}, domain={domain}, budget={budget}, "
+                f"depth={request.depth}"
+            )
+
+            tool_executor = create_tool_executor(query=request.query)
+
+            envelope = await run_kernel(
+                query=request.query,
+                tool_executor=tool_executor,
+                level=level,
+                domain=domain,
+                budget=budget,
+                max_depth=request.depth + 1,
+            )
+
+            result = envelope_to_research_response(envelope)
+
+            return ResearchResponse(
+                job_id=job_id,
+                status="completed",
+                report=result.get("report"),
+                confidence=result.get("confidence", 0.0),
+                sources_count=result.get("sources_count", 0),
+                facts_count=result.get("facts_count", 0),
+                facts=result.get("facts", []),
+                errors=result.get("errors", []),
+            )
+
+        except Exception as e:
+            logger.error(f"Kernel pipeline failed: {e}", exc_info=True)
+            if not research_graph:
+                raise HTTPException(status_code=500, detail=str(e))
+            logger.info("Falling back to legacy graph pipeline")
+
+    # ── Legacy Graph Pipeline (fallback) ──────────────────────────────────
+    if not research_graph:
+        raise HTTPException(status_code=503, detail="Research graph not initialized")
+
     initial_state: GraphState = {
         "job_id": job_id,
         "query": request.query,
@@ -184,7 +300,7 @@ async def start_research(request: ResearchRequest):
         "status": ResearchStatus.PENDING.value,
         "sub_queries": [],
         "hypotheses": [],
-        "facts": request.seed_facts or [],  # Initialize with seed facts
+        "facts": request.seed_facts or [],
         "sources": [],
         "artifacts": [],
         "generator_output": "",
@@ -196,11 +312,10 @@ async def start_research(request: ResearchRequest):
         "max_iterations": request.depth,
         "should_continue": True,
         "error": None,
-        "error_feedback": request.error_feedback or [],  # Initialize with previous errors
+        "error_feedback": request.error_feedback or [],
     }
 
     try:
-        # Execute the research graph
         final_state = await research_graph.ainvoke(initial_state)
 
         return ResearchResponse(
@@ -210,8 +325,8 @@ async def start_research(request: ResearchRequest):
             confidence=final_state.get("confidence", 0.0),
             sources_count=len(final_state.get("sources", [])),
             facts_count=len(final_state.get("facts", [])),
-            facts=final_state.get("facts", []),  # Return facts for cross-attempt sharing
-            errors=final_state.get("error_feedback", []),  # Return errors for next attempt
+            facts=final_state.get("facts", []),
+            errors=final_state.get("error_feedback", []),
         )
 
     except Exception as e:
@@ -258,29 +373,12 @@ async def process_chat_message(request: ChatMessageRequest):
     """
     Process a chat message through the research pipeline.
 
-    This endpoint:
-    1. Classifies the query
-    2. Checks cache
-    3. Runs research graph if needed
-    4. Logs to audit trail
-    5. Returns the result (content, sources, etc.)
+    Uses kernel pipeline when enabled, falls back to legacy pipeline.
     """
     from services.orchestrator.core.pipeline import get_research_pipeline
 
     try:
         pipeline = await get_research_pipeline()
-
-        # Note: pipeline.process_message does NOT store to DB if called directly.
-        # But pipeline.process_and_store DOES.
-        # However, Gateway's conversation route typically adds the User message first,
-        # then expects the Assistant message to be generated.
-        # If we use process_message, we just get the result, and Gateway can save the Assistant message.
-        # OR we let Orchestrator save it.
-        # Let's check conversations.py again.
-        # conversations.py: adds User msg, then calls pipeline.process_message, then adds Assistant msg.
-        # So we should return the Result, and let Gateway save the Assistant msg (or Orchestrator).
-        # To keep Gateway as the "Interface Layer", it handles DB interaction for the conversation view.
-        # Orchestrator provides the "Result".
 
         result = await pipeline.process_message(
             conversation_id=request.conversation_id,
@@ -309,39 +407,63 @@ async def process_chat_message(request: ChatMessageRequest):
 # Streaming Endpoints (SSE)
 # ============================================================================
 
-import json
-
-from fastapi.responses import StreamingResponse
-
 
 @app.get("/research/stream")
 async def stream_research(query: str, depth: int = 2, max_sources: int = 10):
     """
     Stream research results via Server-Sent Events (SSE).
 
-    This endpoint provides real-time updates as the research progresses:
-    - Planning phase updates
-    - Tool call results
-    - LLM streaming output
-    - Final report
-
-    Example:
-        curl -N "http://localhost:8000/research/stream?query=What%20is%20AI"
+    Uses kernel pipeline when enabled, falls back to legacy streaming.
     """
 
     async def event_generator():
         global research_graph
+        job_id = f"stream-{uuid.uuid4().hex[:8]}"
 
+        yield f"data: {json.dumps({'event': 'start', 'job_id': job_id, 'query': query})}\n\n"
+
+        # ── Kernel Streaming ──────────────────────────────────────────
+        if USE_KERNEL:
+            try:
+                from services.orchestrator.core.kernel_cell import run_kernel
+                from services.orchestrator.core.response_formatter import (
+                    envelope_to_sse_events,
+                )
+                from services.orchestrator.core.tool_bridge import create_tool_executor
+
+                yield f"data: {json.dumps({'event': 'phase', 'phase': 'kernel_processing'})}\n\n"
+
+                level = _kernel_level_from_complexity(query, depth)
+                domain = _domain_from_query(query)
+                base_budget = int(
+                    get_kernel_config("kernel_cell.budget.default_max_tokens") or 30000
+                )
+                budget = base_budget * max(1, depth)
+
+                tool_executor = create_tool_executor(query=query)
+
+                envelope = await run_kernel(
+                    query=query,
+                    tool_executor=tool_executor,
+                    level=level,
+                    domain=domain,
+                    budget=budget,
+                    max_depth=depth + 1,
+                )
+
+                async for event in envelope_to_sse_events(envelope, job_id):
+                    yield f"data: {json.dumps(event)}\n\n"
+
+                return
+            except Exception as e:
+                logger.error(f"Kernel streaming failed: {e}", exc_info=True)
+                yield f"data: {json.dumps({'event': 'phase', 'phase': 'fallback_to_legacy'})}\n\n"
+
+        # ── Legacy Graph Streaming (fallback) ─────────────────────────
         if not research_graph:
             yield f"data: {json.dumps({'event': 'error', 'message': 'Research graph not initialized'})}\n\n"
             return
 
-        job_id = f"stream-{uuid.uuid4().hex[:8]}"
-
-        # Send start event
-        yield f"data: {json.dumps({'event': 'start', 'job_id': job_id, 'query': query})}\n\n"
-
-        # Build initial state
         initial_state: GraphState = {
             "job_id": job_id,
             "query": query,
@@ -364,7 +486,6 @@ async def stream_research(query: str, depth: int = 2, max_sources: int = 10):
         }
 
         try:
-            # Stream LLM if available
             import os
 
             if os.getenv("OPENROUTER_API_KEY"):
@@ -374,7 +495,6 @@ async def stream_research(query: str, depth: int = 2, max_sources: int = 10):
                 provider = OpenRouterProvider()
                 config = LLMConfig(temperature=0.7, max_tokens=32768)
 
-                # Phase 1: Planning
                 yield f"data: {json.dumps({'event': 'phase', 'phase': 'planning'})}\n\n"
 
                 messages = [
@@ -388,12 +508,9 @@ async def stream_research(query: str, depth: int = 2, max_sources: int = 10):
                     if chunk.content:
                         yield f"data: {json.dumps({'event': 'chunk', 'phase': 'planning', 'content': chunk.content})}\n\n"
 
-                # Phase 2: Research (using graph)
                 yield f"data: {json.dumps({'event': 'phase', 'phase': 'research'})}\n\n"
-
                 final_state = await research_graph.ainvoke(initial_state)
 
-                # Phase 3: Synthesis with streaming
                 yield f"data: {json.dumps({'event': 'phase', 'phase': 'synthesis'})}\n\n"
 
                 facts_text = "\n".join([str(f)[:100] for f in final_state.get("facts", [])[:5]])
@@ -418,11 +535,9 @@ async def stream_research(query: str, depth: int = 2, max_sources: int = 10):
                 final_report = "".join(report_chunks) or final_state.get("report", "")
 
             else:
-                # Fallback without streaming
                 final_state = await research_graph.ainvoke(initial_state)
                 final_report = final_state.get("report", "Research completed without LLM.")
 
-            # Send completion
             yield f"data: {json.dumps({'event': 'complete', 'job_id': job_id, 'report': final_report, 'confidence': final_state.get('confidence', 0.5), 'facts_count': len(final_state.get('facts', [])), 'sources_count': len(final_state.get('sources', []))})}\n\n"
 
         except Exception as e:
@@ -444,9 +559,6 @@ async def stream_research(query: str, depth: int = 2, max_sources: int = 10):
 # ============================================================================
 
 # Force Proactor loop for Windows subprocess support
-import asyncio
-import sys
-
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
@@ -456,8 +568,6 @@ def main():
     import uvicorn
 
     settings = get_settings()
-
-    from shared.service_registry import ServiceName, ServiceRegistry
 
     uvicorn.run(
         "services.orchestrator.main:app",

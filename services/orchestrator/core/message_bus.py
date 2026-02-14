@@ -48,9 +48,9 @@ logger = get_logger(__name__)
 class MessageDirection(str, Enum):
     """Direction of message flow in the hierarchy."""
 
-    UPWARD = "upward"        # Child → Parent
-    DOWNWARD = "downward"    # Parent → Child
-    LATERAL = "lateral"      # Peer ↔ Peer
+    UPWARD = "upward"  # Child → Parent
+    DOWNWARD = "downward"  # Parent → Child
+    LATERAL = "lateral"  # Peer ↔ Peer
     BROADCAST = "broadcast"  # One → Many
 
 
@@ -58,37 +58,40 @@ class MessageChannel(str, Enum):
     """Communication channel type."""
 
     # Vertical (command chain)
-    CLARIFY = "clarify"                # "I need more information"
-    PROGRESS = "progress"              # "I'm 60% done"
-    ESCALATE = "escalate"              # "Above my pay grade"
-    PARTIAL = "partial"                # "Here's a draft for review"
-    BLOCKED = "blocked"                # "I'm stuck on X"
-    DELEGATE = "delegate"              # "Here's your task"
-    REDIRECT = "redirect"              # "Change direction"
-    FEEDBACK = "feedback"              # "Your draft needs X"
-    CANCEL = "cancel"                  # "Stop working on this"
-    RESOURCE = "resource"              # "Here's more info/budget"
+    CLARIFY = "clarify"  # "I need more information"
+    PROGRESS = "progress"  # "I'm 60% done"
+    ESCALATE = "escalate"  # "Above my pay grade"
+    PARTIAL = "partial"  # "Here's a draft for review"
+    BLOCKED = "blocked"  # "I'm stuck on X"
+    DELEGATE = "delegate"  # "Here's your task"
+    REDIRECT = "redirect"  # "Change direction"
+    FEEDBACK = "feedback"  # "Your draft needs X"
+    CANCEL = "cancel"  # "Stop working on this"
+    RESOURCE = "resource"  # "Here's more info/budget"
 
     # Lateral (peer-to-peer)
-    SHARE = "share"                    # "Here's my data"
-    CONSULT = "consult"                # "What's your opinion?"
-    COORDINATE = "coordinate"          # "Let's align assumptions"
-    HANDOFF = "handoff"                # "My part is done, here's yours"
-    CONFLICT = "conflict"              # "Our findings disagree"
+    SHARE = "share"  # "Here's my data"
+    CONSULT = "consult"  # "What's your opinion?"
+    COORDINATE = "coordinate"  # "Let's align assumptions"
+    HANDOFF = "handoff"  # "My part is done, here's yours"
+    CONFLICT = "conflict"  # "Our findings disagree"
 
     # Broadcast
-    ANNOUNCE = "announce"              # "New policy"
-    ALERT = "alert"                    # "Critical finding"
-    UPDATE = "update"                  # "Context change"
+    ANNOUNCE = "announce"  # "New policy"
+    ALERT = "alert"  # "Critical finding"
+    UPDATE = "update"  # "Context change"
+
+    # Insight propagation (bottom-up discovery)
+    INSIGHT = "insight"  # "I discovered something important"
 
 
 class MessagePriority(str, Enum):
     """How urgently this message should be processed."""
 
-    LOW = "low"              # Process when idle
-    NORMAL = "normal"        # Process in order
-    HIGH = "high"            # Process soon
-    CRITICAL = "critical"    # Process immediately (interrupts work)
+    LOW = "low"  # Process when idle
+    NORMAL = "normal"  # Process in order
+    HIGH = "high"  # Process soon
+    CRITICAL = "critical"  # Process immediately (interrupts work)
 
 
 # ============================================================================
@@ -211,7 +214,7 @@ class Mailbox:
             message = await asyncio.wait_for(self._queue.get(), timeout=timeout)
             message.read = True
             return message
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return None
 
     def poll(self) -> CellMessage | None:
@@ -243,9 +246,7 @@ class Mailbox:
                 try:
                     self._queue.put_nowait(m)
                 except asyncio.QueueFull:
-                    logger.warning(
-                        f"Mailbox {self.cell_id} full, dropping message {m.id}"
-                    )
+                    logger.warning(f"Mailbox {self.cell_id} full, dropping message {m.id}")
         return matching
 
     async def wait_for_response(
@@ -265,11 +266,9 @@ class Mailbox:
 
         try:
             return await asyncio.wait_for(future, timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self._pending_responses.pop(message_id, None)
-            logger.warning(
-                f"Mailbox {self.cell_id}: Timeout waiting for response to {message_id}"
-            )
+            logger.warning(f"Mailbox {self.cell_id}: Timeout waiting for response to {message_id}")
             return None
 
     @property
@@ -298,7 +297,7 @@ class TopicSubscription:
     """A cell's subscription to a broadcast topic."""
 
     cell_id: str
-    pattern: str                   # e.g., "research.*", "quality.alerts"
+    pattern: str  # e.g., "research.*", "quality.alerts"
     created_at: datetime = field(default_factory=datetime.utcnow)
 
     def matches(self, topic: str) -> bool:
@@ -322,8 +321,8 @@ class CommunicationCost:
 
     channel: MessageChannel
     base_token_cost: int
-    latency_class: str      # "low" | "medium" | "high" | "very_high"
-    worth_it_when: str       # Human-readable guidance
+    latency_class: str  # "low" | "medium" | "high" | "very_high"
+    worth_it_when: str  # Human-readable guidance
 
 
 _COMMUNICATION_COSTS: dict[MessageChannel, CommunicationCost] = {
@@ -435,9 +434,9 @@ class MessageBus:
         self._mailboxes: dict[str, Mailbox] = {}
         self._subscriptions: list[TopicSubscription] = []
         self._message_log: list[CellMessage] = []
-        self._parent_map: dict[str, str] = {}   # child_id → parent_id
-        self._children_map: dict[str, list[str]] = defaultdict(list)   # parent_id → [child_ids]
-        self._peer_groups: dict[str, set[str]] = defaultdict(set)   # group_key → {cell_ids}
+        self._parent_map: dict[str, str] = {}  # child_id → parent_id
+        self._children_map: dict[str, list[str]] = defaultdict(list)  # parent_id → [child_ids]
+        self._peer_groups: dict[str, set[str]] = defaultdict(set)  # group_key → {cell_ids}
         self._total_messages: int = 0
         self._total_token_cost: int = 0
 
@@ -494,8 +493,7 @@ class MessageBus:
         receiver = self._mailboxes.get(message.receiver_id)
         if not receiver:
             logger.warning(
-                f"MessageBus: receiver {message.receiver_id} not found "
-                f"(sender={message.sender_id})"
+                f"MessageBus: receiver {message.receiver_id} not found (sender={message.sender_id})"
             )
             return False
 
@@ -628,7 +626,12 @@ class MessageBus:
         children = self._children_map.get(parent_id, [])
         for child_id in children:
             await self.send_to_child(
-                parent_id, child_id, channel, content, subject, payload,
+                parent_id,
+                child_id,
+                channel,
+                content,
+                subject,
+                payload,
             )
 
     # ── Lateral Messaging (Peer-to-Peer) ─────────────────────────────
@@ -720,10 +723,12 @@ class MessageBus:
 
     def subscribe(self, cell_id: str, topic_pattern: str) -> None:
         """Subscribe a cell to a topic pattern for broadcast messages."""
-        self._subscriptions.append(TopicSubscription(
-            cell_id=cell_id,
-            pattern=topic_pattern,
-        ))
+        self._subscriptions.append(
+            TopicSubscription(
+                cell_id=cell_id,
+                pattern=topic_pattern,
+            )
+        )
         logger.debug(f"MessageBus: {cell_id} subscribed to '{topic_pattern}'")
 
     async def broadcast(
@@ -748,8 +753,9 @@ class MessageBus:
             message = CellMessage(
                 sender_id=sender_id,
                 receiver_id=cell_id,
-                channel=MessageChannel.ALERT if priority == MessagePriority.CRITICAL
-                    else MessageChannel.UPDATE,
+                channel=MessageChannel.ALERT
+                if priority == MessagePriority.CRITICAL
+                else MessageChannel.UPDATE,
                 direction=MessageDirection.BROADCAST,
                 priority=priority,
                 subject=f"[{topic}]",
@@ -758,10 +764,7 @@ class MessageBus:
             )
             await self.send(message)
 
-        logger.info(
-            f"📢 Broadcast [{topic}] from {sender_id} → "
-            f"{len(recipients)} recipients"
-        )
+        logger.info(f"📢 Broadcast [{topic}] from {sender_id} → {len(recipients)} recipients")
         return len(recipients)
 
     # ── Receiving ─────────────────────────────────────────────────────
@@ -814,10 +817,7 @@ class MessageBus:
         parent = self._parent_map.get(cell_id)
         if not parent:
             return []
-        return [
-            c for c in self._children_map.get(parent, [])
-            if c != cell_id
-        ]
+        return [c for c in self._children_map.get(parent, []) if c != cell_id]
 
     # ── Statistics ────────────────────────────────────────────────────
 

@@ -25,8 +25,8 @@ Version: 2.0.0 — Part of Kernel Communication Network (Phase 2)
 
 from __future__ import annotations
 
-import asyncio
-from typing import Any, Callable, Awaitable
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from shared.logging import get_logger
 
@@ -44,7 +44,6 @@ from .message_bus import (
 from .working_memory import (
     FocusItem,
     FocusItemType,
-    PendingQuestion,
     QuestionTarget,
     WorkingMemory,
 )
@@ -201,8 +200,7 @@ class CellCommunicator:
 
         if not self.budget.can_afford(MessageChannel.CLARIFY):
             logger.warning(
-                f"Cell {self.cell_id}: Communication budget exhausted, "
-                f"cannot ask clarification"
+                f"Cell {self.cell_id}: Communication budget exhausted, cannot ask clarification"
             )
             return None
 
@@ -236,18 +234,19 @@ class CellCommunicator:
                 f"Parent clarified: {response.content}",
             )
             # Focus on the new information
-            self.memory.focus(FocusItem(
-                id=f"clarify-answer-{self._clarifications_asked}",
-                item_type=FocusItemType.FACT,
-                content=f"Clarification: {response.content}",
-                source="parent",
-            ))
+            self.memory.focus(
+                FocusItem(
+                    id=f"clarify-answer-{self._clarifications_asked}",
+                    item_type=FocusItemType.FACT,
+                    content=f"Clarification: {response.content}",
+                    source="parent",
+                )
+            )
             self._received_messages.append(response)
             return response.content
 
         logger.info(
-            f"Cell {self.cell_id}: No response to clarification "
-            f"(will proceed with best guess)"
+            f"Cell {self.cell_id}: No response to clarification (will proceed with best guess)"
         )
         return None
 
@@ -279,9 +278,7 @@ class CellCommunicator:
             progress_pct=progress_pct,
             current_work=current_work,
             findings_so_far=findings_so_far,
-            blockers=[
-                q.question for q in self.memory.blocking_questions
-            ],
+            blockers=[q.question for q in self.memory.blocking_questions],
         )
 
     async def send_partial_results(
@@ -315,12 +312,14 @@ class CellCommunicator:
 
         if response and request_feedback:
             # Record feedback in working memory
-            self.memory.focus(FocusItem(
-                id=f"feedback-{response.id}",
-                item_type=FocusItemType.OBSERVATION,
-                content=f"Parent feedback: {response.content}",
-                source="parent",
-            ))
+            self.memory.focus(
+                FocusItem(
+                    id=f"feedback-{response.id}",
+                    item_type=FocusItemType.OBSERVATION,
+                    content=f"Parent feedback: {response.content}",
+                    source="parent",
+                )
+            )
             self._received_messages.append(response)
             return response.content
 
@@ -381,12 +380,14 @@ class CellCommunicator:
         )
 
         if response:
-            self.memory.focus(FocusItem(
-                id=f"unblock-{response.id}",
-                item_type=FocusItemType.FACT,
-                content=f"Parent unblocking: {response.content}",
-                source="parent",
-            ))
+            self.memory.focus(
+                FocusItem(
+                    id=f"unblock-{response.id}",
+                    item_type=FocusItemType.FACT,
+                    content=f"Parent unblocking: {response.content}",
+                    source="parent",
+                )
+            )
             return response.content
 
         return None
@@ -424,12 +425,14 @@ class CellCommunicator:
 
         if response:
             # Record in memory
-            self.memory.focus(FocusItem(
-                id=f"consult-{response.id}",
-                item_type=FocusItemType.FACT,
-                content=f"Peer {peer_id}: {response.content}",
-                source=f"peer:{peer_id}",
-            ))
+            self.memory.focus(
+                FocusItem(
+                    id=f"consult-{response.id}",
+                    item_type=FocusItemType.FACT,
+                    content=f"Peer {peer_id}: {response.content}",
+                    source=f"peer:{peer_id}",
+                )
+            )
             self.memory.store_fact(
                 f"peer-consult-{peer_id}",
                 response.content,
@@ -464,6 +467,44 @@ class CellCommunicator:
             subject=subject,
             payload=data,
         )
+
+    async def share_upward(
+        self,
+        content: str,
+        urgency: str = "normal",
+        data: dict[str, Any] | None = None,
+    ) -> bool:
+        """
+        Push a high-confidence discovery upward to parent.
+
+        Used for insight propagation: when a child discovers something
+        important, it pushes it up so the parent can redistribute to
+        sibling cells or escalate further.
+
+        Returns:
+            True if message was sent, False if budget exhausted.
+        """
+        if not self._parent_id:
+            return False
+
+        # Use ESCALATE budget as proxy for INSIGHT (similar cost)
+        if not self.budget.can_afford(MessageChannel.ESCALATE):
+            return False
+
+        self.budget.spend(MessageChannel.ESCALATE)
+
+        await self._bus.send(
+            sender_id=self.cell_id,
+            receiver_id=self._parent_id,
+            channel=MessageChannel.INSIGHT,
+            direction=MessageDirection.UPWARD,
+            content=content,
+            subject=f"Insight ({urgency})",
+            payload={"urgency": urgency, **(data or {})},
+        )
+
+        self.stats["messages_sent"] = self.stats.get("messages_sent", 0) + 1
+        return True
 
     async def coordinate_with_peer(
         self,
@@ -634,12 +675,14 @@ class CellCommunicator:
 
             # Register in working memory
             focus_type = _channel_to_focus_type(msg.channel)
-            self.memory.focus(FocusItem(
-                id=f"msg-{msg.id}",
-                item_type=focus_type,
-                content=f"[{msg.channel.value}] from {msg.sender_id}: {msg.content[:200]}",
-                source=f"cell:{msg.sender_id}",
-            ))
+            self.memory.focus(
+                FocusItem(
+                    id=f"msg-{msg.id}",
+                    item_type=focus_type,
+                    content=f"[{msg.channel.value}] from {msg.sender_id}: {msg.content[:200]}",
+                    source=f"cell:{msg.sender_id}",
+                )
+            )
 
             logger.info(
                 f"📬 Cell {self.cell_id} received [{msg.channel.value}] "
@@ -689,12 +732,14 @@ class CellCommunicator:
                 f"shared-{msg.sender_id}-{msg.id}",
                 msg.content,
             )
-            self.memory.focus(FocusItem(
-                id=f"shared-{msg.id}",
-                item_type=FocusItemType.FACT,
-                content=f"Peer {msg.sender_id} shared: {msg.content[:200]}",
-                source=f"peer:{msg.sender_id}",
-            ))
+            self.memory.focus(
+                FocusItem(
+                    id=f"shared-{msg.id}",
+                    item_type=FocusItemType.FACT,
+                    content=f"Peer {msg.sender_id} shared: {msg.content[:200]}",
+                    source=f"peer:{msg.sender_id}",
+                )
+            )
 
         return shares + handoffs
 
