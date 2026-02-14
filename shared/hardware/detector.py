@@ -267,12 +267,13 @@ def detect_hardware() -> HardwareProfile:
     except Exception:
         pass
     
-    logger.debug(
-        f"Hardware detected: {profile.cpu_threads} threads, "
-        f"{profile.ram_total_gb:.1f}GB RAM, "
-        f"{profile.gpu_count} GPU(s), "
-        f"env={profile.environment}"
-    )
+    if not os.path.exists(".quiet_logs"):
+        logger.debug(
+            f"Hardware detected: {profile.cpu_threads} threads, "
+            f"{profile.ram_total_gb:.1f}GB RAM, "
+            f"{profile.gpu_count} GPU(s), "
+            f"env={profile.environment}"
+        )
     
     return profile
 

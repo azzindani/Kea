@@ -69,10 +69,25 @@ def pytest_configure(config):
             
         # Set env var for subprocesses (API Gateway, etc.)
         os.environ["QUIET_LOGGERS"] = ",".join(noisy_loggers)
+        
+        # Create filesystem flag for running processes
+        with open(".quiet_logs", "w") as f:
+            f.write("1")
 
     
     # Register markers
     config.addinivalue_line("markers", "stress: Stress/load tests")
+
+
+def pytest_unconfigure(config):
+    """Cleanup after tests."""
+    # Remove quiet flag
+    if os.path.exists(".quiet_logs"):
+        try:
+            os.remove(".quiet_logs")
+        except Exception:
+            pass
+
 
 
 def pytest_addoption(parser):
@@ -199,7 +214,7 @@ class AuthenticatedAPIClient:
 
     def _log_request(self, method: str, path: str, kwargs: dict):
         """Log full request if verbose mode."""
-        if os.getenv("KEA_LOG_NO_TRUNCATE") != "1":
+        if os.getenv("LOG_NO_TRUNCATE") != "1":
             return
             
         print(f"\n⚡ REQUEST: {method} {path}")
@@ -212,7 +227,7 @@ class AuthenticatedAPIClient:
 
     def _log_response(self, response: httpx.Response):
         """Log full response if verbose mode."""
-        if os.getenv("KEA_LOG_NO_TRUNCATE") != "1":
+        if os.getenv("LOG_NO_TRUNCATE") != "1":
             return
             
         print(f"⚡ RESPONSE: {response.status_code}")
@@ -549,4 +564,4 @@ def setup_stress_test_environment(monkeypatch, request):
     # Check for verbosity (mapped to -v flag)
     # Note: request.config.getoption("verbose") returns int (0, 1, 2...)
     if request.config.getoption("verbose") > 0:
-        monkeypatch.setenv("KEA_LOG_NO_TRUNCATE", "1")
+        monkeypatch.setenv("LOG_NO_TRUNCATE", "1")
