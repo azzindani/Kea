@@ -63,6 +63,11 @@ from services.orchestrator.core.delegation_protocol import (
     DelegationProtocol,
     DelegationState,
 )
+from services.orchestrator.core.error_journal import (
+    ErrorStatus,
+    FixAttempt,
+    FixResult,
+)
 from services.orchestrator.core.inference_context import (
     AgentIdentity,
     InferenceContext,
@@ -417,6 +422,15 @@ class KernelCell:
                             f"falling back to solo execution"
                         )
                         result_content = await self._execute_solo(task_text, context, envelope)
+
+                    # Phase 3.5: HEAL (Recursive Self-Healing)
+                    if self._should_heal():
+                        result_content = await self._execute_heal(
+                            task_text,
+                            result_content,
+                            context,
+                            envelope,
+                        )
 
                     # Phase 4: QUALITY ASSURANCE
                     scored_result = await self._quality_check(result_content, task_text)
@@ -1144,6 +1158,12 @@ class KernelCell:
             failures = gate.get_failures(self.score_card)
             logger.warning(f"Cell {self.cell_id} failed quality gate: {failures}")
 
+            # Record in error journal for self-healing awareness
+            self.working_memory.error_journal.record_from_quality_gate(
+                failures=failures,
+                score_card_summary=str(self.score_card.composite_score),
+            )
+
             # Try to revise if budget allows
             if self.score_card.retries < gate.max_retries and self.budget.has_remaining:
                 self.score_card.retries += 1
@@ -1245,6 +1265,223 @@ class KernelCell:
         self.budget.consume(200)
 
         return response.content
+
+    # ================================================================== #
+    # Phase 3.5: HEAL (Recursive Self-Healing at Cell Level)
+    # ================================================================== #
+
+    def _should_heal(self) -> bool:
+        """Decide if self-healing is needed based on error journal state."""
+        journal = self.working_memory.error_journal
+
+        # No errors → no healing
+        if journal.get_unresolved_count() == 0:
+            return False
+
+        # Budget too low for healing
+        if self.budget.remaining < 1000:
+            return False
+
+        # Only levels staff+ can self-heal (interns just retry)
+        if self.identity.level == "intern":
+            return False
+
+        # Check healing config
+        heal_cfg = self._get_heal_config()
+        if not heal_cfg.get("enabled", True):
+            return False
+
+        return True
+
+    async def _execute_heal(
+        self,
+        task_text: str,
+        original_result: str,
+        context: InferenceContext,
+        envelope: StdioEnvelope,
+    ) -> str:
+        """
+        Recursive self-healing at the cell level.
+
+        After execution, if errors were recorded, this method:
+        1. Collects unresolved errors from the error journal
+        2. Separates into solo-fixable vs delegation-required
+        3. Fixes simple errors inline
+        4. Delegates complex errors to child cells (if budget allows)
+        5. Re-synthesises with fixes applied
+        """
+        from .convergence import ConvergenceDetector, IterationSnapshot
+        from .error_journal import ErrorStatus
+
+        journal = self.working_memory.error_journal
+        heal_cfg = self._get_heal_config()
+
+        max_heal_rounds = min(
+            heal_cfg.get("max_iterations", 3),
+            self.budget.max_depth - self.budget.depth,
+        )
+        budget_fraction = heal_cfg.get("budget_fraction", 0.25)
+        heal_budget = int(self.budget.remaining * budget_fraction)
+
+        detector = ConvergenceDetector(
+            max_iterations=max(1, max_heal_rounds),
+            max_cascade_depth=heal_cfg.get("max_cascade_depth", 3),
+            min_budget_for_heal=heal_cfg.get("min_budget_for_heal", 500),
+        )
+
+        logger.info(
+            f"Cell {self.cell_id}: Starting self-healing "
+            f"({journal.get_unresolved_count()} unresolved errors, "
+            f"heal_budget={heal_budget})"
+        )
+
+        iteration = 0
+        while True:
+            decision = detector.should_continue(journal, heal_budget)
+            if not decision.continue_healing:
+                logger.info(f"Cell {self.cell_id}: Healing stopped — {decision.reason}")
+                break
+
+            iteration += 1
+            journal.advance_iteration()
+            fixes_this_round = 0
+            cascades_this_round = 0
+
+            unresolved = journal.get_unresolved()
+
+            # Separate fixable errors by complexity
+            solo_fixes = [e for e in unresolved if e.estimated_complexity in ("trivial", "simple")]
+            delegation_fixes = [
+                e for e in unresolved if e.estimated_complexity in ("moderate", "complex")
+            ]
+
+            # Solo fixes: run via cognitive cycle LLM call
+            for error in solo_fixes[:3]:
+                if heal_budget < 300:
+                    break
+
+                # Quick LLM fix
+                fix_prompt = (
+                    f"Fix this error that occurred during '{task_text[:100]}':\n"
+                    f"Error: {error.message[:200]}\n"
+                    f"Source: {error.source.value}\n"
+                    f"Suggest a corrective action or alternative approach."
+                )
+
+                try:
+                    fix_response = await self._cognitive_llm_call(
+                        system_prompt="You are a diagnostic expert. Fix errors concisely.",
+                        user_prompt=fix_prompt,
+                    )
+                    error.status = ErrorStatus.FIXED
+                    error.root_cause = "Diagnosed and resolved inline"
+                    fixes_this_round += 1
+                    heal_budget -= 200
+                    self.budget.consume(200)
+
+                    # Incorporate fix into result
+                    self.working_memory.store_fact(
+                        f"heal_fix_{error.id}",
+                        str(fix_response)[:300],
+                    )
+                    self.working_memory.learn_fix(
+                        error,
+                        FixAttempt(
+                            attempt_number=1,
+                            strategy="inline_llm_fix",
+                            result=FixResult.SUCCESS,
+                        ),
+                    )
+                except Exception as e:
+                    logger.warning(f"Cell {self.cell_id}: Inline fix failed: {e}")
+
+            # Complex fixes: delegate to child cells
+            if delegation_fixes and self.budget.can_delegate and heal_budget > 2000:
+                fix_subtasks = self._errors_to_subtasks(delegation_fixes[:2])
+                peer_group = f"heal-{self.cell_id}"
+
+                for subtask in fix_subtasks:
+                    try:
+                        child_result = await self._spawn_child(subtask, peer_group)
+                        if (
+                            hasattr(child_result, "stdout")
+                            and child_result.stdout
+                            and child_result.stdout.content
+                        ):
+                            # Record as fixed
+                            err_id = subtask.id.replace("fix_", "")
+                            entry = journal.get_entry(err_id)
+                            if entry:
+                                entry.status = ErrorStatus.FIXED
+                                fixes_this_round += 1
+                            self.working_memory.store_fact(
+                                f"heal_delegation_{subtask.id}",
+                                child_result.stdout.content[:300],
+                            )
+                        heal_budget -= 1000
+                        self.budget.consume(500)
+                    except Exception as e:
+                        logger.warning(f"Cell {self.cell_id}: Heal delegation failed: {e}")
+                        cascades_this_round += 1
+
+            detector.record_iteration(
+                IterationSnapshot(
+                    iteration=iteration,
+                    unresolved_count=journal.get_unresolved_count(),
+                    fixed_count=fixes_this_round,
+                    cascaded_count=cascades_this_round,
+                    tokens_consumed=fixes_this_round * 300,
+                )
+            )
+
+        # Re-synthesise if fixes were applied
+        if journal.count_by_status(ErrorStatus.FIXED) > 0:
+            heal_facts = {
+                k: v for k, v in self.working_memory.all_facts.items() if k.startswith("heal_")
+            }
+            if heal_facts:
+                heal_context = "\n".join(f"- {k}: {v[:200]}" for k, v in heal_facts.items())
+                return await self._synthesize(
+                    task_text,
+                    f"{original_result}\n\n[HEALING FIXES APPLIED]:\n{heal_context}",
+                    context,
+                )
+
+        return original_result
+
+    def _errors_to_subtasks(
+        self,
+        errors: list[Any],
+    ) -> list[SubTask]:
+        """Convert detected errors into subtasks for child delegation."""
+        subtasks = []
+        for error in errors:
+            subtasks.append(
+                SubTask(
+                    id=f"fix_{error.id}",
+                    description=(
+                        f"Investigate and fix the following error:\n"
+                        f"Error: {error.message[:300]}\n"
+                        f"Source: {error.source.value}\n"
+                        f"Context: {json.dumps(error.context, default=str)[:200]}\n\n"
+                        f"Diagnose the root cause, apply a fix, and verify "
+                        f"the fix doesn't introduce new issues."
+                    ),
+                    domain=self.identity.domain,
+                    required_tools=error.context.get("related_tools", []),
+                    depends_on=[],
+                    estimated_complexity=error.estimated_complexity or "moderate",
+                )
+            )
+        return subtasks
+
+    def _get_heal_config(self) -> dict[str, Any]:
+        """Load healing configuration from kernel.yaml."""
+        try:
+            cfg = get_kernel_config("kernel_cell") or {}
+            return cfg.get("healing", {})
+        except Exception:
+            return {}
 
     # ================================================================== #
     # Phase 5: OUTPUT
@@ -1382,6 +1619,12 @@ class KernelCell:
                 clarifications_resolved=self.comm.stats.get("clarifications_answered", 0)
                 if self.comm
                 else 0,
+                # Self-healing stats (v2.1)
+                heal_errors_fixed=self.working_memory.error_journal.count_by_status(
+                    ErrorStatus.FIXED,
+                ),
+                heal_errors_remaining=self.working_memory.error_journal.get_unresolved_count(),
+                heal_cascade_depth=self.working_memory.error_journal.max_cascade_depth(),
             ),
             message_type=MessageType.REPORT,
         )
@@ -1861,6 +2104,43 @@ async def _store_result_in_vault(
         logger.debug(f"Vault storage skipped: {e}")
 
 
+async def _store_fix_patterns(
+    patterns: list[Any],
+    domain: str,
+) -> None:
+    """
+    Persist learned fix patterns to Vault for cross-session healing.
+
+    Fire-and-forget: errors are logged but don't block the response.
+    """
+    try:
+        import httpx
+
+        vault_url = ServiceRegistry.get_url(ServiceName.VAULT)
+
+        payload = {
+            "type": "fix_patterns",
+            "domain": domain,
+            "patterns": [
+                {
+                    "error_signature": p.error_signature,
+                    "successful_fix": p.successful_fix,
+                    "frequency": p.frequency,
+                }
+                for p in patterns[:20]  # Cap at 20 patterns
+            ],
+        }
+
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.post(
+                f"{vault_url}/research/sessions",
+                json=payload,
+            )
+        logger.debug(f"Stored {len(patterns)} fix patterns in Vault")
+    except Exception as e:
+        logger.debug(f"Fix pattern storage skipped: {e}")
+
+
 async def run_kernel(
     query: str,
     tool_executor: Callable[[str, dict], Awaitable[Any]],
@@ -1931,7 +2211,10 @@ async def run_kernel(
     result = await cell.process(envelope)
 
     # Store result in Vault for future cross-session knowledge (non-blocking)
-
     asyncio.create_task(_store_result_in_vault(query, result))
+
+    # Store learned fix patterns for cross-session healing (non-blocking)
+    if cell.working_memory.fix_patterns:
+        asyncio.create_task(_store_fix_patterns(cell.working_memory.fix_patterns, domain))
 
     return result

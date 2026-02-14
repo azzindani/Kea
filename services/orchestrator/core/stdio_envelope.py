@@ -12,9 +12,10 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 from typing import Any
-from pydantic import BaseModel, Field
-from services.orchestrator.core.output_schemas import Artifact, WorkPackage
 
+from pydantic import BaseModel, Field
+
+from services.orchestrator.core.output_schemas import Artifact, WorkPackage
 
 # ============================================================================
 # Envelop Enums
@@ -167,7 +168,9 @@ class StdoutEnvelope(BaseModel):
     sections: list[DeliverableSection] = Field(default_factory=list)
     summary: str = Field(default="", description="One-paragraph executive summary")
     key_findings: list[KeyFinding] = Field(default_factory=list)
-    work_package: WorkPackage | None = Field(default=None, description="Structured work package (v2.0)")
+    work_package: WorkPackage | None = Field(
+        default=None, description="Structured work package (v2.0)"
+    )
 
 
 # ============================================================================
@@ -178,7 +181,9 @@ class StdoutEnvelope(BaseModel):
 class Warning(BaseModel):
     """A warning produced during processing."""
 
-    type: str = Field(description="Warning type: data_gap | low_confidence | tool_failure | timeout")
+    type: str = Field(
+        description="Warning type: data_gap | low_confidence | tool_failure | timeout"
+    )
     message: str
     severity: WarningSeverity = Field(default=WarningSeverity.MEDIUM)
 
@@ -230,7 +235,9 @@ class ArtifactReference(BaseModel):
     """Reference to an artifact produced by a kernel cell."""
 
     name: str
-    type: str = Field(description="Type: structured_data | tabular_data | working_document | report")
+    type: str = Field(
+        description="Type: structured_data | tabular_data | working_document | report"
+    )
     visibility: ArtifactVisibility = Field(default=ArtifactVisibility.TEAM)
     content: Any = Field(default=None, description="Inline content (for small artifacts)")
     size_bytes: int = Field(default=0)
@@ -260,6 +267,11 @@ class EnvelopeMetadata(BaseModel):
     messages_received: int = Field(default=0)
     comm_tokens_spent: int = Field(default=0)
     clarifications_resolved: int = Field(default=0)
+
+    # Self-healing stats (v2.1)
+    heal_errors_fixed: int = Field(default=0)
+    heal_errors_remaining: int = Field(default=0)
+    heal_cascade_depth: int = Field(default=0)
 
 
 # ============================================================================
@@ -294,7 +306,9 @@ class StdioEnvelope(BaseModel):
     stdout: StdoutEnvelope = Field(default_factory=StdoutEnvelope, description="Primary output")
     stderr: StderrEnvelope = Field(default_factory=StderrEnvelope, description="Warnings/errors")
     artifacts: list[Artifact] = Field(default_factory=list, description="Produced artifacts (v2.0)")
-    metadata: EnvelopeMetadata = Field(default_factory=EnvelopeMetadata, description="Processing metadata")
+    metadata: EnvelopeMetadata = Field(
+        default_factory=EnvelopeMetadata, description="Processing metadata"
+    )
 
     # Communication
     message_type: MessageType = Field(

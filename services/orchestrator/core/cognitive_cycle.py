@@ -42,6 +42,15 @@ from shared.logging import get_logger
 from shared.prompts import get_agent_prompt
 
 from .cognitive_profiles import CognitiveProfile, ReasoningStyle
+from .convergence import ConvergenceDetector, IterationSnapshot
+from .error_journal import (
+    ErrorEntry,
+    ErrorSeverity,
+    ErrorSource,
+    ErrorStatus,
+    FixAttempt,
+    FixResult,
+)
 from .output_schemas import (
     Artifact,
     ArtifactMetadata,
@@ -177,6 +186,18 @@ class AdaptResult(BaseModel):
     adjustment: str = Field(default="")
     new_steps: list[str] = Field(default_factory=list)
     reason: str = Field(default="")
+
+
+class HealResult(BaseModel):
+    """Output of the HEAL phase (recursive self-healing)."""
+
+    iterations: int = Field(default=0)
+    fixed_count: int = Field(default=0)
+    remaining_count: int = Field(default=0)
+    cascaded_count: int = Field(default=0)
+    converged: bool = Field(default=False)
+    convergence_reason: str = Field(default="")
+    fixes_applied: list[str] = Field(default_factory=list)
 
 
 # ============================================================================
@@ -335,6 +356,21 @@ class CognitiveCycle:
         # ── Phase 4+5+6: EXECUTE ↔ MONITOR → ADAPT loop ──────────────
         self.current_phase = CyclePhase.EXECUTE
         await self._execute_loop(task, context, plan, available_tools)
+
+        # ── Phase 4.5: HEAL (Recursive Self-Healing) ──────────────────
+        if self.memory.error_journal.get_unresolved_count() > 0:
+            if self.profile.reasoning_style not in (ReasoningStyle.DIRECT_LOOKUP,):
+                heal_result = await self._recursive_heal(
+                    task,
+                    context,
+                    available_tools,
+                )
+                if heal_result.fixes_applied:
+                    logger.info(
+                        f"  Heal phase: {heal_result.fixed_count} fixed, "
+                        f"{heal_result.remaining_count} remaining, "
+                        f"converged={heal_result.converged}"
+                    )
 
         # ── Check for mid-execution delegation signal ─────────────────
         if self._delegation_signal:
@@ -927,6 +963,12 @@ class CognitiveCycle:
                 f"tool_error_{step_idx}",
                 f"{tool_name} failed: {str(e)[:200]}",
             )
+            # Record in error journal for self-healing
+            self.memory.error_journal.record_from_tool_failure(
+                tool_name=tool_name,
+                error_message=str(e)[:500],
+                arguments=tool_args,
+            )
 
     # ================================================================ #
     # Phase 5: MONITOR
@@ -1127,6 +1169,299 @@ class CognitiveCycle:
                 new_steps=["Synthesize all current findings"],
                 reason="Adaptation LLM failed",
             )
+
+    # ================================================================ #
+    # Phase 4.5: HEAL (Recursive Self-Healing)
+    # ================================================================ #
+
+    async def _recursive_heal(
+        self,
+        task: str,
+        context: str,
+        available_tools: list[dict[str, Any]],
+        max_heal_iterations: int = 3,
+    ) -> HealResult:
+        """
+        Claude Code-style recursive self-healing loop.
+
+        After the execute phase, if errors were recorded in the error journal,
+        this method attempts to fix them one by one. Each fix triggers a
+        cascade check that may discover new errors, forming a recursive chain.
+
+        The loop terminates on convergence (no more errors), budget exhaustion,
+        or diminishing returns.
+        """
+        journal = self.memory.error_journal
+        heal_cfg = self._get_heal_config()
+        max_iterations = min(
+            max_heal_iterations,
+            heal_cfg.get("max_iterations", 3),
+        )
+
+        detector = ConvergenceDetector(
+            max_iterations=max_iterations,
+            max_cascade_depth=heal_cfg.get("max_cascade_depth", 3),
+            diminishing_returns_threshold=heal_cfg.get(
+                "diminishing_returns_threshold",
+                0.1,
+            ),
+            max_new_errors_per_iteration=heal_cfg.get(
+                "max_new_errors_per_iteration",
+                5,
+            ),
+            min_budget_for_heal=heal_cfg.get("min_budget_for_heal", 500),
+        )
+
+        # Estimate remaining budget (rough: tokens left for LLM calls)
+        budget_remaining = max(
+            0,
+            (self.profile.max_reasoning_steps - self.memory.step_count)
+            * 500,  # ~500 tokens per step
+        )
+
+        all_fixes: list[str] = []
+        total_cascaded = 0
+        iteration = 0
+
+        while True:
+            decision = detector.should_continue(journal, budget_remaining)
+            if not decision.continue_healing:
+                break
+
+            iteration += 1
+            journal.advance_iteration()
+            fixes_this_round = 0
+            cascades_this_round = 0
+
+            # Prioritise by severity
+            unresolved = sorted(
+                journal.get_unresolved(),
+                key=lambda e: list(ErrorSeverity).index(e.severity),
+                reverse=True,
+            )
+
+            for error in unresolved[:3]:  # Fix at most 3 per iteration
+                fix_attempt = await self._attempt_fix(
+                    error,
+                    task,
+                    context,
+                    available_tools,
+                )
+                if fix_attempt.result in (FixResult.SUCCESS, FixResult.PARTIAL):
+                    fixes_this_round += 1
+                    all_fixes.append(fix_attempt.strategy)
+                    self.memory.learn_fix(error, fix_attempt)
+
+                cascades_this_round += len(fix_attempt.new_errors_discovered)
+                budget_remaining -= fix_attempt.tokens_consumed
+
+            total_cascaded += cascades_this_round
+
+            detector.record_iteration(
+                IterationSnapshot(
+                    iteration=iteration,
+                    unresolved_count=journal.get_unresolved_count(),
+                    fixed_count=fixes_this_round,
+                    cascaded_count=cascades_this_round,
+                    tokens_consumed=fixes_this_round * 300,
+                )
+            )
+
+        final_decision = detector.should_continue(journal, budget_remaining)
+        return HealResult(
+            iterations=iteration,
+            fixed_count=journal.count_by_status(ErrorStatus.FIXED),
+            remaining_count=journal.get_unresolved_count(),
+            cascaded_count=total_cascaded,
+            converged=journal.is_converged(),
+            convergence_reason=final_decision.reason,
+            fixes_applied=all_fixes,
+        )
+
+    async def _attempt_fix(
+        self,
+        error: ErrorEntry,
+        task: str,
+        context: str,
+        available_tools: list[dict[str, Any]],
+    ) -> FixAttempt:
+        """Attempt to fix a single error. May discover cascading issues."""
+        journal = self.memory.error_journal
+        journal.diagnose(error.id, "diagnosing")
+
+        # Check if we have a learned fix pattern
+        suggested = self.memory.suggest_fix(error)
+        if suggested:
+            logger.info(f"  Heal: using learned fix for {error.error_type}: {suggested[:60]}")
+
+        # Ask LLM to diagnose root cause and suggest fix
+        error_context = json.dumps(error.context, default=str)[:300]
+        prompt = (
+            f"An error occurred during task execution.\n\n"
+            f"Task: {task[:200]}\n"
+            f"Error source: {error.source.value}\n"
+            f"Error message: {error.message[:300]}\n"
+            f"Error context: {error_context}\n"
+        )
+        if suggested:
+            prompt += f"Previously successful fix for similar errors: {suggested}\n"
+        prompt += (
+            "\nDiagnose the root cause and suggest a fix strategy.\n"
+            "Respond in JSON: {root_cause, fix_strategy, can_fix_with_tools, "
+            "tool_to_call, tool_args, potential_cascades}\n"
+        )
+
+        try:
+            raw = await self.llm_call(
+                system_prompt=(
+                    "You are a diagnostic expert. Analyze errors, identify root "
+                    "causes, and suggest specific fix strategies. Respond in JSON."
+                ),
+                user_prompt=prompt,
+            )
+            data = _parse_json_safe(raw)
+        except Exception as e:
+            logger.warning(f"  Heal: diagnosis LLM failed: {e}")
+            journal.mark_wont_fix(error.id, reason=f"diagnosis_failed: {e}")
+            return FixAttempt(
+                attempt_number=len(error.fix_attempts) + 1,
+                strategy="diagnosis_failed",
+                result=FixResult.FAILED,
+                tokens_consumed=100,
+            )
+
+        root_cause = data.get("root_cause", "unknown")
+        fix_strategy = data.get("fix_strategy", "retry")
+        journal.diagnose(error.id, root_cause)
+
+        # Attempt the fix
+        fix_result = FixResult.FAILED
+        new_errors: list[str] = []
+
+        if data.get("can_fix_with_tools") and data.get("tool_to_call"):
+            # Execute a corrective tool call
+            tool_name = data["tool_to_call"]
+            tool_args = data.get("tool_args", {})
+            try:
+                result = await self.tool_call(tool_name, tool_args)
+                result_str = str(result)[:500]
+                # Check if the tool call succeeded
+                if result_str and not result_str.startswith("ERROR"):
+                    fix_result = FixResult.SUCCESS
+                    self.memory.store_fact(
+                        f"heal_fix_{error.id}",
+                        f"Fixed {error.error_type} via {tool_name}: {result_str[:200]}",
+                    )
+                    self.accumulated_content.append(result_str)
+                else:
+                    fix_result = FixResult.FAILED
+            except Exception as e:
+                logger.warning(f"  Heal: fix tool call failed: {e}")
+                fix_result = FixResult.FAILED
+        else:
+            # Mark as fixed-by-diagnosis (the understanding itself is the fix)
+            fix_result = FixResult.SUCCESS
+            self.memory.store_fact(
+                f"heal_diagnosis_{error.id}",
+                f"Root cause of {error.error_type}: {root_cause}. Strategy: {fix_strategy}",
+            )
+
+        # Cascade check
+        cascade_errors = await self._cascade_check(error, fix_strategy, context)
+        for cascade_err in cascade_errors:
+            err_id = journal.record(cascade_err)
+            new_errors.append(err_id)
+
+        if new_errors:
+            fix_result = FixResult.CASCADED
+
+        attempt = FixAttempt(
+            attempt_number=len(error.fix_attempts) + 1,
+            strategy=fix_strategy,
+            result=fix_result,
+            new_errors_discovered=new_errors,
+            tokens_consumed=300,
+        )
+        journal.record_fix(error.id, attempt)
+        return attempt
+
+    async def _cascade_check(
+        self,
+        fixed_error: ErrorEntry,
+        fix_strategy: str,
+        context: str,
+    ) -> list[ErrorEntry]:
+        """Proactively check if a fix introduced new issues."""
+        prompt = (
+            f"I fixed the following error:\n"
+            f"Error: {fixed_error.message[:200]}\n"
+            f"Root cause: {fixed_error.root_cause or 'unknown'}\n"
+            f"Fix applied: {fix_strategy[:200]}\n\n"
+            f"What cascading issues might this fix introduce? "
+            f"Check for: missing dependencies, broken references, "
+            f"type mismatches, config inconsistencies, API contract violations.\n"
+            f"Return a JSON list of objects with keys: "
+            f"description, category, severity (low/medium/high/critical)\n"
+            f"Return an empty list [] if no cascading issues are expected."
+        )
+
+        try:
+            raw = await self.llm_call(
+                system_prompt=(
+                    "You are a cascade analysis expert. Given a fix, "
+                    "identify potential side effects. Be conservative — "
+                    "only report likely issues. Respond with a JSON list."
+                ),
+                user_prompt=prompt,
+            )
+            data = _parse_json_safe(raw)
+
+            # Parse cascade list
+            cascade_list = data if isinstance(data, list) else data.get("cascades", [])
+            if isinstance(data, dict) and not cascade_list:
+                # Try to extract from raw response as list
+                raw_str = str(raw)
+                if raw_str.strip().startswith("["):
+                    try:
+                        cascade_list = json.loads(raw_str)
+                    except json.JSONDecodeError:
+                        cascade_list = []
+
+            new_errors: list[ErrorEntry] = []
+            for item in cascade_list[:3]:  # Cap at 3 cascades per fix
+                if isinstance(item, dict) and item.get("description"):
+                    severity_str = item.get("severity", "medium").lower()
+                    try:
+                        severity = ErrorSeverity(severity_str)
+                    except ValueError:
+                        severity = ErrorSeverity.MEDIUM
+
+                    new_errors.append(
+                        ErrorEntry(
+                            source=ErrorSource.CASCADE,
+                            error_type=item.get("category", "cascade"),
+                            message=item["description"][:300],
+                            context={"parent_error": fixed_error.id},
+                            severity=severity,
+                            estimated_complexity="simple",
+                        )
+                    )
+
+            return new_errors
+
+        except Exception as e:
+            logger.debug(f"  Cascade check failed: {e}")
+            return []
+
+    def _get_heal_config(self) -> dict[str, Any]:
+        """Load healing config from kernel.yaml."""
+        try:
+            from shared.prompts import get_kernel_config
+
+            cfg = get_kernel_config("kernel_cell") or {}
+            return cfg.get("healing", {})
+        except Exception:
+            return {}
 
     # ================================================================ #
     # Phase 7: PACKAGE
