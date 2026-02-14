@@ -2163,14 +2163,18 @@ async def run_kernel(
     domain: str = "general",
     budget: int = 30_000,
     max_depth: int = 3,
+    seed_facts: list[dict] | None = None,
+    error_feedback: list[dict] | None = None,
 ) -> StdioEnvelope:
     """
     Run the kernel for a query.
 
     This is the primary entry point for the entire Kea kernel.
 
-    v4.1: Now wired into /research and /chat/message routes.
+    v4.2: Accepts seed_facts and error_feedback for cross-attempt learning.
     - Retrieves prior knowledge from Vault (cross-session)
+    - Injects seed_facts into context for continuity across retries
+    - Injects error_feedback so the kernel avoids repeating mistakes
     - Stores results in Vault after completion
     - Resets the message bus for clean communication
 
@@ -2181,6 +2185,8 @@ async def run_kernel(
         domain: Primary domain for the query.
         budget: Total token budget.
         max_depth: Maximum delegation depth.
+        seed_facts: Facts from previous attempts to build upon.
+        error_feedback: Errors from previous attempts to avoid repeating.
 
     Returns:
         StdioEnvelope with the complete result.
@@ -2198,6 +2204,10 @@ async def run_kernel(
 
     # Retrieve prior knowledge from Vault (cross-session facts)
     prior_findings = await _retrieve_prior_knowledge(query, domain)
+
+    # Merge seed_facts from previous attempts with Vault knowledge
+    if seed_facts:
+        prior_findings = prior_findings + seed_facts
 
     identity = AgentIdentity(role="orchestrator", level=level, domain=domain)
     token_budget = TokenBudget(
@@ -2218,6 +2228,7 @@ async def run_kernel(
             context=TaskContext(
                 domain_hints=[domain],
                 prior_findings=prior_findings,
+                error_feedback=error_feedback or [],
             ),
             constraints=Constraints(token_budget=budget),
         ),

@@ -39,7 +39,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from shared.logging import get_logger
-from shared.prompts import get_agent_prompt
+from shared.prompts import get_agent_prompt, get_kernel_config
 
 from .cognitive_profiles import CognitiveProfile, ReasoningStyle
 from .convergence import ConvergenceDetector, IterationSnapshot
@@ -75,7 +75,8 @@ logger = get_logger(__name__)
 class CyclePhase(str, Enum):
     """Current phase in the cognitive cycle."""
 
-    PERCEIVE = "perceive"  # Understand the instruction
+    PERCEIVE = "perceive"  # Understand the instruction + route intent
+    EXPLORE = "explore"  # Pre-planning reconnaissance (tools, sources, knowledge)
     FRAME = "frame"  # Restate the problem, identify assumptions
     PLAN = "plan"  # Choose approach, estimate effort
     EXECUTE = "execute"  # Do the work (tool calls, analysis)
@@ -105,6 +106,36 @@ class PerceptionResult(BaseModel):
     key_entities: list[str] = Field(
         default_factory=list,
         description="Key entities/topics mentioned in the task",
+    )
+    # IntentionRouter classification (v3.0)
+    intent_path: str = Field(
+        default="D",
+        description="Intent path: A (memory) | B (verify) | C (synthesis) | D (deep research)",
+    )
+
+
+class ExploreResult(BaseModel):
+    """Output of the EXPLORE phase — pre-planning reconnaissance."""
+
+    available_tools: list[str] = Field(
+        default_factory=list,
+        description="Relevant tool names from registry",
+    )
+    suggested_sources: list[str] = Field(
+        default_factory=list,
+        description="Data sources worth querying",
+    )
+    domain_knowledge: list[str] = Field(
+        default_factory=list,
+        description="Retrieved knowledge snippets",
+    )
+    prior_findings: list[str] = Field(
+        default_factory=list,
+        description="Cross-session findings from Vault",
+    )
+    exploration_notes: str = Field(
+        default="",
+        description="LLM assessment of the tool/source landscape",
     )
 
 
@@ -298,12 +329,22 @@ class CognitiveCycle:
         self.current_phase = CyclePhase.PERCEIVE
         perception = await self._perceive(task, context)
 
+        # ── Phase 1.5: EXPLORE (pre-planning reconnaissance) ─────────
+        self.current_phase = CyclePhase.EXPLORE
+        exploration = await self._explore(task, perception, available_tools)
+
         # ── Phase 2: FRAME ────────────────────────────────────────────
         self.current_phase = CyclePhase.FRAME
         framing = await self._frame(task, context, perception)
 
         # ── Phase 3: PLAN ────────────────────────────────────────────
         self.current_phase = CyclePhase.PLAN
+        # Enrich available_tools with exploration discoveries
+        if exploration.available_tools:
+            explored_tool_names = set(exploration.available_tools)
+            existing_names = {t.get("name", "") for t in available_tools}
+            for tool_name in explored_tool_names - existing_names:
+                available_tools.append({"name": tool_name, "description": "Discovered during exploration"})
         plan = await self._plan(task, context, perception, framing, available_tools)
 
         # Short-circuit: if the plan says we need delegation or
@@ -481,14 +522,187 @@ class CognitiveCycle:
                 key_entities=_extract_entities(task),
             )
 
+        # ── IntentionRouter classification (v3.0) ──────────────────
+        routing_cfg = get_kernel_config("kernel_cell_routing") or {}
+        if routing_cfg.get("enabled", True):
+            try:
+                from services.orchestrator.core.router import IntentionRouter
+
+                router = IntentionRouter()
+                route_context = {
+                    "key_entities": result.key_entities,
+                    "urgency": result.urgency,
+                }
+                intent_path = await router.route(task, route_context)
+                result.intent_path = str(intent_path)
+                logger.info(f"  IntentionRouter → Path {result.intent_path}")
+            except Exception as e:
+                default_path = routing_cfg.get("default_path", "D")
+                result.intent_path = str(default_path)
+                logger.warning(
+                    f"IntentionRouter failed: {e}; defaulting to Path {default_path}"
+                )
+
         # Store in working memory
         self.memory.focus_observation(
             "perception",
             f"Task: {result.task_text[:200]}",
             source="perceive",
         )
+        self.memory.note("intent_path", result.intent_path)
         for entity in result.key_entities[:5]:
             self.memory.focus_fact(f"entity_{entity}", entity, source="perceive")
+
+        return result
+
+    # ================================================================ #
+    # Phase 1.5: EXPLORE (Pre-Planning Reconnaissance)
+    # ================================================================ #
+
+    async def _explore(
+        self,
+        task: str,
+        perception: PerceptionResult,
+        available_tools: list[dict[str, Any]],
+    ) -> ExploreResult:
+        """
+        Pre-planning reconnaissance — discover tools, sources, and prior knowledge.
+
+        Like Claude Code exploring the codebase before coding, this phase scans
+        the landscape so the PLAN phase has context about what's available.
+        Skipped for lightweight levels (intern) or when disabled in config.
+        """
+        explore_cfg = get_kernel_config("kernel_cell_explore") or {}
+        if not explore_cfg.get("enabled", True):
+            return ExploreResult()
+
+        skip_levels = explore_cfg.get("skip_for_levels", ["intern"])
+        if self.profile.level in skip_levels:
+            return ExploreResult()
+
+        max_tools = explore_cfg.get("max_tools_to_scan", 30)
+        max_knowledge = explore_cfg.get("max_knowledge_snippets", 5)
+
+        # ── 1. Scan available tools for relevance ──────────────────
+        relevant_tools: list[str] = []
+        if available_tools:
+            tool_names = [t.get("name", "") for t in available_tools[:max_tools]]
+            relevant_tools = tool_names
+
+        # ── 2. Retrieve domain knowledge ───────────────────────────
+        domain_snippets: list[str] = []
+        try:
+            from shared.knowledge.retriever import get_knowledge_retriever
+
+            retriever = get_knowledge_retriever()
+            if await retriever.is_available():
+                knowledge = await retriever.retrieve_all(
+                    query=perception.task_text,
+                    skill_limit=max_knowledge,
+                    rule_limit=2,
+                    procedure_limit=2,
+                )
+                if knowledge:
+                    domain_snippets = [
+                        s.strip() for s in knowledge.split("\n") if s.strip()
+                    ][:max_knowledge]
+        except Exception as e:
+            logger.debug(f"Knowledge retrieval during EXPLORE failed: {e}")
+
+        # ── 3. Check Vault for prior findings ──────────────────────
+        prior_findings: list[str] = []
+        max_prior = explore_cfg.get("max_prior_findings", 3)
+        try:
+            from shared.service_registry import ServiceName, ServiceRegistry
+
+            vault_url = ServiceRegistry.get_url(ServiceName.VAULT)
+            if vault_url:
+                import httpx
+
+                async with httpx.AsyncClient(timeout=5.0) as client:
+                    resp = await client.post(
+                        f"{vault_url}/api/v1/search",
+                        json={
+                            "query": perception.task_text[:200],
+                            "limit": max_prior,
+                        },
+                    )
+                    if resp.status_code == 200:
+                        results = resp.json().get("results", [])
+                        prior_findings = [
+                            r.get("summary", r.get("content", ""))[:300]
+                            for r in results
+                            if r.get("summary") or r.get("content")
+                        ]
+        except Exception as e:
+            logger.debug(f"Vault cross-session lookup during EXPLORE failed: {e}")
+
+        # ── 4. LLM assessment of landscape ─────────────────────────
+        exploration_notes = ""
+        if self.profile.reasoning_style not in (
+            ReasoningStyle.DIRECT_LOOKUP,
+            ReasoningStyle.PROCEDURAL,
+        ):
+            try:
+                prompt = (
+                    f"You are scouting the landscape before starting work.\n\n"
+                    f"Task: {perception.task_text[:400]}\n"
+                    f"Key entities: {', '.join(perception.key_entities[:5])}\n"
+                    f"Intent path: {perception.intent_path}\n"
+                    f"Available tools ({len(relevant_tools)}): "
+                    f"{', '.join(relevant_tools[:15])}\n"
+                )
+                if domain_snippets:
+                    prompt += f"Domain knowledge: {'; '.join(domain_snippets[:3])}\n"
+                if prior_findings:
+                    prompt += f"Prior research: {'; '.join(prior_findings[:2])}\n"
+                prompt += (
+                    "\nProvide a brief exploration assessment in JSON:\n"
+                    '{"suggested_sources": [...], "exploration_notes": "..."}'
+                )
+
+                raw = await self.llm_call(
+                    system_prompt=get_agent_prompt("explorer")
+                    or (
+                        "You are a research scout. Assess available resources "
+                        "and suggest the best sources/tools for the task. "
+                        "Respond only in JSON."
+                    ),
+                    user_prompt=prompt,
+                )
+                data = _parse_json_safe(raw)
+                exploration_notes = data.get("exploration_notes", "")
+                suggested = data.get("suggested_sources", [])
+                if isinstance(suggested, list):
+                    relevant_tools = list(
+                        dict.fromkeys(relevant_tools + [s for s in suggested if isinstance(s, str)])
+                    )
+            except Exception as e:
+                logger.debug(f"Exploration LLM call failed: {e}")
+
+        result = ExploreResult(
+            available_tools=relevant_tools,
+            suggested_sources=[],
+            domain_knowledge=domain_snippets,
+            prior_findings=prior_findings,
+            exploration_notes=exploration_notes,
+        )
+
+        # Store exploration in working memory for PLAN phase
+        if domain_snippets:
+            for i, snippet in enumerate(domain_snippets[:3]):
+                self.memory.store_fact(f"explore_knowledge_{i}", snippet[:500])
+        if prior_findings:
+            for i, finding in enumerate(prior_findings[:3]):
+                self.memory.store_fact(f"explore_prior_{i}", finding[:500])
+        if exploration_notes:
+            self.memory.note("exploration_notes", exploration_notes[:500])
+
+        logger.info(
+            f"  EXPLORE: {len(relevant_tools)} tools, "
+            f"{len(domain_snippets)} knowledge, "
+            f"{len(prior_findings)} prior findings"
+        )
 
         return result
 
@@ -683,14 +897,18 @@ class CognitiveCycle:
         """
         The main execution loop with integrated monitoring.
 
-        Iterates through plan steps, calling tools and analyzing results.
-        Periodically self-monitors and adapts if quality is declining.
+        v3.0: Attempts DAG-based parallel execution for medium+ complexity.
+        Falls back to sequential ReAct loop for simple queries or on DAG failure.
 
         v2.0 Communication hooks:
         - Check for REDIRECT/CANCEL from parent between steps
         - Incorporate peer-shared data as it arrives
         - Report progress to parent at regular intervals
         """
+        # ── Try DAG-based execution for complex queries ────────────
+        if await self._try_dag_execution(task, context, plan, available_tools):
+            return  # DAG completed successfully
+
         max_steps = self.profile.max_reasoning_steps
         monitor_interval = max(
             1,
@@ -881,6 +1099,195 @@ class CognitiveCycle:
             topic = f"step_{step_idx}"
             self.memory.set_confidence(topic, confidence)
 
+    async def _try_dag_execution(
+        self,
+        task: str,
+        context: str,
+        plan: PlanResult,
+        available_tools: list[dict[str, Any]],
+    ) -> bool:
+        """
+        Attempt DAG-based parallel execution using the existing DAGExecutor.
+
+        Converts plan steps into WorkflowNodes and executes them as a
+        dependency-driven DAG. Returns True if DAG execution was used
+        and completed, False to fall back to sequential.
+        """
+        dag_cfg = get_kernel_config("kernel_cell_dag") or {}
+        if not dag_cfg.get("enabled", True):
+            return False
+
+        # Check complexity threshold — skip DAG for trivial/low
+        min_complexity = dag_cfg.get("min_complexity_for_dag", "medium")
+        complexity_order = ["trivial", "low", "medium", "high", "extreme"]
+        # Use plan step count as complexity proxy
+        plan_complexity = "low" if plan.estimated_steps <= 2 else "medium"
+        if plan.estimated_steps >= 5:
+            plan_complexity = "high"
+
+        try:
+            min_idx = complexity_order.index(min_complexity)
+            cur_idx = complexity_order.index(plan_complexity)
+        except ValueError:
+            min_idx, cur_idx = 2, 1  # Default: skip
+
+        if cur_idx < min_idx:
+            logger.debug(
+                f"  DAG skipped: complexity={plan_complexity} < {min_complexity}"
+            )
+            return False
+
+        # ── Convert plan steps → WorkflowNodes ──────────────────────
+        try:
+            from services.orchestrator.core.workflow_nodes import (
+                WorkflowNode,
+                NodeResult,
+                NodeStatus,
+                NodeType,
+                parse_blueprint,
+            )
+            from services.orchestrator.core.dag_executor import DAGExecutor
+            from services.orchestrator.core.assembler import ArtifactStore
+
+            blueprint_steps: list[dict[str, Any]] = []
+            for i, step_desc in enumerate(plan.steps):
+                # Determine if this step should call a tool
+                step_dict: dict[str, Any] = {
+                    "id": f"step_{i}",
+                    "description": step_desc,
+                    "phase": (i // 2) + 1,  # Group into phases for parallelism
+                }
+
+                # Try to match step to an available tool
+                matched_tool = ""
+                step_lower = step_desc.lower()
+                for t in available_tools:
+                    tool_name = t.get("name", "")
+                    if tool_name and tool_name.lower() in step_lower:
+                        matched_tool = tool_name
+                        break
+
+                if matched_tool:
+                    step_dict["type"] = "tool"
+                    step_dict["tool"] = matched_tool
+                    step_dict["args"] = {"query": task[:500]}
+                else:
+                    step_dict["type"] = "llm"
+                    step_dict["llm_prompt"] = (
+                        f"Execute this step: {step_desc}\n\nOriginal task: {task[:300]}"
+                    )
+                    step_dict["llm_system"] = self._build_execute_system_prompt()
+
+                # Dependency: each step depends on the previous in same phase
+                if i > 0 and blueprint_steps[i - 1].get("phase") == step_dict["phase"]:
+                    step_dict["depends_on"] = []  # Same phase = parallel
+                elif i > 0:
+                    step_dict["depends_on"] = [f"step_{i - 1}"]
+
+                blueprint_steps.append(step_dict)
+
+            if not blueprint_steps:
+                return False
+
+            nodes = parse_blueprint(blueprint_steps)
+
+            # ── Build node executor ─────────────────────────────────
+            async def node_executor(
+                node: WorkflowNode, inputs: dict[str, Any]
+            ) -> NodeResult:
+                if node.node_type == NodeType.TOOL and node.tool:
+                    try:
+                        result = await self.tool_call(node.tool, node.args or {})
+                        self.tool_call_count += 1
+                        result_str = str(result)[:1000] if result else "No output"
+                        self.tool_results.append({
+                            "tool": node.tool,
+                            "args": node.args,
+                            "result": result_str,
+                            "step": node.id,
+                        })
+                        self.memory.store_fact(f"dag_{node.id}", result_str[:500])
+                        return NodeResult(
+                            node_id=node.id,
+                            status=NodeStatus.COMPLETED,
+                            output=result_str,
+                        )
+                    except Exception as e:
+                        return NodeResult(
+                            node_id=node.id,
+                            status=NodeStatus.FAILED,
+                            error=str(e)[:500],
+                        )
+                elif node.node_type == NodeType.LLM:
+                    try:
+                        raw = await self.llm_call(
+                            system_prompt=node.llm_system or self._build_execute_system_prompt(),
+                            user_prompt=node.llm_prompt or node.description,
+                        )
+                        content = str(raw)[:2000]
+                        self.accumulated_content.append(content)
+                        self.memory.store_fact(f"dag_{node.id}", content[:500])
+                        return NodeResult(
+                            node_id=node.id,
+                            status=NodeStatus.COMPLETED,
+                            output=content,
+                        )
+                    except Exception as e:
+                        return NodeResult(
+                            node_id=node.id,
+                            status=NodeStatus.FAILED,
+                            error=str(e)[:500],
+                        )
+                else:
+                    return NodeResult(
+                        node_id=node.id,
+                        status=NodeStatus.COMPLETED,
+                        output=f"Skipped node type: {node.node_type}",
+                    )
+
+            # ── Execute DAG ─────────────────────────────────────────
+            max_concurrent = dag_cfg.get(
+                "max_concurrent_default",
+                self.profile.max_tool_calls or 4,
+            )
+            store = ArtifactStore()
+            dag = DAGExecutor(
+                store=store,
+                node_executor=node_executor,
+                max_parallel=max_concurrent,
+            )
+
+            dag_result = await dag.execute(nodes)
+
+            logger.info(
+                f"  DAG execution: {dag_result.completed}/{dag_result.total_nodes} "
+                f"completed, {dag_result.failed} failed, "
+                f"{dag_result.replans_triggered} replans"
+            )
+
+            # Feed DAG results back into working memory
+            for node_id, nr in dag_result.node_results.items():
+                if nr.status == NodeStatus.COMPLETED and nr.output:
+                    output_str = str(nr.output)[:500]
+                    if output_str not in self.accumulated_content:
+                        self.accumulated_content.append(output_str)
+
+            # If too many failures, fall back to sequential
+            if dag_result.success_rate < 0.3:
+                logger.warning(
+                    f"  DAG success rate {dag_result.success_rate:.0%} too low, "
+                    f"falling back to sequential"
+                )
+                return False
+
+            return True
+
+        except Exception as e:
+            logger.warning(f"  DAG execution setup failed: {e}; falling back to sequential")
+            if dag_cfg.get("sequential_fallback", True):
+                return False
+            raise
+
     def _check_convergence(self, step_idx: int) -> bool:
         """
         Check if recent content is converging (diminishing returns).
@@ -1022,6 +1429,21 @@ class CognitiveCycle:
             shared = self.comm.check_for_shared_data()
             shared_data_count = len(shared)
 
+        # ── Keeper-level context guard (v3.0) ──────────────────────────
+        keeper_cfg = get_kernel_config("kernel_cell_keeper") or {}
+        keeper_enabled = keeper_cfg.get("enabled", True)
+        keeper_contradictions: list[str] = []
+        keeper_confidence_boost = 0.0
+
+        if keeper_enabled and self.memory.fact_count >= 2:
+            keeper_contradictions, keeper_confidence_boost = await self._keeper_check(
+                task, keeper_cfg
+            )
+            if keeper_contradictions:
+                logger.info(
+                    f"  Keeper: {len(keeper_contradictions)} contradiction(s) detected"
+                )
+
         # For senior levels, also use LLM self-assessment
         quality_assessment = "adequate"
         weak_areas: list[str] = []
@@ -1045,6 +1467,12 @@ class CognitiveCycle:
                 )
                 if shared_data_count > 0:
                     prompt += f"Peer data received: {shared_data_count} item(s)\n"
+                if keeper_contradictions:
+                    prompt += (
+                        f"CONTRADICTIONS DETECTED:\n"
+                        + "\n".join(f"- {c}" for c in keeper_contradictions[:3])
+                        + "\n"
+                    )
                 prompt += (
                     "\nAssess:\n"
                     "1. quality_so_far: poor/adequate/good/excellent\n"
@@ -1054,7 +1482,8 @@ class CognitiveCycle:
                     "Respond in JSON."
                 )
                 raw = await self.llm_call(
-                    system_prompt=(
+                    system_prompt=get_agent_prompt("keeper_kernel")
+                    or (
                         "You are a quality monitor reviewing work in progress. "
                         "Be honest and specific about weaknesses. Respond in JSON."
                     ),
@@ -1067,6 +1496,10 @@ class CognitiveCycle:
                 suggested_adjustment = data.get("suggested_adjustment", "")
             except Exception as e:
                 logger.debug(f"Monitor LLM call failed: {e}; using heuristics only")
+
+        # Add keeper-detected contradictions to weak areas
+        if keeper_contradictions:
+            weak_areas.extend(f"Contradiction: {c}" for c in keeper_contradictions[:2])
 
         # Combine heuristic + LLM signals
         should_continue = True

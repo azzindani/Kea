@@ -370,3 +370,65 @@ organization:
       default_roles: [data_scientist]
   skip_levels_for_simple: true
   budget_allocation: equal         # equal | weighted | priority
+
+# ==============================================================================
+# Kernel Exploration Phase (Step 1 — Pre-Planning Reconnaissance)
+# Enables Claude-Code-style exploration before the PLAN phase.
+# ==============================================================================
+
+kernel_cell_explore:
+  enabled: true
+  max_tools_to_scan: 30            # Max tools to consider from registry
+  max_knowledge_snippets: 5        # Max knowledge chunks from retriever
+  max_prior_findings: 3            # Max Vault cross-session findings
+  skip_for_levels: [intern]        # These levels skip exploration
+  budget_fraction: 0.05            # Max fraction of budget for exploration
+
+# ==============================================================================
+# Kernel Intent Routing (Step 2 — Path A/B/C/D Classification)
+# Integrates IntentionRouter into the kernel's PERCEIVE phase.
+# ==============================================================================
+
+kernel_cell_routing:
+  enabled: true
+  use_llm_fallback: true           # Use LLM if heuristics don't match
+  default_path: D                  # Default to deep research
+  path_overrides:
+    A:
+      inject_conversation: true    # Inject conversation history
+      max_prior_facts: 20          # Max facts from prior sessions
+    B:
+      verification_mode: true      # Cross-verify claims
+      spawn_shadow_cell: true      # Spawn a verification child cell
+    C:
+      multi_topic: true            # Aggregate across topics
+      min_sources: 5               # Minimum source diversity
+    D:
+      deep_mode: true              # Full deep research
+
+# ==============================================================================
+# Kernel DAG Execution (Step 3 — Self-Assembling Workflows)
+# Replaces sequential tool calls with parallel, dependency-driven DAG execution.
+# ==============================================================================
+
+kernel_cell_dag:
+  enabled: true
+  min_complexity_for_dag: medium   # trivial/low use sequential fallback
+  max_concurrent_default: 4        # Overridden by hardware detection
+  enable_microplanner: true        # Reactive mid-execution replanning
+  enable_artifact_cache: true      # Cache identical tool call results
+  sequential_fallback: true        # Fall back to sequential on DAG failure
+
+# ==============================================================================
+# Kernel Keeper Guard (Step 4 — Context Quality in MONITOR Phase)
+# Ports the legacy graph's keeper node capabilities into the kernel.
+# ==============================================================================
+
+kernel_cell_keeper:
+  enabled: true
+  rerank_facts: true               # Neural reranking by relevance
+  rerank_top_k: 10                 # Keep top-K facts after reranking
+  detect_contradictions: true      # Find disagreements between facts
+  detect_drift: true               # Check for topic wandering
+  confidence_from_agreement: true  # Calculate confidence from fact consensus
+  min_facts_for_rerank: 3          # Only rerank if this many facts exist

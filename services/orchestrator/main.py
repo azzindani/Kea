@@ -280,6 +280,8 @@ async def start_research(request: ResearchRequest):
                 domain=domain,
                 budget=budget,
                 max_depth=request.depth + 1,
+                seed_facts=request.seed_facts,
+                error_feedback=request.error_feedback,
             )
 
             result = envelope_to_research_response(envelope)
