@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from shared.knowledge.retriever import get_knowledge_retriever
 from shared.llm import LLMConfig, OpenRouterProvider
 from shared.llm.provider import LLMMessage, LLMRole
 from shared.logging import get_logger
@@ -53,10 +54,25 @@ async def divergence_node(state: dict[str, Any]) -> dict[str, Any]:
             facts_text = "\n".join([str(f)[:100] for f in facts[:5]])
             hypotheses_text = "\n".join(hypotheses[:3]) if hypotheses else "None yet"
 
+            knowledge_context = ""
+            try:
+                knowledge_context = await get_knowledge_retriever().retrieve_skills(query)
+            except Exception as _kr_err:
+                logger.debug(f"Divergence: knowledge retrieval skipped ({_kr_err})")
+
+            system_prompt = get_agent_prompt("divergence")
+            if knowledge_context:
+                system_prompt += f"\n\n{knowledge_context}"
+                logger.info(
+                    f"Divergence: injected {len(knowledge_context)} chars of domain knowledge"
+                )
+            else:
+                logger.debug("Divergence: No domain knowledge retrieved — using base system prompt")
+
             messages = [
                 LLMMessage(
                     role=LLMRole.SYSTEM,
-                    content=get_agent_prompt("divergence"),
+                    content=system_prompt,
                 ),
                 LLMMessage(
                     role=LLMRole.USER,
