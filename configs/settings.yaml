@@ -271,13 +271,13 @@ rate_limits:
 # Model Identity Configuration
 models:
   # The default model for most tasks
-  default_model: "nvidia/nemotron-3-nano-30b-a3b:free"
+  default_model: "${MODELS_DEFAULT_MODEL:nvidia/nemotron-3-nano-30b-a3b:free}"
   app_name: "Kea Research Engine"
   
   # Specialized models (can be same as default)
-  planner_model: "nvidia/nemotron-3-nano-30b-a3b:free"
-  critic_model: "nvidia/nemotron-3-nano-30b-a3b:free"
-  generator_model: "nvidia/nemotron-3-nano-30b-a3b:free"
+  planner_model: "${MODELS_PLANNER_MODEL:nvidia/nemotron-3-nano-30b-a3b:free}"
+  critic_model: "${MODELS_CRITIC_MODEL:nvidia/nemotron-3-nano-30b-a3b:free}"
+  generator_model: "${MODELS_GENERATOR_MODEL:nvidia/nemotron-3-nano-30b-a3b:free}"
 
 # Governance & Safety
 governance:

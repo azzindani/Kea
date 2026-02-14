@@ -11,6 +11,7 @@ from enum import Enum
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
+import re
 
 import yaml
 from pydantic import BaseModel, Field
@@ -252,7 +253,19 @@ class Settings(BaseSettings):
 
         try:
             with open(config_path) as f:
-                yaml_config = yaml.safe_load(f)
+                yaml_content = f.read()
+            
+            # Perform environment variable substitution
+            # Pattern: ${VAR_NAME} or ${VAR_NAME:default_value}
+            pattern = re.compile(r'\$\{([^}:]+)(?::([^}]*))?\}')
+            
+            def replace_env_var(match):
+                var_name = match.group(1)
+                default_val = match.group(2) or ""
+                return os.getenv(var_name, default_val)
+                
+            yaml_with_env = pattern.sub(replace_env_var, yaml_content)
+            yaml_config = yaml.safe_load(yaml_with_env)
 
             if not yaml_config:
                 return
