@@ -32,7 +32,7 @@ class LLMSettings(BaseModel):
     default_provider: str = "openrouter"
     default_model: str = "nvidia/nemotron-3-nano-30b-a3b:free"
     temperature: float = 0.7
-    max_tokens: int = 4096
+    max_tokens: int = 32768
     enable_reasoning: bool = True
 
 

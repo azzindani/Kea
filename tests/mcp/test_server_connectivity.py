@@ -5,9 +5,8 @@ import logging
 import traceback
 import sys
 import os
-from pathlib import Path
-from typing import List, Dict, Optional
-from dataclasses import dataclass, field
+from typing import Dict, Optional
+from dataclasses import dataclass
 
 # Configure logging BEFORE any imports to capture ALL output
 # Create a handler that writes to stdout
@@ -85,7 +84,7 @@ class VerboseServerTester:
             return result
         
         # Print config details
-        print(f"\n📁 Server Config:")
+        print("\n📁 Server Config:")
         print(f"   Script: {config.script_path}")
         print(f"   Exists: {config.script_path.exists()}")
         
@@ -95,7 +94,7 @@ class VerboseServerTester:
         print(f"   PyProject: {pyproject} (exists: {pyproject.exists()})")
         
         if pyproject.exists():
-            print(f"\n📦 pyproject.toml contents:")
+            print("\n📦 pyproject.toml contents:")
             print(f"   {'─'*50}")
             try:
                 with open(pyproject, 'r') as f:
@@ -113,7 +112,7 @@ class VerboseServerTester:
         stdout_lines = []
         
         try:
-            print(f"\n🚀 Spawning server...")
+            print("\n🚀 Spawning server...")
             print(f"   Timeout: {timeout}s")
             
             # Use modified get_session that we can monitor
@@ -368,9 +367,17 @@ class TestMCPServerConnectivity:
         failed = []
         passed = []
         
-        for server_name in discovered_servers:
-            result = await tester.test_server(server_name)
-            
+        semaphore = asyncio.Semaphore(10)
+        
+        async def _test_worker(name):
+            async with semaphore:
+                return await tester.test_server(name)
+
+        print(f"🚀 Starting parallel tests with concurrency 10...")
+        tasks = [_test_worker(name) for name in discovered_servers]
+        results_list = await asyncio.gather(*tasks)
+        
+        for server_name, result in zip(discovered_servers, results_list):
             if result.success:
                 passed.append(server_name)
             else:

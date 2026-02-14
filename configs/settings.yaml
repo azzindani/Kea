@@ -41,6 +41,7 @@ mcp:
     uv_enabled: true
     idle_timeout: 300  # 5 minutes
     max_servers: 20
+    connect_timeout: 300
   
   servers:
     - name: "scraper_server"
@@ -291,7 +292,7 @@ timeouts:
   llm_completion: 60.0
   llm_streaming: 120.0
   tool_execution: 300.0
-  long: 600.0
+  long: 1200.0
 
 # Loop Safety Controls
 loop_safety:

@@ -61,14 +61,18 @@ async def test_crawler_real_simulation():
             if res.isError:
                  print(f" \033[91m[FAIL]\033[0m Crawl: {res.content[0].text if res.content else 'Error'}")
             else:
-                 content = res.content[0].text
-                 print(f" \033[92m[PASS]\033[0m Crawl successful. Content len: {len(content)}")
-                 # In restricted network environments, the crawler may return 0 pages
-                 if "Pages Found**: 0" in content:
-                     pytest.skip("Crawler returned 0 pages (network restriction)")
-                 assert "Example Domain" in content or "example.com" in content
+                content = res.content[0].text
+                print(f" \033[92m[PASS]\033[0m Crawl successful. Content len: {len(content)}")
+                # In restricted network environments, the crawler may return 0 pages
+                if "Pages Found**: 0" in content:
+                    skip_msg = "Crawler returned 0 pages (network restriction)"
+                elif not ("Example Domain" in content or "example.com" in content):
+                    pytest.fail(f"Content mismatch. Got: {content[:200]}")
             
             print("--- Crawler Simulation Complete ---")
+    
+    if 'skip_msg' in locals() and skip_msg:
+        pytest.skip(skip_msg)
 
 if __name__ == "__main__":
     import sys

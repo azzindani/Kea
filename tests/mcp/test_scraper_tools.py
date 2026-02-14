@@ -24,16 +24,16 @@ async def test_fetch_example_com():
             tool_names = [t.name for t in tools_res.tools]
             assert "fetch_url" in tool_names
 
-            # Call tool
             res = await session.call_tool("fetch_url", arguments={"url": "https://example.com"})
-
             content_str = res.content[0].text if res.content else ""
-            # Skip if network is restricted (proxy errors, connection failures)
             if "ProxyError" in content_str or "RetryError" in content_str or "Connect" in content_str:
-                pytest.skip("example.com unreachable (proxy/network restriction)")
-            assert not res.isError
-            assert "Example Domain" in content_str or "example" in content_str.lower(), \
-                f"Expected example.com content, got: {content_str[:1000]}"
+                skip_msg = "example.com unreachable (proxy/network restriction)"
+            else:
+                assert not res.isError
+                assert "Example Domain" in content_str or "example" in content_str.lower()
+    
+    if "skip_msg" in locals():
+        pytest.skip(skip_msg)
 
 @pytest.mark.asyncio
 async def test_fetch_with_timeout():
@@ -45,12 +45,15 @@ async def test_fetch_with_timeout():
             await session.initialize()
 
             res = await session.call_tool("fetch_url", arguments={"url": "https://example.com", "timeout": 10})
-
             content_str = res.content[0].text if res.content else ""
             if "ProxyError" in content_str or "RetryError" in content_str or "Connect" in content_str:
-                pytest.skip("example.com unreachable (proxy/network restriction)")
-            assert not res.isError
-            assert "Example Domain" in content_str
+                skip_msg = "example.com unreachable (proxy/network restriction)"
+            else:
+                assert not res.isError
+                assert "Example Domain" in content_str
+    
+    if "skip_msg" in locals():
+        pytest.skip(skip_msg)
 
 @pytest.mark.asyncio
 async def test_batch_multiple_urls():
@@ -65,13 +68,15 @@ async def test_batch_multiple_urls():
             # batch_scrape might return text directly strictly or a JSON string, let's check implementation behavior through test
             # Assuming it returns a list of results in some format
             res = await session.call_tool("batch_scrape", arguments={"urls": urls, "max_concurrent": 2})
-
             content_str = res.content[0].text if res.content else ""
             if "ProxyError" in content_str or "RetryError" in content_str or "Connect" in content_str:
-                pytest.skip("URLs unreachable (proxy/network restriction)")
-            assert not res.isError
-            # It likely returns a JSON string or a summary
-            assert "example" in content_str.lower()
+                skip_msg = "URLs unreachable (proxy/network restriction)"
+            else:
+                assert not res.isError
+                assert "example" in content_str.lower()
+    
+    if "skip_msg" in locals():
+        pytest.skip(skip_msg)
 
 if __name__ == "__main__":
     import sys
