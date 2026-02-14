@@ -8,22 +8,20 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from services.rag_service.core import (
     FactStore,
-    create_vector_store,
     create_artifact_store,
-    Artifact,
+    create_vector_store,
 )
 from services.rag_service.core.dataset_loader import DatasetLoader
 from services.rag_service.core.knowledge_store import KnowledgeStore, create_knowledge_store
-from shared.schemas import AtomicFact
 from shared.config import get_settings
-from shared.logging import setup_logging, get_logger, LogConfig
+from shared.logging import LogConfig, get_logger, setup_logging
 from shared.logging.middleware import RequestLoggingMiddleware
-
+from shared.schemas import AtomicFact
 
 logger = get_logger(__name__)
 
@@ -41,11 +39,13 @@ async def lifespan(app: FastAPI):
 
     settings = get_settings()
 
-    setup_logging(LogConfig(
-        level=settings.log_level,
-        format=settings.log_format,
-        service_name="rag_service",
-    ))
+    setup_logging(
+        LogConfig(
+            level=settings.log_level,
+            format=settings.log_format,
+            service_name="rag_service",
+        )
+    )
 
     logger.info("Starting RAG Service")
 
@@ -59,14 +59,22 @@ async def lifespan(app: FastAPI):
     try:
         knowledge_store = create_knowledge_store()
         logger.info("Knowledge store initialized")
+
+        # Auto-sync knowledge files from the knowledge/ library on startup.
+        # This ensures domain expertise (skills, rules, procedures) is always
+        # available for retrieval without a manual POST /knowledge/sync call.
+        import asyncio
+
+        asyncio.create_task(_sync_knowledge_job())
+        logger.info("Knowledge auto-sync scheduled (background)")
     except Exception as e:
         logger.warning(f"Knowledge store unavailable: {e}")
         knowledge_store = None
 
     logger.info("RAG Service initialized")
-    
+
     yield
-    
+
     logger.info("RAG Service stopped")
 
 
@@ -84,8 +92,10 @@ app.add_middleware(RequestLoggingMiddleware)
 # Models
 # ============================================================================
 
+
 class AddFactRequest(BaseModel):
     """Add fact request."""
+
     entity: str
     attribute: str
     value: str
@@ -99,8 +109,11 @@ class AddFactRequest(BaseModel):
 
 class SearchRequest(BaseModel):
     """Search request."""
+
     query: str
-    limit: int = Field(default=10, ge=1, le=10000, description="Max results (up to 10000 for large-scale searches)")
+    limit: int = Field(
+        default=10, ge=1, le=10000, description="Max results (up to 10000 for large-scale searches)"
+    )
     entity: str | None = None
     dataset_id: str | None = None
     min_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
@@ -108,6 +121,7 @@ class SearchRequest(BaseModel):
 
 class IngestRequest(BaseModel):
     """Dataset ingestion request."""
+
     dataset_name: str
     split: str = "train"
     max_rows: int = 1000
@@ -116,6 +130,7 @@ class IngestRequest(BaseModel):
 
 class FactResponse(BaseModel):
     """Fact response."""
+
     fact_id: str
     entity: str
     attribute: str
@@ -130,6 +145,7 @@ class FactResponse(BaseModel):
 # Routes
 # ============================================================================
 
+
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "service": "rag_service"}
@@ -140,7 +156,7 @@ async def add_fact(request: AddFactRequest):
     """Add a new atomic fact."""
     if not fact_store:
         raise HTTPException(status_code=503, detail="Fact store not initialized")
-    
+
     fact = AtomicFact(
         fact_id="",
         entity=request.entity,
@@ -152,7 +168,7 @@ async def add_fact(request: AddFactRequest):
         source_title=request.source_title,
         confidence_score=request.confidence_score,
     )
-    
+
     fact_id = await fact_store.add_fact(fact, dataset_id=request.dataset_id)
     return {"fact_id": fact_id}
 
@@ -162,7 +178,7 @@ async def search_facts(request: SearchRequest):
     """Search for facts."""
     if not fact_store:
         raise HTTPException(status_code=503, detail="Fact store not initialized")
-    
+
     facts = await fact_store.search(
         query=request.query,
         limit=request.limit,
@@ -170,7 +186,7 @@ async def search_facts(request: SearchRequest):
         dataset_id=request.dataset_id,
         min_confidence=request.min_confidence,
     )
-    
+
     return [
         FactResponse(
             fact_id=f.fact_id,
@@ -191,11 +207,11 @@ async def get_fact(fact_id: str):
     """Get a specific fact."""
     if not fact_store:
         raise HTTPException(status_code=503, detail="Fact store not initialized")
-    
+
     fact = await fact_store.get_fact(fact_id)
     if not fact:
         raise HTTPException(status_code=404, detail="Fact not found")
-    
+
     return FactResponse(
         fact_id=fact.fact_id,
         entity=fact.entity,
@@ -213,7 +229,7 @@ async def delete_fact(fact_id: str):
     """Delete a fact."""
     if not fact_store:
         raise HTTPException(status_code=503, detail="Fact store not initialized")
-    
+
     await fact_store.delete_fact(fact_id)
     return {"message": "Fact deleted"}
 
@@ -223,7 +239,7 @@ async def list_entities():
     """List all unique entities."""
     if not fact_store:
         raise HTTPException(status_code=503, detail="Fact store not initialized")
-    
+
     entities = await fact_store.get_entities()
     return {"entities": entities}
 
@@ -232,38 +248,39 @@ async def list_entities():
 # Dataset Routes
 # ============================================================================
 
+
 async def _ingest_job(request: IngestRequest):
     """Background task for ingestion."""
     if not dataset_loader or not fact_store:
         logger.error("Stores not initialized for background job")
         return
-        
+
     try:
         logger.info(f"Starting ingestion: {request.dataset_name}")
         facts_buffer = []
         count = 0
-        
+
         async for fact in dataset_loader.stream_dataset(
-            dataset_name=request.dataset_name, 
+            dataset_name=request.dataset_name,
             split=request.split,
             max_rows=request.max_rows,
-            mapping=request.mapping
+            mapping=request.mapping,
         ):
             facts_buffer.append(fact)
-            
+
             # Batch insert every 50
             if len(facts_buffer) >= 50:
                 await fact_store.add_facts(facts_buffer, dataset_id=request.dataset_name)
                 count += len(facts_buffer)
                 facts_buffer.clear()
-        
+
         # Insert remaining
         if facts_buffer:
             await fact_store.add_facts(facts_buffer, dataset_id=request.dataset_name)
             count += len(facts_buffer)
-            
+
         logger.info(f"Ingestion complete: {request.dataset_name} ({count} facts)")
-        
+
     except Exception as e:
         logger.error(f"Ingestion failed for {request.dataset_name}: {e}")
 
@@ -273,7 +290,7 @@ async def ingest_dataset(request: IngestRequest, background_tasks: BackgroundTas
     """Trigger background ingestion of a generic HF dataset."""
     if not dataset_loader:
         raise HTTPException(status_code=503, detail="Dataset service not initialized")
-        
+
     background_tasks.add_task(_ingest_job, request)
     return {"message": "Ingestion started", "dataset": request.dataset_name}
 
@@ -292,8 +309,10 @@ async def delete_dataset(dataset_id: str):
 # Knowledge Routes
 # ============================================================================
 
+
 class KnowledgeSearchRequest(BaseModel):
     """Knowledge search request."""
+
     query: str
     limit: int = Field(default=5, ge=1, le=20)
     domain: str | None = None
@@ -303,6 +322,7 @@ class KnowledgeSearchRequest(BaseModel):
 
 class KnowledgeResponse(BaseModel):
     """Knowledge item response."""
+
     knowledge_id: str
     name: str
     description: str
@@ -315,6 +335,7 @@ class KnowledgeResponse(BaseModel):
 
 class KnowledgeSyncRequest(BaseModel):
     """Knowledge sync request."""
+
     domain: str | None = None
     category: str | None = None
 
@@ -378,9 +399,7 @@ async def sync_knowledge(
     if not knowledge_store:
         raise HTTPException(status_code=503, detail="Knowledge store not initialized")
 
-    background_tasks.add_task(
-        _sync_knowledge_job, request.domain, request.category
-    )
+    background_tasks.add_task(_sync_knowledge_job, request.domain, request.category)
     return {"message": "Knowledge sync started"}
 
 
@@ -395,9 +414,7 @@ async def _sync_knowledge_job(
         from knowledge.index_knowledge import scan_knowledge_files
 
         knowledge_dir = Path(__file__).resolve().parents[2] / "knowledge"
-        items = scan_knowledge_files(
-            knowledge_dir, domain_filter=domain, category_filter=category
-        )
+        items = scan_knowledge_files(knowledge_dir, domain_filter=domain, category_filter=category)
 
         if items and knowledge_store:
             updated = await knowledge_store.sync(items)
@@ -420,11 +437,12 @@ async def knowledge_stats():
 # Main
 # ============================================================================
 
+
 def main():
     import uvicorn
-    
+
     settings = get_settings()
-    
+
     uvicorn.run(
         "services.rag_service.main:app",
         host="0.0.0.0",

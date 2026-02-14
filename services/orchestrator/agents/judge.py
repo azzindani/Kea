@@ -90,7 +90,11 @@ class JudgeAgent:
             system_prompt = self.system_prompt
             if knowledge_context:
                 system_prompt += f"\n\n{knowledge_context}"
-                logger.info(f"Judge: Injecting {len(knowledge_context)} chars of domain knowledge")
+                logger.info(
+                    f"Judge: Injecting {len(knowledge_context)} chars of domain knowledge into system prompt"
+                )
+            else:
+                logger.debug("Judge: No domain knowledge retrieved — using base system prompt")
 
             messages = [
                 LLMMessage(role=LLMRole.SYSTEM, content=system_prompt),

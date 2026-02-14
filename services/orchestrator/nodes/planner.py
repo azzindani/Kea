@@ -8,11 +8,12 @@ Each micro-task is routed to specific tools with dependencies and fallbacks.
 from __future__ import annotations
 
 from typing import Any
+
 from pydantic import BaseModel, Field
-from shared.logging import get_logger
-from shared.llm import OpenRouterProvider, LLMConfig
+
+from shared.llm import LLMConfig, OpenRouterProvider
 from shared.llm.provider import LLMMessage, LLMRole
-import asyncio
+from shared.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -21,8 +22,10 @@ logger = get_logger(__name__)
 # Execution Plan Schema
 # ============================================================================
 
+
 class MicroTask(BaseModel):
     """A single micro-task in the execution plan."""
+
     task_id: str
     description: str
     tool: str  # Which tool to call
@@ -33,7 +36,9 @@ class MicroTask(BaseModel):
     phase: str = "research"  # Execution phase for parallel batching
 
     # Node Assembly Engine fields
-    input_mapping: dict[str, str] = Field(default_factory=dict)  # {"csv_path": "{{step_id.artifacts.key}}"}
+    input_mapping: dict[str, str] = Field(
+        default_factory=dict
+    )  # {"csv_path": "{{step_id.artifacts.key}}"}
     output_artifact: str | None = None  # Artifact key this task produces
 
     # Workflow node type (tool, code, llm, switch, loop, merge, agentic)
@@ -41,20 +46,22 @@ class MicroTask(BaseModel):
 
     # Advanced node fields (stored as raw dict for DAG executor to interpret)
     node_config: dict[str, Any] = Field(default_factory=dict)
-    
-    
+
+
 class ExecutionPlan(BaseModel):
     """Full execution plan for a research query."""
+
     plan_id: str
     query: str
     micro_tasks: list[MicroTask] = Field(default_factory=list)
     phases: list[str] = Field(default_factory=list)  # Phase names
     estimated_tools: int = 0
-    
+
 
 # ============================================================================
 # Tool Validation & Fuzzy Matching
 # ============================================================================
+
 
 async def _validate_and_correct_tool_names(execution_plan: ExecutionPlan) -> ExecutionPlan:
     """
@@ -71,8 +78,9 @@ async def _validate_and_correct_tool_names(execution_plan: ExecutionPlan) -> Exe
     Returns:
         Execution plan with validated and corrected tool names
     """
-    from services.mcp_host.core.session_registry import get_session_registry
     from difflib import get_close_matches
+
+    from services.mcp_host.core.session_registry import get_session_registry
 
     registry = get_session_registry()
 
@@ -113,9 +121,7 @@ async def _validate_and_correct_tool_names(execution_plan: ExecutionPlan) -> Exe
         if tool_name in aliases:
             corrected_tool = aliases[tool_name]
             if corrected_tool in available_tools:
-                logger.warning(
-                    f"🔧 Correcting hallucinated tool: {tool_name} → {corrected_tool}"
-                )
+                logger.warning(f"🔧 Correcting hallucinated tool: {tool_name} → {corrected_tool}")
                 task.tool = corrected_tool
                 corrected_tasks.append(task)
                 corrected_count += 1
@@ -190,7 +196,7 @@ async def _validate_tool_arguments(execution_plan: ExecutionPlan, query: str) ->
                 # Search for this specific tool in RAG
                 results = await registry.pg_registry.search_tools(tool_name, limit=1)
                 if results:
-                    tool_schemas[tool_name] = results[0].get('inputSchema', {})
+                    tool_schemas[tool_name] = results[0].get("inputSchema", {})
         else:
             logger.warning("Postgres registry unavailable, skipping schema validation")
             return execution_plan
@@ -201,7 +207,7 @@ async def _validate_tool_arguments(execution_plan: ExecutionPlan, query: str) ->
     logger.info(f"🔍 Validating {len(execution_plan.micro_tasks)} tasks against tool schemas...")
 
     fixed_tasks = []
-    validation_stats = {'passed': 0, 'fixed': 0, 'failed': 0}
+    validation_stats = {"passed": 0, "fixed": 0, "failed": 0}
 
     for task in execution_plan.micro_tasks:
         tool_name = task.tool
@@ -218,10 +224,10 @@ async def _validate_tool_arguments(execution_plan: ExecutionPlan, query: str) ->
         # FULL JSON SCHEMA VALIDATION
         validation_result = _validate_against_json_schema(args, schema, tool_name)
 
-        if validation_result['valid']:
+        if validation_result["valid"]:
             # Schema validation passed
             logger.info(f"✅ {tool_name} schema validation passed")
-            validation_stats['passed'] += 1
+            validation_stats["passed"] += 1
             fixed_tasks.append(task)
             continue
 
@@ -231,26 +237,24 @@ async def _validate_tool_arguments(execution_plan: ExecutionPlan, query: str) ->
         )
 
         # Fix missing required parameters by extracting from query
-        if validation_result['missing_required']:
+        if validation_result["missing_required"]:
             logger.info(f"🔧 Extracting missing params: {validation_result['missing_required']}")
             extracted_args = _extract_params_from_query(
-                query,
-                validation_result['missing_required'],
-                schema.get('properties', {})
+                query, validation_result["missing_required"], schema.get("properties", {})
             )
             if extracted_args:
                 logger.info(f"✅ Extracted: {extracted_args}")
                 args = {**args, **extracted_args}
             else:
-                logger.warning(f"❌ Could not extract params from query")
+                logger.warning("❌ Could not extract params from query")
 
         # Fix type mismatches
-        if validation_result['type_errors']:
-            args = _fix_type_mismatches(args, validation_result['type_errors'], schema)
+        if validation_result["type_errors"]:
+            args = _fix_type_mismatches(args, validation_result["type_errors"], schema)
 
         # Remove extra parameters
-        if validation_result['extra_params']:
-            for extra_param in validation_result['extra_params']:
+        if validation_result["extra_params"]:
+            for extra_param in validation_result["extra_params"]:
                 logger.info(f"🗑️ Removing extra param '{extra_param}'")
                 args.pop(extra_param, None)
 
@@ -259,12 +263,12 @@ async def _validate_tool_arguments(execution_plan: ExecutionPlan, query: str) ->
 
         # Re-validate after fixes
         revalidation = _validate_against_json_schema(args, schema, tool_name)
-        if revalidation['valid']:
+        if revalidation["valid"]:
             logger.info(f"✅ {tool_name} fixed successfully")
-            validation_stats['fixed'] += 1
+            validation_stats["fixed"] += 1
         else:
             logger.error(f"❌ {tool_name} still invalid: {', '.join(revalidation['errors'][:2])}")
-            validation_stats['failed'] += 1
+            validation_stats["failed"] += 1
 
         fixed_tasks.append(task)
 
@@ -292,60 +296,63 @@ def _validate_against_json_schema(args: dict, schema: dict, tool_name: str) -> d
         }
     """
     result = {
-        'valid': True,
-        'errors': [],
-        'missing_required': [],
-        'type_errors': {},
-        'extra_params': []
+        "valid": True,
+        "errors": [],
+        "missing_required": [],
+        "type_errors": {},
+        "extra_params": [],
     }
 
-    properties = schema.get('properties', {})
-    required = schema.get('required', [])
-    additional_properties = schema.get('additionalProperties', True)
+    properties = schema.get("properties", {})
+    required = schema.get("required", [])
+    additional_properties = schema.get("additionalProperties", True)
 
     # Check required parameters
     for param in required:
-        if param not in args or args[param] is None or args[param] == '':
-            result['valid'] = False
-            result['missing_required'].append(param)
-            result['errors'].append(f"Missing required: {param}")
+        if param not in args or args[param] is None or args[param] == "":
+            result["valid"] = False
+            result["missing_required"].append(param)
+            result["errors"].append(f"Missing required: {param}")
 
     # Check parameter types and constraints
     for param, value in args.items():
         if param not in properties:
             # Extra parameter not in schema
             if not additional_properties:
-                result['valid'] = False
-                result['extra_params'].append(param)
-                result['errors'].append(f"Extra param: {param}")
+                result["valid"] = False
+                result["extra_params"].append(param)
+                result["errors"].append(f"Extra param: {param}")
             continue
 
         param_schema = properties[param]
-        param_type = param_schema.get('type')
+        param_type = param_schema.get("type")
 
         # Type validation
         if param_type:
             type_valid, type_error = _check_type(value, param_type, param)
             if not type_valid:
-                result['valid'] = False
-                result['type_errors'][param] = {'expected': param_type, 'actual': type(value).__name__}
-                result['errors'].append(type_error)
+                result["valid"] = False
+                result["type_errors"][param] = {
+                    "expected": param_type,
+                    "actual": type(value).__name__,
+                }
+                result["errors"].append(type_error)
 
         # Enum validation
-        if 'enum' in param_schema:
-            if value not in param_schema['enum']:
-                result['valid'] = False
-                result['errors'].append(f"{param}='{value}' not in enum")
+        if "enum" in param_schema:
+            if value not in param_schema["enum"]:
+                result["valid"] = False
+                result["errors"].append(f"{param}='{value}' not in enum")
 
         # Min/max validation for numbers
-        if param_type in ('integer', 'number'):
+        if param_type in ("integer", "number"):
             if isinstance(value, (int, float)):
-                if 'minimum' in param_schema and value < param_schema['minimum']:
-                    result['valid'] = False
-                    result['errors'].append(f"{param}={value} < min {param_schema['minimum']}")
-                if 'maximum' in param_schema and value > param_schema['maximum']:
-                    result['valid'] = False
-                    result['errors'].append(f"{param}={value} > max {param_schema['maximum']}")
+                if "minimum" in param_schema and value < param_schema["minimum"]:
+                    result["valid"] = False
+                    result["errors"].append(f"{param}={value} < min {param_schema['minimum']}")
+                if "maximum" in param_schema and value > param_schema["maximum"]:
+                    result["valid"] = False
+                    result["errors"].append(f"{param}={value} > max {param_schema['maximum']}")
 
     return result
 
@@ -353,12 +360,12 @@ def _validate_against_json_schema(args: dict, schema: dict, tool_name: str) -> d
 def _check_type(value: any, expected_type: str, param_name: str) -> tuple[bool, str]:
     """Check if value matches expected JSON schema type."""
     type_map = {
-        'string': str,
-        'integer': int,
-        'number': (int, float),
-        'boolean': bool,
-        'array': list,
-        'object': dict
+        "string": str,
+        "integer": int,
+        "number": (int, float),
+        "boolean": bool,
+        "array": list,
+        "object": dict,
     }
 
     expected_python_type = type_map.get(expected_type)
@@ -376,20 +383,20 @@ def _fix_type_mismatches(args: dict, type_errors: dict, schema: dict) -> dict:
     fixed_args = args.copy()
 
     for param, error_info in type_errors.items():
-        expected_type = error_info['expected']
+        expected_type = error_info["expected"]
         current_value = args[param]
 
         try:
             # Attempt type conversion
-            if expected_type == 'string':
+            if expected_type == "string":
                 fixed_args[param] = str(current_value)
-            elif expected_type == 'integer':
+            elif expected_type == "integer":
                 fixed_args[param] = int(current_value)
-            elif expected_type == 'number':
+            elif expected_type == "number":
                 fixed_args[param] = float(current_value)
-            elif expected_type == 'boolean':
+            elif expected_type == "boolean":
                 fixed_args[param] = bool(current_value)
-            elif expected_type == 'array':
+            elif expected_type == "array":
                 if not isinstance(current_value, list):
                     fixed_args[param] = [current_value]
 
@@ -418,24 +425,24 @@ def _extract_params_from_query(query: str, param_names: list[str], properties: d
     query_lower = query.lower()
 
     for param in param_names:
-        param_type = properties.get(param, {}).get('type', 'string')
+        param_type = properties.get(param, {}).get("type", "string")
 
         # Extract ticker symbols (most common case)
-        if param in ('ticker', 'symbol', 'stock'):
+        if param in ("ticker", "symbol", "stock"):
             # Look for ticker patterns: BBCA.JK, AAPL, TSLA, etc.
-            ticker_matches = re.findall(r'\b[A-Z]{1,5}(?:\.[A-Z]{1,3})?\b', query.upper())
+            ticker_matches = re.findall(r"\b[A-Z]{1,5}(?:\.[A-Z]{1,3})?\b", query.upper())
             if ticker_matches:
                 extracted[param] = ticker_matches[0]
             # Or extract company name and try to convert
-            elif 'bank' in query_lower:
+            elif "bank" in query_lower:
                 # Common patterns: "BCA Bank" → BBCA.JK
                 company_patterns = {
-                    'bca bank': 'BBCA.JK',
-                    'mandiri': 'BMRI.JK',
-                    'bri': 'BBRI.JK',
-                    'tesla': 'TSLA',
-                    'apple': 'AAPL',
-                    'microsoft': 'MSFT',
+                    "bca bank": "BBCA.JK",
+                    "mandiri": "BMRI.JK",
+                    "bri": "BBRI.JK",
+                    "tesla": "TSLA",
+                    "apple": "AAPL",
+                    "microsoft": "MSFT",
                 }
                 for company, ticker in company_patterns.items():
                     if company in query_lower:
@@ -443,29 +450,29 @@ def _extract_params_from_query(query: str, param_names: list[str], properties: d
                         break
 
         # Extract query/search terms
-        elif param in ('query', 'search_query', 'q'):
+        elif param in ("query", "search_query", "q"):
             # Use the entire query as search query
             extracted[param] = query[:200]  # Truncate to reasonable length
 
         # Extract period/timeframe
-        elif param in ('period', 'timeframe'):
-            if 'annual' in query_lower or 'year' in query_lower:
-                extracted[param] = '1y'
-            elif 'quarter' in query_lower:
-                extracted[param] = '3mo'
+        elif param in ("period", "timeframe"):
+            if "annual" in query_lower or "year" in query_lower:
+                extracted[param] = "1y"
+            elif "quarter" in query_lower:
+                extracted[param] = "3mo"
             else:
-                extracted[param] = '1y'  # Default to annual
+                extracted[param] = "1y"  # Default to annual
 
         # Extract statement type for financial tools
-        elif param in ('statement', 'statement_type'):
-            if 'balance' in query_lower:
-                extracted[param] = 'balance_sheet'
-            elif 'income' in query_lower:
-                extracted[param] = 'income_statement'
-            elif 'cash' in query_lower:
-                extracted[param] = 'cash_flow'
+        elif param in ("statement", "statement_type"):
+            if "balance" in query_lower:
+                extracted[param] = "balance_sheet"
+            elif "income" in query_lower:
+                extracted[param] = "income_statement"
+            elif "cash" in query_lower:
+                extracted[param] = "cash_flow"
             else:
-                extracted[param] = 'balance_sheet'  # Default
+                extracted[param] = "balance_sheet"  # Default
 
     return extracted
 
@@ -473,6 +480,7 @@ def _extract_params_from_query(query: str, param_names: list[str], properties: d
 def _similarity_score(str1: str, str2: str) -> float:
     """Calculate similarity score between two strings (0.0 - 1.0)."""
     from difflib import SequenceMatcher
+
     return SequenceMatcher(None, str1, str2).ratio()
 
 
@@ -481,6 +489,7 @@ def _similarity_score(str1: str, str2: str) -> float:
 # ============================================================================
 
 from services.orchestrator.core.tool_loader import route_to_tool_dynamic
+
 
 def route_to_tool(task_description: str) -> tuple[str, list[str]]:
     """
@@ -514,34 +523,34 @@ def _extract_template_variables(query: str, expected_vars: list[str]) -> dict[st
     for var in expected_vars:
         if var.lower() == "ticker":
             # Simple extraction: look for ticker patterns, let retry loop fix errors
-            ticker_match = re.search(r'\b([A-Z]{2,5}(?:\.[A-Z]{2,3})?)\b', query_upper)
+            ticker_match = re.search(r"\b([A-Z]{2,5}(?:\.[A-Z]{2,3})?)\b", query_upper)
             if ticker_match:
                 variables[var] = ticker_match.group(1)
             else:
                 # Fallback: use query company name, retry loop will correct via LLM
                 variables[var] = query.strip()
-                
+
         elif var.lower() == "company":
             # Use first few words as company name
             words = query.split()[:3]
             variables[var] = " ".join(words)
-            
+
         elif var.lower() == "period":
             # Look for period patterns (1y, 6mo, 3mo, 1d, etc.)
-            period_match = re.search(r'\b(\d+(?:y|mo|d|w))\b', query.lower())
+            period_match = re.search(r"\b(\d+(?:y|mo|d|w))\b", query.lower())
             if period_match:
                 variables[var] = period_match.group(1)
             else:
                 variables[var] = "1y"  # Default
-                
+
         elif var.lower() in ("source_url", "url"):
             # Look for URL patterns
-            url_match = re.search(r'https?://[^\s]+', query)
+            url_match = re.search(r"https?://[^\s]+", query)
             if url_match:
                 variables[var] = url_match.group(0)
             else:
                 variables[var] = query  # Use query as source
-                
+
         elif var.lower() in ("output_format", "format"):
             # Look for format mentions
             if "json" in query.lower():
@@ -552,7 +561,7 @@ def _extract_template_variables(query: str, expected_vars: list[str]) -> dict[st
                 variables[var] = "markdown"
             else:
                 variables[var] = "json"  # Default
-                
+
         elif var.lower() == "document_type":
             # Legal document types
             for doc_type in ["10-K", "10-Q", "8-K", "contract", "agreement", "filing"]:
@@ -561,11 +570,11 @@ def _extract_template_variables(query: str, expected_vars: list[str]) -> dict[st
                     break
             else:
                 variables[var] = "filing"
-                
+
         else:
             # Generic: use query as the variable value
             variables[var] = query
-            
+
     return variables
 
 
@@ -573,60 +582,63 @@ def _extract_template_variables(query: str, expected_vars: list[str]) -> dict[st
 # Planner Node
 # ============================================================================
 
+
 async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
     """
     Planner node: Decompose query into sub-queries AND execution plan.
-    
+
     Takes a complex research query and breaks it down into:
     - Sub-queries (atomic research questions)
     - Hypotheses (testable claims)
     - Execution plan (micro-tasks with tool routing)
-    
+
     Args:
         state: Current graph state with 'query'
-        
+
     Returns:
         Updated state with 'sub_queries', 'hypotheses', 'execution_plan'
     """
     logger.info("Planner: Decomposing query", extra={"query": state.get("query", "")[:100]})
-    
+
     query = state.get("query", "")
-    
+
     # ============================================================
     # RELATED FACT LOOKUP (Semantic Search for Past Research)
     # ============================================================
     related_facts = []
     try:
         import asyncio
+
         from services.rag_service.core.fact_store import FactStore
         from shared.hardware.detector import detect_hardware
-        
+
         store = FactStore()
         hw = detect_hardware()
         fact_limit = hw.optimal_fact_limit()  # Hardware-aware limit
-        
+
         # Search for related past research with timeout to avoid blocking
         related_facts = await asyncio.wait_for(
             store.search(query, limit=fact_limit),
-            timeout=5.0  # 5 second timeout to avoid blocking research
+            timeout=5.0,  # 5 second timeout to avoid blocking research
         )
-        
+
         if related_facts:
             logger.info(f"Planner: Found {len(related_facts)} related past facts")
             state["related_facts"] = [
                 {"entity": f.entity, "value": f.value[:200], "source": f.source_url}
                 for f in related_facts
             ]
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.warning("Planner: Related fact lookup timed out, skipping")
     except Exception as e:
         logger.debug(f"Related fact lookup skipped: {e}")
-    
+
     # ============================================================
     # COMPLEXITY CLASSIFICATION (Dynamic Limit Scaling)
     # ============================================================
     try:
         from services.orchestrator.core.complexity import classify_complexity
+
         complexity = classify_complexity(query)
         state["complexity"] = {
             "tier": complexity.tier.value,
@@ -660,28 +672,34 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
         )
         if knowledge_context:
             logger.info(
-                f"Planner: Retrieved {len(knowledge_context)} chars of domain knowledge"
+                f"Planner: Retrieved {len(knowledge_context)} chars of domain knowledge — injecting into plan context"
             )
             state["knowledge_context"] = knowledge_context
-    except asyncio.TimeoutError:
+        else:
+            logger.info(
+                "Planner: Knowledge retrieval returned empty — no domain expertise injected"
+            )
+    except TimeoutError:
         logger.warning("Planner: Knowledge retrieval timed out, skipping")
     except Exception as e:
-        logger.debug(f"Knowledge retrieval skipped: {e}")
+        logger.warning(f"Planner: Knowledge retrieval failed: {e}")
 
     # Use LLM to decompose query
     try:
         import os
+
         if os.getenv("OPENROUTER_API_KEY"):
             provider = OpenRouterProvider()
             from shared.config import get_settings
+
             app_config = get_settings()
-            
+
             config = LLMConfig(
                 model=app_config.models.planner_model,
                 temperature=0.3,
                 max_tokens=32768,  # Maximum for task generation
             )
-            
+
             # ============================================================
             # TEMPLATE-FIRST PLANNING (Node Assembly Engine)
             # ============================================================
@@ -690,78 +708,84 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
             template_used = False
             try:
                 from services.orchestrator.templates.loader import get_template_loader
+
                 loader = get_template_loader()
-                
+
                 matched_template = loader.match(query)
                 if matched_template:
                     template = loader.load(matched_template)
                     if template:
                         logger.info(f"🎯 Using template: {matched_template}")
-                        
+
                         # Extract variables from query
-                        variables = _extract_template_variables(query, template.get("variables", []))
-                        
+                        variables = _extract_template_variables(
+                            query, template.get("variables", [])
+                        )
+
                         # Expand template into tasks
                         expanded_tasks = loader.expand(template, variables)
-                        
+
                         # Generate execution plan from expanded template
                         execution_plan = generate_execution_plan_from_blueprint(
-                            query, 
-                            {"blueprint": expanded_tasks}
+                            query, {"blueprint": expanded_tasks}
                         )
-                        
+
                         state["sub_queries"] = [query]
                         state["hypotheses"] = []
                         state["execution_plan"] = execution_plan.model_dump()
                         state["status"] = "planning_complete"
                         state["template_used"] = matched_template
-                        
+
                         logger.info(
                             f"Planner: Generated {len(execution_plan.micro_tasks)} tasks "
                             f"from template: {matched_template}"
                         )
                         template_used = True
-                        
+
             except Exception as e:
                 logger.warning(f"Template matching failed: {e}. Falling back to LLM.")
-            
+
             # If template was used, skip LLM planning
             if template_used:
                 return state
-            
+
             # Discover relevant tools (INTELLIGENCE INJECTION - RAG)
             try:
                 from services.mcp_host.core.session_registry import get_session_registry
+
                 registry = get_session_registry()
-                
+
                 # 1. Try High-Limit Semantic Search (RAG)
                 # This scales to 10k+ tools by finding only relevant ones
                 relevant_tools = []
                 try:
                     # Search specifically for tools that match the query intention
                     search_results = await asyncio.wait_for(
-                        registry.search_tools(query, limit=50),  # Reduced limit for schema inclusion
-                        timeout=5.0
+                        registry.search_tools(
+                            query, limit=50
+                        ),  # Reduced limit for schema inclusion
+                        timeout=5.0,
                     )
-                    
+
                     if search_results:
                         logger.info(f"Planner: RAG found {len(search_results)} relevant tools")
                         # Format: "tool_name: {input_schema}" for precise mapping
                         for t in search_results:
-                            name = t.get('name', 'N/A')
+                            name = t.get("name", "N/A")
                             # Optimized for Front-Loaded Docstrings: Summary (200 chars) + context (200 chars)
-                            desc = t.get('description', '')[:400]
-                            schema = t.get('inputSchema', {})
+                            desc = t.get("description", "")[:400]
+                            schema = t.get("inputSchema", {})
 
                             # Format schema as JSON for LLM clarity (not Python dict)
                             import json
+
                             schema_json = json.dumps(schema, indent=2)
                             # Escape braces for f-string
                             schema_escaped = schema_json.replace("{", "{{").replace("}", "}}")
 
                             # Extract required parameters for emphasis
-                            required_params = schema.get('required', [])
-                            properties = schema.get('properties', {})
+                            required_params = schema.get("required", [])
+                            properties = schema.get("properties", {})
 
                             tool_doc = f"TOOL: {name}\n"
                             tool_doc += f"DESCRIPTION: {desc}\n"
@@ -771,7 +795,9 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
 
                             relevant_tools.append(tool_doc)
                 except Exception as search_err:
-                    logger.warning(f"Planner RAG Search failed: {search_err}. Falling back to active list.")
+                    logger.warning(
+                        f"Planner RAG Search failed: {search_err}. Falling back to active list."
+                    )
 
                 # 2. Fallback: List Active/Cached Tools (Safety Net)
                 if not relevant_tools:
@@ -779,7 +805,9 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
                         known_tools = list(registry.tool_to_server.keys())
                         # Slice to avoid context overflow
                         target_tools = known_tools[:50]  # Reduced from 100 to fit context
-                        logger.warning(f"Planner: RAG search failed, using fallback list of {len(target_tools)} tools (NAME ONLY - schemas unavailable)")
+                        logger.warning(
+                            f"Planner: RAG search failed, using fallback list of {len(target_tools)} tools (NAME ONLY - schemas unavailable)"
+                        )
 
                         # Fallback: Tool names only (no schemas available without RAG)
                         # This will cause the LLM to make best-effort parameter guessing
@@ -792,21 +820,24 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
                         # 3. Last Resort: Try to force discovery once
                         try:
                             logger.info("Planner: Registry empty, forcing tool scan...")
-                            all_tools = await asyncio.wait_for(registry.list_all_tools(), timeout=5.0)
+                            all_tools = await asyncio.wait_for(
+                                registry.list_all_tools(), timeout=5.0
+                            )
                             # Here we HAVE schemas
                             import json
+
                             for t in all_tools[:50]:
-                                name = t.get('name', 'N/A')
+                                name = t.get("name", "N/A")
                                 # Optimized for Front-Loaded Docstrings
-                                desc = t.get('description', '')[:400]
-                                schema = t.get('inputSchema', {})
+                                desc = t.get("description", "")[:400]
+                                schema = t.get("inputSchema", {})
 
                                 # Format schema as JSON (not Python dict)
                                 schema_json = json.dumps(schema, indent=2)
                                 schema_escaped = schema_json.replace("{", "{{").replace("}", "}}")
 
                                 # Extract required parameters
-                                required_params = schema.get('required', [])
+                                required_params = schema.get("required", [])
 
                                 tool_doc = f"TOOL: {name}\n"
                                 tool_doc += f"DESCRIPTION: {desc}\n"
@@ -815,16 +846,18 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
                                 tool_doc += f"FULL SCHEMA (JSON):\n{schema_escaped}\n"
 
                                 relevant_tools.append(tool_doc)
-                        except asyncio.TimeoutError:
-                             pass
+                        except TimeoutError:
+                            pass
 
                 # Format for LLM
                 if relevant_tools:
                     tools_context = f"RELEVANT TOOLS ({len(relevant_tools)} found):\n"
                     tools_context += "\n".join(relevant_tools)
                 else:
-                    tools_context = "No specific tools found. Rely on 'web_search' and 'execute_code'."
-                
+                    tools_context = (
+                        "No specific tools found. Rely on 'web_search' and 'execute_code'."
+                    )
+
             except Exception as e:
                 logger.warning(f"Planner tool discovery CRITICAL FAILURE: {e}")
                 tools_context = "Tool Discovery Unavailable."
@@ -849,21 +882,27 @@ QUERY COMPLEXITY: {complexity.tier.value.upper()}
             error_feedback = state.get("error_feedback", [])
             if error_feedback:
                 error_feedback_section = "\n\n⚠️ PREVIOUS TOOL FAILURES (LEARN FROM THESE):\n"
-                error_feedback_section += "The following tool calls FAILED in the previous iteration. "
+                error_feedback_section += (
+                    "The following tool calls FAILED in the previous iteration. "
+                )
                 error_feedback_section += "You MUST correct these mistakes:\n\n"
-                for i, err in enumerate(error_feedback[:5], 1):  # Limit to 5 to avoid context overflow
+                for i, err in enumerate(
+                    error_feedback[:5], 1
+                ):  # Limit to 5 to avoid context overflow
                     error_feedback_section += f"{i}. TOOL: {err.get('tool', 'unknown')}\n"
                     error_feedback_section += f"   FAILED ARGS: {err.get('args', {})}\n"
                     error_feedback_section += f"   ERROR: {err.get('error', 'unknown')[:200]}\n"
                     error_feedback_section += f"   TASK: {err.get('description', '')[:100]}\n"
                     # Include dynamic suggestion if present
-                    if err.get('suggestion'):
+                    if err.get("suggestion"):
                         error_feedback_section += f"   ➡️ SUGGESTION: {err.get('suggestion')}\n"
                     error_feedback_section += "\n"
                 error_feedback_section += "CORRECTION GUIDANCE:\n"
                 error_feedback_section += "- If ticker was wrong, use search_ticker('company name') to find the correct symbol FIRST\n"
                 error_feedback_section += "- If parameter was missing, ensure you include ALL required parameters from the schema\n"
-                error_feedback_section += "- If tool doesn't exist, use an alternative from the AVAILABLE TOOLS list\n"
+                error_feedback_section += (
+                    "- If tool doesn't exist, use an alternative from the AVAILABLE TOOLS list\n"
+                )
 
             # Build knowledge section for prompt
             knowledge_section = ""
@@ -891,39 +930,41 @@ and output standards defined in the retrieved knowledge."""
                 ),
                 LLMMessage(role=LLMRole.USER, content=query),
             ]
-            
+
             response = await provider.complete(messages, config)
-            
+
             # Parse JSON Blueprint response
             blueprint = None
             try:
                 import json
                 import re
-                
+
                 # Extract JSON from response (handle markdown code blocks)
                 content = response.content.strip()
-                
+
                 # Try to find JSON in code blocks first
-                json_match = re.search(r'```(?:json)?\s*(\{[\s\S]*\})\s*```', content)
+                json_match = re.search(r"```(?:json)?\s*(\{[\s\S]*\})\s*```", content)
                 if json_match:
                     content = json_match.group(1)
                 # Or find raw JSON object
-                elif content.startswith('{'):
+                elif content.startswith("{"):
                     pass  # Already JSON
                 else:
                     # Try to find JSON anywhere in response
-                    json_start = content.find('{')
-                    json_end = content.rfind('}') + 1
+                    json_start = content.find("{")
+                    json_end = content.rfind("}") + 1
                     if json_start >= 0 and json_end > json_start:
                         content = content[json_start:json_end]
-                
+
                 blueprint = json.loads(content)
-                logger.info(f"Planner: Parsed JSON Blueprint with {len(blueprint.get('blueprint', []))} steps")
-                
+                logger.info(
+                    f"Planner: Parsed JSON Blueprint with {len(blueprint.get('blueprint', []))} steps"
+                )
+
             except json.JSONDecodeError as e:
                 logger.warning(f"Planner: JSON parse failed ({e}), falling back to text parsing")
                 blueprint = None
-            
+
             if blueprint and "blueprint" in blueprint:
                 # Generate execution plan from JSON Blueprint
                 execution_plan = generate_execution_plan_from_blueprint(query, blueprint)
@@ -932,7 +973,9 @@ and output standards defined in the retrieved knowledge."""
                 try:
                     execution_plan = await _validate_and_correct_tool_names(execution_plan)
                 except Exception as val_err:
-                    logger.warning(f"Tool validation failed: {val_err}, proceeding with unvalidated tools")
+                    logger.warning(
+                        f"Tool validation failed: {val_err}, proceeding with unvalidated tools"
+                    )
 
                 # CRITICAL: Validate arguments are not empty for required parameters
                 try:
@@ -954,15 +997,15 @@ and output standards defined in the retrieved knowledge."""
                 hypotheses = []
                 execution_phases = {}
                 current_phase_name = "default"
-                
+
                 lines = response.content.split("\n")
                 current_section = None
-                
+
                 for line in lines:
                     line = line.strip()
                     if not line:
                         continue
-                        
+
                     if "SUB-QUERIES" in line.upper():
                         current_section = "sub_queries"
                         continue
@@ -978,7 +1021,7 @@ and output standards defined in the retrieved knowledge."""
                         if current_phase_name not in execution_phases:
                             execution_phases[current_phase_name] = []
                         continue
-                    
+
                     # Extract content
                     text = None
                     if line[0].isdigit() and "." in line:
@@ -987,7 +1030,7 @@ and output standards defined in the retrieved knowledge."""
                         text = line[1:].strip()
                     elif current_section == "execution" and len(line) > 10:
                         text = line
-                    
+
                     if text and current_section:
                         if current_section == "sub_queries":
                             sub_queries.append(text)
@@ -997,85 +1040,91 @@ and output standards defined in the retrieved knowledge."""
                             if current_phase_name not in execution_phases:
                                 execution_phases[current_phase_name] = []
                             execution_phases[current_phase_name].append(text)
-                
+
                 state["sub_queries"] = sub_queries or [query]
                 state["hypotheses"] = hypotheses
-                
+
                 execution_plan = generate_execution_plan_phased(query, execution_phases)
                 state["execution_plan"] = execution_plan.model_dump()
-                
+
                 logger.info(
                     f"Planner: Generated {len(execution_plan.micro_tasks)} micro-tasks "
                     f"(text fallback mode)"
                 )
-            
+
         else:
             # Fallback without LLM
             state["sub_queries"] = [query]
             state["hypotheses"] = []
-            state["execution_plan"] = generate_execution_plan_phased(query, {"research": [query]}).model_dump()
+            state["execution_plan"] = generate_execution_plan_phased(
+                query, {"research": [query]}
+            ).model_dump()
             logger.info("Planner: No LLM, using query as-is")
-            
+
     except Exception as e:
         logger.error(f"Planner error: {e}")
         state["sub_queries"] = [query]
         state["hypotheses"] = []
-        state["execution_plan"] = generate_execution_plan_phased(query, {"research": [query]}).model_dump()
-    
+        state["execution_plan"] = generate_execution_plan_phased(
+            query, {"research": [query]}
+        ).model_dump()
+
     state["status"] = "planning_complete"
     return state
 
 
-def generate_execution_plan_phased(query: str, execution_phases: dict[str, list[str]]) -> ExecutionPlan:
+def generate_execution_plan_phased(
+    query: str, execution_phases: dict[str, list[str]]
+) -> ExecutionPlan:
     """
     Generate execution plan from Phased LLM output.
-    
+
     STRICT DEPENDENCY LOGIC:
     - All tasks in Phase N depend on ALL tasks in Phase N-1.
     - Tasks within the same Phase are independent (Parallel).
     """
     import uuid
-    
+
     micro_tasks = []
     task_id_counter = 1
-    
+
     # Track tasks by phase for dependency linking
     # We maintain order of phases as they appeared in the dict (insertion order preserved in Py3.7+)
     phase_names = list(execution_phases.keys())
     phase_task_ids: dict[str, list[str]] = {p: [] for p in phase_names}
-    
+
     for i, phase_name in enumerate(phase_names):
         steps = execution_phases[phase_name]
-        
+
         # Determine dependencies: All tasks from previous phase
         depends_on = []
         if i > 0:
-            previous_phase = phase_names[i-1]
+            previous_phase = phase_names[i - 1]
             depends_on = phase_task_ids[previous_phase]
-            
+
         for step in steps:
             task_id = f"task_{task_id_counter}"
             task_id_counter += 1
-            
+
             primary_tool, fallbacks = route_to_tool(step)
-            
+
             # Handle special case: execute_code needs "python_server" usually
             # route_to_tool logic might need checking, but usually returns 'execute_code'
-            
+
             micro_task = MicroTask(
                 task_id=task_id,
                 description=step,
                 tool=primary_tool,
                 inputs={"query": step},  # Basic input, refined by researcher_node
-                depends_on=depends_on,   # STRICT DEPENDENCY
+                depends_on=depends_on,  # STRICT DEPENDENCY
                 fallback_tools=fallbacks,
                 persist=True,
                 phase=phase_name,
             )
-            
+
             micro_tasks.append(micro_task)
             phase_task_ids[phase_name].append(task_id)
-            
+
     return ExecutionPlan(
         plan_id=f"plan_{uuid.uuid4().hex[:8]}",
         query=query,
@@ -1088,7 +1137,7 @@ def generate_execution_plan_phased(query: str, execution_phases: dict[str, list[
 def generate_execution_plan_from_blueprint(query: str, blueprint: dict) -> ExecutionPlan:
     """
     Generate execution plan from JSON Blueprint (new format).
-    
+
     Blueprint format:
     {
         "intent": "short description",
@@ -1099,42 +1148,42 @@ def generate_execution_plan_from_blueprint(query: str, blueprint: dict) -> Execu
     }
     """
     import uuid
-    
+
     micro_tasks = []
     steps = blueprint.get("blueprint", [])
-    
+
     # Group steps by phase for dependency calculation
     phase_map: dict[int, list[str]] = {}  # phase_number -> [step_ids]
-    
+
     for step in steps:
         phase_num = step.get("phase", 1)
         step_id = step.get("id", f"step_{len(micro_tasks) + 1}")
         if phase_num not in phase_map:
             phase_map[phase_num] = []
         phase_map[phase_num].append(step_id)
-    
+
     # Sort phases to build dependency chain
     sorted_phases = sorted(phase_map.keys())
-    
+
     for step in steps:
         step_id = step.get("id", f"step_{len(micro_tasks) + 1}")
         phase_num = step.get("phase", 1)
         tool_name = step.get("tool", "execute_code")
         args = step.get("args", {})
         artifact_key = step.get("artifact")
-        
+
         # Calculate dependencies: all steps from previous phase
         depends_on = []
         phase_idx = sorted_phases.index(phase_num)
         if phase_idx > 0:
             previous_phase = sorted_phases[phase_idx - 1]
             depends_on = phase_map.get(previous_phase, [])
-        
+
         # Build inputs from args
         inputs = {}
         for key, value in args.items():
             inputs[key] = value
-        
+
         # Parse input_mapping from blueprint (Node Assembly Engine)
         input_mapping = step.get("input_mapping", {})
 
@@ -1147,11 +1196,27 @@ def generate_execution_plan_from_blueprint(query: str, blueprint: dict) -> Execu
         # Collect advanced node config for DAG executor
         node_config: dict[str, Any] = {}
         for adv_key in (
-            "condition", "true_branch", "false_branch", "true", "false",
-            "loop_over", "over", "loop_body", "body", "loop_variable",
-            "merge_inputs", "merge_strategy",
-            "goal", "agent_max_steps", "agent_tools", "max_steps", "tools",
-            "llm_prompt", "llm_system", "prompt", "system",
+            "condition",
+            "true_branch",
+            "false_branch",
+            "true",
+            "false",
+            "loop_over",
+            "over",
+            "loop_body",
+            "body",
+            "loop_variable",
+            "merge_inputs",
+            "merge_strategy",
+            "goal",
+            "agent_max_steps",
+            "agent_tools",
+            "max_steps",
+            "tools",
+            "llm_prompt",
+            "llm_system",
+            "prompt",
+            "system",
             "max_parallel",
         ):
             if adv_key in step:
@@ -1159,7 +1224,10 @@ def generate_execution_plan_from_blueprint(query: str, blueprint: dict) -> Execu
 
         micro_task = MicroTask(
             task_id=step_id,
-            description=step.get("description", f"{tool_name}: {args.get('query', args.get('code', str(args)[:100]))}"),
+            description=step.get(
+                "description",
+                f"{tool_name}: {args.get('query', args.get('code', str(args)[:100]))}",
+            ),
             tool=tool_name,
             inputs=inputs,
             depends_on=step.get("depends_on", depends_on),
@@ -1171,12 +1239,12 @@ def generate_execution_plan_from_blueprint(query: str, blueprint: dict) -> Execu
             node_type=node_type,
             node_config=node_config,
         )
-        
+
         micro_tasks.append(micro_task)
-    
+
     # Generate phase names from numbers
     phase_names = [str(p) for p in sorted_phases]
-    
+
     return ExecutionPlan(
         plan_id=f"plan_{uuid.uuid4().hex[:8]}",
         query=query,
