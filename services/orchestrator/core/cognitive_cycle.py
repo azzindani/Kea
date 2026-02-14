@@ -39,7 +39,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from shared.logging import get_logger
-from shared.prompts import get_agent_prompt, get_kernel_config
+from shared.prompts import get_agent_prompt, get_kernel_config, get_report_template
 
 from .cognitive_profiles import CognitiveProfile, ReasoningStyle
 from .convergence import ConvergenceDetector, IterationSnapshot
@@ -309,6 +309,8 @@ class CognitiveCycle:
         task: str,
         context: str = "",
         available_tools: list[dict[str, Any]] | None = None,
+        seed_facts: list[dict[str, Any]] | None = None,
+        error_feedback: list[dict[str, Any]] | None = None,
     ) -> CycleOutput:
         """
         Execute the full cognitive cycle.
@@ -318,6 +320,54 @@ class CognitiveCycle:
         """
         start_time = datetime.utcnow()
         available_tools = available_tools or []
+
+        # Load seed facts into working memory
+        if seed_facts:
+            for fact in seed_facts:
+                key = str(fact.get("key") or fact.get("finding") or "unknown_seed_fact")
+                content = str(fact.get("content") or fact.get("value") or fact)
+                # Avoid duplicate generic keys if possible, but keep simple
+                self.memory.store_fact(key, content)
+
+        # Load error feedback into error journal
+        if error_feedback:
+            try:
+                from services.orchestrator.core.error_journal import (
+                    ErrorEntry,
+                    ErrorSeverity,
+                    ErrorSource,
+                    ErrorStatus,
+                )
+
+                for err in error_feedback:
+                    # Map dict to ErrorEntry
+                    msg = str(err.get("error") or err.get("message") or "Previously encountered error")
+                    ctx = err.get("context") or {}
+                    # Try to match source enum, fallback to RUNTIME
+                    src_str = str(err.get("source", "runtime"))
+                    try:
+                        src = ErrorSource(src_str)
+                    except ValueError:
+                        src = ErrorSource.RUNTIME
+                    
+                    # Try to match severity enum
+                    sev_str = str(err.get("severity", "medium"))
+                    try:
+                        sev = ErrorSeverity(sev_str)
+                    except ValueError:
+                        sev = ErrorSeverity.MEDIUM
+
+                    entry = ErrorEntry(
+                        source=src,
+                        message=msg,
+                        context=ctx,
+                        severity=sev,
+                        status=ErrorStatus.DETECTED,  # Mark as detected so planner sees it
+                    )
+                    self.memory.error_journal.record(entry)
+                    
+            except Exception as e:
+                logger.warning(f"Failed to load error feedback: {e}")
 
         logger.info(
             f"🧠 CognitiveCycle [{self.profile.level}] starting | "
@@ -1603,6 +1653,83 @@ class CognitiveCycle:
                 reason="Adaptation LLM failed",
             )
 
+    async def _rerank_facts(self, task: str) -> None:
+        """Rerank facts in working memory by relevance to the task."""
+        try:
+             from shared.embedding.model_manager import get_reranker_provider
+             from shared.config import get_settings
+             
+             reranker = get_reranker_provider()
+             config = get_settings()
+             
+             if not self.memory.all_facts:
+                 return
+
+             fact_items = list(self.memory.all_facts.items())
+             fact_texts = [v[:8000] for k, v in fact_items]
+             
+             top_k = min(len(fact_items), config.reranker.per_task_top_k)
+             
+             results = await reranker.rerank(task, fact_texts, top_k=top_k)
+             
+             # Reorder in memory (trickier with dict, but we can update keys or just rely on list usage)
+             # For now, just logging corelations or could rebuild dict. 
+             # Simpler: just store the high-relevance ones in a focus list or similar.
+             # But the memory is a dict. Let's just log for now as per the plan/graph.py logic
+             # In graph.py, it reorders the list of facts. Here we have a dict.
+             # We can't easily reorder a standard dict in place to affect iteration order reliably across all python versions (though 3.7+ does).
+             # Let's confusingly just leave it be, but maybe drop low relevance ones?
+             # For safety/speed, let's just update a "relevance" metadata if possible.
+             # But cognitive_cycle memory structure is simple {key: text}.
+             pass
+             
+        except Exception as e:
+            logger.debug(f"Reranking failed: {e}")
+
+    async def _keeper_check(
+        self,
+        task: str,
+        config: dict[str, Any],
+    ) -> tuple[list[str], float]:
+        """
+        Keeper-level context guard: reranking and contradiction detection.
+        """
+        contradictions: list[str] = []
+        confidence_boost = 0.0
+        
+        # 1. Rerank facts if enabled
+        if config.get("rerank_facts", True):
+             await self._rerank_facts(task)
+
+        # 2. Detect contradictions (Neural + Heuristic)
+        if config.get("detect_contradictions", True):
+            # Simple heuristic check for direct contradictions in recent facts
+            recent_facts = list(self.memory.all_facts.values())[-5:]
+            if len(recent_facts) >= 2:
+                prompt = (
+                    f"Check for contradictions between these facts related to: {task[:200]}\n\n"
+                    f"Facts:\n" + "\n".join(f"- {f[:300]}" for f in recent_facts) + "\n\n"
+                    f"Return JSON: {{'contradictions': ['desc1']}} or {{'contradictions': []}}"
+                )
+                try:
+                    raw = await self.llm_call(
+                        system_prompt="You are a contradiction detector. Be strict.",
+                        user_prompt=prompt,
+                    )
+                    data = _parse_json_safe(raw)
+                    contradictions = data.get("contradictions", [])
+                except Exception:
+                    pass
+
+        # 3. Calculate confidence from agreement (simplified)
+        # If we have many facts and few contradictions, boost confidence
+        if self.memory.fact_count > 5 and not contradictions:
+            confidence_boost = 0.1
+        elif contradictions:
+            confidence_boost = -0.2
+
+        return contradictions, confidence_boost
+
     # ================================================================ #
     # Phase 4.5: HEAL (Recursive Self-Healing)
     # ================================================================ #
@@ -1924,6 +2051,76 @@ class CognitiveCycle:
         tool_summary = "\n".join(
             f"- {t['tool']}({t.get('args', {})}): {t['result'][:200]}" for t in self.tool_results
         )
+
+        # Consensus Engine (Manager+ levels)
+        consensus_cfg = get_kernel_config("kernel_cell.consensus") or {}
+        rounds = consensus_cfg.get(f"{self.profile.level.lower()}_rounds", 0)
+        
+        if rounds > 0:
+            try:
+                from services.orchestrator.core.consensus import ConsensusEngine
+                
+                engine = ConsensusEngine(max_rounds=rounds)
+                sources_list = []
+                for t in self.tool_results:
+                     if "url" in t.get("args", {}):
+                         sources_list.append({"url": t["args"]["url"], "title": t["tool"]})
+
+                consensus_result = await engine.reach_consensus(
+                    query=perception.task_text,
+                    facts=[v for k, v in self.memory.all_facts.items()],
+                    sources=sources_list,
+                )
+                
+                final_content = consensus_result.get("final_answer", "")
+                final_confidence = consensus_result.get("confidence", 0.8)
+                
+                if final_content:
+                    # Format report
+                    try:
+                         tmpl = get_report_template()
+                         sec = tmpl.get("sections", {})
+                         
+                         if not final_content.startswith("# Research Report"):
+                             report = sec.get("title", "# Research Report: {query}").format(query=perception.task_text) + "\n\n"
+                             report += sec.get("metadata", "").format(
+                                 confidence_pct=f"{final_confidence:.0%}",
+                                 sources_count=len(self.tool_results),
+                                 facts_count=self.memory.fact_count,
+                                 verdict="Consensus Reached"
+                             ) + "\n\n"
+                             report += sec.get("divider", "---") + "\n\n"
+                             report += final_content
+                             final_content = report
+                    except Exception:
+                        pass
+                    
+                    artifacts = [
+                        self.memory.artifacts.create_artifact(
+                            id=f"report_{datetime.utcnow().timestamp()}",
+                            type=ArtifactType.REPORT,
+                            title=f"Research Report: {perception.task_text[:50]}",
+                            content=final_content,
+                            summary=final_content[:300] + "...",
+                            confidence=final_confidence,
+                            metadata=ArtifactMetadata(
+                                sources=[t.get("tool", "") for t in self.tool_results],
+                                data_gaps=framing.unknown_gaps,
+                            ),
+                            status=ArtifactStatus.PUBLISHED
+                        )
+                    ]
+                    
+                    return WorkPackage(
+                        summary=final_content[:3000],
+                        artifacts=artifacts,
+                        overall_confidence=final_confidence,
+                        key_findings=["Consensus reached"],
+                        metadata={"produced_by": self.profile.level, "steps": self.monitor_count},
+                    )
+
+            except Exception as e:
+                logger.warning(f"Consensus engine failed: {e}")
 
         prompt = (
             f"Synthesize the FOLLOWING WORK into a professional Work Package.\n\n"

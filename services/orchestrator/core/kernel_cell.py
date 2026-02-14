@@ -665,11 +665,20 @@ class KernelCell:
             if ctx.parent_task_id:
                 context_str += f"Parent task: {ctx.parent_task_id}\n"
 
+        # Extract seed facts and error feedback (if any)
+        seed_facts: list[dict[str, Any]] = []
+        error_feedback: list[dict[str, Any]] = []
+        if envelope.stdin and envelope.stdin.context:
+            seed_facts = envelope.stdin.context.prior_findings
+            error_feedback = envelope.stdin.context.error_feedback
+
         # Run the full cognitive cycle
         cycle_output: CycleOutput = await cycle.run(
             task=task_text,
             context=context_str,
             available_tools=available_tools,
+            seed_facts=seed_facts,
+            error_feedback=error_feedback,
         )
 
         # Handle delegation signal from the cognitive cycle
