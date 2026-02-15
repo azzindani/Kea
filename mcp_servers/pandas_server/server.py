@@ -27,7 +27,8 @@ logger = structlog.get_logger()
 from shared.logging import setup_logging
 setup_logging()
 
-mcp = FastMCP("pandas_server")
+
+mcp = FastMCP("pandas_server", dependencies=["ydata-profiling", "pandas", "numpy", "structlog", "requests"])
 
 # ==========================================
 # 1. IO Operations
@@ -788,6 +789,59 @@ def execute_chain(initial_file_path: str, steps: List[Dict[str, Any]], final_out
     """
     from mcp_servers.pandas_server.tools import chain_ops
     return chain_ops.execute_chain(initial_file_path, steps, final_output_path)
+
+
+# ==========================================
+# 16. Bulk Operations (New)
+# ==========================================
+@mcp.tool()
+def bulk_read_datasets(urls: List[str]) -> Dict[str, Any]:
+    """READS multiple datasets. [DATA]
+    
+    [RAG Context]
+    Downloads and loads multiple datasets from URLs (CSV, JSON, ZIP).
+    Returns a summary dictionary containing success/failure status and metadata.
+    Supported formats: CSV, JSON, ZIP (containing CSVs).
+    """
+    from mcp_servers.pandas_server.tools import bulk_ops
+    return bulk_ops.bulk_read_datasets(urls)
+
+@mcp.tool()
+def merge_datasets_bulk(file_paths: List[str], on: str, how: str = "inner", output_path: str = "") -> str:
+    """MERGES multiple dataframes. [ACTION]
+    
+    [RAG Context]
+    Iteratively merges a list of datasets on a common key.
+    Useful for combining scattered data files into a master dataset.
+    """
+    from mcp_servers.pandas_server.tools import bulk_ops
+    return bulk_ops.merge_datasets_bulk(file_paths, on, how, output_path)
+
+
+# ==========================================
+# 17. Pipeline Operations (New)
+# ==========================================
+@mcp.tool()
+def clean_dataset_auto(file_path: str, output_path: str) -> str:
+    """CLEANS dataset automatically. [ACTION]
+    
+    [RAG Context]
+    "Super Cleaner". Runs standard pipeline: 
+    Headers, Whitespace, Empty Cols, Impute NaNs, Dates, Outliers.
+    """
+    from mcp_servers.pandas_server.tools import pipeline_ops
+    return pipeline_ops.clean_dataset_auto(file_path, output_path)
+
+@mcp.tool()
+def generate_profile_report(file_path: str, output_path: str) -> str:
+    """GENERATES HTML profile. [DATA]
+    
+    [RAG Context]
+    Generates a comprehensive HTML report using ydata_profiling.
+    Includes stats, correlations, distributions.
+    """
+    from mcp_servers.pandas_server.tools import pipeline_ops
+    return pipeline_ops.generate_profile_report(file_path, output_path)
 
 if __name__ == "__main__":
     mcp.run()

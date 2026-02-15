@@ -95,7 +95,7 @@ Kea includes a multi-layered financial stack:
 | **Core** | `search`, `scraper`, `python` | Web search, stealth browsing, code execution. |
 | **Quant** | `ccxt`, `yfinance`, `finta` | Crypto, stocks, technical analysis. |
 | **Academic**| `academic`, `document` | arXiv, Semantic Scholar, PDF parsing. |
-| **Analysis**| `pandas`, `sklearn`, `statsmodels`| ML, statistical modeling, data cleaning. |
+| **Analysis**| `pandas`, `sklearn`, `statsmodels`, `deep_learning`| ML, DL, statistical modeling, data cleaning. |
 | **Web3** | `web3`, `security` | Smart contracts, on-chain data, safety. |
 
 ### Tool Development Pattern

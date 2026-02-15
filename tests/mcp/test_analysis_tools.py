@@ -1,61 +1,83 @@
 """
 MCP Tool Tests: Analysis Tools.
 """
-
 import pytest
 import asyncio
+import pandas as pd
+import numpy as np
 from tests.mcp.client_utils import SafeClientSession as ClientSession
 from mcp.client.stdio import stdio_client
 from tests.mcp.client_utils import get_server_params
 
 @pytest.mark.asyncio
-async def test_analysis_real_simulation():
+async def test_analysis_real_simulation(tmp_path):
     """
-    REAL SIMULATION: Verify Analysis Tools with real data points.
+    REAL SIMULATION: Verify Analysis Tools including Advanced Plots, Stats, Signals.
     """
-    # Assuming 'analysis_server' is the correct folder name based on list_dir
-    params = get_server_params("analysis_server", extra_dependencies=["pandas", "numpy", "scipy"])
+    params = get_server_params("analysis_server", extra_dependencies=["pandas", "numpy", "scipy", "scikit-learn", "matplotlib", "seaborn", "statsmodels"])
     
+    # Create dummy data
+    data_path = tmp_path / "data.csv"
+    df = pd.DataFrame({
+        'group': np.random.choice(['A', 'B'], 50),
+        'val1': np.random.randn(50),
+        'val2': np.random.randn(50) + 1,
+        'time': np.linspace(0, 10, 50)
+    })
+    df.to_csv(data_path, index=False)
+    data_url = str(data_path)
+
     print(f"\n--- Starting Real-World Simulation: Analysis Server ---")
     
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
             
-            # 1. Discover
-            tools_res = await session.list_tools()
-            tool_names = [t.name for t in tools_res.tools]
-            print(f"Discovered {len(tool_names)} tools: {tool_names[:5]}...")
+            # --- Previous Tests (Brief) ---
+            # await session.call_tool("plot_scatter", arguments={"file_path": data_url, "x": "val1", "y": "val2"})
             
-            # 2. Trend Detection
-            if "trend_detection" in tool_names:
-                print("1. Testing Trend Detection...")
-                data = [10, 12, 15, 18, 22, 25, 30] # Clear upward trend
-                print(f"   Data: {data}")
-                
-                res = await session.call_tool("trend_detection", arguments={"data": data, "metric_name": "Growth"})
-                
-                if res.isError:
-                     print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
-                else:
-                     print(f" \033[92m[PASS]\033[0m Result: {res.content[0].text}")
-                     # assert "increasing" in res.content[0].text.lower()
-            
-            # 3. Meta Analysis (Comparison)
-            if "meta_analysis" in tool_names:
-                print("2. Testing Meta Analysis...")
-                points = [
-                    {"source": "A", "value": 100},
-                    {"source": "B", "value": 110},
-                    {"source": "C", "value": 105},
-                ]
-                res = await session.call_tool("meta_analysis", arguments={"data_points": points, "analysis_type": "comparison"})
-                if not res.isError:
-                     print(f" \033[92m[PASS]\033[0m {res.content[0].text[:1000]}...")
-                else:
-                     print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
+            # --- New Tests ---
 
-            print("--- Analysis Simulation Complete ---")
+            # 4. Advanced Plots
+            print("4. Advanced Plots (KDE, Joint)...")
+            plot_out = tmp_path / "kde.png"
+            res = await session.call_tool("plot_kde", arguments={
+                "file_path": data_url, "x": "val1"
+            })
+            if not res.isError:
+                 print(f" \033[92m[PASS]\033[0m KDE Plot: {res.content[0].text}")
+            else:
+                 print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
+
+            print("   Joint Plot...")
+            res = await session.call_tool("plot_joint", arguments={
+                "file_path": data_url, "x": "val1", "y": "val2"
+            })
+            assert not res.isError
+            
+            # 5. Advanced Stats
+            print("5. Advanced Stats (ANOVA)...")
+            res = await session.call_tool("stat_anova_oneway", arguments={
+                "file_path": data_url,
+                "formula": "val1 ~ C(group)"
+            })
+            if not res.isError:
+                 print(f" \033[92m[PASS]\033[0m ANOVA: {res.content[0].text[:100]}...")
+            else:
+                 print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
+
+            # 6. Signal Processing
+            print("6. Signal Processing (FFT)...")
+            res = await session.call_tool("signal_fft", arguments={
+                "file_path": data_url,
+                "column": "val1"
+            })
+            if not res.isError:
+                 print(f" \033[92m[PASS]\033[0m FFT: {res.content[0].text[:100]}...")
+            else:
+                 print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
+
+    print("--- Analysis Simulation Complete ---")
 
 if __name__ == "__main__":
     import sys

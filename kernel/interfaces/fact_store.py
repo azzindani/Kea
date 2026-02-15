@@ -5,9 +5,6 @@ Fact Store Interface.
 Defines the protocol for storing and retrieving facts, allowing
 the kernel to use RAG without depending on the RAG Service implementation.
 """
-from typing import Any, Protocol, List, Dict, NamedTuple
-from runtime import runtime_checkable
-
 from typing import Any, Protocol, List, Dict, Optional, runtime_checkable
 from shared.schemas import AtomicFact
 
