@@ -36,7 +36,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from shared.logging import get_logger
 from shared.prompts import get_agent_prompt, get_kernel_config, get_report_template
@@ -145,10 +145,17 @@ class FramingResult(BaseModel):
     restatement: str = Field(description="Problem restated in own words")
     assumptions: list[str] = Field(default_factory=list)
     constraints: list[str] = Field(default_factory=list)
-    scope_boundaries: str = Field(
+    scope_boundaries: Any = Field(
         default="",
         description="What IS and IS NOT in scope",
     )
+
+    @field_validator("scope_boundaries", mode="before")
+    @classmethod
+    def parse_scope_boundaries(cls, v: Any) -> str:
+        if isinstance(v, (dict, list)):
+            return json.dumps(v, indent=2)
+        return str(v)
     known_facts: list[str] = Field(
         default_factory=list,
         description="Facts already known (from memory/context)",

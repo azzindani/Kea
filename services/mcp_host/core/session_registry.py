@@ -99,7 +99,9 @@ class SessionRegistry:
                 await self.pg_registry.sync_tools(self.discovered_tools)
                 # Clear buffer to free memory, or keep if we want to query them locally later?
                 # RAG is persistent, so we can clear. but keep for debugging if needed.
-                self.discovered_tools.clear() 
+                # Clear buffer to free memory, or keep if we want to query them locally later?
+                # KEEPING for static listing (fix for "No tools found" error)
+                # self.discovered_tools.clear() 
             except Exception as e:
                 logger.error(f"❌ Failed to sync discovered tools to RAG: {e}")
 
