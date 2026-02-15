@@ -68,7 +68,7 @@ class JudgeAgent:
 
         # Calculate fact-based confidence (default if facts provided)
         # CRITICAL: If NO facts collected, confidence should be 0% (not 70%!)
-        fact_based_confidence = self._calculate_fact_quality(facts) if facts else 0.0
+        fact_based_confidence = await self._calculate_fact_quality(facts) if facts else 0.0
 
         try:
             import os
@@ -183,7 +183,7 @@ Provide:
             "confidence": 0.5,
         }
 
-    def _calculate_fact_quality(self, facts: list[dict] | None) -> float | None:
+    async def _calculate_fact_quality(self, facts: list[dict] | None) -> float | None:
         """
         Calculate confidence based on fact quality using embedding-based semantic analysis.
 
@@ -205,13 +205,11 @@ Provide:
 
         # Try embedding-based scoring (more accurate)
         try:
-            import asyncio
-
             import numpy as np
 
-            from shared.embedding.qwen3_embedding import create_embedding_provider
+            from shared.embedding.model_manager import get_embedding_provider
 
-            embedder = create_embedding_provider(use_local=True)
+            embedder = get_embedding_provider()
 
             # Error pattern templates for semantic matching
             error_patterns = [
@@ -234,19 +232,10 @@ Provide:
                 "The information is available",
             ]
 
-            # Get embeddings for patterns
-            loop = None
-            try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                # No loop running, create one
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-
             # Embed patterns once
-            error_embeds = loop.run_until_complete(embedder.embed(error_patterns))
-            valid_embeds = loop.run_until_complete(embedder.embed(valid_patterns))
-
+            error_embeds = await embedder.embed(error_patterns)
+            valid_embeds = await embedder.embed(valid_patterns)
+            
             # Calculate average pattern embeddings
             error_centroid = np.mean(error_embeds, axis=0)
             valid_centroid = np.mean(valid_embeds, axis=0)
@@ -259,7 +248,7 @@ Provide:
                 else:
                     fact_texts.append(str(fact)[:500])
 
-            fact_embeds = loop.run_until_complete(embedder.embed(fact_texts))
+            fact_embeds = await embedder.embed(fact_texts)
 
             # Score each fact by semantic similarity
             error_count = 0
