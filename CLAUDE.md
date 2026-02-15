@@ -137,6 +137,22 @@ Kea/
 
 ---
 
+## 🎯 Operational Focus Tiers
+
+**CRITICAL**: To optimize context management and maintain system integrity, Kea follows a **5-Tier Operational Focus** structure.
+
+| Tier | Area | Component | Description |
+| :--- | :--- | :--- | :--- |
+| **Tier 1** | **Core Brain** | `kernel/` | Logic, reasoning, and hierarchical planning. |
+| **Tier 2** | **System Body** | `services/`, `shared/` | Infrastructure, API routing, and core schemas. |
+| **Tier 3** | **Execution Engine** | `workers/`, `configs/` | Background processing and operational settings. |
+| **Tier 4** | **Intelligence** | `knowledge/`, `mcp_servers/`| Skills, rules, and external tool integrations. |
+| **Tier 5** | **Support** | `migrations/`, `k8s/`, `scripts/` | DB versioning, orchestration, and utilities. |
+
+**Rule**: Unless explicitly requested, your primary focus for improvements, fixes, and refactors should be **Tiers 1-3**. Tiers 4-5 are considered stable and should only be modified when explicitly instructed.
+
+---
+
 ## 🛠️ Technology Stack
 
 - **Language**: Python 3.12+

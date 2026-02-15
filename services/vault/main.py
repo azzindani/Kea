@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import uuid
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
