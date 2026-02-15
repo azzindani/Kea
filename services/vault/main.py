@@ -24,11 +24,24 @@ from pydantic import BaseModel, Field
 
 from services.vault.core.audit_trail import AuditEventType, get_audit_trail
 from services.vault.core.checkpointing import get_checkpoint_store
+from services.vault.core.postgres_store import PostgresVectorStore
+from services.vault.core.vector_store import Document
 from shared.logging import get_logger
 
 logger = get_logger(__name__)
 
 app = FastAPI(title="The Vault")
+
+# Global Vector Store
+_vector_store: PostgresVectorStore | None = None
+
+
+async def get_vector_store() -> PostgresVectorStore:
+    """Lazy initialize and return the PostgresVectorStore."""
+    global _vector_store
+    if _vector_store is None:
+        _vector_store = PostgresVectorStore()
+    return _vector_store
 
 
 @app.get("/health")
@@ -208,6 +221,91 @@ async def search_vault(request: SearchRequest) -> dict:
     except Exception as e:
         logger.error(f"Vault search failed: {e}")
         return {"query": request.query, "results": [], "total": 0}
+
+
+# ============================================================================
+# Research Routes — Semantic search over findings
+# ============================================================================
+
+
+class SaveSessionRequest(BaseModel):
+    query: str
+    job_id: str = ""
+    content: str = ""
+    confidence: float = 0.0
+    facts: list[dict[str, Any]] = []
+
+
+@app.post("/research/sessions", status_code=201)
+async def save_research_session(request: SaveSessionRequest) -> dict:
+    """Persist research results to the vector store for later retrieval."""
+    store = await get_vector_store()
+
+    # Create a document for the main content
+    doc_id = f"research_{request.job_id or str(uuid.uuid4())[:8]}"
+    doc = Document(
+        id=doc_id,
+        content=request.content,
+        metadata={
+            "query": request.query,
+            "job_id": request.job_id,
+            "confidence": request.confidence,
+            "type": "research_report",
+        },
+    )
+
+    # Also extract individual facts as documents for more granular retrieval
+    documents = [doc]
+    for i, fact in enumerate(request.facts):
+        documents.append(
+            Document(
+                id=f"{doc_id}_fact_{i}",
+                content=fact.get("text", ""),
+                metadata={
+                    "query": request.query,
+                    "job_id": request.job_id,
+                    "confidence": fact.get("confidence", 0.0),
+                    "type": "atomic_fact",
+                },
+            )
+        )
+
+    await store.add(documents)
+    return {"status": "saved", "document_id": doc_id, "facts_count": len(request.facts)}
+
+
+@app.get("/research/query")
+async def query_research(
+    q: str,
+    limit: int = 5,
+    domain: str | None = None,
+) -> dict:
+    """Semantic search over stored research findings."""
+    store = await get_vector_store()
+
+    filters = {}
+    if domain:
+        filters["domain"] = domain
+
+    # Search for relevant facts or reports
+    results = await store.search(
+        query=q,
+        limit=limit,
+        filter=filters if filters else None,
+    )
+
+    # Format for KernelCell
+    facts = []
+    for res in results:
+        facts.append(
+            {
+                "text": res.content,
+                "confidence": res.score,
+                "metadata": res.metadata,
+            }
+        )
+
+    return {"query": q, "facts": facts, "total": len(facts)}
 
 
 if __name__ == "__main__":

@@ -1,6 +1,9 @@
 # ⏳ Chronos Service ("The Timekeeper")
 
-**Chronos** is the planned temporal orchestration layer of Kea v4.0. It is designed to manage scheduled research jobs, recurring tasks, and maintain a historical audit trail of system activities over time. In the Fractal Corporation, it acts as the **Chief Operating Officer (COO)**, managing shifts, schedules, and deadlines.
+**Chronos** is the planned temporal orchestration layer of Kea v0.4.0.
+
+> [!NOTE]
+> In the **Brain vs Body** architecture, Chronos is a "Body" service. It coordinates timing and scheduling for the **Kea Kernel**.
 
 > [!NOTE]
 > **Current Status**: Chronos is currently a **placeholder service**. It provides a base FastAPI structure and a health check endpoint, but the scheduler and historian logic are pending implementation.

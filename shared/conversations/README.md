@@ -1,6 +1,6 @@
 # 💬 Shared Conversations Module
 
-The `shared/conversations` module provides the foundational data models and management logic for handling multi-turn interactions, session state, and message persistence within the Kea v4.0 system.
+The `shared/conversations` module provides the foundational data models and management logic for handling multi-turn interactions, session state, and message persistence within the Kea v0.4.0 system.
 
 ## ✨ Features
 

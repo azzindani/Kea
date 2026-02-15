@@ -35,11 +35,11 @@ class FeatureFlags:
     """
     
     # Core Features
-    enable_multimodal: bool = True          # v4.0 modality support
-    enable_query_classifier: bool = True     # v4.0 query classification
-    enable_compliance_check: bool = True     # v4.0 compliance engine
-    enable_audit_trail: bool = True          # v4.0 audit logging
-    enable_context_cache: bool = True        # v4.0 caching
+    enable_multimodal: bool = True          # v0.4.0 modality support
+    enable_query_classifier: bool = True     # v0.4.0 query classification
+    enable_compliance_check: bool = True     # v0.4.0 compliance engine
+    enable_audit_trail: bool = True          # v0.4.0 audit logging
+    enable_context_cache: bool = True        # v0.4.0 caching
     
     # Experimental Features (dev/staging only)
     enable_semantic_cache: bool = False      # Semantic similarity matching

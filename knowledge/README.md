@@ -20,7 +20,7 @@ This directory contains the **Liquid Intelligence** of Kea. It is a collection o
 
 ## 🛠️ Integration Guide
 
-This library is designed to be consumed by the **Kea Orchestrator** via a **Context RAG** system.
+This library is designed to be consumed by the **Kea Kernel** (via the `knowledge` and `logic` subsystems) to ground reasoning in domain-specific expertise.
 
 ### 1. The Skill Schema (Pure Context)
 All files in `skills/` must adhere to the **[Kea Skill Standard (v1.0)](skills/README.md)**.

@@ -1,6 +1,6 @@
 # 🌐 Playwright MCP Server ("The Eyes")
 
-The **Playwright Server** is the high-fidelity web automation and extraction engine of Kea v4.0. It provides "Silicon Eyes" for agents, enabling them to browse the modern web, interact with complex SPAs (Single Page Applications), handle authentication, and extract structured data with human-like behavioral patterns.
+The **Playwright Server** is the high-fidelity web automation and extraction engine of Kea v0.4.0. It provides "Silicon Eyes" for agents, enabling them to browse the modern web, interact with complex SPAs (Single Page Applications), handle authentication, and extract structured data with human-like behavioral patterns.
 
 ## 📐 Architecture
 

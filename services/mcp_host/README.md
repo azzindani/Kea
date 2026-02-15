@@ -1,6 +1,9 @@
 # 🔌 MCP Host Service ("The Hands")
 
-The **MCP Host Service** is the multi-process execution engine of Kea v4.0. It acts as the **Department Head** responsible for staffing and tooling. It manages the lifecycle of ephemeral tool processes, handles JSON-RPC communication, and provides a governed high-throughput interface for tool execution. It implements the "Pure MCP" architecture, ensuring the core system remains decoupled from tool-specific dependencies.
+The **MCP Host Service** is the multi-process execution engine of Kea v0.4.0. It acts as the **Hands** of the system, responsible for staffing and tooling. It manages the lifecycle of ephemeral tool processes, handles JSON-RPC communication, and provides a governed high-throughput interface for tool execution.
+
+> [!NOTE]
+> In the **Brain vs Body** architecture, the MCP Host is a "Body" service. It provides the concrete implementation of the `ToolRegistry` interface required by the **Kea Kernel**.
 
 ## ✨ Features
 

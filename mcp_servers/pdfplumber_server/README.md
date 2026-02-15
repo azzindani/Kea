@@ -1,6 +1,6 @@
 # 📄 PDFPlumber Server ("The Forensics Team")
 
-The **PDFPlumber Server** is the **Legal and Forensics Department** of the Kea v4.0 system. It specializes in high-fidelity extraction of text, tables, and visual elements from PDF documents. Unlike simple text strippers, it understands layout, preserving the structural integrity of complex documents like financial reports, contracts, and academic papers.
+The **PDFPlumber Server** is the **Legal and Forensics Department** of the Kea v0.4.0 system. It specializes in high-fidelity extraction of text, tables, and visual elements from PDF documents. Unlike simple text strippers, it understands layout, preserving the structural integrity of complex documents like financial reports, contracts, and academic papers.
 
 ## ✨ Features
 

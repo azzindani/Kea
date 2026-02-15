@@ -88,7 +88,7 @@ async def lifespan(app: FastAPI):
     await get_api_key_manager()
     await get_conversation_manager()
     
-    logger.info(f"API Gateway v0.3.0 started [{env_config.mode.value}]")
+    logger.info(f"API Gateway v0.4.0 started [{env_config.mode.value}]")
     
     yield
     

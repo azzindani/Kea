@@ -1,6 +1,6 @@
 # 🏢 Shared Tenants & Compliance Context
 
-The `shared/tenants` module provides the foundational support for multi-tenancy and organizational isolation in the Kea v4.0 architecture. It ensures that data, resources, and security policies are strictly partitioned between different "Departments" or "Clients" within the system.
+The `shared/tenants` module provides the foundational support for multi-tenancy and organizational isolation in the Kea v0.4.0 architecture. It ensures that data, resources, and security policies are strictly partitioned between different "Departments" or "Clients" within the system.
 
 ## ✨ Features
 

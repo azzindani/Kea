@@ -19,7 +19,7 @@ Iteration Loop::
     Plan   Spawn   [Collect   Review   Feedback]   N   Synthesize
                      max rounds gated by budget  
 
-Version: 2.0.0   Part of Kernel Brain Upgrade (Phase 3)
+Version: 0.4.0   Part of Kernel Brain Upgrade (Phase 3)
 """
 
 from __future__ import annotations

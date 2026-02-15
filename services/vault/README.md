@@ -1,6 +1,9 @@
 # 🏦 The Vault ("The Black Box")
 
-The **Vault Service** is the research persistence, context, and data transport layer of the Kea v4.0 system. It serves as the **Active Memory** for on-progress research, multi-user conversational data, and cryptographic audit trails. It functions as the **Artifact Bus**, ensuring that every cognitive step and tool execution is logged and that large artifacts (webscrapes, PDFs, CSVs) are vectorized and indexed for JIT context injection.
+The **Vault Service** is the research persistence, context, and data transport layer of the Kea v0.4.0 system.
+
+> [!NOTE]
+> In the **Brain vs Body** architecture, the Vault is a "Body" service. It provides the persistent storage and artifact bus supporting the **Kea Kernel**.
 
 ## ✨ Features
 

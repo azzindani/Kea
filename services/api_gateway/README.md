@@ -1,6 +1,6 @@
 # 🚪 API Gateway Service ("The Front Door")
 
-The **API Gateway** is the centralized nerve center of the **Kea v4.0 Autonomous Enterprise Operating System**. It is responsible for routing user intentions, managing the security perimeter, orchestrating asynchronous research jobs, and handling the entire cognitive pipeline lifecycle. It acts as the single point of entry for all external clients, ensuring consistent authentication, rate limiting, and request validation.
+The **API Gateway** is the centralized nerve center of the **Kea v0.4.0 Autonomous Enterprise Operating System**. It is responsible for routing user intentions, managing the security perimeter, orchestrating asynchronous research jobs, and handling the entire cognitive pipeline lifecycle. It acts as the single point of entry for all external clients, ensuring consistent authentication, rate limiting, and request validation.
 
 ## ✨ Features
 
@@ -39,7 +39,10 @@ graph TD
         Gateway --> Auth[Identity & Security]
         Auth --> Router{Route Dispatcher}
         
-        Router -->|/chat/message| Orch[Orchestrator<br/>(Port 8001)]
+        Router -->|/chat/message| Orch[Orchestrator Service<br/>(Port 8001)]
+        subgraph Kernel [Isolated Kernel]
+            Orch --> Cell[KernelCell]
+        end
         Router -->|/tools/call| MCP[MCP Host<br/>(Port 8002)]
         Router -->|/datasets| RAG[RAG Service<br/>(Port 8003)]
         Router -->|/audit/logs| Vault[Vault Service<br/>(Port 8004)]
@@ -56,7 +59,7 @@ The service is organized into functional modules that isolate security logic fro
 
 ### 🔌 Core Components
 
-- **`main.py`**: The application entrypoint (v0.3.0). Configures FastAPI, assembles the middleware stack, and mounts all polymorphic routers.
+- **`main.py`**: The application entrypoint (v0.4.0). Configures FastAPI, assembles the middleware stack, and mounts all polymorphic routers.
 - **`routes/`**: Implementation of API endpoints. These modules serve as "orchestrators" that validate inputs and delegate work.
     - `auth.py`: Identity management, login, registration, and token issuance.
     - `conversations.py`: High-level chat interface, interacting with the Orchestrator's state machine.
@@ -94,11 +97,11 @@ The Gateway is the **Source of Truth for Identity**.
 - Internal communication is managed via a `ServiceRegistry` that can be overridden via environment variables for flexible deployment (e.g., K8s vs. Local).
 
 ### 3. Polymorphic Job Lifecycle
-The `/jobs` endpoint follows a persistent pattern where jobs are stored in the `research_jobs` PostgreSQL table. The Gateway manages the state transitions (`PENDING`, `RUNNING`, `COMPLETED`, `FAILED`) and delegates the heavy cognitive work to the **Orchestrator**.
+The `/jobs` endpoint follows a persistent pattern where jobs are stored in the `research_jobs` PostgreSQL table. The Gateway manages the state transitions (`PENDING`, `RUNNING`, `COMPLETED`, `FAILED`) and delegates the heavy cognitive work to the **Orchestrator Service**, which in turn executes the **Kea Kernel**.
 
 ## 📚 Reference
 
-### API Endpoints (v0.3.0)
+### API Endpoints (v0.4.0)
 
 | Category | Endpoint | Method | Description |
 |:---------|:---------|:-------|:------------|

@@ -25,7 +25,7 @@ Communication Integration (v2.0):
 - MONITOR phase: includes communication signals (redirects, shared data)
   in the self-assessment.
 
-Version: 2.0.1   Brain Upgrade + Communication Network
+Version: 0.4.0   Brain Upgrade + Communication Network
 """
 
 from __future__ import annotations
@@ -107,7 +107,7 @@ class PerceptionResult(BaseModel):
         default_factory=list,
         description="Key entities/topics mentioned in the task",
     )
-    # IntentionRouter classification (v3.0)
+    # IntentionRouter classification (v0.3.x legacy)
     intent_path: str = Field(
         default="D",
         description="Intent path: A (memory) | B (verify) | C (synthesis) | D (deep research)",
@@ -579,7 +579,7 @@ class CognitiveCycle:
                 key_entities=_extract_entities(task),
             )
 
-        #   IntentionRouter classification (v3.0)  
+        #   IntentionRouter classification (v0.3.x legacy)  
         routing_cfg = get_kernel_config("kernel_cell_routing") or {}
         if routing_cfg.get("enabled", True):
             try:
@@ -954,7 +954,7 @@ class CognitiveCycle:
         """
         The main execution loop with integrated monitoring.
 
-        v3.0: Attempts DAG-based parallel execution for medium+ complexity.
+        v0.4.0: Attempts DAG-based parallel execution for medium+ complexity.
         Falls back to sequential ReAct loop for simple queries or on DAG failure.
 
         v2.0 Communication hooks:
@@ -1486,7 +1486,7 @@ class CognitiveCycle:
             shared = self.comm.check_for_shared_data()
             shared_data_count = len(shared)
 
-        #   Keeper-level context guard (v3.0)  
+        #   Keeper-level context guard (legacy)  
         keeper_cfg = get_kernel_config("kernel_cell_keeper") or {}
         keeper_enabled = keeper_cfg.get("enabled", True)
         keeper_contradictions: list[str] = []

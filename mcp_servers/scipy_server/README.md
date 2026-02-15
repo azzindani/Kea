@@ -1,6 +1,6 @@
 # 🧪 SciPy Server ("The Research Lab")
 
-The **SciPy Server** is the **Advanced Analytics & Research Laboratory** of the Kea v4.0 system. It provides high-performance scientific computing capabilities, enabling agents to perform optimization, signal processing, linear algebra, and complex statistical testing. It acts as the mathematical backbone for quantitative research and engineering tasks.
+The **SciPy Server** is the **Advanced Analytics & Research Laboratory** of the Kea v0.4.0 system. It provides high-performance scientific computing capabilities, enabling agents to perform optimization, signal processing, linear algebra, and complex statistical testing. It acts as the mathematical backbone for quantitative research and engineering tasks.
 
 ## ✨ Features
 

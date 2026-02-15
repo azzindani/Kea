@@ -16,7 +16,7 @@ The memory can be *compressed* into a context-window-sized summary for
 injection into LLM calls, and *serialised* for persistence into the
 Vault or ArtifactStore.
 
-Version: 2.0.0   Part of Kernel Brain Upgrade (Phase 1)
+Version: 0.4.0   Part of Kernel Brain Upgrade (Phase 1)
 """
 
 from __future__ import annotations

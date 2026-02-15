@@ -16,7 +16,7 @@ Each profile specifies:
 
 Profiles are loaded from ``kernel.yaml`` with sensible defaults.
 
-Version: 2.0.0   Part of Kernel Brain Upgrade (Phase 1)
+Version: 0.4.0   Part of Kernel Brain Upgrade (Phase 1)
 """
 
 from __future__ import annotations

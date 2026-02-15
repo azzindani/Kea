@@ -1,6 +1,6 @@
 # 👤 Shared User Management
 
-The `shared/users` module provides the core identity, profile, and API key management system for the Kea v4.0 architecture. It enables secure multi-user research sessions and delegated authorization for service-to-service communication.
+The `shared/users` module provides the core identity, profile, and API key management system for the Kea v0.4.0 architecture. It enables secure multi-user research sessions and delegated authorization for service-to-service communication.
 
 ## ✨ Features
 

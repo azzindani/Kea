@@ -20,7 +20,7 @@ Design principle: communication has a TOKEN COST. The communicator
 tracks spending and refuses messages if the budget is exhausted. This
 prevents runaway messaging from consuming the entire token budget.
 
-Version: 2.0.0   Part of Kernel Communication Network (Phase 2)
+Version: 0.4.0   Part of Kernel Communication Network (Phase 2)
 """
 
 from __future__ import annotations

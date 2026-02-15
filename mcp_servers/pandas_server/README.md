@@ -1,6 +1,6 @@
 # 🐼 Pandas Server ("The Data Science Dept")
 
-The **Pandas Server** is the **Data Science Department** of the Kea v4.0 system. It provides a comprehensive suite of 50+ tools for dataframe manipulation, statistical analysis, feature engineering, and data cleaning. It operates on "Physical Artifacts" (CSVs, Parquet, JSON) stored in the Vault, enabling complex transformations without moving data across the network.
+The **Pandas Server** is the **Data Science Department** of the Kea v0.4.0 system. It provides a comprehensive suite of 50+ tools for dataframe manipulation, statistical analysis, feature engineering, and data cleaning. It operates on "Physical Artifacts" (CSVs, Parquet, JSON) stored in the Vault, enabling complex transformations without moving data across the network.
 
 ## ✨ Features
 

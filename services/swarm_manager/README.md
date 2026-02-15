@@ -1,6 +1,9 @@
 # 🛡️ Swarm Manager ("The Governor")
 
-The **Swarm Manager** is the governance and compliance layer of the Kea v4.0 system. It acts as the **Chief Risk Officer (CRO)** and **Legal Department** for the autonomous agents, ensuring that every operation adheres to enterprise policies, international standards (ISO, SOC2, GDPR), and hardware constraints.
+The **Swarm Manager** is the governance and compliance layer of the Kea v0.4.0 system.
+
+> [!NOTE]
+> In the **Brain vs Body** architecture, the Swarm Manager is a "Body" service. It enforces governance and compliance over the **Kea Kernel**'s autonomous operations.
 
 ## ✨ Features
 

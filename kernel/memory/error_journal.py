@@ -12,7 +12,7 @@ Key concepts:
 - **Causality Graph**: Tracks which errors caused which other errors (DAG)
 - **Convergence**: Knows when the recursive fix chain has stabilized
 
-Version: 1.0.0   Part of Kernel Recursion (Phase 1)
+Version: 0.4.0   Part of Kernel Recursion (Phase 1)
 """
 
 from __future__ import annotations

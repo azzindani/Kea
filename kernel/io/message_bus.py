@@ -20,7 +20,7 @@ Architecture:
     The bus supports topic-based subscriptions for broadcast messages.
     Communication cost is modelled (token budget) to prevent runaway messaging.
 
-Version: 2.0.0   Part of Kernel Communication Network (Phase 2)
+Version: 0.4.0   Part of Kernel Communication Network (Phase 2)
 """
 
 from __future__ import annotations

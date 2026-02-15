@@ -1,7 +1,7 @@
 # Application Settings
 app:
   name: "Kea Research Engine"
-  version: "0.1.0"
+  version: "0.4.0"
   environment: "${ENVIRONMENT:development}"
 
 # Logging Configuration

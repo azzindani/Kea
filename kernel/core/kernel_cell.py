@@ -21,7 +21,7 @@ This is the CORE module of Kea's kernel. It wires together:
 - MessageBus   for async message routing between cells
 - DelegationProtocol   for iterative, review-driven delegation
 
-Features (v2.0.1   Brain + Communication + Iterative Delegation):
+Features (v0.4.0   Brain + Communication + Iterative Delegation):
 - Full cognitive cycle replaces flat ReAct loop
 - Structured working memory per cell (focus, hypotheses, decisions)
 - Level-aware cognitive profiles (intern   board)
@@ -368,7 +368,7 @@ class KernelCell:
 
         Every employee   CEO to intern   runs this exact loop.
 
-        v2.0.1 (Phase 4): Wrapped with ExecutionGuard for pre-flight
+        v0.4.0 (Phase 4): Wrapped with ExecutionGuard for pre-flight
         validation, execution tracking, and post-execution audit.
         """
         self._start_time = datetime.utcnow()
@@ -795,7 +795,7 @@ class KernelCell:
         Incoming messages (CLARIFY, PROGRESS, etc.) are processed
         between phases, allowing the parent to course-correct.
 
-        v2.0.1 (Phase 3): Uses the DelegationProtocol for iterative
+        v0.4.0 (Phase 3): Uses the DelegationProtocol for iterative
         review   parent reviews child outputs, sends feedback for
         revisions, and resolves conflicts between siblings before
         final synthesis.
@@ -1923,7 +1923,7 @@ class KernelCell:
         """
         Synthesize final answer from gathered data.
 
-        v2.0.1: Updated to handle [CONFLICT RESOLUTION] notes and [REVIEWER NOTES]
+        v0.4.0: Updated to handle [CONFLICT RESOLUTION] notes and [REVIEWER NOTES]
         produced by the iterative delegation protocol.
         """
         synthesizer_prompt = get_agent_prompt("kernel_synthesizer")

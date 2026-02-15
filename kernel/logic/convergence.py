@@ -6,7 +6,7 @@ recursive healing loop. Prevents infinite loops via hard limits and
 detects diminishing returns to stop early when further healing isn't
 productive.
 
-Version: 1.0.0   Part of Kernel Recursion (Phase 4)
+Version: 0.4.0   Part of Kernel Recursion (Phase 4)
 """
 
 from __future__ import annotations

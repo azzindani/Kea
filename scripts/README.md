@@ -1,11 +1,11 @@
 # 📜 Utility Scripts
 
-The `scripts/` directory contains various internal tools and administration scripts for managing the Kea v4.0 development lifecycle.
+The `scripts/` directory contains various internal tools and administration scripts for managing the Kea v0.4.0 development lifecycle.
 
 ## 📁 Contents
 
 - **`cli.py`**: A unified Command Line Interface for interacting with the Kea system from the terminal. Supports starting services, running one-off research jobs, and system diagnostics.
-- **`standardize_init.py`**: A developer utility that ensures all `__init__.py` files across the repository follow the Kea v4.0 boilerplate standard (docstrings, imports, and `__all__` definitions).
+- **`standardize_init.py`**: A developer utility that ensures all `__init__.py` files across the repository follow the Kea v0.4.0 boilerplate standard (docstrings, imports, and `__all__` definitions).
 
 ## 🚀 Usage
 

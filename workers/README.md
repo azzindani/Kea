@@ -1,6 +1,6 @@
 # ⚙️ Workers ("The Engines")
 
-The `workers/` directory contains the background task processors that handle the heavy lifting of the Kea v4.0 research pipeline. These workers decouple long-running cognitive processes from the synchronous API layer, ensuring high throughput and resilience. They act as the "Line Workers" of the Fractal Corporation.
+The `workers/` directory contains the background task processors that handle the heavy lifting of the Kea v0.4.0 research pipeline. These workers decouple long-running cognitive processes from the synchronous API layer, ensuring high throughput and resilience. They act as the "Line Workers" of the Fractal Corporation.
 
 ## ✨ Features
 

@@ -34,7 +34,7 @@ Architecture::
        rebalance() cancel_stalled() govern()   
      
 
-Version: 2.0.0   Part of Kernel Brain Upgrade (Phase 4)
+Version: 0.4.0   Part of Kernel Brain Upgrade (Phase 4)
 """
 
 from __future__ import annotations

@@ -13,27 +13,32 @@ The `services/` directory is the engine room of the Kea system. It follows a **F
 
 ## 🏗️ The 7-Service "Fractal Corp"
 
+Kea cognition is built on a **"Brain vs Body"** topology, where core reasoning is isolated from microservice execution.
+
 ```mermaid
 graph TD
     User((User)) -->|Rest API| Gateway[API Gateway]
     
-    subgraph "Nerve Center"
-        Gateway -->|Route| Orchestrator[Orchestrator]
-        Orchestrator -->|Jobs| Chronos[Chronos]
+    subgraph "The Brain (Reasoning)"
+        Gateway --> Orchestrator[Orchestrator Service]
+        subgraph Kernel [Isolated Kernel]
+            Orchestrator --> Cell[KernelCell]
+        end
+        Orchestrator --> Chronos[Chronos]
     end
     
-    subgraph "Execution & Memory"
+    subgraph "The Body (Execution & Persistence)"
         Orchestrator -->|Execute| Host[MCP Host]
         Orchestrator -->|Learn| RAG[RAG Service]
         Orchestrator -->|Audit| Vault[Vault]
     end
     
-    subgraph "Oversight"
+    subgraph "The Conscience (Oversight)"
         Host -->|Check| Manager[Swarm Manager]
         Orchestrator -->|Policy| Manager
     end
     
-    Host -->|JSON-RPC| Tools[33+ MCP Servers]
+    Host -->|JSON-RPC| Tools[68+ MCP Servers]
 ```
 
 ---
@@ -42,8 +47,9 @@ graph TD
 
 | Service | Persona | Role | Documentation |
 |:--------|:--------|:-----|:--------------|
+| **[kernel](../kernel/README.md)** | **The Logic** | Isolated Reasoning Engine | [🧠 View Doc](../kernel/README.md) |
 | **[api_gateway](api_gateway/README.md)** | **The Mouth** | Entry point, Auth, & Routing | [📖 View Doc](api_gateway/README.md) |
-| **[orchestrator](orchestrator/README.md)** | **The Brain** | Reasoning & Graph State | [📖 View Doc](orchestrator/README.md) |
+| **[orchestrator](orchestrator/README.md)** | **The Nervous System** | Kernel Wrapper & Graph State | [📖 View Doc](orchestrator/README.md) |
 | **[mcp_host](mcp_host/README.md)** | **The Hands** | Tool execution & JIT Spawning| [📖 View Doc](mcp_host/README.md) |
 | **[rag_service](rag_service/README.md)** | **The Library**| Semantic search & HF Datasets | [📖 View Doc](rag_service/README.md) |
 | **[vault](vault/README.md)** | **The Memory** | Audit logs & Checkpoints | [📖 View Doc](vault/README.md) |

@@ -1,6 +1,9 @@
 # 🗄️ RAG Service ("The Memory")
 
-The **RAG (Retrieval-Augmented Generation) Service** provides the reference intelligence and global knowledge orchestration layer for the Kea v4.0 system. It functions as the **Corporate Library & Controller**, managing access to massive, external, or multiple distinct RAG servers via API. It handles the ingestion of global datasets and feeds synthesized reference context into the research process.
+The **RAG (Retrieval-Augmented Generation) Service** provides the reference intelligence and global knowledge orchestration layer for the Kea v0.4.0 system. It functions as the **Librarian**, managing access to massive, external, or multiple distinct RAG servers via API.
+
+> [!NOTE]
+> In the **Brain vs Body** architecture, the RAG Service is a "Body" service. It provides the concrete implementation of the `FactStore` interface required by the **Kea Kernel**.
 
 ## ✨ Features
 

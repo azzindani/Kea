@@ -1,7 +1,7 @@
 """
 Research Pipeline Integration.
 
-Connects conversations to research graph with v4.0 modules.
+Connects conversations to research graph with v0.4.0 modules.
 """
 
 from __future__ import annotations
@@ -38,10 +38,10 @@ class ConversationResearchPipeline:
 
     Flow:
     1. Receive message from conversation
-    2. Classify query (v4.0 query_classifier)
-    3. Check cache (v4.0 context_cache)
-    4. Run research if needed
-    5. Audit log (v4.0 audit_trail)
+    2. Classify query (v0.4.0 query_classifier)
+    3. Check cache (v0.4.0 context_cache)
+    4. Guard check (v0.4.0 resource_governor)
+    5. Audit log (v0.4.0 audit_trail)
     6. Store response with sources
     """
 

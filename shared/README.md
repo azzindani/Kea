@@ -1,6 +1,6 @@
 # 📚 Shared Libraries ("The Foundation")
 
-The `shared/` directory is the **Standard Library** of the Kea v4.0 system. It contains the core primitives, data schemas, and infrastructure abstractions that ensure consistency and interoperability across all microservices. It is the common substrate upon which the entire "Fractal Corp" architecture is built.
+The `shared/` directory is the **Standard Library** of the Kea v0.4.0 system. It contains the core primitives, data schemas, and infrastructure abstractions that ensure consistency and interoperability across all microservices. It is the common substrate upon which the entire "Fractal Corp" architecture is built.
 
 ## ✨ Features
 
@@ -18,28 +18,27 @@ The Shared Library acts as the "Glue" and "Substrate" for the distributed system
 
 ```mermaid
 graph TD
-    subgraph Services [Kea Microservices]
+    subgraph Reasoning [Kea Brain]
+        Kernel[Isolated Kernel]
+        Orch[Orchestrator Service]
+    end
+
+    subgraph Body [Kea Body]
         Gateway[API Gateway]
-        Orch[Orchestrator]
         Host[MCP Host]
+        RAG[RAG Service]
         Vault[Vault]
-        Manager[Swarm Manager]
     end
 
     subgraph Shared [shared/ Library]
-        Config[config.py<br/>Global Settings]
-        Schemas[schemas.py<br/>Domain Models]
-        Bus[messaging.py<br/>Event Bus]
-        Dispatch[dispatcher.py<br/>Task Queue]
-        Hardware[hardware/<br/>Resource Monitoring]
-        Logging[logging/<br/>Observability]
+        Config[config.py]
+        Schemas[schemas.py]
+        Hardware[hardware/]
+        Logging[logging/]
     end
 
-    Gateway -.-> Shared
-    Orch -.-> Shared
-    Host -.-> Shared
-    Vault -.-> Shared
-    Manager -.-> Shared
+    Reasoning -.-> Shared
+    Body -.-> Shared
 ```
 
 ## 📁 Codebase Structure

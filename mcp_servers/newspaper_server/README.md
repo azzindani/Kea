@@ -1,6 +1,6 @@
 # 📰 Newspaper Server ("The Communications Dept")
 
-The **Newspaper Server** is the **News & Communications Department** of the Kea v4.0 system. It specializes in high-speed news ingestion, source discovery, and NLP-based content analysis. "Paper-boy" can read thousands of articles in seconds, stripping away ads and boilerplate to deliver clean, actionable text to the Research Engine.
+The **Newspaper Server** is the **News & Communications Department** of the Kea v0.4.0 system. It specializes in high-speed news ingestion, source discovery, and NLP-based content analysis. "Paper-boy" can read thousands of articles in seconds, stripping away ads and boilerplate to deliver clean, actionable text to the Research Engine.
 
 ## ✨ Features
 

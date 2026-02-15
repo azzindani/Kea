@@ -1,8 +1,8 @@
-# 🦜 Project Kea v4.0: Autonomous Enterprise Operating System
+# 🦜 Project Kea v0.4.0: Autonomous Enterprise Operating System
 
 > **"Not just a Chatbot. A Research Factory."**
 
-Kea v4.0 represents the evolution from a "Distributed Autonomous Research Engine" (DARE) to a **Generative ERP (Enterprise Resource Planning)** system. It simulates a **100,000+ Employee Corporation** where the "Employees" are silicon, the "Departments" are microservices, and the "Workflows" are generated Just-In-Time.
+Kea v0.4.0 represents the evolution from a "Distributed Autonomous Research Engine" (DARE) to a **Generative ERP (Enterprise Resource Planning)** system. It simulates a **100,000+ Employee Corporation** where the "Employees" are silicon, the "Departments" are microservices, and the "Workflows" are generated Just-In-Time.
 
 Instead of writing linear "To-Do Lists," Kea architects and executes **Directed Acyclic Graphs (DAGs)**, enabling complex, non-linear problem solving at an enterprise scale.
 
@@ -10,7 +10,7 @@ Instead of writing linear "To-Do Lists," Kea architects and executes **Directed 
 
 ## 🏗️ The Paradigm Shift
 
-| Feature | Legacy Agents (v3) | Kea v4.0 (Enterprise OS) |
+| Feature | Legacy Agents (v0.3.x) | Kea v0.4.0 (Enterprise OS) |
 |:--------|:-------------------|:--------------------------|
 | **Structure** | Single Loop ("Thought -> Act") | **Fractal DAGs** (Main Graph spawns Sub-Graphs) |
 | **Tools** | Static list of Python functions | **"Departments"** (Isolated Microservices) |
@@ -23,18 +23,24 @@ Instead of writing linear "To-Do Lists," Kea architects and executes **Directed 
 
 ## 📐 Architecture ("The Fractal Corp")
 
-Kea divides cognition into 7 specialized microservices, ensuring fault isolation and "Split-Brain" governance (Reasoning vs. Execution).
+Kea divides cognition into 7 specialized microservices, centered around a **Recursive Logic Kernel**. This ensures strict fault isolation and "Brain vs Body" governance.
 
 ```mermaid
 graph TD
     User((User)) -->|Rest API| Gateway[API Gateway]
     
-    subgraph "The Brain (Nerve Center)"
-        Gateway --> Orchestrator[Orchestrator]
+    subgraph "The Brain (Reasoning)"
+        Gateway --> Orchestrator[Orchestrator Service]
+        subgraph Kernel [Isolated Kernel]
+            Orchestrator --> Cell[KernelCell]
+            Cell --> Flow[DAG/Flow]
+            Cell --> Logic[Consensus/Logic]
+            Cell --> Memory[Working Memory]
+        end
         Orchestrator --> Chronos[Chronos]
     end
     
-    subgraph "The Body (Execution & Memory)"
+    subgraph "The Body (Execution & Persistence)"
         Orchestrator -->|Execute| Host[MCP Host]
         Orchestrator -->|Learn| RAG[RAG Service]
         Orchestrator -->|Persistence| Vault[(The Vault)]
@@ -59,11 +65,12 @@ Each service acts as a distinct corporate persona with a specific mandate.
 
 | Service | Persona | Role | Documentation |
 |:--------|:--------|:-----|:--------------|
+| **Kernel** | The Logic | Isolated Core Reasoning Engine | [🧠 View Doc](kernel/README.md) |
 | **Gateway** | The Mouth | Security, Auth, & Routing | [📖 View Doc](services/api_gateway/README.md) |
-| **Orchestrator** | The Brain | LangGraph State & Reasoning | [📖 View Doc](services/orchestrator/README.md) |
+| **Orchestrator** | The Nervous System | Kernel Wrapper & State Machine | [📖 View Doc](services/orchestrator/README.md) |
 | **MCP Host** | The Hands | Tool Execution & JIT Spawning | [📖 View Doc](services/mcp_host/README.md) |
 | **RAG Service** | The Librarian| Multi-Source Knowledge Controller | [📖 View Doc](services/rag_service/README.md) |
-| **Vault** | The Vault | Research Persistence & Context Engine | [📖 View Doc](services/vault/README.md) |
+| **Vault** | The Memory | Research Persistence & Context Engine | [📖 View Doc](services/vault/README.md) |
 | **Swarm Manager**| The Conscience| Governance & Compliance | [📖 View Doc](services/swarm_manager/README.md) |
 | **Chronos** | The Clock | Scheduling & Future Tasks | [📖 View Doc](services/chronos/README.md) |
 
