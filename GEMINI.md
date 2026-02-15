@@ -28,7 +28,7 @@ When working on this codebase, approach every task with the mindset of a seasone
 ### 🧠 The Kea Kernel
 At the heart of every agent is the **Kea Kernel** (`KernelCell`) - a universal recursive processing unit.
 - **Pure Logic**: Runs the standard **Cognitive Cycle** (Perceive → Frame → Plan → Execute → Monitor → Package).
-- **Universal Code**: Every level of the hierarchy (Intern to CEO) runs the *exact same* logic in `services/orchestrator/core/kernel_cell.py`.
+- **Universal Code**: Every level of the hierarchy (Intern to CEO) runs the *exact same* logic in `kernel/`.
 - **Config-Driven**: Behavior is dictated strictly by **Cognitive Profiles** in `configs/kernel.yaml`.
 
 ### ⚡ Core Architecture (Microservices)
@@ -117,19 +117,24 @@ return JobResponse(status=ResearchStatus.COMPLETED)
 
 ```
 Kea/
-├── services/           # [LOGIC] ONLY. No local state.
+├── kernel/             # [BRAIN] Isolated Core Reasoning Engine. Pure logic.
+├── services/           # [BODY] I/O, Networking, and Tool implementation. 
 ├── shared/             # [MODELS] schemas.py, config.py. No heavy logic.
 ├── mcp_servers/        # [TOOLS] Independent MCP servers.
 ├── workers/            # [JOBS] Background processing.
 ├── configs/            # [SETTINGS] .yaml files. NO CODE.
+├── knowledge/          # [INTELLIGENCE] Skills, rules, and personas.
 ├── migrations/         # [DB] Alembic versions.
 ├── k8s/                # [OPS] Kubernetes manifests.
+├── references/         # [DOCS] Static reference materials.
+├── scripts/            # [UTILS] Developer utilities.
 └── tests/              # ⚠️ DO NOT TOUCH (Forbidden)
 ```
 **Strict Path Rules**:
-- **Logic**: `services/<service>/core/`
+- **Logic**: `kernel/core/` and `services/<service>/core/`
 - **Models**: `shared/schemas.py` or `services/<service>/models/`
 - **Configs**: `configs/*.yaml` or `.env`
+- **Isolation**: `kernel/` must NEVER import from `services/`.
 - **Tests**: **FORBIDDEN**
 
 ---
