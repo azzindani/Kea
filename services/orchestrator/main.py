@@ -1,9 +1,9 @@
-"""
+﻿"""
 Orchestrator Main Service.
 
 FastAPI entrypoint for the research orchestrator.
 
-v4.1: Dual-mode — kernel-first with legacy graph fallback.
+v4.1: Dual-mode â€” kernel-first with legacy graph fallback.
 The USE_KERNEL_PIPELINE env var / config controls which engine runs.
 """
 
@@ -22,7 +22,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from services.orchestrator.core.graph import GraphState, compile_research_graph
+from kernel.flow.graph import GraphState, compile_research_graph
 from shared.config import get_settings
 from shared.logging import get_logger
 from shared.logging.middleware import RequestLoggingMiddleware
@@ -46,12 +46,12 @@ def _kernel_level_from_complexity(query: str, depth: int) -> str:
     and depth escalation from ``kernel_cell.depth_escalation``.
     """
     try:
-        from services.orchestrator.core.complexity import classify_complexity
+        from kernel.logic.complexity import classify_complexity
 
         score = classify_complexity(query)
         tier = score.tier.value
 
-        # Load tier→level mapping from config
+        # Load tierâ†’level mapping from config
         mapping = get_kernel_config("kernel_cell.complexity_level_mapping") or {}
         level = mapping.get(tier, "manager")
 
@@ -76,7 +76,7 @@ def _domain_from_query(query: str) -> str:
     ``configs/vocab/classification.yaml``.
     """
     try:
-        from services.orchestrator.core.prompt_factory import PromptFactory
+        from kernel.core.prompt_factory import PromptFactory
 
         factory = PromptFactory()
         return factory.detect_domain(query).value
@@ -98,7 +98,7 @@ async def lifespan(app: FastAPI):
     # =========================================================================
     try:
         # Organization structure (owned by Orchestrator, loaded from kernel.yaml)
-        from services.orchestrator.core.organization import (
+        from kernel.core.organization import (
             get_organization,
             initialize_from_config,
         )
@@ -110,10 +110,41 @@ async def lifespan(app: FastAPI):
             logger.info(f"Organization initialized from config: {dept_names}")
 
         # Conversation memory (owned by Orchestrator)
-        from services.orchestrator.core.conversation import get_conversation_manager
+        from kernel.memory.conversation import get_conversation_manager
 
         get_conversation_manager()
         logger.info("Conversation Memory initialized")
+
+        # =====================================================================
+        # KERNEL DEPENDENCY INJECTION
+        # =====================================================================
+        # Register Tool Registry (MCP Host)
+        try:
+            from services.mcp_host.core.session_registry import get_session_registry
+            from kernel.interfaces.tool_registry import register_tool_registry
+
+            register_tool_registry(get_session_registry())
+            logger.info("Dependency Injection: Registered SessionRegistry as ToolRegistry")
+        except Exception as e:
+            logger.warning(f"Dependency Injection Failed (ToolRegistry): {e}")
+
+        # Register Fact Store (RAG Service)
+        try:
+            from services.rag_service.core.fact_store import FactStore
+            from kernel.interfaces.fact_store import register_fact_store
+
+            # Note: FactStore needs to be instantiated or singleton retrieved
+            # The original code instantiated it: store = FactStore()
+            # We should probably use a singleton if acceptable, or instantiate here.
+            # Given it uses VectorStore which might be expensive, singleton is better.
+            # But FactStore class doesn't seem to have a singleton getter.
+            # We will instantiate it here for the kernel.
+            
+            fact_store_instance = FactStore()
+            register_fact_store(fact_store_instance)
+            logger.info("Dependency Injection: Registered FactStore instance")
+        except Exception as e:
+            logger.warning(f"Dependency Injection Failed (FactStore): {e}")
 
     except Exception as e:
         logger.error(f"Failed to initialize orchestrator subsystems: {e}")
@@ -125,13 +156,13 @@ async def lifespan(app: FastAPI):
     # Verify MCP Host connectivity (non-blocking)
     if USE_KERNEL:
         try:
-            from services.orchestrator.core.tool_bridge import verify_mcp_connectivity
+            from kernel.actions.tool_bridge import verify_mcp_connectivity
 
             connected = await verify_mcp_connectivity()
             if connected:
                 logger.info("MCP Host connectivity verified for kernel mode")
             else:
-                logger.warning("MCP Host not reachable — kernel will retry on first request")
+                logger.warning("MCP Host not reachable â€” kernel will retry on first request")
         except Exception as e:
             logger.warning(f"MCP Host connectivity check failed: {e}")
 
@@ -249,14 +280,14 @@ async def start_research(request: ResearchRequest):
         extra={"query": request.query[:100]},
     )
 
-    # ── Kernel Pipeline ───────────────────────────────────────────────────
+    # â”€â”€ Kernel Pipeline â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if USE_KERNEL:
         try:
-            from services.orchestrator.core.kernel_cell import run_kernel
-            from services.orchestrator.core.response_formatter import (
+            from kernel.core.kernel_cell import run_kernel
+            from kernel.io.response_formatter import (
                 envelope_to_research_response,
             )
-            from services.orchestrator.core.tool_bridge import create_tool_executor
+            from kernel.actions.tool_bridge import create_tool_executor
 
             # Determine starting level and domain
             level = _kernel_level_from_complexity(request.query, request.depth)
@@ -303,7 +334,7 @@ async def start_research(request: ResearchRequest):
                 raise HTTPException(status_code=500, detail=str(e))
             logger.info("Falling back to legacy graph pipeline")
 
-    # ── Legacy Graph Pipeline (fallback) ──────────────────────────────────
+    # â”€â”€ Legacy Graph Pipeline (fallback) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if not research_graph:
         raise HTTPException(status_code=503, detail="Research graph not initialized")
 
@@ -389,7 +420,7 @@ async def process_chat_message(request: ChatMessageRequest):
 
     Uses kernel pipeline when enabled, falls back to legacy pipeline.
     """
-    from services.orchestrator.core.pipeline import get_research_pipeline
+    from kernel.flow.pipeline import get_research_pipeline
 
     try:
         pipeline = await get_research_pipeline()
@@ -436,14 +467,14 @@ async def stream_research(query: str, depth: int = 2, max_sources: int = 10):
 
         yield f"data: {json.dumps({'event': 'start', 'job_id': job_id, 'query': query})}\n\n"
 
-        # ── Kernel Streaming ──────────────────────────────────────────
+        # â”€â”€ Kernel Streaming â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if USE_KERNEL:
             try:
-                from services.orchestrator.core.kernel_cell import run_kernel
-                from services.orchestrator.core.response_formatter import (
+                from kernel.core.kernel_cell import run_kernel
+                from kernel.io.response_formatter import (
                     envelope_to_sse_events,
                 )
-                from services.orchestrator.core.tool_bridge import create_tool_executor
+                from kernel.actions.tool_bridge import create_tool_executor
 
                 yield f"data: {json.dumps({'event': 'phase', 'phase': 'kernel_processing'})}\n\n"
 
@@ -473,7 +504,7 @@ async def stream_research(query: str, depth: int = 2, max_sources: int = 10):
                 logger.error(f"Kernel streaming failed: {e}", exc_info=True)
                 yield f"data: {json.dumps({'event': 'phase', 'phase': 'fallback_to_legacy'})}\n\n"
 
-        # ── Legacy Graph Streaming (fallback) ─────────────────────────
+        # â”€â”€ Legacy Graph Streaming (fallback) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if not research_graph:
             yield f"data: {json.dumps({'event': 'error', 'message': 'Research graph not initialized'})}\n\n"
             return

@@ -450,6 +450,23 @@ class SessionRegistry:
                 
         return stopped
 
+    async def execute_tool(self, tool_name: str, arguments: dict) -> Any:
+        """
+        Execute a tool by name (finding the server automatically).
+        Implementation of ToolRegistry protocol.
+        """
+        server_name = self.get_server_for_tool(tool_name)
+        if not server_name:
+             # Try to find it via search if not in cache?
+             # For now, just fail or default
+             raise ValueError(f"Tool '{tool_name}' not found in registry")
+        
+        # Use ephemeral execution or persistent session?
+        # For internal kernel calls, let's use get_session (persistent/JIT)
+        session = await self.get_session(server_name)
+        result = await session.call_tool(tool_name, arguments)
+        return result
+
     def get_server_for_tool(self, tool_name: str) -> str | None:
         """Get the server name that provides a tool."""
         return self.tool_to_server.get(tool_name)

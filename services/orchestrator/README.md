@@ -47,26 +47,15 @@ graph TD
 ## 📁 Codebase Structure
 
 - **`main.py`**: FastAPI entrypoint hosting the `/research` and `/chat` pipelines.
-- **`core/`**: The engine room of the orchestrator.
-    - `graph.py`: Defines the LangGraph nodes, edges, and state transitions.
-    - `pipeline.py`: Top-level integration layer handling classification and caching.
-    - `assembler.py`: **The Node Assembler**. Wires dependency graphs, resolves artifact inputs/outputs, and implements **Self-Healing** logic for failed nodes.
-    - `agent_spawner.py`: Handles parallel agent spawning for high-throughput phases.
-    - `modality.py`: Manages multi-modal inputs/outputs within the research graph.
-    - `organization.py`: Implements "Fractal Corp" departments and domain rules.
-    - `prompt_factory.py`: Generates context-aware prompts for agents.
-    - `microplanner.py`: Reasoning logic for breaking down high-level queries.
-    - `complexity.py`: Logic for estimating task complexity and resource requirements.
-    - `curiosity.py`: Implements "Active Curiosity" - asking questions to fill knowledge gaps.
-    - `auto_wiring.py`: Automatic connection of DAG nodes based on data dependencies.
-    - `dag_executor.py`: Engine for executing the Directed Acyclic Graph of research tasks.
-    - `recovery.py`: Error handling and recovery strategies for failed nodes.
-    - `query_classifier.py`: Classification logic for incoming user queries.
-- **`nodes/`**: Individual LangGraph node implementations.
-    - `planner.py`: Reasoning logic for sub-query decomposition.
-    - `keeper.py`: Context filtering and contradiction detection.
-- **`agents/`**: Core agent logic and specialized code generators.
-    - `code_generator.py`: "Shadow Lab" logic for autonomous Python script generation.
+- **`nodes/`**: Residual stubs (Logic moved to `kernel/nodes`).
+- **`agents/`**: Residual stubs (Logic moved to `kernel/agents/`).
+- **`templates/`**: Residual stubs (Logic moved to `kernel/templates/`).
+- **`kernel/` (External)**: The engine room of the system (The Brain).
+    - `core/`: LangGraph orchestrator and Cognitive Cycle.
+    - `flow/`: DAG execution and graph compilation.
+    - `memory/`: Working memory and artifact stores.
+    - `actions/`: Tool execution and agent spawning.
+    - `interfaces/`: Protocols for service-kernel communication.
 - **`templates/`**: Version-controlled prompt templates for all agent personas.
 
 ## 🧠 Deep Dive

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Research Worker.
 
 Background worker for processing research jobs.
@@ -67,7 +67,7 @@ class ResearchWorker:
                 await asyncio.sleep(5)
 
     async def _get_next_job(self) -> dict | None:
-        """Claim the next pending job from research_jobs via SELECT … FOR UPDATE SKIP LOCKED."""
+        """Claim the next pending job from research_jobs via SELECT â€¦ FOR UPDATE SKIP LOCKED."""
         try:
             from shared.database.connection import get_database_pool
 
@@ -105,7 +105,7 @@ class ResearchWorker:
             await self._update_job_status(job_id, ResearchStatus.RUNNING, 0.0)
 
             # Import and run the research graph
-            from services.orchestrator.core.graph import GraphState, compile_research_graph
+            from kernel.flow.graph import GraphState, compile_research_graph
 
             graph = compile_research_graph()
 

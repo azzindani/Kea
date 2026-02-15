@@ -40,7 +40,7 @@ graph TD
 
 - **`main.py`**: FastAPI entrypoint (v0.2.0) hosting the facts, datasets, and knowledge API.
 - **`core/`**: The implementation of the storage and loading logic.
-    - `fact_store.py`: Orchestrates the `AtomicFact` lifecycle across vector and metadata stores.
+    - `fact_store.py`: Implementation of the `FactStore` protocol for the Kernel.
     - `knowledge_store.py`: Semantic search for system-level knowledge (skills, rules, personas).
     - `artifact_store.py`: Implementation of Local and S3 storage for large research files.
     - `dataset_loader.py`: Integration with Hugging Face `datasets` for streaming ingestion.

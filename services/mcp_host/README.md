@@ -48,11 +48,10 @@ The service is divided into a lightweight API layer and a robust core orchestrat
 - **`core/`**: The implementation of the MCP hosting logic.
     - `session_registry.py`: Manages JIT spawning, process termination, and AST-based tool discovery.
     - `supervisor_engine.py`: Implements the governance loop, hardware health checks, and priority-based dispatching.
-    - `parallel_executor.py`: Provides utilities for concurrent execution of multiple tools.
     - `postgres_registry.py`: Persistence layer for tool metadata and semantic search indexing.
     - `background.py`: Background workers for processing dispatched batch tasks.
     - `models.py`: Pydantic data models for the internal and external API.
-    - `tool_registry.py`: Interface for tool registration and access.
+    - `tool_registry.py`: Implementation of `ToolRegistry` protocol for the Kernel.
 
 ## 🧠 Deep Dive
 
