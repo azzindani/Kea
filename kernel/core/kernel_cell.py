@@ -703,6 +703,15 @@ class KernelCell:
             self.score_card.assumptions = cycle_output.framing.assumptions[:5]
             self.score_card.data_gaps = cycle_output.framing.unknown_gaps[:5]
 
+        # Reconcile tool_call_count from cycle into score card.
+        # The legacy self.state.tool_executions may under-count (auto-wire calls
+        # are not always appended there), so take the max to avoid losing metrics.
+        if hasattr(cycle, "tool_call_count"):
+            self.score_card.tools_used = max(
+                self.score_card.tools_used,
+                cycle.tool_call_count,
+            )
+
         # Record step count in legacy state
         self.state.current_step = wm_state.get("step_count", 0)
 

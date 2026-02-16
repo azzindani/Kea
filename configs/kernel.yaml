@@ -432,3 +432,23 @@ kernel_cell_keeper:
   detect_drift: true               # Check for topic wandering
   confidence_from_agreement: true  # Calculate confidence from fact consensus
   min_facts_for_rerank: 3          # Only rerank if this many facts exist
+
+# ==============================================================================
+# Cognitive Cycle Execute Phase Configuration
+# Restores the old orchestrator's auto-wire enforcement — config-driven, no hardcoding.
+# ==============================================================================
+
+kernel_cell_execute:
+  # Minimum tool calls required before synthesis/complete is allowed. 0 = no enforcement.
+  min_tool_calls_before_synthesis: 1
+
+  # Step index after which a "use your tools" nudge fires when tool_call_count is 0.
+  tool_call_nudge_after_step: 1
+
+  # Downgrade quality to "poor" if tools were available but tool_call_count < min.
+  # Prevents 91% confidence with 0 tool calls.
+  tool_call_quality_penalty_enabled: true
+
+  # Fallback when RAG returns 0 tools (cold start / empty registry): use GET /tools.
+  # 0 = disabled.
+  rag_fallback_static_limit: 10

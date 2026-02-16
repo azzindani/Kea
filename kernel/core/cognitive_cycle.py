@@ -179,6 +179,17 @@ class PlanResult(BaseModel):
     needs_clarification: bool = Field(default=False)
     clarification_questions: list[str] = Field(default_factory=list)
 
+    # Restored from old Planner node: explicit tool assignment per step.
+    # Each entry maps step index (0-based) to {"tool": "<name>", "args_hint": {...}}.
+    # Empty dict ({}) = no tool assigned for that step (LLM decides freely).
+    step_tool_assignments: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description=(
+            "Per-step tool assignments from the planner. "
+            "Index matches steps[]. Empty dict = LLM-decided step."
+        ),
+    )
+
 
 class MonitorResult(BaseModel):
     """Output of the MONITOR phase (self-assessment)."""
@@ -890,13 +901,17 @@ class CognitiveCycle:
             f"Produce a plan with:\n"
             f"1. approach: high-level strategy\n"
             f"2. steps: ordered list of concrete steps\n"
-            f"3. estimated_tools: number of tool calls needed\n"
-            f"4. estimated_steps: number of reasoning steps\n"
-            f"5. risk_factors: what could go wrong\n"
-            f"6. can_complete_solo: can you do this alone?\n"
-            f"7. needs_delegation: should this be split across agents?\n"
-            f"8. needs_clarification: do you need more info first?\n"
-            f"9. clarification_questions: if so, what questions?\n\n"
+            f"3. step_tool_assignments: for EACH step, specify which tool to call "
+            f"(use exact name from Available tools listed above) and what args_hint to pass. "
+            f"Use {{}} for steps that are pure analysis/synthesis (no tool needed).\n"
+            f'   Example: [{{"tool": "web_search", "args_hint": {{"query": "BCA Bank annual report 2024"}}}}, {{}}]\n'
+            f"4. estimated_tools: number of tool calls needed\n"
+            f"5. estimated_steps: number of reasoning steps\n"
+            f"6. risk_factors: what could go wrong\n"
+            f"7. can_complete_solo: can you do this alone?\n"
+            f"8. needs_delegation: should this be split across agents?\n"
+            f"9. needs_clarification: do you need more info first?\n"
+            f"10. clarification_questions: if so, what questions?\n\n"
             f"Respond in JSON only."
         )
 
@@ -913,6 +928,7 @@ class CognitiveCycle:
             result = PlanResult(
                 approach=data.get("approach", "Sequential analysis"),
                 steps=data.get("steps", ["Research and analyze"]),
+                step_tool_assignments=data.get("step_tool_assignments", []),
                 estimated_tools=data.get("estimated_tools", 0),
                 estimated_steps=data.get("estimated_steps", 3),
                 risk_factors=data.get("risk_factors", []),
@@ -975,6 +991,11 @@ class CognitiveCycle:
 
         reasoning_instruction = self.profile.get_reasoning_instruction()
         tools_summary = self._format_tools(available_tools)
+
+        # Auto-wire state: track tool availability and nudge threshold
+        self._tools_available: bool = bool(available_tools)
+        exec_cfg = get_kernel_config("kernel_cell_execute") or {}
+        nudge_threshold: int = exec_cfg.get("tool_call_nudge_after_step", 1)
 
         for step_idx in range(max_steps):
             self.memory.advance_step()
@@ -1052,7 +1073,31 @@ class CognitiveCycle:
 
                 self.current_phase = CyclePhase.EXECUTE
 
-            #   Execute one reasoning step  
+            # --- Auto-Wire: execute assigned tool directly (no LLM choice) ---
+            # Restores old Planner node + Node Assembler + Auto-Wire behavior:
+            # the Planner already decided what tool to use — execute it directly.
+            assignment: dict[str, Any] = {}
+            if step_idx < len(plan.step_tool_assignments):
+                assignment = plan.step_tool_assignments[step_idx] or {}
+
+            if assignment.get("tool") and self.tool_call_count < self.profile.max_tool_calls:
+                tool_name = assignment["tool"]
+                tool_args = assignment.get("args_hint", {})
+                logger.info(
+                    f"  Auto-wire step {step_idx}: executing assigned tool '{tool_name}'"
+                )
+                await self._execute_tool(tool_name, tool_args, step_idx)
+                self.memory.advance_step()
+                continue  # Skip LLM step — tool result is now in working memory
+
+            # Compute nudge flag: fire when past threshold and still 0 tool calls
+            nudge = (
+                step_idx >= nudge_threshold
+                and self.tool_call_count == 0
+                and self._tools_available
+            )
+
+            #   Execute one reasoning step
             step_prompt = self._build_step_prompt(
                 task=task,
                 context=context,
@@ -1061,11 +1106,14 @@ class CognitiveCycle:
                 plan=plan,
                 tools_summary=tools_summary,
                 reasoning_instruction=reasoning_instruction,
+                nudge_tool_use=nudge,
             )
 
             try:
                 raw = await self.llm_call(
-                    system_prompt=self._build_execute_system_prompt(),
+                    system_prompt=self._build_execute_system_prompt(
+                        has_tools=self._tools_available
+                    ),
                     user_prompt=step_prompt,
                 )
                 data = _parse_json_safe(raw)
@@ -2226,14 +2274,31 @@ class CognitiveCycle:
     # Helpers
     # ================================================================ #
 
-    def _build_execute_system_prompt(self) -> str:
-        """Build the system prompt for execute steps."""
+    def _build_execute_system_prompt(self, has_tools: bool = False) -> str:
+        """Build the system prompt for execute steps.
+
+        Args:
+            has_tools: Whether tools are available for this execution. When True,
+                       injects a mandatory tool-use directive so the LLM cannot
+                       fabricate answers from memory.
+        """
         base = get_agent_prompt("kernel_executor") or (
             "You are an autonomous research agent executing tasks step by step."
         )
         modifier = self.profile.system_prompt_modifier
         reasoning = self.profile.get_reasoning_instruction()
-        return f"{base}\n\n{modifier}\n\nREASONING APPROACH:\n{reasoning}"
+        prompt = f"{base}\n\n{modifier}\n\nREASONING APPROACH:\n{reasoning}"
+
+        if has_tools:
+            exec_cfg = get_kernel_config("kernel_cell_execute") or {}
+            if exec_cfg.get("min_tool_calls_before_synthesis", 1) > 0:
+                prompt += (
+                    "\n\nCRITICAL RULE: You have tools available. You MUST call at least "
+                    "one tool to gather real external data before synthesizing or completing. "
+                    "Reasoning from memory alone is a failure. Use call_tool."
+                )
+
+        return prompt
 
     def _build_step_prompt(
         self,
@@ -2244,8 +2309,14 @@ class CognitiveCycle:
         plan: PlanResult,
         tools_summary: str,
         reasoning_instruction: str,
+        nudge_tool_use: bool = False,
     ) -> str:
-        """Build the user prompt for a single execution step."""
+        """Build the user prompt for a single execution step.
+
+        Args:
+            nudge_tool_use: When True, injects a warning that tool calls are
+                            required and none have been made yet.
+        """
         wm_summary = self.memory.compress(max_chars=1500)
 
         current_step = "Continue working"
@@ -2267,6 +2338,13 @@ class CognitiveCycle:
 
         if tools_summary:
             prompt_parts.append(f"\n=== AVAILABLE TOOLS ===\n{tools_summary}")
+
+        # Nudge injection: fire when tools are available but not yet used
+        if nudge_tool_use and tools_summary:
+            prompt_parts.append(
+                "\n⚠️ NO TOOL CALLS MADE YET. You MUST use call_tool on this step "
+                "to gather real data. Do not analyze from memory."
+            )
 
         force_synthesis = self.memory.get_note("force_synthesis")
         if force_synthesis:
@@ -2309,13 +2387,31 @@ class CognitiveCycle:
         return "\n".join(lines)
 
     def _assess_final_quality(self) -> str:
-        """Quick final quality assessment based on working memory signals."""
+        """Quick final quality assessment based on working memory signals.
+
+        Applies a config-driven quality penalty when tools were available
+        but no tool calls were made — prevents 91% confidence "Accept" with
+        0 actual data gathering (restores old orchestrator's quality gate).
+        """
         if not self.accumulated_content:
             return "poor"
 
         confidence = self.memory.overall_confidence
         facts = self.memory.fact_count
         content_length = sum(len(c) for c in self.accumulated_content)
+
+        # Tool-call quality gate: penalize fabricated answers
+        exec_cfg = get_kernel_config("kernel_cell_execute") or {}
+        penalty_enabled = exec_cfg.get("tool_call_quality_penalty_enabled", True)
+        min_calls = exec_cfg.get("min_tool_calls_before_synthesis", 1)
+        tools_were_available = getattr(self, "_tools_available", False)
+
+        if penalty_enabled and tools_were_available and self.tool_call_count < min_calls:
+            logger.warning(
+                f"Quality penalty: {self.tool_call_count} tool calls "
+                f"(min={min_calls}) with tools available — capping at 'poor'"
+            )
+            return "poor"
 
         if confidence >= 0.7 and facts >= 3 and content_length > 500:
             return "good"
