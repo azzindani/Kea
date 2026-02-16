@@ -168,6 +168,15 @@ class FramingResult(BaseModel):
     )
 
 
+class WorkflowStep(BaseModel):
+    """A single step in a DAG workflow."""
+    id: str = Field(description="Unique step ID (e.g., 'step_1')")
+    step: str = Field(description="Description of the step")
+    tool: str | None = Field(default=None, description="Tool to use (if any)")
+    args: dict[str, Any] = Field(default_factory=dict, description="Tool arguments")
+    depends_on: list[str] = Field(default_factory=list, description="IDs of steps that must finish first")
+
+
 class PlanResult(BaseModel):
     """Output of the PLAN phase."""
 
@@ -181,6 +190,12 @@ class PlanResult(BaseModel):
     needs_clarification: bool = Field(default=False)
     clarification_questions: list[str] = Field(default_factory=list)
 
+    # Explicit DAG workflow (v0.4.0)
+    workflow: list[WorkflowStep] = Field(
+        default_factory=list,
+        description="Explicit DAG definition for parallel execution",
+    )
+
     # Restored from old Planner node: explicit tool assignment per step.
     # Each entry maps step index (0-based) to {"tool": "<name>", "args_hint": {...}}.
     # Empty dict ({}) = no tool assigned for that step (LLM decides freely).
@@ -191,6 +206,17 @@ class PlanResult(BaseModel):
             "Index matches steps[]. Empty dict = LLM-decided step."
         ),
     )
+
+    @field_validator("risk_factors", mode="before")
+    @classmethod
+    def parse_risk_factors(cls, v: Any) -> list[str]:
+        """Handle LLM returning a single string instead of a list."""
+        if isinstance(v, str):
+            # Split by newlines or just wrap if it looks like a sentence
+            if "\n" in v:
+                return [line.strip("- *") for line in v.split("\n") if line.strip()]
+            return [v]
+        return v
 
     @model_validator(mode="before")
     @classmethod
@@ -207,6 +233,20 @@ class PlanResult(BaseModel):
         """
         if not isinstance(data, dict):
             return data
+        
+        # Also clean up workflow if provided as simple dicts
+        workflow_raw = data.get("workflow", [])
+        if workflow_raw and isinstance(workflow_raw, list):
+            # Ensure proper WorkflowStep structure if simplified
+            cleaned_wf = []
+            for item in workflow_raw:
+                if isinstance(item, dict):
+                    # Ensure ID exists
+                    if "id" not in item:
+                        item["id"] = f"step_{len(cleaned_wf)}"
+                    cleaned_wf.append(item)
+            data["workflow"] = cleaned_wf
+
         raw_steps = data.get("steps", [])
         if not raw_steps or not isinstance(raw_steps, list) or not isinstance(raw_steps[0], dict):
             return data  # Already in correct str format
@@ -960,17 +1000,18 @@ class CognitiveCycle:
             f"Produce a plan with:\n"
             f"1. approach: high-level strategy\n"
             f"2. steps: ordered list of concrete steps\n"
-            f"3. step_tool_assignments: for EACH step, specify which tool to call "
-            f"(use exact name from Available tools listed above) and what args_hint to pass. "
-            f"Use {{}} for steps that are pure analysis/synthesis (no tool needed).\n"
-            f'   Example: [{{"tool": "web_search", "args_hint": {{"query": "BCA Bank annual report 2024"}}}}, {{}}]\n'
-            f"4. estimated_tools: number of tool calls needed\n"
-            f"5. estimated_steps: number of reasoning steps\n"
-            f"6. risk_factors: what could go wrong\n"
-            f"7. can_complete_solo: can you do this alone?\n"
-            f"8. needs_delegation: should this be split across agents?\n"
-            f"9. needs_clarification: do you need more info first?\n"
-            f"10. clarification_questions: if so, what questions?\n\n"
+            f"3. workflow: explicit DAG for complex execution (optional). List of objects:\n"
+            f"   {{'id': 'step_0', 'step': 'search google', 'tool': 'web_search', 'args': {{...}}, 'depends_on': []}}\n"
+            f"   {{'id': 'step_1', 'step': 'summarize', 'depends_on': ['step_0']}}\n"
+            f"   Use this for parallel execution (e.g., step_1 and step_2 both depend on step_0).\n"
+            f"4. step_tool_assignments: mapping for sequential steps (legacy/fallback)\n"
+            f"5. estimated_tools: number of tool calls needed\n"
+            f"6. estimated_steps: number of reasoning steps\n"
+            f"7. risk_factors: what could go wrong\n"
+            f"8. can_complete_solo: can you do this alone?\n"
+            f"9. needs_delegation: should this be split across agents?\n"
+            f"10. needs_clarification: do you need more info first?\n"
+            f"11. clarification_questions: if so, what questions?\n\n"
             f"Respond in JSON only."
         )
 
@@ -986,8 +1027,7 @@ class CognitiveCycle:
             data = _parse_json_safe(raw)
             result = PlanResult(
                 approach=data.get("approach", "Sequential analysis"),
-                steps=data.get("steps", ["Research and analyze"]),
-                step_tool_assignments=data.get("step_tool_assignments", []),
+                steps=data.get("steps", ["Analyze task", "Execute"]),
                 estimated_tools=data.get("estimated_tools", 0),
                 estimated_steps=data.get("estimated_steps", 3),
                 risk_factors=data.get("risk_factors", []),
@@ -995,6 +1035,8 @@ class CognitiveCycle:
                 needs_delegation=data.get("needs_delegation", False),
                 needs_clarification=data.get("needs_clarification", False),
                 clarification_questions=data.get("clarification_questions", []),
+                step_tool_assignments=data.get("step_tool_assignments", []),
+                workflow=data.get("workflow", []),
             )
         except Exception as e:
             logger.warning(f"Planning LLM call failed: {e}; using default plan")
@@ -1303,16 +1345,67 @@ class CognitiveCycle:
         available_tools: list[dict[str, Any]],
     ) -> bool:
         """
-        Attempt DAG-based parallel execution using the existing DAGExecutor.
+        Attempt DAG-based parallel execution.
 
-        Converts plan steps into WorkflowNodes and executes them as a
-        dependency-driven DAG. Returns True if DAG execution was used
-        and completed, False to fall back to sequential.
+        Uses explicit plan.workflow OR falls back to converting sequential
+        steps into a simple phased DAG.
         """
         dag_cfg = get_kernel_config("kernel_cell_dag") or {}
         if not dag_cfg.get("enabled", True):
             return False
 
+        # If explicit workflow is provided, use it directly
+        if plan.workflow and len(plan.workflow) > 0:
+            logger.info(f"  DAG: Using explicit workflow from planner ({len(plan.workflow)} nodes)")
+            blueprint_steps = []
+            for node in plan.workflow:
+                step_dict = {
+                    "id": node.id,
+                    "description": node.step,
+                    "type": "tool" if node.tool else "llm",
+                    "depends_on": node.depends_on,
+                }
+                if node.tool:
+                    step_dict["tool"] = node.tool
+                    step_dict["args"] = node.args or {"query": task[:500]}
+                else:
+                    step_dict["llm_prompt"] = (
+                        f"Execute: {node.step}\nContext: {task[:300]}"
+                    )
+                    step_dict["llm_system"] = self._build_execute_system_prompt(
+                         has_tools=bool(available_tools)
+                    )
+                blueprint_steps.append(step_dict)
+            
+            # Execute with Blueprint
+            try:
+                from kernel.flow.workflow_nodes import parse_blueprint
+                from kernel.flow.dag_executor import DAGExecutor
+                
+                dag_nodes = parse_blueprint(blueprint_steps)
+                executor = DAGExecutor(
+                    nodes=dag_nodes,
+                    max_parallel=dag_cfg.get("max_parallel", 4),
+                    tool_executor=self.tool_call,
+                    llm_executor=self.llm_call,
+                )
+                
+                logger.info(f"  DAG Executor starting: {len(dag_nodes)} nodes (explicit)")
+                results = await executor.run()
+                
+                # Consolidate results
+                for res in results.values():
+                    if res.status == "completed":
+                        self.accumulated_content.append(str(res.output))
+                        if res.output:
+                            self.memory.store_fact(f"dag_result_{res.node_id}", str(res.output)[:500])
+                
+                return True
+            except Exception as e:
+                logger.warning(f"  DAG execution failed: {e}, falling back to sequential")
+                return False
+
+        # Fallback: Heuristic DAG construction (existing logic)
         # Check complexity threshold   skip DAG for trivial/low
         min_complexity = dag_cfg.get("min_complexity_for_dag", "medium")
         complexity_order = ["trivial", "low", "medium", "high", "extreme"]

@@ -287,12 +287,17 @@ async def discover_tools(
 
     cfg = get_kernel_config("kernel_cell_explore") or {}
     n_tools = limit or cfg.get("max_tools_to_scan", 15)
+    min_sim = cfg.get("rag_min_similarity", 0.0)
 
     # Prepend domain hint to improve semantic matching precision
     search_query = f"{domain}: {query}" if domain else query
 
     mcp_url = ServiceRegistry.get_url(ServiceName.MCP_HOST)
-    payload = ToolSearchRequest(query=search_query, limit=n_tools)
+    payload = ToolSearchRequest(
+        query=search_query, 
+        limit=n_tools,
+        min_similarity=min_sim
+    )
 
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
@@ -319,9 +324,12 @@ async def discover_tools(
                     )
                     try:
                         async with httpx.AsyncClient(timeout=timeout) as client:
-                            fb_resp = await client.get(f"{mcp_url}/tools")
+                            fb_resp = await client.get(
+                                f"{mcp_url}/tools",
+                                params={"limit": fallback_limit}
+                            )
                             if fb_resp.status_code == 200:
-                                tools = fb_resp.json().get("tools", [])[:fallback_limit]
+                                tools = fb_resp.json().get("tools", [])
                                 logger.info(
                                     f"Static fallback: {len(tools)} tools available"
                                 )

@@ -53,8 +53,8 @@ async def health():
 
 
 @app.get("/tools")
-async def list_tools(server: str | None = None):
-    """List available tools, optionally filtered by server (JIT)."""
+async def list_tools(server: str | None = None, limit: int | None = None):
+    """List available tools, optionally filtered by server (JIT) or limited."""
     from services.mcp_host.core.session_registry import get_session_registry
     registry = get_session_registry()
     
@@ -64,6 +64,9 @@ async def list_tools(server: str | None = None):
     else:
         # Full scan (legacy behavior, wakes all servers)
         tools = await registry.list_all_tools()
+        
+    if limit and limit > 0:
+        tools = tools[:limit]
         
     return {"tools": tools}
 
@@ -79,7 +82,11 @@ async def search_tools(request: ToolSearchRequest):
     from services.mcp_host.core.session_registry import get_session_registry
 
     registry = get_session_registry()
-    tools = await registry.search_tools(query=request.query, limit=request.limit)
+    tools = await registry.search_tools(
+        query=request.query, 
+        limit=request.limit,
+        min_similarity=request.min_similarity
+    )
     return {"tools": tools}
 
 

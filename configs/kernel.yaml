@@ -378,11 +378,12 @@ organization:
 
 kernel_cell_explore:
   enabled: true
-  max_tools_to_scan: 30            # Max tools to consider from registry
+  max_tools_to_scan: 100           # Max tools to consider from registry
   max_knowledge_snippets: 5        # Max knowledge chunks from retriever
   max_prior_findings: 3            # Max Vault cross-session findings
   skip_for_levels: [intern]        # These levels skip exploration
   budget_fraction: 0.05            # Max fraction of budget for exploration
+  rag_min_similarity: 0.2          # Minimum quality for tools (0.2 = lenient)
 
 # ==============================================================================
 # Kernel Intent Routing (Step 2 — Path A/B/C/D Classification)
@@ -451,4 +452,4 @@ kernel_cell_execute:
 
   # Fallback when RAG returns 0 tools (cold start / empty registry): use GET /tools.
   # 0 = disabled.
-  rag_fallback_static_limit: 10
+  rag_fallback_static_limit: 100

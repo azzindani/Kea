@@ -57,7 +57,7 @@ class KnowledgeRetriever:
         category: str | None = None,
         tags: list[str] | None = None,
         min_similarity: float = 0.3,
-        enable_reranking: bool = True,
+        enable_reranking: bool = False,
     ) -> str:
         """
         Retrieve formatted knowledge context for prompt injection.
@@ -85,6 +85,8 @@ class KnowledgeRetriever:
             payload["category"] = category
         if tags:
             payload["tags"] = tags
+        
+        payload["enable_reranking"] = enable_reranking
 
         label = f"category={category or 'all'} domain={domain or 'any'}"
         logger.debug(f"KnowledgeRetriever: querying RAG Service [{label}] q='{query[:60]}'")
@@ -112,6 +114,17 @@ class KnowledgeRetriever:
             logger.info(f"KnowledgeRetriever: {len(results)} items [{label}] -> {log_items}")
 
             relevant = [r for r in results if r.get("similarity", 0) >= min_similarity]
+            
+            # Fallback logic: if no items meet strict threshold, return what we found
+            # The user explicitly requested "real output... make it fall back"
+            if not relevant and results:
+                logger.warning(
+                    f"KnowledgeRetriever: Strict threshold {min_similarity} yielded 0 items. "
+                    f"Falling back to {len(results)} items with low similarity [{label}]"
+                )
+                relevant = results
+
+            # Final check (should only be empty if results was empty)
             if not relevant:
                 logger.debug(
                     f"KnowledgeRetriever: all {len(results)} items below "

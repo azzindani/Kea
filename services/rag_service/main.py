@@ -318,6 +318,7 @@ class KnowledgeSearchRequest(BaseModel):
     domain: str | None = None
     category: str | None = None
     tags: list[str] | None = None
+    enable_reranking: bool = True
 
 
 class KnowledgeResponse(BaseModel):
@@ -352,6 +353,7 @@ async def search_knowledge(request: KnowledgeSearchRequest):
         domain=request.domain,
         category=request.category,
         tags=request.tags,
+        enable_reranking=request.enable_reranking,
     )
 
     return [
