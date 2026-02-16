@@ -281,6 +281,27 @@ async def discover_tools(
                 return []
             tools = resp.json().get("tools", [])
             logger.info(f"Tool RAG search: {len(tools)} tools for query '{search_query[:60]}'")
+
+            # Static fallback: when RAG returns 0 tools (cold start / empty registry)
+            # fall back to GET /tools to give the LLM at least some tools to work with.
+            if not tools:
+                exec_cfg = get_kernel_config("kernel_cell_execute") or {}
+                fallback_limit = exec_cfg.get("rag_fallback_static_limit", 0)
+                if fallback_limit > 0:
+                    logger.warning(
+                        f"Tool RAG search returned 0 — static fallback (limit={fallback_limit})"
+                    )
+                    try:
+                        async with httpx.AsyncClient(timeout=timeout) as client:
+                            fb_resp = await client.get(f"{mcp_url}/tools")
+                            if fb_resp.status_code == 200:
+                                tools = fb_resp.json().get("tools", [])[:fallback_limit]
+                                logger.info(
+                                    f"Static fallback: {len(tools)} tools available"
+                                )
+                    except Exception as fe:
+                        logger.warning(f"Static fallback failed: {fe}")
+
             return tools
     except httpx.TimeoutException:
         logger.warning("Tool RAG search timed out")
