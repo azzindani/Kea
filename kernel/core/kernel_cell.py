@@ -338,6 +338,10 @@ class KernelCell:
         # Config cache (avoid repeated YAML loads)
         self._complexity_modes: dict[str, str] | None = None
 
+        # Active inference context: set by _execute_solo so _cognitive_llm_call
+        # can pass it to KnowledgeEnhancedInference.complete() for knowledge injection.
+        self._active_inference_context: InferenceContext | None = None
+
         #   Resource Governance (Phase 4)  
         # Governor: manages budgets and escalations for children
         async def _governor_llm_call(system_prompt: str, user_prompt: str) -> str:
@@ -635,6 +639,11 @@ class KernelCell:
             f"style={self.cognitive_profile.reasoning_style.value})"
         )
 
+        # Store active context so _cognitive_llm_call can inject domain knowledge
+        # (skills, rules, procedures, quality bar) into every CognitiveCycle LLM call.
+        # Without this, engine.complete() receives context=None and skips all retrieval.
+        self._active_inference_context = context
+
         # Build the cognitive cycle with level-aware profile
         cycle = CognitiveCycle(
             profile=self.cognitive_profile,
@@ -772,7 +781,11 @@ class KernelCell:
             temperature=0.3,
             max_tokens=4096,
         )
-        response = await self.engine.complete(messages, config)
+        # Pass the active InferenceContext so KnowledgeEnhancedInference injects
+        # role-specific skills, rules, procedures, and quality bar into every call.
+        response = await self.engine.complete(
+            messages, config, context=self._active_inference_context
+        )
         return response.content
 
     async def _execute_tool_for_cycle(
