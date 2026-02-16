@@ -1264,25 +1264,37 @@ class CognitiveCycle:
                     "phase": (i // 2) + 1,  # Group into phases for parallelism
                 }
 
-                # Try to match step to an available tool
-                matched_tool = ""
-                step_lower = step_desc.lower()
-                for t in available_tools:
-                    tool_name = t.get("name", "")
-                    if tool_name and tool_name.lower() in step_lower:
-                        matched_tool = tool_name
-                        break
+                # --- Tool matching: assignment-first, substring fallback ---
+                # Priority 1: use the planner's explicit assignment (step_tool_assignments).
+                # The planner already selected the right tool via RAG — trust it.
+                assignment: dict[str, Any] = {}
+                if i < len(plan.step_tool_assignments):
+                    assignment = plan.step_tool_assignments[i] or {}
+
+                matched_tool = assignment.get("tool", "")
+                tool_args_from_plan: dict[str, Any] = assignment.get("args_hint", {})
+
+                if not matched_tool:
+                    # Priority 2: legacy substring match (backwards compat)
+                    step_lower = step_desc.lower()
+                    for t in available_tools:
+                        t_name = t.get("name", "")
+                        if t_name and t_name.lower() in step_lower:
+                            matched_tool = t_name
+                            break
 
                 if matched_tool:
                     step_dict["type"] = "tool"
                     step_dict["tool"] = matched_tool
-                    step_dict["args"] = {"query": task[:500]}
+                    step_dict["args"] = tool_args_from_plan or {"query": task[:500]}
                 else:
                     step_dict["type"] = "llm"
                     step_dict["llm_prompt"] = (
                         f"Execute this step: {step_desc}\n\nOriginal task: {task[:300]}"
                     )
-                    step_dict["llm_system"] = self._build_execute_system_prompt()
+                    step_dict["llm_system"] = self._build_execute_system_prompt(
+                        has_tools=bool(available_tools)
+                    )
 
                 # Dependency: each step depends on the previous in same phase
                 if i > 0 and blueprint_steps[i - 1].get("phase") == step_dict["phase"]:
