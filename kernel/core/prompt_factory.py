@@ -98,7 +98,7 @@ def load_prompts_config() -> tuple[dict, dict, dict, dict]:
 
     try:
         # Resolve path relative to project root
-        root_path = Path(__file__).resolve().parents[3]
+        root_path = Path(__file__).resolve().parents[2]
         config_path = root_path / "configs" / "prompts.yaml"
 
         if not config_path.exists():

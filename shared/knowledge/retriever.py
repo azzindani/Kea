@@ -90,7 +90,7 @@ class KnowledgeRetriever:
         logger.debug(f"KnowledgeRetriever: querying RAG Service [{label}] q='{query[:60]}'")
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 resp = await client.post(
                     f"{self._rag_url()}/knowledge/search",
                     json=payload,
