@@ -254,10 +254,10 @@ class AutoWirer:
                 else:
                     score -= 1.0
 
-            if score > best_score and score > 1.0:  # High threshold for automatic heuristic
+            if score > best_score and score > 0.7:  # Lowered threshold for partial matches
                 best_score = score
                 best_candidate = candidate
-                if score >= 1.3:
+                if score >= 1.0:
                     candidate.score = score
                     return candidate
 

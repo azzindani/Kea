@@ -58,6 +58,8 @@ from kernel.io.output_schemas import (
     ArtifactType,
     WorkPackage,
 )
+from kernel.memory.artifact_store import ArtifactStore
+from kernel.core.assembler import resolve_and_wire_inputs
 from kernel.memory.working_memory import (
     FocusItem,
     FocusItemType,
@@ -371,6 +373,9 @@ class CognitiveCycle:
 
         # Mid-execution delegation signal
         self._delegation_signal: dict[str, str] | None = None
+        
+        # Artifact Store for auto-wiring (holds intermediate tool outputs)
+        self._store = ArtifactStore()
 
     # ================================================================ #
     # Main Entry Point
@@ -1152,9 +1157,20 @@ class CognitiveCycle:
 
             if assignment.get("tool") and self.tool_call_count < self.profile.max_tool_calls:
                 tool_name = assignment["tool"]
-                tool_args = assignment.get("args_hint", {})
+                raw_args = assignment.get("args_hint", {})
+                
+                # Resolve inputs (Auto-Wire)
+                tool_args = await resolve_and_wire_inputs(
+                    input_mapping={},
+                    current_args=raw_args,
+                    tool_name=tool_name,
+                    store=self._store,
+                    auto_wirer=None
+                )
+                
                 logger.info(
-                    f"  Auto-wire step {step_idx}: executing assigned tool '{tool_name}'"
+                    f"  Auto-wire step {step_idx}: executing assigned tool '{tool_name}' "
+                    f"args={list(tool_args.keys())}"
                 )
                 await self._execute_tool(tool_name, tool_args, step_idx)
                 self.memory.advance_step()
@@ -1444,9 +1460,9 @@ class CognitiveCycle:
                 "max_concurrent_default",
                 self.profile.max_tool_calls or 4,
             )
-            store = ArtifactStore()
+            # Share the cycle's artifact store so DAG can see/write shared state
             dag = DAGExecutor(
-                store=store,
+                store=self._store,
                 node_executor=node_executor,
                 max_parallel=max_concurrent,
             )
@@ -1557,6 +1573,13 @@ class CognitiveCycle:
             )
 
             logger.debug(f"  Tool {tool_name}: {len(result_str)} chars")
+            
+            # Store in ArtifactStore for auto-wiring
+            step_key = f"step_{step_idx}"
+            self._store.store(step_key, "output", result_str)
+            self._store.store(step_key, "result", result_str)
+            # Also store by tool name if it helps heuristics
+            self._store.store(step_key, tool_name, result_str)
 
         except Exception as e:
             logger.warning(f"  Tool {tool_name} failed: {e}")
