@@ -36,7 +36,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from shared.logging import get_logger
 from shared.prompts import get_agent_prompt, get_kernel_config, get_report_template
@@ -189,6 +189,60 @@ class PlanResult(BaseModel):
             "Index matches steps[]. Empty dict = LLM-decided step."
         ),
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_steps_format(cls, data: Any) -> Any:
+        """
+        Handle the LLM returning a merged format where each step is a dict:
+            steps: [{"step": "...", "tool": "web_search", "args_hint": {...}}, ...]
+
+        Instead of the expected separate lists:
+            steps: ["...", "..."]
+            step_tool_assignments: [{"tool": "web_search", "args_hint": {...}}, {}]
+
+        Extracts step text into steps[] and tool info into step_tool_assignments[].
+        """
+        if not isinstance(data, dict):
+            return data
+        raw_steps = data.get("steps", [])
+        if not raw_steps or not isinstance(raw_steps, list) or not isinstance(raw_steps[0], dict):
+            return data  # Already in correct str format
+
+        steps_clean: list[str] = []
+        assignments: list[dict[str, Any]] = []
+
+        for item in raw_steps:
+            if isinstance(item, dict):
+                step_text = item.get("step") or item.get("description") or str(item)
+                steps_clean.append(str(step_text))
+                tool_name = item.get("tool", "")
+                args_hint = item.get("args_hint") or item.get("arguments") or {}
+                # Guard against LLM returning tool as "{}" string
+                if (
+                    isinstance(tool_name, str)
+                    and tool_name
+                    and tool_name not in ("{}", "null", "none", "")
+                ):
+                    assignments.append(
+                        {"tool": tool_name, "args_hint": args_hint if isinstance(args_hint, dict) else {}}
+                    )
+                else:
+                    assignments.append({})
+            else:
+                steps_clean.append(str(item))
+                assignments.append({})
+
+        data["steps"] = steps_clean
+        # Only fill assignments if not already explicitly provided
+        if not data.get("step_tool_assignments"):
+            data["step_tool_assignments"] = assignments
+
+        logger.debug(
+            f"PlanResult.normalize_steps_format: extracted {len(steps_clean)} steps, "
+            f"{sum(1 for a in assignments if a.get('tool'))} tool assignments from merged format"
+        )
+        return data
 
 
 class MonitorResult(BaseModel):
@@ -939,9 +993,19 @@ class CognitiveCycle:
             )
         except Exception as e:
             logger.warning(f"Planning LLM call failed: {e}; using default plan")
+            # Build a default plan that still wires available tools so auto-wire
+            # can fire even when the LLM planner fails (e.g. JSON truncation).
+            default_assignments: list[dict[str, Any]] = []
+            if available_tools:
+                default_assignments = [
+                    {"tool": available_tools[0].get("name", ""), "args_hint": {"query": task[:200]}},
+                    {},  # analyze step — LLM-decided
+                    {},  # synthesize step — LLM-decided
+                ]
             result = PlanResult(
                 approach="Sequential research and analysis",
-                steps=["Gather data", "Analyze", "Synthesize"],
+                steps=["Gather data using available tools", "Analyze findings", "Synthesize results"],
+                step_tool_assignments=default_assignments,
             )
 
         # Record plan in working memory
@@ -996,6 +1060,12 @@ class CognitiveCycle:
         self._tools_available: bool = bool(available_tools)
         exec_cfg = get_kernel_config("kernel_cell_execute") or {}
         nudge_threshold: int = exec_cfg.get("tool_call_nudge_after_step", 1)
+
+        assigned_count = sum(1 for a in plan.step_tool_assignments if a.get("tool"))
+        logger.info(
+            f"  [EXECUTE] starting | max_steps={max_steps} tools={len(available_tools)} "
+            f"plan_steps={len(plan.steps)} auto_wire_assignments={assigned_count}"
+        )
 
         for step_idx in range(max_steps):
             self.memory.advance_step()
@@ -1127,7 +1197,10 @@ class CognitiveCycle:
             action_input = data.get("action_input", {})
             confidence = data.get("confidence", 0.5)
 
-            logger.debug(f"  Step {step_idx}: action={action} confidence={confidence:.2f}")
+            logger.info(
+                f"  [Step {step_idx + 1}/{max_steps}] action={action} "
+                f"confidence={confidence:.2f} tool_calls_so_far={self.tool_call_count}"
+            )
 
             # Record thinking in working memory
             if thought:
@@ -1149,6 +1222,7 @@ class CognitiveCycle:
                     tool_name = action_input.get("tool", "")
                     tool_args = action_input.get("arguments", {})
                     if tool_name:
+                        logger.info(f"  [call_tool] {tool_name} args={list(tool_args.keys())}")
                         await self._execute_tool(tool_name, tool_args, step_idx)
 
             elif action == "analyze":
@@ -1287,6 +1361,7 @@ class CognitiveCycle:
                     step_dict["type"] = "tool"
                     step_dict["tool"] = matched_tool
                     step_dict["args"] = tool_args_from_plan or {"query": task[:500]}
+                    logger.info(f"  [DAG] step_{i}: tool={matched_tool}")
                 else:
                     step_dict["type"] = "llm"
                     step_dict["llm_prompt"] = (
@@ -1295,6 +1370,7 @@ class CognitiveCycle:
                     step_dict["llm_system"] = self._build_execute_system_prompt(
                         has_tools=bool(available_tools)
                     )
+                    logger.info(f"  [DAG] step_{i}: llm (no tool assigned)")
 
                 # Dependency: each step depends on the previous in same phase
                 if i > 0 and blueprint_steps[i - 1].get("phase") == step_dict["phase"]:
@@ -1378,9 +1454,9 @@ class CognitiveCycle:
             dag_result = await dag.execute(nodes)
 
             logger.info(
-                f"  DAG execution: {dag_result.completed}/{dag_result.total_nodes} "
-                f"completed, {dag_result.failed} failed, "
-                f"{dag_result.replans_triggered} replans"
+                f"  [DAG] complete: {dag_result.completed}/{dag_result.total_nodes} nodes "
+                f"| failed={dag_result.failed} replans={dag_result.replans_triggered} "
+                f"| tool_calls={self.tool_call_count}"
             )
 
             # Feed DAG results back into working memory
