@@ -17,6 +17,6 @@ from shared.mcp.protocol import (
 )
 from shared.schemas import (
     ToolOutput, DataPayload, FileReference, FileType,
-    ToolRequest, BatchToolRequest, ToolResponse
+    ToolRequest, BatchToolRequest, ToolResponse, ToolSearchRequest,
 )
     

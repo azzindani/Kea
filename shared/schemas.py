@@ -377,6 +377,22 @@ class ToolRequest(BaseModel):
     arguments: dict[str, Any] = Field(default_factory=dict)
 
 
+class ToolSearchRequest(BaseModel):
+    """Semantic tool search request — used by kernel to discover relevant tools via RAG."""
+
+    query: str = Field(
+        ...,
+        min_length=1,
+        description="Natural-language task description for semantic matching",
+    )
+    limit: int = Field(
+        default=10,
+        ge=1,
+        le=50,
+        description="Max number of tools to return",
+    )
+
+
 class BatchToolRequest(BaseModel):
     """Batch tool execution request."""
     tasks: list[ToolRequest]

@@ -233,107 +233,61 @@ def create_tool_executor(
 
 
 async def discover_tools(
-    timeout: float = 10.0,
-    query: str | None = None,
-    domain: str | None = None,
+    timeout: float = 5.0,
+    query: str = "",
+    domain: str = "",
+    limit: int | None = None,
 ) -> list[dict[str, Any]]:
     """
-    Discover tools from MCP Host, optimized for Just-In-Time (JIT) loading.
-    
-    If `query` or `domain` is provided, it consults `tool_registry.yaml` to
-    identify relevant servers and *only* wakes those up.
-    Otherwise, it performs a full scan (which wakes all servers).
+    Discover relevant tools via RAG semantic search on the MCP Host.
+
+    Replaces keyword YAML matching and hardcoded domain fallbacks with
+    pgvector cosine-similarity search over all 2000+ registered tools
+    across 60+ MCP servers.
+
+    Args:
+        timeout: HTTP timeout in seconds.
+        query: Natural-language task description for semantic matching.
+        domain: Optional domain hint prepended to query for better relevance.
+        limit: Max tools to return (defaults to kernel_cell_explore config value).
+
+    Returns:
+        List of tool dicts with name, description, and inputSchema.
     """
-    mcp_url = ServiceRegistry.get_url(ServiceName.MCP_HOST)
-    
-    # 1. Identify Target Servers (JIT Optimization)
-    target_servers = set()
-    
-    if query:
-        try:
-            # Load registry map: keywords -> server
-            from pathlib import Path
-            import yaml
-            
-            # Find configs/ relative to this file
-            # services/orchestrator/core/tool_bridge.py -> ... -> Kea/configs
-            try:
-                root_path = Path(__file__).resolve().parents[3]
-                registry_path = root_path / "configs" / "tool_registry.yaml"
-            except IndexError:
-                registry_path = Path("configs/tool_registry.yaml")
+    from shared.schemas import ToolSearchRequest
 
-            if registry_path and registry_path.exists():
-                with open(registry_path, "r", encoding="utf-8") as f:
-                    reg_data = yaml.safe_load(f)
-                    
-                items = reg_data.get("items", {})
-                query_lower = query.lower()
-                
-                for tool_key, tool_cfg in items.items():
-                    # Check keywords
-                    keywords = tool_cfg.get("keywords", [])
-                    if any(k in query_lower for k in keywords):
-                        target_servers.add(tool_cfg.get("server"))
-                        
-                    # Also check tool name itself
-                    if tool_key in query_lower:
-                        target_servers.add(tool_cfg.get("server"))
-        except Exception as e:
-            logger.warning(f"JIT Registry lookup failed: {e}")
-
-    # Always include 'mcp_host' (system tools) and domain-specific defaults
-    if not target_servers:
-        # Fallback 1: If domain implies a specifc server
-        if domain == "finance":
-            target_servers.add("yfinance_server")
-        elif domain == "crypto":
-            target_servers.add("ccxt_server")
-        elif domain == "academic":
-            target_servers.add("academic_server")
-        elif domain == "coding":
-            target_servers.add("python_server")
-            
-        # Fallback 2: General purpose
-        target_servers.add("search_server")
-        target_servers.add("browser_agent_server")
-
-    # 2. Fetch tools from targets
-    discovered_tools = []
-    
-    async def _fetch_server(srv_name: str):
-        if not srv_name: return
-        try:
-            async with httpx.AsyncClient(timeout=timeout) as client:
-                # Use new 'server=' param to avoid waking everything
-                resp = await client.get(f"{mcp_url}/tools", params={"server": srv_name})
-                if resp.status_code == 200:
-                    data = resp.json()
-                    tools = data.get("tools", [])
-                    logger.info(f"JIT loaded {len(tools)} tools from {srv_name}")
-                    return tools
-        except Exception:
-            pass # Server might be down or name wrong, ignore
+    if not query:
         return []
 
-    # Parallel fetch
-    results = await asyncio.gather(*[_fetch_server(s) for s in target_servers if s])
-    for r in results:
-        if r:
-            discovered_tools.extend(r)
-            
-    # If JIT failed to find anything useful, fallback to full scan (safety net)
-    if not discovered_tools and not query:
-        logger.warning("JIT discovery found no tools, falling back to full scan")
-        try:
-            async with httpx.AsyncClient(timeout=timeout*2) as client:
-                resp = await client.get(f"{mcp_url}/tools") # No server param = all
-                if resp.status_code == 200:
-                    return resp.json().get("tools", [])
-        except Exception as e:
-            logger.warning(f"Full tool discovery failed: {e}")
+    cfg = get_kernel_config("kernel_cell_explore") or {}
+    n_tools = limit or cfg.get("max_tools_to_scan", 15)
 
-    return discovered_tools
+    # Prepend domain hint to improve semantic matching precision
+    search_query = f"{domain}: {query}" if domain else query
+
+    mcp_url = ServiceRegistry.get_url(ServiceName.MCP_HOST)
+    payload = ToolSearchRequest(query=search_query, limit=n_tools)
+
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(
+                f"{mcp_url}/tools/search",
+                json=payload.model_dump(),
+            )
+            if resp.status_code != 200:
+                logger.warning(
+                    f"Tool RAG search returned {resp.status_code}: {resp.text[:200]}"
+                )
+                return []
+            tools = resp.json().get("tools", [])
+            logger.info(f"Tool RAG search: {len(tools)} tools for query '{search_query[:60]}'")
+            return tools
+    except httpx.TimeoutException:
+        logger.warning("Tool RAG search timed out")
+        return []
+    except Exception as e:
+        logger.warning(f"Tool RAG search failed: {e}")
+        return []
 
 
 async def verify_mcp_connectivity(timeout: float = 3.0) -> bool:
