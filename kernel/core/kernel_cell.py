@@ -776,10 +776,12 @@ class KernelCell:
             LLMMessage(role=LLMRole.SYSTEM, content=system_prompt),
             LLMMessage(role=LLMRole.USER, content=user_prompt),
         ]
+        # Use config-driven token budget — prevents JSON truncation on large responses.
+        # kernel.yaml llm_callbacks.planner_max_tokens is the authoritative value.
         config = LLMConfig(
             model=self.model,
             temperature=0.3,
-            max_tokens=4096,
+            max_tokens=(get_kernel_config("llm_callbacks") or {}).get("planner_max_tokens", 32768),
         )
         # Pass the active InferenceContext so KnowledgeEnhancedInference injects
         # role-specific skills, rules, procedures, and quality bar into every call.
@@ -1161,9 +1163,12 @@ class KernelCell:
 
         #   Record completion and reclaim surplus  
         # In a real async system, this would be an event, but here we await
-        tokens_used = (
-            result.stdout.metadata.get("tokens_used", 0) if hasattr(result, "stdout") else 0
-        )
+        # StdoutEnvelope has no metadata field — use getattr to guard safely
+        tokens_used = 0
+        if hasattr(result, "stdout") and result.stdout:
+            _stdout_meta = getattr(result.stdout, "metadata", {})
+            if isinstance(_stdout_meta, dict):
+                tokens_used = _stdout_meta.get("tokens_used", 0)
         surplus = self.governor.child_completed(child.cell_id, tokens_used=tokens_used)
         if surplus > 0:
             logger.debug(f"Cell {self.cell_id}: Reclaimed {surplus} tokens from {child.cell_id}")
