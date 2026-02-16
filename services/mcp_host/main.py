@@ -5,9 +5,10 @@ from contextlib import asynccontextmanager
 
 from shared.logging import get_logger
 from services.mcp_host.core.models import (
-    ToolRequest, 
-    BatchToolRequest, 
-    ToolResponse
+    ToolRequest,
+    BatchToolRequest,
+    ToolResponse,
+    ToolSearchRequest,
 )
 
 logger = get_logger(__name__)
@@ -64,6 +65,21 @@ async def list_tools(server: str | None = None):
         # Full scan (legacy behavior, wakes all servers)
         tools = await registry.list_all_tools()
         
+    return {"tools": tools}
+
+
+@app.post("/tools/search")
+async def search_tools(request: ToolSearchRequest):
+    """
+    Semantic tool search via pgvector RAG.
+
+    Returns tools ranked by cosine similarity to the query — no hardcoded
+    keywords or domain lists. Covers all 2000+ tools across 60+ MCP servers.
+    """
+    from services.mcp_host.core.session_registry import get_session_registry
+
+    registry = get_session_registry()
+    tools = await registry.search_tools(query=request.query, limit=request.limit)
     return {"tools": tools}
 
 

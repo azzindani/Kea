@@ -117,9 +117,9 @@ class PerceptionResult(BaseModel):
 class ExploreResult(BaseModel):
     """Output of the EXPLORE phase   pre-planning reconnaissance."""
 
-    available_tools: list[str] = Field(
+    available_tools: list[dict[str, Any]] = Field(
         default_factory=list,
-        description="Relevant tool names from registry",
+        description="Relevant tool dicts (name, description, inputSchema) from RAG registry",
     )
     suggested_sources: list[str] = Field(
         default_factory=list,
@@ -398,10 +398,13 @@ class CognitiveCycle:
         self.current_phase = CyclePhase.PLAN
         # Enrich available_tools with exploration discoveries
         if exploration.available_tools:
-            explored_tool_names = set(exploration.available_tools)
-            existing_names = {t.get("name", "") for t in available_tools}
-            for tool_name in explored_tool_names - existing_names:
-                available_tools.append({"name": tool_name, "description": "Discovered during exploration"})
+            # Dict-based dedup: preserve full tool schemas (name + description + inputSchema)
+            existing_by_name: dict[str, dict] = {t.get("name", ""): t for t in available_tools}
+            for tool_dict in exploration.available_tools:
+                name = tool_dict.get("name", "")
+                if name and name not in existing_by_name:
+                    available_tools.append(tool_dict)
+                    existing_by_name[name] = tool_dict
         plan = await self._plan(task, context, perception, framing, available_tools)
 
         # Short-circuit: if the plan says we need delegation or
@@ -640,11 +643,10 @@ class CognitiveCycle:
         max_tools = explore_cfg.get("max_tools_to_scan", 30)
         max_knowledge = explore_cfg.get("max_knowledge_snippets", 5)
 
-        #   1. Scan available tools for relevance  
-        relevant_tools: list[str] = []
+        #   1. Scan available tools for relevance (preserve full dicts with inputSchema)
+        relevant_tools: list[dict[str, Any]] = []
         if available_tools:
-            tool_names = [t.get("name", "") for t in available_tools[:max_tools]]
-            relevant_tools = tool_names
+            relevant_tools = list(available_tools[:max_tools])
 
         #   2. Retrieve domain knowledge  
         domain_snippets: list[str] = []
@@ -694,20 +696,23 @@ class CognitiveCycle:
         except Exception as e:
             logger.debug(f"Vault cross-session lookup during EXPLORE failed: {e}")
 
-        #   4. LLM assessment of landscape  
+        #   4. LLM assessment of landscape
         exploration_notes = ""
+        suggested: list[str] = []
         if self.profile.reasoning_style not in (
             ReasoningStyle.DIRECT_LOOKUP,
             ReasoningStyle.PROCEDURAL,
         ):
             try:
+                # Extract names for display only — full dicts stay in relevant_tools
+                tool_names_for_prompt = [t.get("name", "?") for t in relevant_tools[:15]]
                 prompt = (
                     f"You are scouting the landscape before starting work.\n\n"
                     f"Task: {perception.task_text[:400]}\n"
                     f"Key entities: {', '.join(perception.key_entities[:5])}\n"
                     f"Intent path: {perception.intent_path}\n"
                     f"Available tools ({len(relevant_tools)}): "
-                    f"{', '.join(relevant_tools[:15])}\n"
+                    f"{', '.join(tool_names_for_prompt)}\n"
                 )
                 if domain_snippets:
                     prompt += f"Domain knowledge: {'; '.join(domain_snippets[:3])}\n"
@@ -729,17 +734,16 @@ class CognitiveCycle:
                 )
                 data = _parse_json_safe(raw)
                 exploration_notes = data.get("exploration_notes", "")
-                suggested = data.get("suggested_sources", [])
-                if isinstance(suggested, list):
-                    relevant_tools = list(
-                        dict.fromkeys(relevant_tools + [s for s in suggested if isinstance(s, str)])
-                    )
+                # suggested_sources are data source URLs/names, NOT MCP tool dicts.
+                # Store them separately in ExploreResult.suggested_sources — do NOT
+                # merge into relevant_tools which must remain full MCP tool dicts.
+                suggested = [s for s in data.get("suggested_sources", []) if isinstance(s, str)]
             except Exception as e:
                 logger.debug(f"Exploration LLM call failed: {e}")
 
         result = ExploreResult(
             available_tools=relevant_tools,
-            suggested_sources=[],
+            suggested_sources=suggested,
             domain_knowledge=domain_snippets,
             prior_findings=prior_findings,
             exploration_notes=exploration_notes,
@@ -870,10 +874,7 @@ class CognitiveCycle:
 
         # Build planning prompt with cognitive profile awareness
         reasoning_instruction = self.profile.get_reasoning_instruction()
-        tools_summary = ""
-        if available_tools:
-            tool_names = [t.get("name", "?") for t in available_tools[:15]]
-            tools_summary = f"\nAvailable tools: {', '.join(tool_names)}"
+        tools_summary = f"\nAvailable tools:\n{self._format_tools(available_tools)}" if available_tools else ""
 
         prompt = (
             f"Plan how to complete this task.\n\n"
@@ -2273,22 +2274,38 @@ class CognitiveCycle:
 
         prompt_parts.append(
             "\n=== RESPOND ===\n"
-            "JSON with keys: thought, action "
-            "(call_tool|analyze|synthesize|complete), "
-            "action_input, confidence (0.0-1.0)"
+            "JSON with keys: thought, action (call_tool|analyze|synthesize|complete), "
+            "action_input, confidence (0.0-1.0)\n"
+            'For call_tool: action_input = {"tool": "<name>", "arguments": {"<param*>": "<value>", ...}}\n'
+            "Use exact parameter names from AVAILABLE TOOLS. Parameters marked * are required."
         )
 
         return "\n".join(prompt_parts)
 
     def _format_tools(self, tools: list[dict[str, Any]]) -> str:
-        """Format available tools for inclusion in prompts."""
+        """Format tool list with parameter schema for LLM prompts.
+
+        Shows each tool as:  - name(param*:type, param:type): description
+        Parameters marked * are required. Falls back to name-only when no schema.
+        """
         if not tools:
             return ""
         lines = []
         for t in tools[:15]:
             name = t.get("name", "?")
-            desc = t.get("description", "")[:100]
-            lines.append(f"- {name}: {desc}")
+            desc = t.get("description", "")[:120]
+            schema = t.get("inputSchema", {})
+            properties = schema.get("properties", {})
+            required = set(schema.get("required", []))
+            if properties:
+                param_parts = []
+                for p_name, p_meta in properties.items():
+                    p_type = p_meta.get("type", "any")
+                    req_marker = "*" if p_name in required else ""
+                    param_parts.append(f"{p_name}{req_marker}:{p_type}")
+                lines.append(f"- {name}({', '.join(param_parts)}): {desc}")
+            else:
+                lines.append(f"- {name}: {desc}")
         return "\n".join(lines)
 
     def _assess_final_quality(self) -> str:
