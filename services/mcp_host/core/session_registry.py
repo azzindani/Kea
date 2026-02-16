@@ -7,6 +7,7 @@ Replaces static configuration with auto-discovery and on-demand spawning.
 import asyncio
 import os
 import sys
+import ast
 from pathlib import Path
 from typing import Dict, List, Any
 import dataclasses
