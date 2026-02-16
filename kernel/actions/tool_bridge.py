@@ -109,6 +109,24 @@ async def _llm_correct_parameters(
     return None
 
 
+
+async def _fetch_tool_schema(tool_name: str, timeout: float = 5.0) -> dict | None:
+    """Fetch schema for a specific tool from MCP Host."""
+    mcp_url = ServiceRegistry.get_url(ServiceName.MCP_HOST)
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            # We use /tools and filter because there is no /tools/{name} endpoint yet
+            resp = await client.get(f"{mcp_url}/tools")
+            if resp.status_code == 200:
+                tools = resp.json().get("tools", [])
+                for t in tools:
+                    if t.get("name") == tool_name:
+                        return t.get("inputSchema")
+    except Exception:
+        pass
+    return None
+
+
 def create_tool_executor(
     query: str = "",
     timeout: float = 30.0,
@@ -143,6 +161,9 @@ def create_tool_executor(
 
         current_args = args.copy()
         last_error = ""
+
+        # Optimization: cache schema if we fetch it once
+        tool_schema = None
 
         for attempt in range(retries + 1):
             try:
@@ -180,12 +201,17 @@ def create_tool_executor(
                         f"{retries + 1}): {error_text[:100]}"
                     )
 
+                    # Fetch schema if we haven't yet, to help the LLM
+                    if not tool_schema:
+                        tool_schema = await _fetch_tool_schema(name)
+
                     # Try LLM correction
                     corrected = await _llm_correct_parameters(
                         query=query,
                         tool_name=name,
                         failed_arguments=current_args,
                         error_message=error_text[:500],
+                        tool_schema=tool_schema,
                     )
                     if corrected:
                         logger.info(f"Tool bridge: LLM corrected args for {name}")

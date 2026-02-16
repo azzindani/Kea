@@ -118,13 +118,15 @@ async def lifespan(app: FastAPI):
         # =====================================================================
         # KERNEL DEPENDENCY INJECTION
         # =====================================================================
-        # Register Tool Registry (MCP Host)
+        # Register Tool Registry (Remote MCP Host)
         try:
-            from services.mcp_host.core.session_registry import get_session_registry
+            from kernel.actions.remote_tool_registry import RemoteToolRegistry
             from kernel.interfaces.tool_registry import register_tool_registry
 
-            register_tool_registry(get_session_registry())
-            logger.info("Dependency Injection: Registered SessionRegistry as ToolRegistry")
+            # Use Remote Registry to talk to MCP Host Service
+            registry = RemoteToolRegistry()
+            register_tool_registry(registry)
+            logger.info("Dependency Injection: Registered RemoteToolRegistry (MCP Client)")
         except Exception as e:
             logger.warning(f"Dependency Injection Failed (ToolRegistry): {e}")
 

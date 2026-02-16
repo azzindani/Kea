@@ -27,32 +27,7 @@ from kernel.utils import build_tool_inputs, extract_url_from_text
 from shared.logging import get_logger
 
 
-async def _call_tool_http(tool_name: str, arguments: dict) -> ToolResponse | None:
-    """
-    Call a tool via MCP Host HTTP API (POST /tools/execute).
-
-    Returns a ToolResponse on success, None on any failure so the caller
-    can fall back to the in-process session registry.
-    """
-    try:
-        import httpx
-
-        from shared.service_registry import ServiceName, ServiceRegistry
-
-        url = ServiceRegistry.get_url(ServiceName.MCP_HOST)
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            resp = await client.post(
-                f"{url}/tools/execute",
-                json={"tool_name": tool_name, "arguments": arguments},
-            )
-            if resp.status_code == 200:
-                from shared.schemas import ToolResponse
-
-                return ToolResponse.model_validate(resp.json())
-    except Exception:
-        pass
-    return None
-
+from kernel.actions.tool_bridge import create_tool_executor, discover_tools
 
 logger = get_logger(__name__)
 
@@ -580,290 +555,92 @@ class AgentSpawner:
                 response = await self._call_llm(full_prompt, subtask.query)
             else:
                 # Fallback to direct tool execution (The "Hands")
-                # PRIORITY 1: Explicit Tool from Planner
-                if subtask.preferred_tool:
-                    tool_name = subtask.preferred_tool
-                    server_name = None
-
-                    # Handle "server.tool" format (e.g., "yfinance_server.get_income_statement_quarterly")
-                    if "." in tool_name and "_server." in tool_name:
-                        parts = tool_name.split(".", 1)
-                        server_name = parts[0]
-                        tool_name = parts[1]
-                        logger.debug(
-                            f"     Parsed server.tool format: server={server_name}, tool={tool_name}"
-                        )
+                
+                # 1. IDENTIFY TOOL
+                tool_name = subtask.preferred_tool
+                if not tool_name:
+                    # Heuristic Routing
+                    if "search" in subtask.query.lower() or "find" in subtask.query.lower():
+                        tool_name = "web_search"
+                    elif "execute" in subtask.query.lower() or "calc" in subtask.query.lower():
+                         tool_name = "execute_code"
                     else:
-                        # Lookup server from static registry
-                        server_name = registry.get_server_for_tool(tool_name)
+                        tool_name = "execute_code" # Default to Python for complex tasks
 
-                    if not server_name:
-                        # Try mapping legacy names if needed
-                        if tool_name == "run_python":
-                            tool_name = "execute_code"
-                        server_name = registry.get_server_for_tool(tool_name)
+                # Handle legacy server.tool format
+                if "." in tool_name and "_server." in tool_name:
+                    tool_name = tool_name.split(".", 1)[1]
 
-                    if server_name:
-                        try:
-                            session = await registry.get_session(server_name)
+                # 2. PREPARE EXECUTOR (Connects to MCP Host with RAG & Retry)
+                tool_exec = create_tool_executor(
+                    query=subtask.query, 
+                    timeout=120.0
+                )
 
-                            # Prepare facts for context-aware parameters
-                            collected_facts = []
-
-                            # 1. Local Context (from this swarm's dependencies)
-                            if context_results:
-                                for r in context_results:
-                                    if r.result:
-                                        collected_facts.append({"text": str(r.result)})
-
-                            # 2. Global Context (from previous phases)
-                            try:
-                                from shared.context_pool import get_context_pool
-
-                                ctx = get_context_pool()
-
-                                # Add facts from pool
-                                for fact in ctx.fact_pool:
-                                    collected_facts.append({"text": fact.get("text", "")})
-
-                                # Add specific data items if short enough
-                                for key, item in ctx.data_pool.items():
-                                    data_str = str(item.get("data", ""))
-                                    if len(data_str) < 5000:  # Limit size
-                                        collected_facts.append({"text": f"Data {key}: {data_str}"})
-
-                            except Exception as e:
-                                logger.warning(f"Failed to fetch global context: {e}")
-
-                            # =========================================================
-                            # GLASS-BOX EXECUTION WITH SELF-CORRECTION
-                            # =========================================================
-                            if tool_name in ["execute_code", "run_python"]:
-                                from kernel.agents.code_generator import (
-                                    generate_python_code,
-                                )
-
-                                attempt = 0
-                                max_attempts = 3
-                                previous_code = None
-                                previous_error = None
-
-                                while attempt < max_attempts:
-                                    attempt += 1
-
-                                    # 1. GENERATE CODE (Autonomous)
-                                    logger.info(
-                                        f"     Generating Python Code (Attempt {attempt})..."
-                                    )
-                                    # Only fetch files once to save IO
-                                    if attempt == 1:
-                                        files = []
-                                        try:
-                                            if hasattr(ctx, "list_files"):
-                                                files = ctx.list_files()
-                                        except Exception:
-                                            pass
-
-                                    code = await generate_python_code(
-                                        task_description=subtask.query,
-                                        facts=[{"text": f.get("text")} for f in collected_facts],
-                                        file_artifacts=files,
-                                        previous_code=previous_code,
-                                        previous_error=previous_error,
-                                    )
-
-                                    # 2. GLASS-BOX LOGGING (Show user the code)
-                                    logger.info(
-                                        f"     CODE TO EXECUTE:\n{'-' * 40}\n{code}\n{'-' * 40}"
-                                    )
-
-                                    # 3. EXECUTE
-                                    args = {"code": code}
-                                    tool_res = await session.call_tool("execute_code", args)
-
-                                    # 4. EVALUATE
-                                    # Normalize Result using Standard I/O
-                                    norm_res = ToolResponse.from_mcp_result(
-                                        "execute_code", tool_res
-                                    )
-
-                                    if not norm_res.is_error:
-                                        # Success!
-                                        response = f"Swarm Tool Result (execute_code):\n {norm_res.output.get_for_llm()[:8000]}"
-
-                                        logger.info(
-                                            f"     EXECUTION SUCCESS:\n{norm_res.output.text[:1000]}..."
-                                        )
-                                        break
-                                    else:
-                                        # Failure - Capture error for retry
-                                        error_msg = norm_res.output.error or str(
-                                            norm_res.output.text
-                                        )
-                                        logger.warning(
-                                            f"     Execution Failed (Attempt {attempt}): {error_msg[:200]}"
-                                        )
-
-                                        previous_code = code
-                                        previous_error = error_msg
-
-                                        if attempt == max_attempts:
-                                            response = f"Swarm Tool Failed after {max_attempts} attempts: {error_msg}"
-                                            logger.error("     Giving up on code generation.")
-
-                            else:
-                                # STANDARD TOOL EXECUTION (Non-Code)
-                                # 0. Use Explicit Arguments if available (Standard I/O)
-                                if subtask.arguments:
-                                    args = subtask.arguments
-                                    logger.info(
-                                        f"     Used Explicit Arguments from Planner: {args}"
-                                    )
-                                else:
-                                    # 1. Try heuristic mapping first
-                                    args = build_tool_inputs(
-                                        tool_name=tool_name,
-                                        description=subtask.query,
-                                        original_inputs={},
-                                        collected_facts=collected_facts,
-                                    )
-
-                                # 2. DYNAMIC ARGUMENT GENERATION (The "Smart Hands" fix)
-                                # If heuristics failed (returned None or generic 'query') and it's complex tool
-                                # We MUST ask the LLM how to call it based on the schema.
-                                is_generic_arg = args is None or (
-                                    len(args) == 1 and "query" in args
-                                )
-                                is_known_simple = tool_name in [
-                                    "web_search",
-                                    "news_search",
-                                    "fetch_data",
-                                ]
-
-                                if is_generic_arg and not is_known_simple:
-                                    try:
-                                        logger.info(
-                                            f"     Fetching schema for complex tool: {tool_name}"
-                                        )
-                                        # Fetch schema from the live session
-                                        tools_list = await session.list_tools()
-                                        target_tool = next(
-                                            (t for t in tools_list if t.name == tool_name), None
-                                        )
-
-                                        if target_tool:
-                                            # Use LLM to map Task -> Arguments
-                                            schema_str = str(target_tool.inputSchema)
-                                            logger.info(
-                                                f"     Mapping arguments using LLM for {tool_name}..."
-                                            )
-
-                                            arg_prompt = f"""You are an API Argument Generator.
-Tool: {tool_name}
-Schema: {schema_str}
-Task: {subtask.query}
-
-Context Facts:
-{str(collected_facts)[:1000] if collected_facts else "None"}
-
-CRITICAL: Return ONLY valid JSON for the tool arguments. No markdown, no explanation."""
-
-                                            arg_json = await self._call_llm(
-                                                arg_prompt, "Generate JSON"
-                                            )
-
-                                            # Clean and parse JSON
-                                            import json
-
-                                            cleaned_json = (
-                                                arg_json.replace("```json", "")
-                                                .replace("```", "")
-                                                .strip()
-                                            )
-                                            try:
-                                                args = json.loads(cleaned_json)
-                                                logger.info(f"     Generated Dynamic Args: {args}")
-                                            except Exception:
-                                                logger.warning(
-                                                    f"     Failed to parse generated args: {cleaned_json[:50]}"
-                                                )
-                                                # Fallback to generic
-                                                if args is None:
-                                                    args = {"query": subtask.query}
-                                        else:
-                                            logger.warning(
-                                                f"     Tool {tool_name} not found in session list."
-                                            )
-                                    except Exception as map_err:
-                                        logger.warning(
-                                            f"     Dynamic Argument Generation Failed: {map_err}"
-                                        )
-
-                                if args is None:
-                                    args = {"query": subtask.query}
-
-                                # HTTP-first: call MCP Host via REST; fallback to in-process
-                                _http_resp = await _call_tool_http(tool_name, args)
-                                if _http_resp is not None:
-                                    norm_res = _http_resp
-                                else:
-                                    tool_res = await session.call_tool(tool_name, args)
-                                    # Normalize Output
-                                    norm_res = ToolResponse.from_mcp_result(tool_name, tool_res)
-
-                                if not norm_res.is_error:
-                                    response = f"Swarm Tool Result ({tool_name}):\n {norm_res.output.get_for_llm()[:8000]}"
-                                else:
-                                    response = f"Swarm Tool Failed ({tool_name}): {norm_res.output.error or norm_res.output.text}"
-                            # =========================================================
-                        except Exception as e:
-                            response = f"Swarm Tool Exception ({tool_name}): {e}"
-                    else:
-                        response = f"Tool {subtask.preferred_tool} not found in registry."
-
-                # PRIORITY 2: Heuristic Routing (Legacy)
-                elif "search" in subtask.query.lower() or "find" in subtask.query.lower():
-                    tool_name = "web_search"
-                    server_name = registry.get_server_for_tool(tool_name) or "search_server"
-
+                # =========================================================
+                # GLASS-BOX EXECUTION (Code Generation)
+                # =========================================================
+                if tool_name in ["execute_code", "run_python"]:
+                    from kernel.agents.code_generator import generate_python_code
+                    
+                    attempt = 0
+                    max_attempts = 3
+                    previous_code = None
+                    previous_error = None
+                    
+                    # Collect context facts
+                    collected_facts = []
+                    if context_results:
+                        for r in context_results:
+                            if r.result:
+                                collected_facts.append({"text": str(r.result)})
+                    
+                    # Fetch Global Context
                     try:
-                        session = await registry.get_session(server_name)
-                        tool_res = await session.call_tool(tool_name, {"query": subtask.query})
+                        from shared.context_pool import get_context_pool
+                        ctx = get_context_pool()
+                        if ctx.fact_pool:
+                            for fact in ctx.fact_pool:
+                                collected_facts.append({"text": fact.get("text", "")})
+                    except Exception:
+                        pass
 
-                        if not tool_res.isError:
-                            response = f"Search Results: {str(tool_res.content)[:500]}..."
-                        else:
-                            response = f"Search Failed: {tool_res.content}"
-                    except Exception as e:
-                        response = f"Search failed: {e}"
-
-                else:
-                    # Default: Just think about it (Simulated thought, or real if connected to Planner)
-                    # Since we want "Real Pipeline", we'll attempt a generic Python solve
-                    tool_name = "execute_code"
-                    server_name = registry.get_server_for_tool(tool_name) or "python_server"
-
-                    try:
-                        session = await registry.get_session(server_name)
-                        # Generate REAL code instead of dummy
-                        from kernel.agents.code_generator import generate_python_code
-
-                        # Gather context for generator
-                        facts = []
-                        if context_results:
-                            for r in context_results:
-                                if r.result:
-                                    facts.append({"text": str(r.result)})
-
-                        # Autonomous generation
+                    while attempt < max_attempts:
+                        attempt += 1
+                        logger.info(f"     Generating Python Code (Attempt {attempt})...")
+                        
                         code = await generate_python_code(
-                            task_description=subtask.query, facts=facts
+                            task_description=subtask.query,
+                            facts=collected_facts,
+                            previous_code=previous_code,
+                            previous_error=previous_error,
                         )
 
-                        code_res = await session.call_tool(tool_name, {"code": code})
-                        response = f"Execution Result: {str(code_res.content)}"
-                    except Exception as e:
-                        response = f"Exec failed: {e}"
+                        logger.info(f"     CODE TO EXECUTE:\n{'-' * 40}\n{code}\n{'-' * 40}")
+                        
+                        # EXECUTE via Bridge
+                        resp_str = await tool_exec("execute_code", {"code": code})
+                        
+                        if "ERROR:" in resp_str and attempt < max_attempts:
+                            previous_error = resp_str
+                            previous_code = code
+                            logger.warning(f"     Execution Failed: {resp_str[:200]}")
+                            continue
+                        else:
+                            response = resp_str
+                            break
+
+                # =========================================================
+                # STANDARD TOOL EXECUTION (Auto-Wiring + Correction)
+                # =========================================================
+                else:
+                    # 1. Build Arguments
+                    args = subtask.arguments or {}
+                    if not args:
+                         args = {"query": subtask.query}
+
+                    # 2. Execute via Bridge (Handles Retries & Parameter Correction)
+                    response = await tool_exec(tool_name, args)
 
             result.result = response
             # Extract source metadata if available (provenance tracking)

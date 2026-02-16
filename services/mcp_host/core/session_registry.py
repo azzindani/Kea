@@ -208,18 +208,89 @@ class SessionRegistry:
                         docstring = ast.get_docstring(node)
                         description = docstring or f"Tool: {tool_name} from {server_name}"
                         
-                        # Create a lightweight Tool object for RAG indexing
-                        # We don't need full schema here, just name + desc for semantic search.
-                        # Full schema is fetched JIT by AgentSpawner.
+                        # Extract Schema from AST
+                        try:
+                            input_schema = self._extract_schema_from_node(node)
+                        except Exception as e:
+                            logger.warning(f"   ⚠️ Schema extraction failed for {tool_name}: {e}")
+                            input_schema = {}
+
+                        # Create a Tool object with SCHEMA for RAG indexing and Planning
                         tool_obj = Tool(
                             name=tool_name,
                             description=description,
-                            inputSchema={}, # Empty schema is fine for RAG indexing
+                            inputSchema=input_schema, 
                         )
                         SessionRegistry._shared_discovered_tools.append(tool_obj)
 
         except Exception as e:
             logger.warning(f"Static scan failed for {server_name}: {e}")
+
+    def _extract_schema_from_node(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> dict:
+        """
+        Extract JSON schema from AST function node.
+        Crucial for RAG to know about parameters and for Planner to know how to call the tool.
+        """
+        import ast
+        
+        properties = {}
+        required = []
+        
+        # Parse arguments
+        args = node.args.args
+        
+        # Handle 'self' or 'cls' exclusion if it's a method (though FastMCP usually decorates standalone functions)
+        # But we don't have enough context to know if it's a method, assume simple functions for now
+        # or filter 'self' if present.
+        
+        for arg in args:
+            if arg.arg in ('self', 'cls'):
+                continue
+                
+            param_name = arg.arg
+            param_type = "string" # Default
+            
+            # Try to infer type from annotation
+            if arg.annotation:
+                try:
+                    type_str = ast.unparse(arg.annotation)
+                    # rudimentary mapping
+                    if type_str in ('int', 'float', 'complex'):
+                        param_type = "number"
+                    elif type_str == 'bool':
+                        param_type = "boolean"
+                    elif type_str in ('dict', 'Dict'):
+                        param_type = "object"
+                    elif type_str.startswith(('list', 'List')):
+                        param_type = "array"
+                except:
+                    pass
+            
+            properties[param_name] = {
+                "type": param_type,
+                "description": f"Parameter {param_name}" 
+            }
+            required.append(param_name)
+            
+        # Handle defaults (remove from required)
+        # node.args.defaults corresponds to the last N args
+        if node.args.defaults:
+            num_defaults = len(node.args.defaults)
+            # The args that have defaults are the last num_defaults ones
+            # args list: [a, b, c, d]
+            # defaults list: [1, 2] -> c has default 1, d has default 2
+            # args with defaults: args[-num_defaults:]
+            
+            args_with_defaults = args[-num_defaults:]
+            for arg in args_with_defaults:
+                if arg.arg in required:
+                    required.remove(arg.arg)
+
+        return {
+            "type": "object",
+            "properties": properties,
+            "required": required
+        }
 
     async def get_session(self, server_name: str) -> MCPClient:
         """
