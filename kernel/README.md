@@ -120,8 +120,8 @@ graph TD
     KEI --> LLM((LLM Provider))
     
     %% Communication Network
-    MB <|--|> Parent((Parent Cell))
-    MB <|--|> Peers((Peer Cells))
+    MB <--> Parent((Parent Cell))
+    MB <--> Peers((Peer Cells))
     
     %% Shared Infrastructure
     MainEntry -.-> WB[(WorkBoard)]
