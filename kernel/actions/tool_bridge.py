@@ -337,11 +337,11 @@ async def discover_tools(
             if total_tools == 0:
                 # System is likely initializing (Race Condition).
                 # Retry loop: Wait for tools to appear.
-                logger.info("Tool RAG returned 0 items & Registry is empty. Waiting for MCP Host initialization...")
+                logger.warning("Tool RAG returned 0 items & Registry is empty. Waiting up to 60s for MCP Host initialization...")
                 
                 start_time = asyncio.get_event_loop().time()
-                # Wait up to 15 seconds for tools to appear
-                while (asyncio.get_event_loop().time() - start_time) < 15.0:
+                # Wait up to 60 seconds for tools to appear (cold start can take 20s+)
+                while (asyncio.get_event_loop().time() - start_time) < 60.0:
                     await asyncio.sleep(2.0)
                     total_tools = await _check_total_tools()
                     if total_tools > 0:
@@ -350,7 +350,7 @@ async def discover_tools(
                         break
                 
                 if not tools and total_tools == 0:
-                    logger.warning("MCP Host failed to initialize tools within timeout.")
+                    logger.error("MCP Host failed to initialize tools within 60s timeout.")
 
         if tools:
             logger.info(f"Tool RAG search: {len(tools)} tools for query '{search_query[:60]}'")
