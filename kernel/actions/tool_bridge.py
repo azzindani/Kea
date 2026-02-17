@@ -291,6 +291,8 @@ async def discover_tools(
 
     cfg = get_kernel_config("kernel_cell_explore") or {}
     n_tools = limit or cfg.get("max_tools_to_scan", 15)
+    # Clamp to ToolSearchRequest schema max (le=50) to prevent validation errors
+    n_tools = min(n_tools, 50)
     min_sim = cfg.get("rag_min_similarity", 0.0)
 
     # Prepend domain hint to improve semantic matching precision

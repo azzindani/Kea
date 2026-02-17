@@ -385,7 +385,7 @@ organization:
 
 kernel_cell_explore:
   enabled: true
-  max_tools_to_scan: 100           # Max tools to consider from registry
+  max_tools_to_scan: 50            # Max tools to consider from registry (schema max: 50)
   max_knowledge_snippets: 5        # Max knowledge chunks from retriever
   max_rag_facts: 5                 # Max facts from FactStore RAG vector search
   max_prior_findings: 3            # Max Vault cross-session findings

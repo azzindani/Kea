@@ -824,7 +824,7 @@ class CognitiveCycle:
 
                 async with httpx.AsyncClient(timeout=5.0) as client:
                     resp = await client.post(
-                        f"{vault_url}/api/v1/search",
+                        f"{vault_url}/search",
                         json={
                             "query": perception.task_text[:200],
                             "limit": max_prior,
@@ -1139,6 +1139,24 @@ class CognitiveCycle:
         - Incorporate peer-shared data as it arrives
         - Report progress to parent at regular intervals
         """
+        # Track tool availability for quality penalty gate.
+        # NOTE: Must be set BEFORE DAG attempt, otherwise DAG-completed
+        # queries bypass the hallucination penalty entirely.
+        self._tools_available: bool = bool(available_tools)
+
+        # For deep-research paths (D), tools SHOULD be available even if
+        # discovery failed. If MCP Host is configured and the intent path
+        # is research, assume tools were expected — prevents hallucinated
+        # reports from passing quality gate with 0 tool calls.
+        if not self._tools_available:
+            intent_path = self.memory.get_note("intent_path") or ""
+            if intent_path in ("D", "C", "B"):
+                self._tools_available = True
+                logger.warning(
+                    f"  [EXECUTE] Path {intent_path} expects tools but "
+                    f"discovery returned 0. Hallucination guard active."
+                )
+
         #   Try DAG-based execution for complex queries  
         if await self._try_dag_execution(task, context, plan, available_tools):
             return  # DAG completed successfully
@@ -1152,8 +1170,7 @@ class CognitiveCycle:
         reasoning_instruction = self.profile.get_reasoning_instruction()
         tools_summary = self._format_tools(available_tools)
 
-        # Auto-wire state: track tool availability and nudge threshold
-        self._tools_available: bool = bool(available_tools)
+        # Auto-wire state: nudge threshold
         exec_cfg = get_kernel_config("kernel_cell_execute") or {}
         nudge_threshold: int = exec_cfg.get("tool_call_nudge_after_step", 1)
 

@@ -264,7 +264,7 @@ def _set_dynamic_limits(score: ComplexityScore) -> None:
     try:
         from shared.hardware.detector import detect_hardware
         hw = detect_hardware()
-        ram_gb = hw.total_memory_gb
+        ram_gb = hw.ram_total_gb
 
         # RAM-based scaling (the real bottleneck for task spawning)
         # 16GB RAM = 1.0x baseline
