@@ -1,0 +1,55 @@
+# Compliance Standards
+standards:
+  - id: iso_9001
+    name: "ISO 9001 (Quality Management)"
+  - id: iso_27001
+    name: "ISO 27001 (Information Security)"
+  - id: gdpr
+    name: "GDPR (Data Protection)"
+
+# Security Check Patterns
+security:
+  sensitive_patterns:
+    - password
+    - secret
+    - api_key
+    - token
+    - access_key
+    - private_key
+
+# Procedures
+procedures:
+  standard_research:
+    name: "Standard Research Procedure"
+    steps:
+      - id: "1"
+        name: "Query Classification"
+      - id: "2"
+        name: "Input Validation"
+      - id: "3"
+        name: "Security Check"
+      - id: "4"
+        name: "Execute Research"
+      - id: "5"
+        name: "Quality Review"
+      - id: "6"
+        name: "Audit Log"
+  
+  data_access:
+    name: "Data Access Procedure"
+    steps:
+      - id: "1"
+        name: "Authorization"
+      - id: "2"
+        name: "Data Classification"
+      - id: "3"
+        name: "Secure Fetch"
+      - id: "4"
+        name: "Audit Log"
+
+# Remediations
+remediations:
+  "27001_https": "Use HTTPS for all external URLs"
+  "27001_sensitive": "Redact sensitive data from logs/context"
+  "gdpr_consent": "Obtain user consent before processing"
+  "gdpr_min": "Remove unnecessary data fields"

@@ -84,21 +84,19 @@ class CriticAgent:
             else:
                 logger.debug("Critic: No domain knowledge retrieved   using base system prompt")
 
+            from shared.vocab import load_vocab
+            vocab = load_vocab("critic")
+            prompt_template = vocab.get("prompt", "Critique this answer: {answer}")
+
             messages = [
                 LLMMessage(role=LLMRole.SYSTEM, content=system_prompt),
                 LLMMessage(
                     role=LLMRole.USER,
-                    content=f"""Critique this answer:
-
-{answer[:1500]}
-
-Based on {len(facts)} facts from {len(sources)} sources.
-
-Provide:
-1. Strengths (what's good)
-2. Weaknesses (what's problematic)
-3. Missing elements
-4. Suggestions for improvement""",
+                    content=prompt_template.format(
+                        answer=answer[:1500],
+                        fact_count=len(facts),
+                        source_count=len(sources),
+                    ),
                 ),
             ]
 
@@ -113,13 +111,12 @@ Provide:
 
     def _fallback_critique(self, answer: str) -> str:
         """Fallback critique without LLM."""
-        return f"""## Critique
-
-Answer length: {len(answer)} characters
-
-Observations:
-- Answer reviewed for basic structure
-- Source citations: {"Present" if "source" in answer.lower() else "Missing"}
-- Confidence stated: {"Yes" if "confidence" in answer.lower() else "No"}
-
-Note: Full critique requires LLM integration."""
+        from shared.vocab import load_vocab
+        vocab = load_vocab("critic")
+        fallback_template = vocab.get("fallback", "Critique length: {length}")
+        
+        return fallback_template.format(
+            length=len(answer),
+            citations="Present" if "source" in answer.lower() else "Missing",
+            confidence="Yes" if "confidence" in answer.lower() else "No",
+        )

@@ -233,10 +233,14 @@ class AgenticWorkflow:
 
             except Exception as e:
                 logger.error(f"  Error in step {state.current_step}: {e}")
+                from shared.vocab import load_vocab
+                v_agentic = load_vocab("agentic")
+                error_template = v_agentic.get("prompts", {}).get("error_step", "Error in step {step}")
+                
                 state.reasoning_steps.append(
                     {
                         "step": state.current_step,
-                        "thought": "Error occurred",
+                        "thought": error_template.format(step=state.current_step),
                         "action": "error",
                         "observation": str(e),
                         "timestamp": datetime.utcnow().isoformat(),
@@ -328,15 +332,17 @@ class AgenticWorkflow:
             else:
                 artifacts_summary += f"\n- {key}: {str(value)[:100]}"
 
-        return f"""OBJECTIVE: {state.query}
+        from shared.vocab import load_vocab
+        v_agentic = load_vocab("agentic")
+        prompt_template = v_agentic.get("prompts", {}).get("reason_context", "{query}")
 
-STEP: {state.current_step + 1} of {state.max_steps}
-
-PREVIOUS STEPS:{history if history else " None yet"}
-
-COLLECTED DATA:{artifacts_summary if artifacts_summary else " None yet"}
-
-What should I do next? Respond with JSON only."""
+        return prompt_template.format(
+            query=state.query,
+            step=state.current_step + 1,
+            max_steps=state.max_steps,
+            history=history if history else " None yet",
+            artifacts=artifacts_summary if artifacts_summary else " None yet",
+        )
 
     def _parse_reasoning(self, content: str) -> tuple[str, AgentAction, dict]:
         """Parse LLM response into thought, action, and input."""
@@ -358,10 +364,14 @@ What should I do next? Respond with JSON only."""
             if start >= 0 and end > start:
                 content = content[start:end]
 
+            from shared.vocab import load_vocab
+            v_agentic = load_vocab("agentic")
+            v_defaults = v_agentic.get("defaults", {})
+
             data = json.loads(content)
 
-            thought = data.get("thought", "Thinking...")
-            action_str = data.get("action", "analyze")
+            thought = data.get("thought", v_defaults.get("thought", "Thinking..."))
+            action_str = data.get("action", v_defaults.get("action_str", "analyze"))
             action_input = data.get("action_input", {})
 
             # Map action string to enum
@@ -511,16 +521,18 @@ What should I do next? Respond with JSON only."""
         if knowledge_context:
             synthesizer_prompt += f"\n\n{knowledge_context}"
 
+        from shared.vocab import load_vocab
+        v_agentic = load_vocab("agentic")
+        prompt_template = v_agentic.get("prompts", {}).get("synthesize", "{query}")
+
         messages = [
             LLMMessage(role=LLMRole.SYSTEM, content=synthesizer_prompt),
             LLMMessage(
                 role=LLMRole.USER,
-                content=f"""Original Query: {state.query}
-
-Gathered Data:
-{chr(10).join(all_data[:10])}
-
-Provide a complete answer:""",
+                content=prompt_template.format(
+                    query=state.query,
+                    data=chr(10).join(all_data[:10]),
+                ),
             ),
         ]
 

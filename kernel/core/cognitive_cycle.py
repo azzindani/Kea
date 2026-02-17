@@ -1565,6 +1565,17 @@ class CognitiveCycle:
                                 isinstance(output_str, str)
                                 and output_str.startswith("ERROR:")
                             )
+                            # Also check for soft errors if not explicit "ERROR:"
+                            if not is_error and isinstance(output_str, str):
+                                # Load vocab (cached)
+                                from shared.vocab import load_vocab
+                                mp_vocab = load_vocab("microplanner")
+                                soft_errors = mp_vocab.get("error_patterns", {}).get("definitive", [])
+                                if any(p in output_str.lower() for p in soft_errors):
+                                     is_error = True
+                                     # Prefix so downstream knows it's an error
+                                     output_str = f"ERROR: (Soft) {output_str}"
+
                             if is_error:
                                 self.tool_call_errors += 1
                                 logger.warning(
@@ -1720,7 +1731,7 @@ class CognitiveCycle:
                     try:
                         result = await self.tool_call(node.tool, node.args or {})
                         self.tool_call_count += 1
-                        result_str = str(result)[:1000] if result else "No output"
+                        result_str = str(result)[:4000] if result else "No output"
 
                         # Detect error results from tool_bridge (returns
                         # "ERROR: ..." strings instead of raising)
@@ -1732,7 +1743,7 @@ class CognitiveCycle:
                             self.tool_call_errors += 1
                             logger.warning(
                                 f"  [DAG] Tool {node.tool} returned error: "
-                                f"{result_str[:120]}"
+                                f"{result_str[:1000]}"
                             )
 
                         self.tool_results.append({
@@ -1744,20 +1755,20 @@ class CognitiveCycle:
                         })
                         if not is_error:
                             self.memory.store_fact(
-                                f"dag_{node.id}", result_str[:500]
+                                f"dag_{node.id}", result_str[:2000]
                             )
                         return NodeResult(
                             node_id=node.id,
                             status=NodeStatus.FAILED if is_error else NodeStatus.COMPLETED,
                             output=result_str if not is_error else "",
-                            error=result_str[:500] if is_error else None,
+                            error=result_str[:2000] if is_error else None,
                         )
                     except Exception as e:
                         self.tool_call_errors += 1
                         return NodeResult(
                             node_id=node.id,
                             status=NodeStatus.FAILED,
-                            error=str(e)[:500],
+                            error=str(e)[:2000],
                         )
                 elif node.node_type == NodeType.LLM:
                     try:
@@ -1880,7 +1891,7 @@ class CognitiveCycle:
             self.tool_call_count += 1
 
             # Record in working memory
-            result_str = str(result)[:1000] if result else "No output"
+            result_str = str(result)[:4000] if result else "No output"
 
             # Detect error results from tool_bridge (returns
             # "ERROR: ..." strings instead of raising)
@@ -1892,12 +1903,12 @@ class CognitiveCycle:
                 self.tool_call_errors += 1
                 logger.warning(
                     f"  Tool {tool_name} returned error result: "
-                    f"{result_str[:120]}"
+                    f"{result_str[:1000]}"
                 )
                 # Store error as fact so Judge sees it
                 self.memory.store_fact(
                     f"error_{tool_name}_{step_idx}",
-                    f"Tool {tool_name} failed: {result_str[:500]}"
+                    f"Tool {tool_name} failed: {result_str[:2000]}"
                 )
 
             self.tool_results.append(
@@ -1913,13 +1924,13 @@ class CognitiveCycle:
             if not is_error:
                 self.memory.store_fact(
                     f"tool_{tool_name}_{step_idx}",
-                    result_str[:500],
+                    result_str[:2000],
                 )
                 self.memory.focus(
                     FocusItem(
                         id=f"tool_result_{step_idx}",
                         item_type=FocusItemType.TOOL_RESULT,
-                        content=f"{tool_name}: {result_str[:200]}",
+                        content=f"{tool_name}: {result_str[:500]}",
                         source=tool_name,
                     )
                 )
@@ -2025,10 +2036,10 @@ class CognitiveCycle:
             and self.accumulated_content
         ):
             try:
-                recent_work = "\n".join(self.accumulated_content[-3:])[:1500]
+                recent_work = "\n".join(self.accumulated_content[-3:])[:3000]
                 prompt = (
                     f"You are reviewing your own work IN PROGRESS.\n\n"
-                    f"Original task: {task[:300]}\n\n"
+                    f"Original task: {task[:500]}\n\n"
                     f"Work so far:\n{recent_work}\n\n"
                     f"Progress: step {step_idx}/{max_steps}\n"
                     f"Facts gathered: {self.memory.fact_count}\n"
@@ -2175,32 +2186,46 @@ class CognitiveCycle:
     async def _rerank_facts(self, task: str) -> None:
         """Rerank facts in working memory by relevance to the task."""
         try:
-             from shared.embedding.model_manager import get_reranker_provider
-             from shared.config import get_settings
+            # Semantic Re-ranking
+            from shared.embedding.model_manager import get_embedding_provider
+            import numpy as np
              
-             reranker = get_reranker_provider()
-             config = get_settings()
+            embedder = get_embedding_provider()
              
-             if not self.memory.all_facts:
-                 return
+            # 1. Embed Task
+            task_embed = await embedder.embed([task])
+            task_vec = task_embed[0]
+             
+            # 2. Embed Facts
+            fact_items = list(self.memory.all_facts.items())
+            if not fact_items:
+                return
 
-             fact_items = list(self.memory.all_facts.items())
-             fact_texts = [v[:8000] for k, v in fact_items]
+            fact_texts = [str(v)[:1000] for k, v in fact_items]
+            fact_embeds = await embedder.embed(fact_texts)
              
-             top_k = min(len(fact_items), config.reranker.per_task_top_k)
+            # 3. Calculate Scores
+            scores = []
+            task_norm = np.linalg.norm(task_vec)
              
-             results = await reranker.rerank(task, fact_texts, top_k=top_k)
-             
-             # Reorder in memory (trickier with dict, but we can update keys or just rely on list usage)
-             # For now, just logging corelations or could rebuild dict. 
-             # Simpler: just store the high-relevance ones in a focus list or similar.
-             # But the memory is a dict. Let's just log for now as per the plan/graph.py logic
-             # In graph.py, it reorders the list of facts. Here we have a dict.
-             # We can't easily reorder a standard dict in place to affect iteration order reliably across all python versions (though 3.7+ does).
-             # Let's confusingly just leave it be, but maybe drop low relevance ones?
-             # For safety/speed, let's just update a "relevance" metadata if possible.
-             # But cognitive_cycle memory structure is simple {key: text}.
-             pass
+            for i, f_embed in enumerate(fact_embeds):
+                f_norm = np.linalg.norm(f_embed)
+                sim = np.dot(task_vec, f_embed) / (task_norm * f_norm + 1e-9)
+                scores.append((sim, fact_items[i][0], fact_items[i][1]))
+            
+            # 4. Sort and Rebuild Memory
+            # Sort descending by similarity score
+            scores.sort(key=lambda x: x[0], reverse=True)
+            
+            # Keep top K (default 50 to avoid unlimited growth of context garbage)
+            top_k = 50
+            new_facts = {k: v for _, k, v in scores[:top_k]}
+            
+            # Log reranking impact
+            if len(scores) > top_k:
+                logger.info(f"  Reranking pruned {len(scores) - top_k} low-relevance facts")
+                
+            self.memory.all_facts = new_facts
              
         except Exception as e:
             logger.debug(f"Reranking failed: {e}")
@@ -2226,8 +2251,8 @@ class CognitiveCycle:
             recent_facts = list(self.memory.all_facts.values())[-5:]
             if len(recent_facts) >= 2:
                 prompt = (
-                    f"Check for contradictions between these facts related to: {task[:200]}\n\n"
-                    f"Facts:\n" + "\n".join(f"- {f[:300]}" for f in recent_facts) + "\n\n"
+                    f"Check for contradictions between these facts related to: {task[:500]}\n\n"
+                    f"Facts:\n" + "\n".join(f"- {f[:1000]}" for f in recent_facts) + "\n\n"
                     f"Return JSON: {{'contradictions': ['desc1']}} or {{'contradictions': []}}"
                 )
                 try:

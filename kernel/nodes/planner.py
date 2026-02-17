@@ -102,19 +102,11 @@ async def _validate_and_correct_tool_names(execution_plan: ExecutionPlan) -> Exe
     available_tools = {t.get("name") for t in tools_list}
 
     # Common hallucination aliases
-    aliases = {
-        "get_balance_sheet": "get_balance_sheet_annual",
-        "get_income_statement": "get_income_statement_annual",
-        "get_cash_flow": "get_cash_flow_annual",
-        "get_cash_flow_statement": "get_cash_flow_statement_annual",
-        "get_financial_ratios": "calculate_indicators",
-        "get_financials": "get_full_report",
-        "search": "web_search",
-        "scrape": "fetch_url",
-        "scrape_url": "fetch_url",
-        "google_search": "web_search",
-        "bing_search": "web_search",
-    }
+    from shared.vocab import load_vocab
+    vocab = load_vocab("planner")
+    aliases = vocab.get("aliases", {})
+    
+
 
     corrected_tasks = []
     removed_count = 0
@@ -431,7 +423,12 @@ def _extract_params_from_query(query: str, param_names: list[str], properties: d
         Dict of extracted param values
     """
     import re
-
+    from shared.vocab import load_vocab
+    
+    vocab = load_vocab("planner")
+    company_patterns = vocab.get("company_patterns", {})
+    extraction_rules = vocab.get("extraction", {})
+    
     extracted = {}
     query_lower = query.lower()
 
@@ -444,17 +441,8 @@ def _extract_params_from_query(query: str, param_names: list[str], properties: d
             ticker_matches = re.findall(r"\b[A-Z]{1,5}(?:\.[A-Z]{1,3})?\b", query.upper())
             if ticker_matches:
                 extracted[param] = ticker_matches[0]
-            # Or extract company name and try to convert
-            elif "bank" in query_lower:
-                # Common patterns: "BCA Bank"   BBCA.JK
-                company_patterns = {
-                    "bca bank": "BBCA.JK",
-                    "mandiri": "BMRI.JK",
-                    "bri": "BBRI.JK",
-                    "tesla": "TSLA",
-                    "apple": "AAPL",
-                    "microsoft": "MSFT",
-                }
+            else:
+                # Try company patterns from vocab
                 for company, ticker in company_patterns.items():
                     if company in query_lower:
                         extracted[param] = ticker
@@ -468,24 +456,48 @@ def _extract_params_from_query(query: str, param_names: list[str], properties: d
         # Extract period/timeframe
         elif param in ("period", "timeframe"):
             if "annual" in query_lower or "year" in query_lower:
-                extracted[param] = "1y"
+                extracted[param] = extraction_rules.get("annual", "1y")
             elif "quarter" in query_lower:
-                extracted[param] = "3mo"
+                extracted[param] = extraction_rules.get("quarter", "3mo")
             else:
-                extracted[param] = "1y"  # Default to annual
+                extracted[param] = extraction_rules.get("default_period", "1y")
 
         # Extract statement type for financial tools
         elif param in ("statement", "statement_type"):
-            if "balance" in query_lower:
-                extracted[param] = "balance_sheet"
-            elif "income" in query_lower:
-                extracted[param] = "income_statement"
-            elif "cash" in query_lower:
-                extracted[param] = "cash_flow"
-            else:
-                extracted[param] = "balance_sheet"  # Default
+            statements = extraction_rules.get("statements", {})
+            found = False
+            for key, val in statements.items():
+                if key in query_lower:
+                    extracted[param] = val
+                    found = True
+                    break
+            if not found:
+                extracted[param] = extraction_rules.get("default_statement", "balance_sheet")
 
-    return extracted
+        # Extract output formats
+        elif param in ("output_format", "format"):
+            formats = extraction_rules.get("formats", {})
+            found = False
+            for key, val in formats.items():
+                if key in query_lower:
+                    extracted[param] = val
+                    found = True
+                    break
+            if not found:
+                extracted[param] = extraction_rules.get("default_format", "json")
+
+        # Extract document_type
+        elif param in ("document_type", "doc_type"):
+            doc_types = extraction_rules.get("document_types", [])
+            found = False
+            for dt in doc_types:
+                if dt.lower() in query_lower:
+                    extracted[param] = dt
+                    found = True
+                    break
+            if not found:
+                extracted[param] = extraction_rules.get("default_document_type", "filing")
+
 
 
 def _similarity_score(str1: str, str2: str) -> float:
@@ -527,9 +539,14 @@ def _extract_template_variables(query: str, expected_vars: list[str]) -> dict[st
         Dict of variable name -> extracted value
     """
     import re
+    from shared.vocab import load_vocab
+    
+    vocab = load_vocab("planner")
+    extraction_rules = vocab.get("extraction", {})
 
     variables = {}
     query_upper = query.upper()
+    query_lower = query.lower()
 
     for var in expected_vars:
         if var.lower() == "ticker":
@@ -548,11 +565,11 @@ def _extract_template_variables(query: str, expected_vars: list[str]) -> dict[st
 
         elif var.lower() == "period":
             # Look for period patterns (1y, 6mo, 3mo, 1d, etc.)
-            period_match = re.search(r"\b(\d+(?:y|mo|d|w))\b", query.lower())
+            period_match = re.search(r"\b(\d+(?:y|mo|d|w))\b", query_lower)
             if period_match:
                 variables[var] = period_match.group(1)
             else:
-                variables[var] = "1y"  # Default
+                variables[var] = extraction_rules.get("default_period", "1y")
 
         elif var.lower() in ("source_url", "url"):
             # Look for URL patterns
@@ -564,23 +581,28 @@ def _extract_template_variables(query: str, expected_vars: list[str]) -> dict[st
 
         elif var.lower() in ("output_format", "format"):
             # Look for format mentions
-            if "json" in query.lower():
-                variables[var] = "json"
-            elif "csv" in query.lower():
-                variables[var] = "csv"
-            elif "markdown" in query.lower() or "md" in query.lower():
-                variables[var] = "markdown"
-            else:
-                variables[var] = "json"  # Default
+            formats = extraction_rules.get("formats", {})
+            found = False
+            for key, val in formats.items():
+                if key in query_lower:
+                    variables[var] = val
+                    found = True
+                    break
+            if not found:
+                variables[var] = extraction_rules.get("default_format", "json")
 
         elif var.lower() == "document_type":
             # Legal document types
-            for doc_type in ["10-K", "10-Q", "8-K", "contract", "agreement", "filing"]:
-                if doc_type.lower() in query.lower():
+            doc_types = extraction_rules.get("document_types", [])
+            found = False
+            for doc_type in doc_types:
+                if doc_type.lower() in query_lower:
                     variables[var] = doc_type
+                    found = True
                     break
-            else:
-                variables[var] = "filing"
+            if not found:
+                variables[var] = extraction_rules.get("default_document_type", "filing")
+
 
         else:
             # Generic: use query as the variable value

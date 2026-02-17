@@ -173,9 +173,7 @@ tool_categories:
     - web_search
     - news_search
 
-tool_aliases:
-  run_python: execute_code
-  fetch_page: fetch_url
+
 
 routing_keywords:
   path_c:

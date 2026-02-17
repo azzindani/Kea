@@ -129,43 +129,30 @@ class GeneratorAgent:
             )
 
             # Add revision feedback if this is a revision
+            from shared.vocab import load_vocab
+            vocab = load_vocab("generator")
+            
             revision_context = ""
             if revision_feedback:
-                revision_context = f"""
-
-  REVISION REQUESTED
-The Critic identified issues with your previous answer. Address these points:
-
-{revision_feedback}
-
-You MUST fix these issues in your revised answer."""
+                rev_header = vocab.get("revision_header", "REVISION: {feedback}")
+                revision_context = rev_header.format(feedback=revision_feedback)
 
             # Build enhanced system prompt with domain knowledge
             system_prompt = self.system_prompt
             if knowledge_context:
                 system_prompt += f"\n\n{knowledge_context}"
 
+            prompt_template = vocab.get("prompt", "{query}")
             messages = [
                 LLMMessage(role=LLMRole.SYSTEM, content=system_prompt),
                 LLMMessage(
                     role=LLMRole.USER,
-                    content=f"""Research Question: {query}
-
-Available Facts (with source URLs):
-{facts_text}
-
-Available Sources:
-{sources_text}
-{revision_context}
-
-Generate a comprehensive answer that:
-1. Directly addresses the question
-2. Uses ONLY the available facts above
-3. CITES source URLs for EVERY numerical claim using [Source: URL] format
-4. Identifies any gaps in information
-5. Provides a confidence assessment
-
-CRITICAL: Every fact, statistic, or number MUST be followed by [Source: URL].""",
+                    content=prompt_template.format(
+                        query=query,
+                        facts=facts_text,
+                        sources=sources_text,
+                        revision_context=revision_context,
+                    ),
                 ),
             ]
 
@@ -180,10 +167,15 @@ CRITICAL: Every fact, statistic, or number MUST be followed by [Source: URL]."""
 
     def _fallback_generate(self, query: str, facts: list, sources: list) -> str:
         """Fallback generation without LLM."""
-        return f"""## Response to: {query}
-
-Based on {len(facts)} collected facts from {len(sources)} sources:
-
-{chr(10).join([f"- {str(f)[:100]}" for f in facts[:5]])}
-
-Note: Full generation requires LLM integration."""
+        from shared.vocab import load_vocab
+        vocab = load_vocab("generator")
+        fallback_template = vocab.get("fallback", "Query: {query}")
+        
+        fact_summary = "\n".join([f"- {str(f)[:100]}" for f in facts[:5]])
+        
+        return fallback_template.format(
+            query=query,
+            fact_count=len(facts),
+            source_count=len(sources),
+            fact_summary=fact_summary,
+        )

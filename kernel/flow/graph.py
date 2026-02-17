@@ -39,10 +39,11 @@ from shared.vocab import load_vocab as _load_vocab
 # Module-level config constants (loaded once, cached via @cache in prompts.py)
 # ---------------------------------------------------------------------------
 _VOCAB = _load_vocab("classification")
+_VOCAB_PLANNER = _load_vocab("planner")
 _STANDARD_ERRORS: list[str] = _VOCAB.get("error_keywords", {}).get("standard", [])
 _QUICK_ERRORS: list[str] = _VOCAB.get("error_keywords", {}).get("quick_filter", [])
 _CODE_TOOLS: list[str] = _VOCAB.get("tool_categories", {}).get("code_execution", [])
-_TOOL_ALIASES: dict = _VOCAB.get("tool_aliases", {})
+_TOOL_ALIASES: dict = _VOCAB_PLANNER.get("aliases", {})
 _AGENTIC_PREFIXES: list[str] = _VOCAB.get("agentic_tool_prefixes", [])
 
 _MIN_LEN: int = get_kernel_config("execution.min_valid_output_length") or 5

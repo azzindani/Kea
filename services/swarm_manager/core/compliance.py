@@ -244,8 +244,11 @@ class ComplianceEngine:
         
         async def check_sensitive_data(ctx: dict) -> CheckResult:
             """Check for sensitive data exposure."""
+            from shared.vocab import load_vocab
+            v_compliance = load_vocab("compliance")
+            sensitive_patterns = v_compliance.get("security", {}).get("sensitive_patterns", ["password", "secret", "api_key", "token"])
+            
             data = str(ctx)
-            sensitive_patterns = ["password", "secret", "api_key", "token"]
             for pattern in sensitive_patterns:
                 if pattern in data.lower():
                     return CheckResult.WARN
@@ -418,17 +421,15 @@ class ComplianceEngine:
     
     async def get_remediations(self, issues: list[ComplianceIssue]) -> list[str]:
         """Get remediation suggestions for issues."""
+        from shared.vocab import load_vocab
+        v_compliance = load_vocab("compliance")
+        remediation_map = v_compliance.get("remediations", {})
+        
         remediations = []
         
         for issue in issues:
-            if issue.check_id == "27001_https":
-                remediations.append("Use HTTPS for all external URLs")
-            elif issue.check_id == "27001_sensitive":
-                remediations.append("Redact sensitive data from logs/context")
-            elif issue.check_id == "gdpr_consent":
-                remediations.append("Obtain user consent before processing")
-            elif issue.check_id == "gdpr_min":
-                remediations.append("Remove unnecessary data fields")
+            if issue.check_id in remediation_map:
+                remediations.append(remediation_map[issue.check_id])
             else:
                 remediations.append(f"Address {issue.check_id}: {issue.message}")
         
@@ -497,36 +498,35 @@ class ProceduralAgent:
     
     def _register_default_procedures(self):
         """Register default procedures."""
-        
+        from shared.vocab import load_vocab
+        v_compliance = load_vocab("compliance")
+        v_procedures = v_compliance.get("procedures", {})
+
         # Research procedure
-        research = Procedure(
-            "standard_research",
-            "Standard Research Procedure",
-            "Steps for conducting research queries",
-            compliance_standards=[ComplianceStandard.ISO_9001],
-        )
-        research.add_step(ProcedureStep("1", "Query Classification", "Classify query type"))
-        research.add_step(ProcedureStep("2", "Input Validation", "Validate and sanitize inputs"))
-        research.add_step(ProcedureStep("3", "Security Check", "Check for security issues"))
-        research.add_step(ProcedureStep("4", "Execute Research", "Perform research operations"))
-        research.add_step(ProcedureStep("5", "Quality Review", "Review output quality"))
-        research.add_step(ProcedureStep("6", "Audit Log", "Log operation for audit"))
-        
-        self.register_procedure(research)
+        if "standard_research" in v_procedures:
+            p_data = v_procedures["standard_research"]
+            research = Procedure(
+                "standard_research",
+                p_data.get("name", "Standard Research Procedure"),
+                p_data.get("description", "Steps for research"),
+                compliance_standards=[ComplianceStandard.ISO_9001],
+            )
+            for s in p_data.get("steps", []):
+                research.add_step(ProcedureStep(s["id"], s["name"], s.get("description", "")))
+            self.register_procedure(research)
         
         # Data access procedure
-        data_access = Procedure(
-            "data_access",
-            "Data Access Procedure",
-            "Steps for accessing external data",
-            compliance_standards=[ComplianceStandard.ISO_27001, ComplianceStandard.GDPR],
-        )
-        data_access.add_step(ProcedureStep("1", "Authorization", "Verify access rights"))
-        data_access.add_step(ProcedureStep("2", "Data Classification", "Classify data sensitivity"))
-        data_access.add_step(ProcedureStep("3", "Secure Fetch", "Fetch data securely"))
-        data_access.add_step(ProcedureStep("4", "Audit Log", "Log access for audit"))
-        
-        self.register_procedure(data_access)
+        if "data_access" in v_procedures:
+            p_data = v_procedures["data_access"]
+            data_access = Procedure(
+                "data_access",
+                p_data.get("name", "Data Access Procedure"),
+                p_data.get("description", "Steps for data access"),
+                compliance_standards=[ComplianceStandard.ISO_27001, ComplianceStandard.GDPR],
+            )
+            for s in p_data.get("steps", []):
+                data_access.add_step(ProcedureStep(s["id"], s["name"], s.get("description", "")))
+            self.register_procedure(data_access)
     
     def register_procedure(self, procedure: Procedure):
         """Register a procedure."""

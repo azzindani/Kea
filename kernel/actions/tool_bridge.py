@@ -148,6 +148,20 @@ def create_tool_executor(
 
     # Deduplication cache (per-executor instance)
     completed_calls: dict[str, str] = {}
+    
+    # Schema cache (per-executor instance) to enable pre-validation
+    schema_cache: dict[str, dict] = {}
+
+    def _validate_args(args: dict, schema: dict) -> str | None:
+        """Validate args against schema locally. Returns error message or None."""
+        try:
+            import jsonschema
+            jsonschema.validate(instance=args, schema=schema)
+            return None
+        except ImportError:
+            return None
+        except Exception as e:
+            return str(e)
 
     async def execute_tool(name: str, args: dict) -> str:
         """Execute a tool via MCP Host REST API with retry and self-correction."""
@@ -162,10 +176,41 @@ def create_tool_executor(
         current_args = args.copy()
         last_error = ""
 
-        # Optimization: cache schema if we fetch it once
-        tool_schema = None
+        # Pre-flight Validation (if schema known)
+        if name in schema_cache:
+            validation_error = _validate_args(current_args, schema_cache[name])
+            if validation_error:
+                logger.warning(
+                    f"Tool bridge: Pre-validation failed for {name}: {validation_error[:500]}"
+                )
+                # Treat as immediate failure to trigger LLM correction without network RTT
+                # We skip to the loop logic by setting last_error
+                last_error = f"Local Validation Error: {validation_error}"
+                pass
 
         for attempt in range(retries + 1):
+             # Check local validation again if we corrected args or just started
+            if name in schema_cache:
+                val_err = _validate_args(current_args, schema_cache[name])
+                if val_err:
+                    # Creating a synthetic error response to trigger correction logic
+                    logger.warning(f"Tool bridge: Local validation error (attempt {attempt+1}): {val_err[:500]}")
+                    
+                    # Try LLM correction immediately
+                    corrected = await _llm_correct_parameters(
+                        query=query,
+                        tool_name=name,
+                        failed_arguments=current_args,
+                        error_message=f"Schema Validation Failed: {val_err}",
+                        tool_schema=schema_cache[name],
+                    )
+                    if corrected:
+                        logger.info(f"Tool bridge: LLM corrected args locally for {name}")
+                        current_args = corrected
+                        continue # Retry loop with new args
+                    else:
+                        return f"ERROR: Validation failed and correction impossible: {val_err}"
+
             try:
                 async with httpx.AsyncClient(timeout=timeout) as client:
                     resp = await client.post(
@@ -177,11 +222,11 @@ def create_tool_executor(
                     return f"ERROR: Tool {name} not found"
 
                 if resp.status_code != 200:
-                    last_error = f"HTTP {resp.status_code}: {resp.text[:300]}"
+                    last_error = f"HTTP {resp.status_code}: {resp.text[:1000]}"
                     if attempt < retries:
                         logger.warning(
                             f"Tool bridge: {name} HTTP error (attempt {attempt + 1}/"
-                            f"{retries + 1}): {last_error[:100]}"
+                            f"{retries + 1}): {last_error[:500]}"
                         )
                         await asyncio.sleep(min(2**attempt, 8))
                         continue
@@ -212,16 +257,18 @@ def create_tool_executor(
                     )
 
                     # Fetch schema if we haven't yet, to help the LLM
-                    if not tool_schema:
-                        tool_schema = await _fetch_tool_schema(name)
-
+                    if name not in schema_cache:
+                        fetched_schema = await _fetch_tool_schema(name)
+                        if fetched_schema:
+                            schema_cache[name] = fetched_schema
+                            
                     # Try LLM correction
                     corrected = await _llm_correct_parameters(
                         query=query,
                         tool_name=name,
                         failed_arguments=current_args,
                         error_message=error_text[:500],
-                        tool_schema=tool_schema,
+                        tool_schema=schema_cache.get(name),
                     )
                     if corrected:
                         logger.info(f"Tool bridge: LLM corrected args for {name}")
@@ -234,6 +281,10 @@ def create_tool_executor(
                 # Success or final attempt
                 result = text or json.dumps(output, default=str)
                 completed_calls[call_hash] = result
+                
+                # If success, double check if we should cache schema for future speed (proactive lazy load?)
+                # No, only fetch on error to save BW.
+                
                 return result
 
             except httpx.TimeoutException:

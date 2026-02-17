@@ -35,8 +35,18 @@ logger = get_logger(__name__)
 # Global state
 research_graph = None
 
+from shared.vocab import load_vocab
+orchestrator_vocab = load_vocab("orchestrator")
+vocab_settings = orchestrator_vocab.get("settings", {})
+
 # Feature flag: kernel vs legacy graph
-USE_KERNEL = os.getenv("USE_KERNEL_PIPELINE", "true").lower() in ("true", "1", "yes")
+USE_KERNEL_ENV = os.getenv("USE_KERNEL_PIPELINE", "").lower()
+if USE_KERNEL_ENV in ("true", "1", "yes"):
+    USE_KERNEL = True
+elif USE_KERNEL_ENV in ("false", "0", "no"):
+    USE_KERNEL = False
+else:
+    USE_KERNEL = vocab_settings.get("use_kernel_default", True)
 
 
 def _kernel_level_from_complexity(query: str, depth: int) -> str:
@@ -51,22 +61,24 @@ def _kernel_level_from_complexity(query: str, depth: int) -> str:
         score = classify_complexity(query)
         tier = score.tier.value
 
+        v_esc = orchestrator_vocab.get("escalation", {})
+
         # Load tierâ†’level mapping from config
         mapping = get_kernel_config("kernel_cell.complexity_level_mapping") or {}
-        level = mapping.get(tier, "manager")
+        level = mapping.get(tier, v_esc.get("default_level", "manager"))
 
         # Depth escalation from config
         escalation = get_kernel_config("kernel_cell.depth_escalation") or {}
-        esc_threshold = escalation.get("threshold", 4)
-        esc_min_level = escalation.get("min_level", "director")
-        esc_from = escalation.get("escalate_from", ["staff", "senior_staff", "manager"])
+        esc_threshold = escalation.get("threshold", v_esc.get("threshold", 4))
+        esc_min_level = escalation.get("min_level", v_esc.get("min_level", "director"))
+        esc_from = escalation.get("escalate_from", v_esc.get("escalate_from", ["staff", "senior_staff", "manager"]))
 
         if depth >= esc_threshold and level in esc_from:
             level = esc_min_level
 
         return level
     except Exception:
-        return "manager"
+        return orchestrator_vocab.get("escalation", {}).get("default_level", "manager")
 
 
 def _domain_from_query(query: str) -> str:
@@ -233,7 +245,7 @@ async def health_check():
     active_sessions = 0
     try:
         mcp_url = ServiceRegistry.get_url(ServiceName.MCP_HOST)
-        async with httpx.AsyncClient(timeout=2.0) as client:
+        async with httpx.AsyncClient(timeout=vocab_settings.get("health_check_timeout", 2.0)) as client:
             resp = await client.get(f"{mcp_url}/health")
             if resp.status_code == 200:
                 active_sessions = resp.json().get("active_sessions", 0)
@@ -253,7 +265,7 @@ async def list_tools():
     """List all available MCP tools via MCP Host service."""
     try:
         mcp_url = ServiceRegistry.get_url(ServiceName.MCP_HOST)
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=vocab_settings.get("mcp_tool_list_timeout", 10.0)) as client:
             resp = await client.get(f"{mcp_url}/tools")
             if resp.status_code == 200:
                 return resp.json()
@@ -296,7 +308,8 @@ async def start_research(request: ResearchRequest):
             domain = _domain_from_query(request.query)
 
             # Budget scales with depth
-            base_budget = int(get_kernel_config("kernel_cell.budget.default_max_tokens") or 30000)
+            v_budget = vocab_settings.get("base_budget", 30000)
+            base_budget = int(get_kernel_config("kernel_cell.budget.default_max_tokens") or v_budget)
             budget = base_budget * max(1, request.depth)
 
             logger.info(
@@ -478,12 +491,13 @@ async def stream_research(query: str, depth: int = 2, max_sources: int = 10):
                 )
                 from kernel.actions.tool_bridge import create_tool_executor
 
-                yield f"data: {json.dumps({'event': 'phase', 'phase': 'kernel_processing'})}\n\n"
+                v_streaming = orchestrator_vocab.get("streaming", {}).get("phases", {})
+                yield f"data: {json.dumps({'event': 'phase', 'phase': v_streaming.get('kernel', 'kernel_processing')})}\n\n"
 
                 level = _kernel_level_from_complexity(query, depth)
                 domain = _domain_from_query(query)
                 base_budget = int(
-                    get_kernel_config("kernel_cell.budget.default_max_tokens") or 30000
+                    get_kernel_config("kernel_cell.budget.default_max_tokens") or vocab_settings.get("base_budget", 30000)
                 )
                 budget = base_budget * max(1, depth)
 
@@ -504,7 +518,7 @@ async def stream_research(query: str, depth: int = 2, max_sources: int = 10):
                 return
             except Exception as e:
                 logger.error(f"Kernel streaming failed: {e}", exc_info=True)
-                yield f"data: {json.dumps({'event': 'phase', 'phase': 'fallback_to_legacy'})}\n\n"
+                yield f"data: {json.dumps({'event': 'phase', 'phase': orchestrator_vocab.get('streaming', {}).get('phases', {}).get('fallback', 'fallback_to_legacy')})}\n\n"
 
         # â”€â”€ Legacy Graph Streaming (fallback) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if not research_graph:
@@ -542,7 +556,8 @@ async def stream_research(query: str, depth: int = 2, max_sources: int = 10):
                 provider = OpenRouterProvider()
                 config = LLMConfig(temperature=0.7, max_tokens=32768)
 
-                yield f"data: {json.dumps({'event': 'phase', 'phase': 'planning'})}\n\n"
+                v_streaming = orchestrator_vocab.get("streaming", {}).get("phases", {})
+                yield f"data: {json.dumps({'event': 'phase', 'phase': v_streaming.get('planning', 'planning')})}\n\n"
 
                 planner_prompt = (
                     get_agent_prompt("planner") or "You are a research planner. Be concise."
@@ -556,10 +571,10 @@ async def stream_research(query: str, depth: int = 2, max_sources: int = 10):
                     if chunk.content:
                         yield f"data: {json.dumps({'event': 'chunk', 'phase': 'planning', 'content': chunk.content})}\n\n"
 
-                yield f"data: {json.dumps({'event': 'phase', 'phase': 'research'})}\n\n"
+                yield f"data: {json.dumps({'event': 'phase', 'phase': v_streaming.get('research', 'research')})}\n\n"
                 final_state = await research_graph.ainvoke(initial_state)
 
-                yield f"data: {json.dumps({'event': 'phase', 'phase': 'synthesis'})}\n\n"
+                yield f"data: {json.dumps({'event': 'phase', 'phase': v_streaming.get('synthesis', 'synthesis')})}\n\n"
 
                 facts_text = "\n".join([str(f)[:100] for f in final_state.get("facts", [])[:5]])
 

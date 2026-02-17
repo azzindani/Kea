@@ -64,7 +64,8 @@ async def calculate_agreement_score(facts: list[dict]) -> float:
     High similarity between facts = high agreement = confident answer.
     """
     if not facts or len(facts) < 2:
-        return 0.5  # Default for insufficient data
+        from shared.vocab import load_vocab
+        return load_vocab("keeper").get("defaults", {}).get("agreement_score", 0.5)
 
     try:
         import numpy as np
@@ -77,13 +78,15 @@ async def calculate_agreement_score(facts: list[dict]) -> float:
         texts = [f.get("text", "")[:1000] for f in facts[:20]]  # Limit for performance
 
         if not any(texts):
-            return 0.5
+            from shared.vocab import load_vocab
+            return load_vocab("keeper").get("defaults", {}).get("agreement_score", 0.5)
 
         # Embed facts
         embeddings = await provider.embed(texts)
 
         if not embeddings:
-            return 0.5
+            from shared.vocab import load_vocab
+            return load_vocab("keeper").get("defaults", {}).get("agreement_score", 0.5)
 
         # Calculate average pairwise cosine similarity
         embeddings_np = np.array(embeddings)
@@ -94,7 +97,8 @@ async def calculate_agreement_score(facts: list[dict]) -> float:
         # Average of upper triangle (excluding diagonal)
         n = len(embeddings)
         if n < 2:
-            return 0.5
+            from shared.vocab import load_vocab
+            return load_vocab("keeper").get("defaults", {}).get("agreement_score", 0.5)
 
         upper_triangle = similarity_matrix[np.triu_indices(n, k=1)]
         agreement_score = float(np.mean(upper_triangle))
@@ -103,7 +107,8 @@ async def calculate_agreement_score(facts: list[dict]) -> float:
 
     except Exception as e:
         logger.warning(f"Agreement score calculation failed: {e}")
-        return 0.5
+        from shared.vocab import load_vocab
+        return load_vocab("keeper").get("defaults", {}).get("agreement_score", 0.5)
 
 
 async def calculate_reward_score(
@@ -141,6 +146,11 @@ async def calculate_reward_score(
         "final_reward": 0.0,
     }
 
+    from shared.vocab import load_vocab
+    vocab = load_vocab("keeper")
+    weights = vocab.get("reward_weights", {})
+    defaults = vocab.get("defaults", {})
+
     # ============================================================
     # 1. RELEVANCE SCORE (How relevant are facts to the query?)
     # ============================================================
@@ -171,7 +181,7 @@ async def calculate_reward_score(
                 scores["relevance"] = float(np.mean(similarities))
         except Exception as e:
             logger.debug(f"Reward relevance calculation failed: {e}")
-            scores["relevance"] = 0.5 if facts else 0.0
+            scores["relevance"] = defaults.get("relevance_score", 0.5) if facts else 0.0
 
     # ============================================================
     # 2. NOVELTY SCORE (Are facts diverse and non-redundant?)
@@ -183,7 +193,7 @@ async def calculate_reward_score(
         # But we cap it - too low agreement might mean noise
         scores["novelty"] = 1.0 - min(0.7, max(0.3, agreement_score))
     else:
-        scores["novelty"] = 0.3  # Default for insufficient data
+        scores["novelty"] = defaults.get("novelty_score", 0.3)
 
     # ============================================================
     # 3. TOOL SUCCESS RATE
@@ -205,7 +215,7 @@ async def calculate_reward_score(
     # ============================================================
     unique_calls = len(completed_calls) if completed_calls else len(tool_invocations)
     # Target: 3-8 calls for typical research. Penalize excess.
-    optimal_calls = 5
+    optimal_calls = vocab.get("thresholds", {}).get("optimal_calls", 5)
     if unique_calls > 0:
         efficiency_ratio = min(optimal_calls / unique_calls, 1.0)
         scores["efficiency"] = efficiency_ratio
@@ -217,27 +227,27 @@ async def calculate_reward_score(
 
     # Penalty for errors
     error_count = len(error_feedback) if error_feedback else 0
-    penalty += error_count * 0.1  # -0.1 per error
+    penalty += error_count * weights.get("penalty_error", 0.1)
 
     # Penalty for failed tools
     failures = (
         sum(1 for inv in tool_invocations if inv.get("success") is False) if tool_invocations else 0
     )
-    penalty += failures * 0.05  # -0.05 per failure
+    penalty += failures * weights.get("penalty_failure", 0.05)
 
-    # Cap penalty at 0.5 (don't make reward negative)
-    scores["penalty"] = min(0.5, penalty)
+    # Cap penalty
+    scores["penalty"] = min(weights.get("max_penalty", 0.5), penalty)
 
     # ============================================================
     # FINAL WEIGHTED REWARD
     # ============================================================
     # Weights inspired by reward policy optimization: prioritize relevance and success
     final_reward = (
-        0.30 * scores["relevance"]
-        + 0.15 * scores["novelty"]
-        + 0.25 * scores["success_rate"]
-        + 0.15 * scores["citation_coverage"]
-        + 0.15 * scores["efficiency"]
+        weights.get("relevance", 0.30) * scores["relevance"]
+        + weights.get("novelty", 0.15) * scores["novelty"]
+        + weights.get("success_rate", 0.25) * scores["success_rate"]
+        + weights.get("citation_coverage", 0.15) * scores["citation_coverage"]
+        + weights.get("efficiency", 0.15) * scores["efficiency"]
         - scores["penalty"]
     )
 
@@ -401,20 +411,19 @@ def analyze_execution_progress(state: dict[str, Any]) -> dict[str, Any]:
     phases = execution_plan.get("phases", [])
     completed_phases = set()
 
+    # Map tool to phase using vocab
+    from shared.vocab import load_vocab
+    phase_mapping = load_vocab("keeper").get("phase_mapping", {})
+    
     for inv in tool_invocations:
         if inv.get("success"):
             # Use the actual tool that ran (may be fallback)
             actual_tool = inv.get("tool", "")
 
-            # Map tool to phase
-            if actual_tool in ["web_search", "news_search", "fetch_data"]:
-                completed_phases.add("data_collection")
-            elif actual_tool in ["scrape_url", "fetch_url", "parse_document"]:
-                completed_phases.add("extraction")
-            elif actual_tool in ["run_python", "execute_code"]:
-                completed_phases.add("analysis")
-            elif actual_tool in ["build_graph"]:
-                completed_phases.add("synthesis")
+            # Map tool to phase dynamically
+            for phase, tools in phase_mapping.items():
+                if actual_tool in tools:
+                    completed_phases.add(phase)
 
     next_phase = None
     for phase in ["data_collection", "extraction", "analysis", "synthesis"]:
@@ -467,6 +476,10 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
     job_id = state.get("job_id", "unknown")
     tool_invocations = state.get("tool_invocations", [])
 
+    from shared.vocab import load_vocab
+    vocab = load_vocab("keeper")
+    thresholds = vocab.get("thresholds", {})
+
     # ============================================================
     # HARDWARE-AWARE SAFETY CONTROLS
     # ============================================================
@@ -512,19 +525,19 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
     # REPLAN ON ALL FAILURES (instead of stopping, give LLM another chance)
     # ============================================================
     replan_count = state.get("replan_count", 0)
-    max_replans = config.research.max_depth  # Use same limit as iterations
+    max_replans_global = config.research.max_depth  # Use same limit as iterations
 
     if (
         progress["total_tasks"] > 0
         and progress["completed_tasks"] == 0
         and progress["failed_tasks"] > 0
     ):
-        if replan_count < max_replans:
+        if replan_count < max_replans_global:
             logger.warning(
                 f"Keeper: ALL tool calls failed ({progress['failed_tasks']}/{progress['total_tasks']})"
             )
             logger.warning(
-                f"   Triggering REPLAN (attempt {replan_count + 1}/{max_replans}) - LLM will receive error feedback"
+                f"   Triggering REPLAN (attempt {replan_count + 1}/{max_replans_global}) - LLM will receive error feedback"
             )
             state["should_continue"] = True  # Continue the loop
             state["stop_reason"] = "replan"  # Route to planner, not researcher
@@ -532,7 +545,7 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
             state["confidence"] = 0.0
             return state
         else:
-            logger.error(f"Keeper: ALL tool calls failed after {max_replans} replans")
+            logger.error(f"Keeper: ALL tool calls failed after {max_replans_global} replans")
             logger.error("   Stopping to prevent infinite loop - no valid facts collected")
             state["should_continue"] = False
             state["stop_reason"] = "max_replans_exceeded"
@@ -547,7 +560,6 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
         logger.info("   Proceeding to final report with achieved confidence score")
 
         # Calculate reward score even when exiting due to max iterations
-        # This ensures the final report shows the actual achieved confidence
         query = state.get("query", "")
         error_feedback = state.get("error_feedback", [])
         completed_calls = state.get("completed_calls", set())
@@ -573,7 +585,7 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
     # SUCCESS-BASED EARLY EXIT (prevents infinite looping)
     # When ALL tools succeed AND we have sufficient facts, STOP
     # ============================================================
-    sufficient_facts = 5  # Minimum facts to consider research "complete"
+    sufficient_facts = thresholds.get("sufficient_facts", 5)
     all_tools_succeeded = (
         progress["total_tasks"] > 0
         and progress["failed_tasks"] == 0
@@ -583,7 +595,7 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
     if all_tools_succeeded and len(facts) >= sufficient_facts:
         logger.info(f"  Keeper: SUCCESS-BASED EXIT - All tools succeeded with {len(facts)} facts")
 
-        # CALCULATE CONFIDENCE before exiting (was missing before!)
+        # CALCULATE CONFIDENCE before exiting
         query = state.get("query", "")
         error_feedback = state.get("error_feedback", [])
         completed_calls = state.get("completed_calls", set())
@@ -608,7 +620,7 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
     # ============================================================
     # REWARD SCORING CONFIDENCE CHECK (Multi-signal reward scoring)
     # ============================================================
-    min_facts = 3
+    min_facts = thresholds.get("min_facts", 3)
     if len(facts) >= min_facts:
         # Calculate adaptive threshold for this iteration
         current_threshold = get_adaptive_threshold(iteration)
@@ -663,7 +675,7 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
 
             if progress["completed_tasks"] >= progress["total_tasks"]:
                 replan_count = state.get("replan_count", 0)
-                max_replans = 2  # Prevent infinite replanning
+                max_replans = thresholds.get("max_replans", 2)
 
                 if replan_count < max_replans:
                     logger.warning(
@@ -733,8 +745,9 @@ async def keeper_node(state: dict[str, Any]) -> dict[str, Any]:
                 relevant_facts += 1
 
         relevance_ratio = relevant_facts / len(facts) if facts else 0
+        drift_threshold = thresholds.get("drift_relevance_threshold", 0.3)
 
-        if relevance_ratio < 0.3:
+        if relevance_ratio < drift_threshold:
             logger.warning(f"Keeper: Context drift detected (relevance: {relevance_ratio:.2f})")
             state["should_continue"] = False
             state["drift_detected"] = True

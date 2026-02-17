@@ -688,7 +688,7 @@ class WorkingMemory:
         if self._facts and budget > 200:
             lines = []
             for key, content in list(self._facts.items())[:10]:
-                lines.append(f"- {key}: {content[:120]}")
+                lines.append(f"- {key}: {content[:500]}")
             section = f"GATHERED FACTS ({self.fact_count} total):\n" + "\n".join(lines)
             sections.append(section)
             budget -= len(section)
@@ -697,7 +697,7 @@ class WorkingMemory:
         if self._decisions and budget > 200:
             lines = []
             for d in self._decisions[-5:]:
-                lines.append(f"- {d.description} (reason: {d.rationale[:80]})")
+                lines.append(f"- {d.description} (reason: {d.rationale[:200]})")
             section = "RECENT DECISIONS:\n" + "\n".join(lines)
             sections.append(section)
             budget -= len(section)
@@ -714,14 +714,14 @@ class WorkingMemory:
         if self._scratch and budget > 200:
             lines = []
             for key, val in list(self._scratch.items())[-5:]:
-                lines.append(f"- {key}: {val[:100]}")
+                lines.append(f"- {key}: {val[:200]}")
             section = "NOTES:\n" + "\n".join(lines)
             sections.append(section)
 
         #   Pending Questions  
         unanswered = self.unanswered_questions
         if unanswered and budget > 100:
-            lines = [f"- [{q.target.value}] {q.question[:80]}" for q in unanswered[:3]]
+            lines = [f"- [{q.target.value}] {q.question[:200]}" for q in unanswered[:3]]
             section = "OPEN QUESTIONS:\n" + "\n".join(lines)
             sections.append(section)
             budget -= len(section)

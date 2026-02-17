@@ -1,20 +1,23 @@
-# Error patterns for Microplanner heuristic checks
+
+# Microplanner Error Patterns
 error_patterns:
+  # Definitive indicators of tool failure
   definitive:
-    - tool not found
-    - not found in registry
-    - missing required parameter
-    - tool reported an error
-    - no data returned
-    - empty result returned
-    - rate limit exceeded
-    - authentication failed
-    - invalid ticker
-    - symbol not found
-    - connection refused
-    - timeout error
-    - data unavailable
-    - balance sheet data unavailable
-    - income statement data unavailable
-    - cash flow data unavailable
-    - no data available for
+    - "tool not found"
+    - "not found in registry"
+    - "missing required parameter"
+    - "tool reported an error"
+    - "no data returned"
+    - "empty result returned"
+    - "rate limit exceeded"
+    - "authentication failed"
+    - "invalid ticker"
+    - "symbol not found"
+    - "connection refused"
+    - "timeout error"
+    - "max retries exceeded"
+    - "permission denied"
+    - "403 forbidden"
+    - "500 internal server error"
+    - "502 bad gateway"
+    - "503 service unavailable"
