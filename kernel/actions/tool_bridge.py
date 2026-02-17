@@ -208,7 +208,7 @@ def create_tool_executor(
 
                     logger.warning(
                         f"Tool bridge: {name} returned error (attempt {attempt + 1}/"
-                        f"{retries + 1}): {error_text[:100]}"
+                        f"{retries + 1}): {error_text[:1000]}"
                     )
 
                     # Fetch schema if we haven't yet, to help the LLM

@@ -104,7 +104,7 @@ Provide:
 
             response = await provider.complete(messages, config)
 
-            logger.info(f"Critic: Critique complete ({len(response.content)} chars)")
+            logger.info(f"Critic: Critique complete ({len(response.content)} chars):\n{response.content[:2000]}")
             return response.content
 
         except Exception as e:

@@ -162,6 +162,7 @@ Provide:
                     )
 
             logger.info(f"Judge: Verdict={verdict}, Confidence={confidence:.2f}")
+            logger.info(f"Judge Reasoning: {content[:2000]}")
 
             return {
                 "verdict": verdict,

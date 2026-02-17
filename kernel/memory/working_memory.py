@@ -403,7 +403,7 @@ class WorkingMemory:
         self._focus.append(item)
         logger.debug(
             f"WM[{self.cell_id}] focus: +{item.item_type.value} "
-            f"({len(self._focus)}/{self.MAX_FOCUS_ITEMS})"
+            f"({len(self._focus)}/{self.MAX_FOCUS_ITEMS}): {item.content[:100]}"
         )
 
     def focus_fact(self, fact_id: str, content: str, source: str = "") -> None:

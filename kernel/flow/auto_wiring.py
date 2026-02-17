@@ -112,6 +112,12 @@ class AutoWirer:
                 logger.debug(f"     Heuristics failed for '{arg_name}'")
                 still_missing.append(arg_name)
 
+        if still_missing:
+             logger.warning(
+                 f"  AutoWirer: Heuristics failed to find required args for {tool_name}: {still_missing}. "
+                 "Tools may fail validation."
+             )
+
         # 4. Fallback to LLM if args are still missing
         if still_missing and available_artifacts:
             logger.info(

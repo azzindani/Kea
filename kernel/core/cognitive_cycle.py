@@ -1894,6 +1894,11 @@ class CognitiveCycle:
                     f"  Tool {tool_name} returned error result: "
                     f"{result_str[:120]}"
                 )
+                # Store error as fact so Judge sees it
+                self.memory.store_fact(
+                    f"error_{tool_name}_{step_idx}",
+                    f"Tool {tool_name} failed: {result_str[:500]}"
+                )
 
             self.tool_results.append(
                 {
