@@ -380,10 +380,12 @@ kernel_cell_explore:
   enabled: true
   max_tools_to_scan: 100           # Max tools to consider from registry
   max_knowledge_snippets: 5        # Max knowledge chunks from retriever
+  max_rag_facts: 5                 # Max facts from FactStore RAG vector search
   max_prior_findings: 3            # Max Vault cross-session findings
   skip_for_levels: [intern]        # These levels skip exploration
   budget_fraction: 0.05            # Max fraction of budget for exploration
   rag_min_similarity: 0.2          # Minimum quality for tools (0.2 = lenient)
+  tool_discovery_retries: 2        # Retry count for MCP Host tool discovery (backoff: 1s, 2s, 4s)
 
 # ==============================================================================
 # Kernel Intent Routing (Step 2 — Path A/B/C/D Classification)

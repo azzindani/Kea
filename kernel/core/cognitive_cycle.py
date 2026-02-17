@@ -786,6 +786,32 @@ class CognitiveCycle:
         except Exception as e:
             logger.debug(f"Knowledge retrieval during EXPLORE failed: {e}")
 
+        #   2b. Query FactStore (RAG vector search) for semantic facts  
+        rag_facts: list[str] = []
+        max_rag_facts = explore_cfg.get("max_rag_facts", 5)
+        try:
+            from kernel.interfaces.fact_store import get_fact_store
+
+            fact_store = get_fact_store()
+            if fact_store is not None:
+                search_query = perception.task_text[:200]
+                atomic_facts = await fact_store.search(
+                    query=search_query,
+                    limit=max_rag_facts,
+                )
+                if atomic_facts:
+                    for af in atomic_facts:
+                        # AtomicFact has .claim and .evidence fields
+                        fact_text = getattr(af, "claim", None) or str(af)
+                        if fact_text:
+                            rag_facts.append(fact_text[:500])
+                    logger.info(
+                        f"  [EXPLORE] FactStore RAG: {len(rag_facts)} facts "
+                        f"for '{search_query[:40]}...'"
+                    )
+        except Exception as e:
+            logger.debug(f"FactStore RAG during EXPLORE failed: {e}")
+
         #   3. Check Vault for prior findings  
         prior_findings: list[str] = []
         max_prior = explore_cfg.get("max_prior_findings", 3)
@@ -864,10 +890,13 @@ class CognitiveCycle:
             except Exception as e:
                 logger.debug(f"Exploration LLM call failed: {e}")
 
+        # Merge RAG facts into domain knowledge for downstream consumption
+        all_knowledge = domain_snippets + rag_facts
+
         result = ExploreResult(
             available_tools=relevant_tools,
             suggested_sources=suggested,
-            domain_knowledge=domain_snippets,
+            domain_knowledge=all_knowledge,
             prior_findings=prior_findings,
             exploration_notes=exploration_notes,
         )
@@ -876,6 +905,9 @@ class CognitiveCycle:
         if domain_snippets:
             for i, snippet in enumerate(domain_snippets[:3]):
                 self.memory.store_fact(f"explore_knowledge_{i}", snippet[:500])
+        if rag_facts:
+            for i, fact in enumerate(rag_facts[:5]):
+                self.memory.store_fact(f"explore_rag_fact_{i}", fact[:500])
         if prior_findings:
             for i, finding in enumerate(prior_findings[:3]):
                 self.memory.store_fact(f"explore_prior_{i}", finding[:500])
@@ -885,6 +917,7 @@ class CognitiveCycle:
         logger.info(
             f"  EXPLORE: {len(relevant_tools)} tools, "
             f"{len(domain_snippets)} knowledge, "
+            f"{len(rag_facts)} RAG facts, "
             f"{len(prior_findings)} prior findings"
         )
 

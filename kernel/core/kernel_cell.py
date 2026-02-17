@@ -666,20 +666,46 @@ class KernelCell:
                 context_str += f"Parent task: {ctx.parent_task_id}\n"
 
         # Discover available tools via MCP Host REST API (JIT)
+        # Uses configurable retry with backoff to prevent tool-less execution
+        # on transient MCP Host failures.
         available_tools: list[dict[str, Any]] = []
         try:
             from kernel.actions.tool_bridge import discover_tools
-            
+
             # Use query (task_text) and domain to filter JIT loading
             primary_domain = domain_hints[0] if domain_hints else self.identity.domain
-            
-            available_tools = await discover_tools(
-                timeout=5.0,
-                query=task_text,
-                domain=primary_domain
-            )
-            if available_tools:
-                logger.info(f"Cell {self.identity.role}: Discovered {len(available_tools)} tools for domain {primary_domain}")
+
+            explore_cfg = get_kernel_config("kernel_cell_explore") or {}
+            max_discovery_retries = explore_cfg.get("tool_discovery_retries", 2)
+
+            for attempt in range(max_discovery_retries + 1):
+                try:
+                    available_tools = await discover_tools(
+                        timeout=5.0,
+                        query=task_text,
+                        domain=primary_domain,
+                    )
+                    if available_tools:
+                        logger.info(
+                            f"Cell {self.identity.role}: Discovered "
+                            f"{len(available_tools)} tools for domain "
+                            f"{primary_domain}"
+                        )
+                        break
+                except Exception as e:
+                    if attempt < max_discovery_retries:
+                        backoff = min(2 ** attempt, 4)
+                        logger.warning(
+                            f"Cell {self.identity.role}: Tool discovery attempt "
+                            f"{attempt + 1}/{max_discovery_retries + 1} failed: {e}. "
+                            f"Retrying in {backoff}s..."
+                        )
+                        await asyncio.sleep(backoff)
+                    else:
+                        logger.warning(
+                            f"Cell {self.identity.role}: Tool discovery failed "
+                            f"after {max_discovery_retries + 1} attempts: {e}"
+                        )
         except Exception as e:
             logger.debug(f"Cell {self.identity.role}: Tool discovery skipped: {e}")
 
