@@ -46,8 +46,6 @@ The system is divided into 7 specialized microservices:
 
 ---
 
----
-
 ## ⚠️ Critical Restrictions
 
 ### 🚫 NO TESTING ACTIVITIES
@@ -110,6 +108,11 @@ return JobResponse(status=ResearchStatus.COMPLETED)
 - **Rule**: Bare LLM calls are **FORBIDDEN**.
 - **Mandatory**: Use `KnowledgeEnhancedInference` for ALL generations.
 - **Effect**: Automatically injects Role, Knowledge, and Quality Bar constraints.
+
+#### 6. Enterprise Resiliency
+- **Rule**: Distrusted components (Network, DB, LLMs) WILL fail.
+- **Mandatory**: Implement retries with exponential backoff (via `tenacity`), circuit breakers, and timeouts for ALL external calls.
+- **Config**: Policies must be defined in `configs/`, not code.
 
 ---
 
@@ -188,8 +191,10 @@ Kea/
 1. **Type hints** - All functions must have complete type annotations
 2. **Async-first** - Use async/await patterns for I/O operations
 3. **Pydantic models** - Use Pydantic for all data validation
-4. **Structured Logging**: **MANDATORY**. Use `structlog` for ALL logging. Never use `print` or standard `logging`.
-5. **Error handling** - Implement proper exception handling with meaningful messages
+4. **Structured Logging & Observability**: **MANDATORY**. Use `structlog` with context binding (e.g. `log.bind(user_id=...)`). Ensure trace context propagation.
+5. **Error Handling**: Use custom exception hierarchies. catch specific errors, and always wrap/re-raise with context. Never swallow exceptions.
+6. **API Contracts**: Strict OpenAPI 3.1 compliance. Use standard error envelopes (ProblemDetails) for non-2xx responses.
+7. **Database Hygiene**: Explicit transaction boundaries. modifying operations must be atomic. Use batch operations for bulk data.
 
 ### Naming Conventions
 - **Files**: snake_case (`artifact_bus.py`)
@@ -202,8 +207,9 @@ Kea/
 ## 📝 When Making Changes
 
 0. **Pre-Flight Cognitive Protocol** - Before writing a single line of code, you MUST mentally map:
-    - **Config**: "Does `configs/settings.yaml` and `shared/config.py` have the settings I need?" (If no → STOP and add them).
+    - **Config**: "Does `configs/settings.yaml` and `shared/config.py` have the settings I need?" (If no → STOP and use defaults/add them).
     - **State**: "Am I trying to save to disk?" (If yes → STOP and use Vault).
+    - **Observability**: "How will I debug this if it fails?" (If unknown → Add structured logs/metrics).
     - **Logic**: "Am I reinventing the wheel?" (If yes → Use `KernelCell` primitives).
 1. **Read Examples First** - **ALWAYS** read 2-3 random example files to understand the context and standards before writing a plan or code.
 1. **Understand the service boundaries** - Know which microservice owns the functionality
@@ -218,5 +224,6 @@ Kea/
 
 - Never hardcode secrets or API keys
 - Use environment variables via `.env` files
-- All external inputs must be validated
-- Follow the Zero-Trust model for service communication
+- All external inputs must be validated (Input Sanitization)
+- Follow the Zero-Trust model for service communication (assume internal networks are hostile)
+- **Review**: Self-audit for OWASP Top 10 vulnerabilities (Injection, Broken Auth, etc.) before completion.
