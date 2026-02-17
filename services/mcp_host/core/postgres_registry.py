@@ -32,11 +32,9 @@ class PostgresToolRegistry:
         self.table_name = table_name
         self.embedder = create_embedding_provider(use_local=True)
         self._pool: asyncpg.Pool | None = None
-        self._db_url = os.getenv("DATABASE_URL")
+        from shared.config import get_settings
+        self._db_url = get_settings().database_url
         self._initialized = False
-        
-        if not self._db_url:
-            raise ValueError("DATABASE_URL environment variable is required for PostgresToolRegistry")
             
     async def _get_pool(self) -> asyncpg.Pool:
         """Get or create connection pool with thread-safe initialization."""

@@ -334,23 +334,44 @@ async def discover_tools(
         # 2. Cold Start Detection: If RAG found nothing, check if the system is empty
         if not tools:
             total_tools = await _check_total_tools()
-            if total_tools == 0:
-                # System is likely initializing (Race Condition).
-                # Retry loop: Wait for tools to appear.
-                logger.warning("Tool RAG returned 0 items & Registry is empty. Waiting up to 60s for MCP Host initialization...")
+                # System is likely initializing (Race Condition) OR Indexing (RAG Warmup).
+                # Retry loop: Wait for tools to appear in RAG.
+                logger.warning("Tool RAG returned 0 items. Checking system readiness...")
                 
                 start_time = asyncio.get_event_loop().time()
-                # Wait up to 60 seconds for tools to appear (cold start can take 20s+)
+                # Wait up to 60 seconds for cold start / indexing
                 while (asyncio.get_event_loop().time() - start_time) < 60.0:
-                    await asyncio.sleep(2.0)
                     total_tools = await _check_total_tools()
-                    if total_tools > 0:
-                        logger.info(f"MCP Host initialized with {total_tools}+ tools. Retrying RAG search...")
-                        tools = await _do_rag_search()
-                        break
-                
-                if not tools and total_tools == 0:
-                    logger.error("MCP Host failed to initialize tools within 60s timeout.")
+                    
+                    if total_tools == 0:
+                        logger.warning("   MCP Host empty (0 tools). Waiting for initialization...")
+                    else:
+                        logger.warning(f"   MCP Host has {total_tools} tools (Static), but RAG returned 0. Waiting for RAG Indexing...")
+                        
+                    await asyncio.sleep(2.0)
+                    
+                    # Retry RAG
+                    tools = await _do_rag_search()
+                    if tools:
+                        logger.info(f"✅ RAG Search succeeded with {len(tools)} tools after wait.")
+                        return tools
+                        
+                    # If we have static tools but RAG is taking too long (e.g. >15s), prevent infinite wait
+                    # by falling back to static now? No, stick to timeout or break early.
+                    # Let's just keep retrying RAG until the function-wide timeout or loop timeout.
+
+                if not tools and total_tools > 0:
+                    logger.warning(f"RAG Indexing timed out. Falling back to static tools ({min(total_tools, 15)} items).")
+                    try:
+                         async with httpx.AsyncClient(timeout=timeout) as client:
+                            fb_resp = await client.get(f"{mcp_url}/tools", params={"limit": 15})
+                            if fb_resp.status_code == 200:
+                                return fb_resp.json().get("tools", [])
+                    except:
+                        pass
+
+                if not tools:
+                    logger.error("MCP Host failed to provide tools within 60s timeout.")
 
         if tools:
             logger.info(f"Tool RAG search: {len(tools)} tools for query '{search_query[:60]}'")
