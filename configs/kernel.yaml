@@ -19,6 +19,13 @@ retry:
   cpu_scale_max: 8                  # Maximum retries regardless of CPU count
   cpu_scale_divisor: 2              # Retries = clamp(cpu_count // divisor, min, max)
 
+# Startup connectivity probe — Orchestrator → MCP Host readiness check
+startup_connectivity:
+  max_retries: 10                   # Number of health-check attempts before giving up
+  backoff_seconds: 2.0              # Seconds between retries (fixed interval)
+  initial_delay_seconds: 1.0        # Wait before the first probe (let MCP Host bind)
+  timeout_per_probe: 3.0            # HTTP timeout for each /health call
+
 defaults:
   max_revisions: 2                  # Max Generator revision loops before forced finalize
   max_parallel_fallback: 6          # Parallel workers when complexity info unavailable

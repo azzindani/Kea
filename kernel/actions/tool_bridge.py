@@ -411,11 +411,44 @@ async def discover_tools(
 
 
 async def verify_mcp_connectivity(timeout: float = 3.0) -> bool:
-    """Check if MCP Host is reachable."""
+    """Check if MCP Host is reachable, with configurable startup retries.
+
+    Loads retry parameters from ``configs/kernel.yaml`` under
+    ``startup_connectivity``.  Falls back to a single probe when the
+    config section is absent (backward-compatible).
+    """
+    cfg = get_kernel_config("startup_connectivity") or {}
+    max_retries: int = cfg.get("max_retries", 1)
+    backoff: float = cfg.get("backoff_seconds", 2.0)
+    initial_delay: float = cfg.get("initial_delay_seconds", 0.0)
+    probe_timeout: float = cfg.get("timeout_per_probe", timeout)
+
     mcp_url = ServiceRegistry.get_url(ServiceName.MCP_HOST)
-    try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            resp = await client.get(f"{mcp_url}/health")
-            return resp.status_code == 200
-    except Exception:
-        return False
+
+    if initial_delay > 0:
+        logger.info(
+            f"Startup probe: waiting {initial_delay}s before first MCP Host check"
+        )
+        await asyncio.sleep(initial_delay)
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            async with httpx.AsyncClient(timeout=probe_timeout) as client:
+                resp = await client.get(f"{mcp_url}/health")
+                if resp.status_code == 200:
+                    logger.info(
+                        f"MCP Host reachable on attempt {attempt}/{max_retries}"
+                    )
+                    return True
+        except Exception:
+            pass
+
+        if attempt < max_retries:
+            logger.info(
+                f"MCP Host not ready (attempt {attempt}/{max_retries}), "
+                f"retrying in {backoff}s …"
+            )
+            await asyncio.sleep(backoff)
+
+    return False
+
