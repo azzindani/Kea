@@ -55,7 +55,7 @@ graph TD
         IC --> Assess{Phase 2: Assess Complexity}
         
         subgraph Complexity [Complexity Analysis Engine]
-            CL[classify_complexity] --> Tiers[Trivial | Low | Medium | High | Extreme]
+            CL[classify_complexity] --> Tiers["Trivial | Low | Medium | High | Extreme"]
             Tiers --> Modes[Direct | Solo | Delegation]
         end
         
