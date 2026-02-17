@@ -196,6 +196,16 @@ def create_tool_executor(
 
                 if is_error and attempt < retries:
                     error_text = text or output.get("error", "Unknown error")
+
+                    # Early exit: "tool not found" is permanent — no amount of
+                    # parameter correction will fix a non-existent tool name.
+                    if "not found" in error_text.lower():
+                        logger.warning(
+                            f"Tool bridge: {name} does not exist — "
+                            f"aborting retries immediately"
+                        )
+                        return f"ERROR: Tool {name} not found in any server"
+
                     logger.warning(
                         f"Tool bridge: {name} returned error (attempt {attempt + 1}/"
                         f"{retries + 1}): {error_text[:100]}"

@@ -1071,13 +1071,25 @@ class CognitiveCycle:
         reasoning_instruction = self.profile.get_reasoning_instruction()
         tools_summary = f"\nAvailable tools:\n{self._format_tools(available_tools)}" if available_tools else ""
 
+        # Build a compact list of valid tool names for the constraint
+        valid_tool_names = [t.get("name", "") for t in available_tools if t.get("name")]
+        tool_name_constraint = ""
+        if valid_tool_names:
+            tool_name_constraint = (
+                f"\n\n⚠️ CRITICAL CONSTRAINT: You may ONLY use tools from the list above. "
+                f"Do NOT invent, guess, or assume tool names. If you need a capability "
+                f"not covered by the available tools, use an LLM step (no tool) instead. "
+                f"Valid tool names: {', '.join(valid_tool_names[:50])}\n"
+            )
+
         prompt = (
             f"Plan how to complete this task.\n\n"
             f"Task: {perception.task_text}\n"
             f"Framing: {framing.restatement}\n"
             f"Known gaps: {', '.join(framing.unknown_gaps[:5])}\n"
             f"Assumptions: {', '.join(framing.assumptions[:3])}\n"
-            f"{tools_summary}\n\n"
+            f"{tools_summary}"
+            f"{tool_name_constraint}\n\n"
             f"Reasoning approach: {reasoning_instruction}\n\n"
             f"Your level: {self.profile.level} "
             f"(execution_pct={self.profile.execution_pct:.0%}, "
@@ -1141,6 +1153,45 @@ class CognitiveCycle:
                 steps=["Gather data using available tools", "Analyze findings", "Synthesize results"],
                 step_tool_assignments=default_assignments,
             )
+
+        # Validate tool names in workflow against available tools.
+        # LLMs frequently hallucinate tool names (e.g. 'download_file',
+        # 'parse_web') that don't exist. Demote to LLM nodes so the DAG
+        # doesn't waste retries on nonexistent tools.
+        if result.workflow and available_tools:
+            valid_names = {t.get("name", "") for t in available_tools}
+            validated_workflow: list[WorkflowStep] = []
+            for ws in result.workflow:
+                if ws.tool and ws.tool not in valid_names:
+                    logger.warning(
+                        f"  [PLAN] Tool '{ws.tool}' in workflow step "
+                        f"'{ws.id}' does not exist — demoting to LLM node"
+                    )
+                    # Keep the step, remove the invalid tool
+                    validated_workflow.append(
+                        WorkflowStep(
+                            id=ws.id,
+                            step=ws.step,
+                            tool=None,  # Demote to LLM
+                            args={},
+                            depends_on=ws.depends_on,
+                        )
+                    )
+                else:
+                    validated_workflow.append(ws)
+            result.workflow = validated_workflow
+
+        # Also validate step_tool_assignments
+        if result.step_tool_assignments and available_tools:
+            valid_names = {t.get("name", "") for t in available_tools}
+            for i, assignment in enumerate(result.step_tool_assignments):
+                tool_name = assignment.get("tool", "")
+                if tool_name and tool_name not in valid_names:
+                    logger.warning(
+                        f"  [PLAN] Tool '{tool_name}' in step_tool_assignments[{i}] "
+                        f"does not exist — removing assignment"
+                    )
+                    result.step_tool_assignments[i] = {}
 
         # Record plan in working memory
         logger.info(f"  [PLAN] Decomposed task into {len(result.steps)} steps (approach: {result.approach})")
@@ -1506,7 +1557,39 @@ class CognitiveCycle:
                             if not node.tool:
                                 raise ValueError("Tool node missing tool name")
                             output = await self.tool_call(node.tool, args)
-                            return NodeResult(node.id, NodeStatus.COMPLETED, output=output)
+                            self.tool_call_count += 1
+                            output_str = str(output)[:1000] if output else "No output"
+
+                            # Detect error results from tool_bridge
+                            is_error = (
+                                isinstance(output_str, str)
+                                and output_str.startswith("ERROR:")
+                            )
+                            if is_error:
+                                self.tool_call_errors += 1
+                                logger.warning(
+                                    f"  [DAG-explicit] Tool {node.tool} returned "
+                                    f"error: {output_str[:120]}"
+                                )
+                                return NodeResult(
+                                    node.id,
+                                    NodeStatus.FAILED,
+                                    error=output_str[:500],
+                                )
+
+                            self.tool_results.append({
+                                "tool": node.tool,
+                                "args": args,
+                                "result": output_str,
+                                "step": node.id,
+                                "is_error": False,
+                            })
+                            self.memory.store_fact(
+                                f"dag_{node.id}", output_str[:500]
+                            )
+                            return NodeResult(
+                                node.id, NodeStatus.COMPLETED, output=output_str
+                            )
                         
                         elif node.node_type == NodeType.LLM:
                             prompt = node.llm_prompt or f"Execute: {node.description}"
@@ -2744,7 +2827,7 @@ class CognitiveCycle:
         if not tools:
             return ""
         lines = []
-        for t in tools[:15]:
+        for t in tools[:50]:
             name = t.get("name", "?")
             desc = t.get("description", "")[:120]
             schema = t.get("inputSchema", {})
