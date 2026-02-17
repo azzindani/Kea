@@ -41,10 +41,10 @@ graph TD
     %% Global Entry
     UserRequest((User Request)) --> MainEntry[KernelCell.process]
     
-    subgraph KernelCell [KernelCell v2.0: The Universal Recursive Unit]
+    subgraph KernelCell ["KernelCell v2.0: The Universal Recursive Unit"]
         direction TB
         
-        subgraph Safety [Governance & Safety]
+        subgraph Safety ["Governance & Safety"]
             EG[ExecutionGuard] --> TB[TokenBudget]
             RG[ResourceGovernor] --> Escalation[Escalation Severity]
         end
@@ -56,7 +56,7 @@ graph TD
         
         subgraph Complexity [Complexity Analysis Engine]
             CL[classify_complexity] --> Tiers["Trivial | Low | Medium | High | Extreme"]
-            Tiers --> Modes[Direct | Solo | Delegation]
+            Tiers --> Modes["Direct | Solo | Delegation"]
         end
         
         Assess --> CL
@@ -65,10 +65,10 @@ graph TD
         ExecutionChoice -- Solo --> SoloExec[Phase 3a: _execute_solo]
         ExecutionChoice -- Delegation --> DeleExec[Phase 3b: _execute_delegation]
         
-        subgraph CognitiveCycle [CognitiveCycle: The Human Thinking Loop]
+        subgraph CognitiveCycle ["CognitiveCycle: The Human Thinking Loop"]
             direction TB
             PH1[PERCEIVE: Instruction Parsing] --> PH2[EXPLORE: Tool Discovery]
-            PH2 --> PH3[FRAME: Restatement & Gaps]
+            PH2 --> PH3["FRAME: Restatement & Gaps"]
             PH3 --> PH4[PLAN: Step Generation]
             PH4 --> PH5[EXECUTE: Tool/Logic Run]
             PH5 --> PH6[MONITOR: Self-Assessment]
@@ -89,7 +89,7 @@ graph TD
         
         DeleExec --> RecursiveDelegation
         
-        subgraph InternalState [State & Communication]
+        subgraph InternalState ["State & Communication"]
             WM[(WorkingMemory)]
             MB[MessageBus]
             Comm[CellCommunicator]
