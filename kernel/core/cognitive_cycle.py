@@ -215,6 +215,33 @@ class PlanResult(BaseModel):
         ),
     )
 
+    @field_validator("step_tool_assignments", mode="before")
+    @classmethod
+    def coerce_step_tool_assignments(cls, v: Any) -> list[dict[str, Any]]:
+        """Coerce dict-keyed format to list.
+
+        LLMs sometimes return::
+
+            {"step_0": {"tool": "...", "args_hint": {...}}, "step_1": {...}}
+
+        instead of::
+
+            [{"tool": "...", "args_hint": {...}}, {...}]
+
+        This validator normalises the dict format to a list ordered by
+        the numeric suffix of the keys.
+        """
+        if isinstance(v, dict):
+            # Sort by numeric suffix: step_0, step_1, ...
+            sorted_keys = sorted(
+                v.keys(),
+                key=lambda k: int(k.split("_")[-1]) if k.split("_")[-1].isdigit() else 0,
+            )
+            return [v[k] if isinstance(v[k], dict) else {} for k in sorted_keys]
+        if isinstance(v, list):
+            return v
+        return []
+
     @field_validator("risk_factors", mode="before")
     @classmethod
     def parse_risk_factors(cls, v: Any) -> list[str]:
@@ -409,6 +436,7 @@ class CognitiveCycle:
         self.current_phase = CyclePhase.PERCEIVE
         self.monitor_count = 0
         self.tool_call_count = 0
+        self.tool_call_errors = 0  # Tool calls that returned errors
         self.accumulated_content: list[str] = []  # Draft sections
         self.tool_results: list[dict[str, Any]] = []  # Raw tool outputs
 
@@ -616,10 +644,12 @@ class CognitiveCycle:
         work_package = await self._package(perception, framing)
 
         elapsed = _elapsed_ms(start_time)
+        successful_calls = self.tool_call_count - self.tool_call_errors
         logger.info(
             f"  CognitiveCycle [{self.profile.level}] done | "
             f"{self.memory.step_count} steps | "
-            f"{self.tool_call_count} tool calls | "
+            f"{successful_calls}/{self.tool_call_count} tool calls ok "
+            f"({self.tool_call_errors} errors) | "
             f"{elapsed:.0f}ms"
         )
 
@@ -1003,6 +1033,15 @@ class CognitiveCycle:
                     source="frame",
                 )
             )
+
+        # Log framing output for observability
+        if result.assumptions or result.unknown_gaps:
+            logger.info(
+                f"  [FRAME] {len(result.assumptions)} assumptions, "
+                f"{len(result.unknown_gaps)} gaps identified"
+            )
+            for i, gap in enumerate(result.unknown_gaps[:5]):
+                logger.info(f"  [FRAME] Gap {i + 1}: {gap[:120]}")
 
         return result
 
@@ -1599,19 +1638,39 @@ class CognitiveCycle:
                         result = await self.tool_call(node.tool, node.args or {})
                         self.tool_call_count += 1
                         result_str = str(result)[:1000] if result else "No output"
+
+                        # Detect error results from tool_bridge (returns
+                        # "ERROR: ..." strings instead of raising)
+                        is_error = (
+                            isinstance(result_str, str)
+                            and result_str.startswith("ERROR:")
+                        )
+                        if is_error:
+                            self.tool_call_errors += 1
+                            logger.warning(
+                                f"  [DAG] Tool {node.tool} returned error: "
+                                f"{result_str[:120]}"
+                            )
+
                         self.tool_results.append({
                             "tool": node.tool,
                             "args": node.args,
                             "result": result_str,
                             "step": node.id,
+                            "is_error": is_error,
                         })
-                        self.memory.store_fact(f"dag_{node.id}", result_str[:500])
+                        if not is_error:
+                            self.memory.store_fact(
+                                f"dag_{node.id}", result_str[:500]
+                            )
                         return NodeResult(
                             node_id=node.id,
-                            status=NodeStatus.COMPLETED,
-                            output=result_str,
+                            status=NodeStatus.FAILED if is_error else NodeStatus.COMPLETED,
+                            output=result_str if not is_error else "",
+                            error=result_str[:500] if is_error else None,
                         )
                     except Exception as e:
+                        self.tool_call_errors += 1
                         return NodeResult(
                             node_id=node.id,
                             status=NodeStatus.FAILED,
@@ -1739,29 +1798,45 @@ class CognitiveCycle:
 
             # Record in working memory
             result_str = str(result)[:1000] if result else "No output"
+
+            # Detect error results from tool_bridge (returns
+            # "ERROR: ..." strings instead of raising)
+            is_error = (
+                isinstance(result_str, str)
+                and result_str.startswith("ERROR:")
+            )
+            if is_error:
+                self.tool_call_errors += 1
+                logger.warning(
+                    f"  Tool {tool_name} returned error result: "
+                    f"{result_str[:120]}"
+                )
+
             self.tool_results.append(
                 {
                     "tool": tool_name,
                     "args": tool_args,
                     "result": result_str,
                     "step": step_idx,
+                    "is_error": is_error,
                 }
             )
 
-            self.memory.store_fact(
-                f"tool_{tool_name}_{step_idx}",
-                result_str[:500],
-            )
-            self.memory.focus(
-                FocusItem(
-                    id=f"tool_result_{step_idx}",
-                    item_type=FocusItemType.TOOL_RESULT,
-                    content=f"{tool_name}: {result_str[:200]}",
-                    source=tool_name,
+            if not is_error:
+                self.memory.store_fact(
+                    f"tool_{tool_name}_{step_idx}",
+                    result_str[:500],
                 )
-            )
+                self.memory.focus(
+                    FocusItem(
+                        id=f"tool_result_{step_idx}",
+                        item_type=FocusItemType.TOOL_RESULT,
+                        content=f"{tool_name}: {result_str[:200]}",
+                        source=tool_name,
+                    )
+                )
 
-            logger.debug(f"  Tool {tool_name}: {len(result_str)} chars")
+            logger.debug(f"  Tool {tool_name}: {len(result_str)} chars (error={is_error})")
             
             # Store in ArtifactStore for auto-wiring
             step_key = f"step_{step_idx}"
@@ -2706,9 +2781,14 @@ class CognitiveCycle:
         min_calls = exec_cfg.get("min_tool_calls_before_synthesis", 1)
         tools_were_available = getattr(self, "_tools_available", False)
 
-        if penalty_enabled and tools_were_available and self.tool_call_count < min_calls:
+        # Successful calls = total attempts minus errors
+        successful_calls = self.tool_call_count - getattr(self, "tool_call_errors", 0)
+
+        if penalty_enabled and tools_were_available and successful_calls < min_calls:
             logger.warning(
-                f"Quality penalty: {self.tool_call_count} tool calls "
+                f"Quality penalty: {successful_calls} successful tool calls "
+                f"({self.tool_call_count} attempts, "
+                f"{getattr(self, 'tool_call_errors', 0)} errors) "
                 f"(min={min_calls}) with tools available — capping at 'poor'"
             )
             return "poor"
