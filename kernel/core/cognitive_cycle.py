@@ -65,6 +65,14 @@ from kernel.memory.working_memory import (
     FocusItemType,
     WorkingMemory,
 )
+from kernel.flow.workflow_nodes import (
+    WorkflowNode,
+    NodeResult,
+    NodeStatus,
+    NodeType,
+    parse_blueprint,
+)
+from kernel.flow.dag_executor import DAGExecutor
 
 logger = get_logger(__name__)
 
@@ -813,6 +821,7 @@ class CognitiveCycle:
             ReasoningStyle.DIRECT_LOOKUP,
             ReasoningStyle.PROCEDURAL,
         ):
+            logger.info(f"  [EXPLORE] Scouting landscape (tools={len(relevant_tools)} knowledge={len(domain_snippets)} prior={len(prior_findings)})")
             try:
                 # Extract names for display only — full dicts stay in relevant_tools
                 tool_names_for_prompt = [t.get("name", "?") for t in relevant_tools[:15]]
@@ -843,6 +852,10 @@ class CognitiveCycle:
                     user_prompt=prompt,
                 )
                 data = _parse_json_safe(raw)
+                
+                if data.get("exploration_notes"):
+                    logger.info(f"  [EXPLORE] Assessment: {data.get('exploration_notes')[:100]}...")
+                
                 exploration_notes = data.get("exploration_notes", "")
                 # suggested_sources are data source URLs/names, NOT MCP tool dicts.
                 # Store them separately in ExploreResult.suggested_sources — do NOT
@@ -1005,6 +1018,8 @@ class CognitiveCycle:
             f"   {{'id': 'step_1', 'step': 'summarize', 'depends_on': ['step_0']}}\n"
             f"   Use this for parallel execution (e.g., step_1 and step_2 both depend on step_0).\n"
             f"4. step_tool_assignments: mapping for sequential steps (legacy/fallback)\n"
+            f"   CRITICAL: You MUST populate this AND 'steps' as a backup, even if using 'workflow'.\n"
+            f"   Use the same tool/args info here so sequential fallback works if DAG fails.\n"
             f"5. estimated_tools: number of tool calls needed\n"
             f"6. estimated_steps: number of reasoning steps\n"
             f"7. risk_factors: what could go wrong\n"
@@ -1056,6 +1071,7 @@ class CognitiveCycle:
             )
 
         # Record plan in working memory
+        logger.info(f"  [PLAN] Decomposed task into {len(result.steps)} steps (approach: {result.approach})")
         self.memory.decide(
             "plan",
             f"Approach: {result.approach}",
@@ -1337,6 +1353,19 @@ class CognitiveCycle:
             topic = f"step_{step_idx}"
             self.memory.set_confidence(topic, confidence)
 
+        # Try DAG-based parallel execution for complex queries  
+        dag_executed = await self._try_dag_execution(task, context, plan, available_tools)
+        if dag_executed:
+            return  # DAG completed successfully
+
+        # Fallback to standard execution loop
+        max_steps = self.profile.max_reasoning_steps
+        monitor_interval = max(
+            1,
+            max_steps // (self.profile.max_self_monitor_checks + 1),
+        )
+
+    
     async def _try_dag_execution(
         self,
         task: str,
@@ -1356,7 +1385,7 @@ class CognitiveCycle:
 
         # If explicit workflow is provided, use it directly
         if plan.workflow and len(plan.workflow) > 0:
-            logger.info(f"  DAG: Using explicit workflow from planner ({len(plan.workflow)} nodes)")
+            logger.info(f"  [DECOMPOSITION] Explicit workflow found ({len(plan.workflow)} nodes)")
             blueprint_steps = []
             for node in plan.workflow:
                 step_dict = {
@@ -1379,26 +1408,51 @@ class CognitiveCycle:
             
             # Execute with Blueprint
             try:
-                from kernel.flow.workflow_nodes import parse_blueprint
-                from kernel.flow.dag_executor import DAGExecutor
-                
+                # Imports already at top-level
+                # Define unified executor for DAG
+                async def execute_dag_node(node: Any, args: dict[str, Any]) -> NodeResult:
+                    # 'node' is a WorkflowNode
+                    try:
+                        if node.node_type == NodeType.TOOL:
+                            if not node.tool:
+                                raise ValueError("Tool node missing tool name")
+                            output = await self.tool_call(node.tool, args)
+                            return NodeResult(node.id, NodeStatus.COMPLETED, output=output)
+                        
+                        elif node.node_type == NodeType.LLM:
+                            prompt = node.llm_prompt or f"Execute: {node.description}"
+                            system = node.llm_system or "You are a helpful assistant."
+                            raw = await self.llm_call(system_prompt=system, user_prompt=prompt)
+                             # Extract output similar to _parse_execution_result or just use raw
+                            return NodeResult(node.id, NodeStatus.COMPLETED, output=raw)
+                        
+                        else:
+                            # Fallback for code/agentic if not implemented
+                            return NodeResult(node.id, NodeStatus.FAILED, error="Unsupported node type")
+                    except Exception as e:
+                        return NodeResult(node.id, NodeStatus.FAILED, error=str(e))
+
                 dag_nodes = parse_blueprint(blueprint_steps)
                 executor = DAGExecutor(
-                    nodes=dag_nodes,
+                    store=self._store,
+                    node_executor=execute_dag_node,
                     max_parallel=dag_cfg.get("max_parallel", 4),
-                    tool_executor=self.tool_call,
-                    llm_executor=self.llm_call,
                 )
                 
-                logger.info(f"  DAG Executor starting: {len(dag_nodes)} nodes (explicit)")
-                results = await executor.run()
+                logger.info(f"  [DAG] Starting execution of {len(dag_nodes)} nodes (explicit)")
+                result = await executor.execute(dag_nodes)
                 
                 # Consolidate results
-                for res in results.values():
-                    if res.status == "completed":
-                        self.accumulated_content.append(str(res.output))
+                for res in result.node_results.values():
+                    if res.status == NodeStatus.COMPLETED:
+                        output_str = str(res.output)
+                        self.accumulated_content.append(output_str)
                         if res.output:
-                            self.memory.store_fact(f"dag_result_{res.node_id}", str(res.output)[:500])
+                            self.memory.store_fact(f"dag_result_{res.node_id}", output_str[:500])
+                            # Also store explicit artifacts as facts if useful
+                            if res.artifacts:
+                                for k, v in res.artifacts.items():
+                                    self.memory.store_fact(f"{k}", str(v)[:500])
                 
                 return True
             except Exception as e:
@@ -1428,15 +1482,7 @@ class CognitiveCycle:
 
         #   Convert plan steps   WorkflowNodes  
         try:
-            from kernel.flow.workflow_nodes import (
-                WorkflowNode,
-                NodeResult,
-                NodeStatus,
-                NodeType,
-                parse_blueprint,
-            )
-            from kernel.flow.dag_executor import DAGExecutor
-            from kernel.core.assembler import ArtifactStore
+            # Imports already at top-level
 
             blueprint_steps: list[dict[str, Any]] = []
             for i, step_desc in enumerate(plan.steps):
