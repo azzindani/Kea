@@ -6,46 +6,62 @@ The **Kernel Nodes** subsystem defines the specialized execution units used with
 
 Nodes are designed to be **Context-Aware** and **Self-Correcting**. They do not just execute strings; they validate, re-plan, and monitor the health of the research graph in real-time.
 
+```mermaid
+graph TD
+    subgraph Nodes [Kernel Nodes]
+        PN[PlannerNode] --> EP[ExecutionPlan Generation]
+        KN[KeeperNode] --> MS[Multi-Signal Reward Scoring]
+        KN --> AP[Always-Persist Policy]
+        DN[DivergenceNode] --> AR[Abductive Reasoning]
+        SN[SynthesizerNode] --> SA[Structured Synthesis]
+    end
+```
+
 ### Component Overview
 
 | Node | Responsibility | Key File |
 | :--- | :--- | :--- |
-| **Planner Node** | The "Draftsman". Decomposes the query into micro-tasks, validates tool schemas, and sets the topological order. | `planner.py` |
-| **Keeper Node** | The "Guardian". Monitors iteration limits, detects context drift, and determines if research is "Complete". | `keeper.py` |
-| **Synthesizer Node** | The "Editor". Aggregates disparate facts and child agent results into a cohesive final report. | `synthesizer.py` |
-| **Divergence Node** | The "Re-aligner". Detects when parallel research branches are contradicting or straying from the original intent. | `divergence.py` |
+| **Planner Node** | The "Draftsman". Decomposes Queries into Micro-tasks and validates tool schemas. | `planner.py` |
+| **Keeper Node** | The "Guardian". Monitors drift, manages persistence, and enforces hardware-aware limits. | `keeper.py` |
+| **Synthesizer Node** | The "Editor". Aggregates disparate facts and child results into a structured report. | `synthesizer.py` |
+| **Divergence Node** | The "Re-aligner". Generates alternative hypotheses to combat LLM confirmation bias. | `divergence.py` |
 
 ---
 
 ## ✨ Key Features
 
-### 1. Zero-Hallucination Planning
-The `PlannerNode` uses a multi-stage validation system:
-- **Fuzzy Tool Matching**: Hallucinated names (e.g., `get_data`) are mapped to the closest 2,000+ available tool names in the registry.
-- **Strict Schema Injection**: Tool arguments are validated against JSON schemas before the research graph even starts, preventing runtime failures.
-- **Auto-Parameter Extraction**: Uses heuristics to pull required variables (Tickers, URLs, Dates) from the global query.
+### 1. Robust Execution Planning (`PlannerNode`)
+The `PlannerNode` transforms natural language into a structured `ExecutionPlan`. It maps hallucinated tools to real registry items and ensures all tool arguments are validated against JSON schemas *before* execution begins, preventing "Broken Graph" scenarios.
 
-### 2. Context Drift Detection
-The `KeeperNode` acts as a watchdog. If the research loop is producing too many iterations without finding new facts, or if the "Conversation Focus" has drifted too far from the initial query, the Keeper triggers a "Graceful Halting" or a "Return to Parent" signal.
+### 2. Multi-Signal "Confidence" Watchdog (`KeeperNode`)
+The `KeeperNode` replaces simple loop counters with sophisticated **Reward Scoring**:
+- **Agreement Score**: Uses embeddings to detect consensus across disparate facts.
+- **Grounding Ratio**: Tracks how much of the answer is backed by tool-retrieved data vs. base LLM weight.
+- **Hardware Throttling**: Automatically lowers the "Refinement" bar if system resources are critical.
+- **Always-Persist**: Every fact discovered is instantly streamed to the `Vault Service` for durability.
 
-### 3. Hierarchical Fact Aggregation
-The `SynthesizerNode` doesn't just concatenate strings. It:
-- Deduplicates facts across different research branches.
-- Ranks citations by confidence.
-- Structures the output based on pre-defined report templates.
+### 3. Abductive Reasoning Loop (`DivergenceNode`)
+To prevent "Echo Chambers" in the reasoning process, the `DivergenceNode` is triggered to look for what *wasn't* considered. It generates counter-hypotheses and identifies potential data gaps that the primary reasoning branch might have ignored.
 
-### 4. Convergence Tracking
-The `DivergenceNode` monitors the "Stability" of the answer. Once the Generative-Critic-Judge loop reaches a stable consensus, the node allows the graph to proceed to synthesis, saving on unnecessary LLM tokens.
+### 4. Structured Synthesis (`SynthesizerNode`)
+The final node uses the `SynthesisOutput` schema to produce a polished result. It distinguishes between **Executive Summaries**, **Deep-Dive Sections**, and **Data Gaps**, ensuring the user knows precisely where the information is weak.
 
 ---
 
 ## 📁 Component Details
 
 ### `planner.py`
-The most complex node in the system. It contains the logic for transforming a natural language request into a fully-wired `ExecutionPlan` with dependencies and fallbacks.
+The "Brain" of the graph. It specializes in task decomposition, variable extraction, and determining if a query requires **Parallel** or **Sequential** execution architectures.
 
 ### `keeper.py`
-Integrates with the `WorkingMemory` to ensure that the agent "Stay on Topic" throughout long-running autonomous missions.
+The "Bodyguard" of the graph. It maintains the stability of the research state, presiding over the decision to `should_continue` or `halt` based on information gain vs. token cost.
+
+### `divergence.py`
+The "Devil's Advocate". It uses specialized prompts to force the LLM to think "Outside the Box," identifying hidden biases or alternative explanations for collected facts.
+
+### `synthesizer.py`
+The "Writer". It takes the raw `facts` and `hypotheses` stored in state and maps them to a consistent report structure defined in `output_schemas.py`.
 
 ---
 *Nodes in Kea provide the modular building blocks that allow complex, multi-agent reasoning to be managed as a structured state machine.*
+

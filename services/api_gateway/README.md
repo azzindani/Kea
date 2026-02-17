@@ -1,121 +1,88 @@
 # 🚪 API Gateway Service ("The Front Door")
 
-The **API Gateway** is the centralized nerve center of the **Kea v0.4.0 Autonomous Enterprise Operating System**. It is responsible for routing user intentions, managing the security perimeter, orchestrating asynchronous research jobs, and handling the entire cognitive pipeline lifecycle. It acts as the single point of entry for all external clients, ensuring consistent authentication, rate limiting, and request validation.
-
-## ✨ Features
-
-- **Centralized Security**: Unified authentication and authorization using JWT and session cookies.
-- **Smart Rate Limiting**: Tiered limiting based on user identity and IP, preventing system abuse via "Sliding Window" algorithm.
-- **Microservice Orchestration**: Seamlessly routes requests to specialized services (Orchestrator, MCP Host, RAG, etc.).
-- **Asynchronous Job Management**: Handles long-running research tasks with status tracking and result retrieval.
-- **Contextual Continuity**: Supports building upon previous research attempts via `seed_facts` and `error_feedback`, enabling iterative knowledge accumulation.
-- **Human-in-the-Loop (HITL)**: Provides endpoints for manual interventions and decision-making during research.
-- **Protocol Proxying**: Translates public REST API calls into internal service-to-service communication.
-- **Production-Ready Observability**: Integrated Prometheus metrics and structured JSON logging.
+The **API Gateway** is the centralized nerve center of the Kea v0.4.0 system. It manages the security perimeter, orchestrates asynchronous research jobs, and serves as the primary interface for human interaction with the "Fractal Corp" hive mind.
 
 ## 📐 Architecture
 
-The Gateway implements a **4-Layer Defense-in-Depth Architecture**, ensuring that only valid, authorized, and safe requests reach the internal service mesh.
-
-1.  **Transport & Security Layer**:
-    *   **HSTS & CSP**: Rigid security headers enforced via `SecurityHeadersMiddleware`.
-    *   **Sliding Window Rate Limiting**: Managed via `RateLimitMiddleware` using a ZSET-based algorithm (100 req/min burst protect).
-    *   **CORS Management**: Dynamically resolved origins via `get_cors_origins()`.
-2.  **Identity Layer**:
-    *   **Hybrid Authentication**: Supports `JWT` for programmatic access and `HttpOnly Cookies` for browser sessions.
-    *   **Token Authority**: The Gateway acts as the central issuer; downstream services trust the injected `X-User-ID` header.
-3.  **Application Layer**:
-    *   **Route Dispatching**: Polymorphic route modules (Jobs, Graph, Memory, etc.) proxying to specialized upstream services.
-    *   **Polymorphic Jobs**: The `/jobs` endpoint handles Research, Synthesis, and Calculation job types.
-4.  **Persistence Layer**:
-    *   **Event Bus**: Internal service-to-service communication hooks.
-    *   **Postgres State**: Used for high-frequency tracking (rate limits, session metrics).
+The Gateway implements a **4-Layer Defense-in-Depth Architecture**, ensuring that only valid, authorized, and safe requests reach the internal reasoning services.
 
 ```mermaid
 graph TD
-    User((User)) -->|HTTP/REST| Gateway[API Gateway (Port 8000)]
-    
-    subgraph Layers
-        Gateway --> Auth[Identity & Security]
-        Auth --> Router{Route Dispatcher}
+    subgraph Gateway [API Gateway]
+        direction TB
+        LB[Load Balancer / HSTS] --> RL[Rate Limiter: Sliding Window]
+        RL --> SEC[Security: CSP/CORS/Auth]
+        SEC --> Router{Polymorphic Router}
         
-        Router -->|/chat/message| Orch[Orchestrator Service<br/>(Port 8001)]
-        subgraph Kernel [Isolated Kernel]
-            Orch --> Cell[KernelCell]
-        end
-        Router -->|/tools/call| MCP[MCP Host<br/>(Port 8002)]
-        Router -->|/datasets| RAG[RAG Service<br/>(Port 8003)]
-        Router -->|/audit/logs| Vault[Vault Service<br/>(Port 8004)]
-        Router -->|/jobs| Chronos[Chronos Service<br/>(Port 8006)]
+        Router -->|Chat| ORC[Orchestrator Proxy]
+        Router -->|Jobs| CHR[Chronos/Vault Proxy]
+        Router -->|HITL| INT[Intervention Manager]
+        Router -->|Tools| MCP[MCP Host Proxy]
     end
-    
-    Orch -->|Trigger| Planner
-    Chronos -->|Schedule| Queue[Postgres Queue]
+
+    subgraph Internal [Service Mesh]
+        ORC --> Brain[Orchestrator]
+        CHR --> Time[Chronos]
+        INT --> Human[Swarm Manager]
+        MCP --> Hands[MCP Host]
+    end
 ```
+
+### Component Overview
+
+| Component | Responsibility | Key Files |
+| :--- | :--- | :--- |
+| **Identity & Security**| JWT/Cookie Auth, CSP enforcement, and XSS protection. | `middleware/auth.py`, `middleware/security.py` |
+| **Rate Limiter** | Postgres-backed sliding window protection (100 req/min). | `middleware/rate_limit.py` |
+| **Intervention Mgr** | Manages "Pause & Escalate" states for HITL decision-making. | `routes/interventions.py` |
+| **Job Orchestrator** | High-level job state transitions (PENDING -> RUNNING). | `routes/jobs.py` |
+| **MCP Proxy** | Direct bridge for tool discovery and execution. | `routes/mcp.py` |
+
+---
+
+## ✨ Key Features
+
+### 1. Hybrid Authentication (JWT + Cookies)
+Supports both programmatic access (via JWT tokens in Header) and browser-based sessions (via HttpOnly cookies). The Gateway is the **Source of Truth for Identity**; downstream services trust the injected `X-User-ID` header.
+
+### 2. High-Fidelity Job Lifecycle
+The `/jobs` endpoint handles the asynchronous nature of research. It creates persistent job records in PostgreSQL and delegates the cognitive workflow to the **Orchestrator**, allowing users to monitor progress via SSE (Server-Sent Events) or WebSockets.
+
+### 3. Human-in-the-Loop (HITL) Protocol
+When a `KernelCell` encounters a high-risk action or an information gap, it sends an **Escalation**. The Gateway's `interventions` route exposes these as actionable notifications, allowing humans to "Approve," "Reject," or "Provide Clarification" without stopping the entire thread.
+
+### 4. Zero-Trust Security Middleware
+Every request passes through a rigid middleware stack:
+- **RateLimitMiddleware**: Blocks brute-force and scraping attempts early.
+- **SecurityHeadersMiddleware**: Sets CSP, HSTS, and Frame-Options to harden the browser client.
+- **AuthMiddleware**: Populates the request state with a verified `User` object.
+
+---
 
 ## 📁 Codebase Structure
 
-The service is organized into functional modules that isolate security logic from routing and upstream communication.
+- **`main.py`**: FastAPI entrypoint. Mounts all routers and configures the global middleware stack.
+- **`routes/`**: Polymorphic API modules.
+    - `conversations.py`: High-level chat interface for "Kea Conversations."
+    - `jobs.py`: Submits and tracks long-running autonomous missions.
+    - `interventions.py`: The interface for human governance and decision points.
+    - `mcp.py`: Management of MCP tools and Direct Execution endpoints.
+- **`middleware/`**: Cross-cutting concerns for security and performance.
+- **`clients/`**: Typed HTTP/RPC clients for communicating with Peer services (Orchestrator, Vault, RAG).
 
-### 🔌 Core Components
-
-- **`main.py`**: The application entrypoint (v0.4.0). Configures FastAPI, assembles the middleware stack, and mounts all polymorphic routers.
-- **`routes/`**: Implementation of API endpoints. These modules serve as "orchestrators" that validate inputs and delegate work.
-    - `auth.py`: Identity management, login, registration, and token issuance.
-    - `conversations.py`: High-level chat interface, interacting with the Orchestrator's state machine.
-    - `jobs.py`: Core research job management (Persistent SQL-backed), proxying to the Orchestrator.
-    - `mcp.py`: Interface for direct tool calls and MCP server management.
-    - `interventions.py`: Manages human-in-the-loop (HITL) pause states and decision points (Approval, Review, Clarification).
-    - `system.py`: Service health (v0.1.0 internal), configuration exposure, and capability discovery.
-    - `artifacts.py`: Interface for uploading/downloading heavy data assets generated by the system.
-    - `graph.py`: Visualizations and graph introspection.
-    - `llm.py`: Direct LLM interaction endpoints.
-    - `memory.py`: Semantic search and memory retrieval interface.
-    - `users.py`: User profile and settings management.
-- **`middleware/`**: Cross-cutting concerns that process every request before it hits a route.
-    - `auth.py`: JWT/Cookie verification and identity injection into the request state.
-    - `rate_limit.py`: Sliding-window rate limiting using a shared Postgres backend.
-    - `security.py`: CSP, HSTS, and CORS header management.
-- **`clients/`**: Highly optimized HTTP/RPC clients for communicating with other Kea services.
-    - `orchestrator.py`: Client for the Reasoning/Planning engine.
-    - `mcp_client.py`: Client for the Tool Execution host.
-    - `rag_service.py`: Client for the Knowledge and Discovery service.
-- **`schemas/`**: Pydantic models for request/response validation across the gateway.
+---
 
 ## 🧠 Deep Dive
 
-### 1. Hybrid Rate Limiting Implementation
-To prevent "DDoS by Agent" (infinite loops), the Gateway implements a tiered limiting strategy:
-- **Algorithm**: Sliding Window (ZSET-based).
-- **Backend**: Postgres Unlogged Table for global state, providing high throughput.
-- **Fail-Open Logic**: If the database becomes unavailable, the Gateway defaults to allowing requests to prioritize system availability.
-- **Key Hierarchy**: Limits are applied to `user_id` if authenticated, falling back to IP address for anonymous traffic.
+### 1. The Async Job "Handshake"
+When a user submits a job, the Gateway doesn't wait for results. It:
+1.  Validates the query and complexity.
+2.  Creates a job in the **Vault**.
+3.  Returns a `202 Accepted` with a `job_id`.
+4.  Wires the job to an background worker that triggers the Orchestrator.
 
-### 2. Service-to-Service Security & Trust
-The Gateway is the **Source of Truth for Identity**. 
-- Internal services (Orchestrator, Vault, etc.) do not implement their own authentication logic. Instead, they trust the Gateway-injected `X-User-ID` and `X-Scope` headers.
-- Internal communication is managed via a `ServiceRegistry` that can be overridden via environment variables for flexible deployment (e.g., K8s vs. Local).
+### 2. Contextual Continuity
+The Gateway supports "Contextual Seeding." A user can provide `seed_facts` or `existing_artifacts` in a request, which the Gateway injects into the Orchestrator's **Inference Context**, allowing new research to build upon previous work seamlessly.
 
-### 3. Polymorphic Job Lifecycle
-The `/jobs` endpoint follows a persistent pattern where jobs are stored in the `research_jobs` PostgreSQL table. The Gateway manages the state transitions (`PENDING`, `RUNNING`, `COMPLETED`, `FAILED`) and delegates the heavy cognitive work to the **Orchestrator Service**, which in turn executes the **Kea Kernel**.
-
-## 📚 Reference
-
-### API Endpoints (v0.4.0)
-
-| Category | Endpoint | Method | Description |
-|:---------|:---------|:-------|:------------|
-| **Auth** | `/api/v1/auth/login` | `POST` | Exchange credentials for a JWT and session cookie. |
-| **Jobs** | `/api/v1/jobs` | `POST` | Submit a Research, Synthesis, or Calculation job. |
-| **Memory** | `/api/v1/memory/search` | `POST` | Semantic search against the Atomic Facts database. |
-| **HITL** | `/api/v1/interventions/pending` | `GET` | List jobs waiting for human decision-making. |
-| **Chat** | `/api/v1/conversations` | `POST` | Send a message to the Orchestrator with intent detection. |
-| **System** | `/health/full` | `GET` | Deep health check of database, redis, and qdrant. |
-| **System** | `/api/v1/system/capabilities` | `GET` | Discover available MCP servers and research paths. |
-
-### Middleware Execution Order
-1. **RateLimitMiddleware**: Outermost layer; drops excessive traffic early.
-2. **RequestLoggingMiddleware**: Generates `trace_id` for request tracking.
-3. **SecurityHeadersMiddleware**: Sets standard security headers (CSP, HSTS).
-4. **AuthMiddleware**: Identifies the user and populates `request.state.user`.
-5. **CORS (FastAPI Default)**: Innermost layer; handles cross-origin requests.
+---
+*The API Gateway is the interface through which human intent is translated into autonomous corporate action.*

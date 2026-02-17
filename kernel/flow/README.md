@@ -1,54 +1,71 @@
 # 🧠 Kernel Flow (The Nervous System)
 
-The **Kernel Flow** subsystem manages the logical sequencing and execution patterns of the Kea system. it provides both high-level state machine orchestration (via LangGraph) and low-level dependency-driven task execution (via DAGs).
+The **Kernel Flow** subsystem manages the logical sequencing and execution patterns of the Kea system. It provides both high-level state machine orchestration (via LangGraph) and low-level dependency-driven task execution (via DAGs).
 
 ## 📐 Architecture
 
 Flow is divided into two primary execution layers:
-1.  **Macro-Flow (Graphs)**: High-level state transitions and multi-agent interaction loops.
-2.  **Micro-Flow (DAGs)**: Granular task dependencies and parallel execution of individual tool calls or sub-steps.
+1.  **Macro-Flow (Graphs)**: High-level state transitions and multi-agent loops.
+2.  **Micro-Flow (DAGs)**: Granular, dependency-aware task execution.
+
+```mermaid
+graph TD
+    subgraph Flow [Kernel Flow]
+        RG[ResearchGraph] --> AW[AgenticWorkflow]
+        AW --> RE[ReAct Loop]
+        MD[MicroPlanner] --> DE[DAGExecutor]
+        DE --> AWir[Auto-Wiring Engine]
+        AP[ApprovalWorkflow] --> HITL[Human-in-the-Loop]
+        Rec[RecoverySystem] --> Healing[Self-Healing Cycles]
+    end
+```
 
 ### Component Overview
 
 | Component | Responsibility | Key File |
 | :--- | :--- | :--- |
-| **Research Graph** | The primary LangGraph state machine. Orchestrates global phase transitions (Plan -> Research -> Critic -> Judge). | `graph.py` |
-| **DAG Executor** | Dependency-driven engine. Fires tasks as soon as their specific inputs are ready, enabling non-linear execution. | `dag_executor.py` |
-| **Microplanner** | The "Internal Draftsman". Generates detailed step-by-step DAGs for child cells or complex tasks. | `microplanner.py` |
-| **Auto-Wirer** | Intelligent data connector. Automatically resolves `input_mapping` between nodes based on artifact types. | `auto_wiring.py` |
-| **Workflow Nodes** | Definitions for various execution units (Standard, Loop, Switch, Merge). | `workflow_nodes.py` |
+| **Research Graph** | The "Master Graph". Implements high-level LangGraph phase transitions. | `graph.py` |
+| **Agentic Workflow**| The "ReAct Engine". Implements the Thought-Action-Observation reasoning loop. | `agentic_workflow.py` |
+| **DAG Executor** | The "Workhorse". Fires tasks in parallel based on artifact readiness. | `dag_executor.py` |
+| **Approval Workflow**| The "Governor". Manages human-in-the-loop requests for high-stakes actions. | `approval_workflow.py` |
+| **Microplanner** | The "Sub-Tasker". Breaks complex directives into execution-ready DAGs. | `microplanner.py` |
+| **Recovery System** | The "Lifeline". Detects stalls or deadlocks and triggers recursive flow healing. | `recovery.py` |
 
 ---
 
 ## ✨ Key Features
 
-### 1. True Dependency Parallelism
-Unlike phase-based systems that wait for all tasks in "Phase 1" to finish before starting "Phase 2", the `DAGExecutor` tracks individual artifact availability. A "Phase 3" task can fire as soon as its specific dependencies from "Phase 1" are satisfied, maximizing hardware utilization.
+### 1. Macro-Micro Hybrid Execution
+Kea combines the predictability of **LangGraph** state machines (Macro) with the efficiency of **DAG** execution (Micro). The Macro-Flow handles agent-to-agent interaction, while the Micro-Flow ensures tool-level tasks are executed with maximum parallelism.
 
-### 2. Recursive Self-Healing Flow
-The `recovery.py` component allows the flow to detect deadlocks or failed branches and trigger "Re-plans" or "Heal-requests" mid-execution. This allows the system to recover from flawed logic or tool failures without restarting the entire cycle.
+### 2. Autonomous Agentic Reasoning (`AgenticWorkflow`)
+The `AgenticWorkflow` implements a true **ReAct** loop. A single node can cycle through multiple internal thoughts, tool calls, and observations before reporting back to the parent graph. This prevents "Graph Bloat" while allowing for complex, granular autonomy.
 
-### 3. Agentic Workflow Library
-Provides pre-defined topological patterns:
-- **Deep Research**: Comprehensive multi-source analysis.
-- **Quick Answer**: Low-latency direct retrieval.
-- **Verification**: Dedicated "Red Team" testing of hypotheses.
+### 3. Human-in-the-Loop Governance (`ApprovalWorkflow`)
+For enterprise-critical actions (e.g., executing a trade, changing security policies), the flow can pause and emit an `ApprovalRequest`. The `ApprovalWorkflow` manages categories (Cost, Compliance, Security) and role-based assignments, resuming the flow only after human verification.
 
-### 4. Dynamic Node Injection
-The `Microplanner` can inject new nodes into a live, running `DAGExecutor` instance. If a task discovers a new information gap (e.g., a hidden company), it can spawn a new research node on-the-fly without breaking the parent graph's structure.
+### 4. Just-In-Time Auto-Wiring (`AutoWirer`)
+Nodes in a Kea DAG don't need hardcoded input mappings. The `AutoWirer` uses metadata and artifact types to "wire" nodes together at runtime. If Node B needs a "Financial Statement," it automatically finds the artifact produced by Node A that matches that type.
 
 ---
 
 ## 📁 Component Details
 
 ### `graph.py`
-The "Macro-Level" brain. Implements the `researcher_node`, `critic_node`, and `judge_node` used in the main LangGraph application.
+The entry point for specialized multi-agent systems. It defines how the **Planner**, **Researcher**, and **Judge** interact over the long-term research mission.
+
+### `agentic_workflow.py`
+The core implementation of the reasoning chain. It handles the parsing of "Thoughts" and provides the state management for iterative tool use within a single node.
 
 ### `dag_executor.py`
-The "Workhorse". Implements the logic for traversing a task graph, handling resource semaphores, and managing artifact passing via the `ArtifactStore`.
+A high-performance engine for non-linear execution. It uses a `Semaphore` to respect hardware limits while firing hundreds of dependent subtasks as soon as their inputs appear in the `ArtifactStore`.
+
+### `approval_workflow.py`
+Defines the `ApprovalRequest` and `ApprovalStatus` lifecycles. It integrates with the `Swarm Manager` for external notification and manages the `wait_for_approval` polling logic.
 
 ### `microplanner.py`
-Translates high-level planning instructions into a list of `WorkflowNodes` that the `DAGExecutor` can understand.
+The bridge between high-level planning and low-level execution. It ensures that every `WorkflowNode` injected into the executor is valid and has reachable dependencies.
 
 ---
 *Flow in Kea ensures that intelligence is not just linear, but a reactive and adaptive network of concurrent thoughts.*
+

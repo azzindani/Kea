@@ -161,6 +161,7 @@ class StressTestRunner:
         self._initialized = True
         logger.info("="*60)
 
+
     async def cleanup(self) -> None:
         """Cleanup resources."""
         if self.client:

@@ -25,7 +25,10 @@ The Kernel is organized into functional subsystems inspired by cognitive science
 | [**Flow**](./flow/README.md) | **Nervous System** | DAG execution and LangGraph state machines. |
 | [**IO**](./io/README.md) | **Circulatory System** | The `MessageBus` and multi-modal sensory packets. |
 | [**Interfaces**](./interfaces/README.md) | **Connective Tissue** | Protocols for RAG, Tools, and Human Supervision. |
-| [**Nodes**](./nodes/README.md) | **Specialized Reflexes** | Individual functional units for Planning, Keeping, and Synthesizing. |
+| [**Nodes**](./nodes/README.md) | **Specialized Reflexes** | Functional units for Planning, Keeping, and Synthesizing. |
+| [**Agents**](./agents/README.md) | **Personas** | Specialized reasoning styles (Generator, Critic, Judge). |
+| [**Templates**](./templates/README.md) | **Muscle Memory** | "Golden Path" JSON blueprints for expert workflows. |
+
 
 ---
 

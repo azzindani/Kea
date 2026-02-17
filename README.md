@@ -65,13 +65,13 @@ Each service acts as a distinct corporate persona with a specific mandate.
 
 | Service | Persona | Role | Documentation |
 |:--------|:--------|:-----|:--------------|
-| **Kernel** | The Logic | Isolated Core Reasoning Engine | [🧠 View Doc](kernel/README.md) |
-| **Gateway** | The Mouth | Security, Auth, & Routing | [📖 View Doc](services/api_gateway/README.md) |
+| **Kernel** | The Brain | Isolated Core Reasoning Engine | [🧠 View Doc](kernel/README.md) |
+| **Gateway** | The Front Door | Security, Auth, & Routing | [📖 View Doc](services/api_gateway/README.md) |
 | **Orchestrator** | The Nervous System | Kernel Wrapper & State Machine | [📖 View Doc](services/orchestrator/README.md) |
 | **MCP Host** | The Hands | Tool Execution & JIT Spawning | [📖 View Doc](services/mcp_host/README.md) |
-| **RAG Service** | The Librarian| Multi-Source Knowledge Controller | [📖 View Doc](services/rag_service/README.md) |
+| **RAG Service** | The Library | Multi-Source Knowledge Controller | [📖 View Doc](services/rag_service/README.md) |
 | **Vault** | The Memory | Research Persistence & Context Engine | [📖 View Doc](services/vault/README.md) |
-| **Swarm Manager**| The Conscience| Governance & Compliance | [📖 View Doc](services/swarm_manager/README.md) |
+| **Swarm Manager**| The Conscience | Governance & Compliance | [📖 View Doc](services/swarm_manager/README.md) |
 | **Chronos** | The Clock | Scheduling & Future Tasks | [📖 View Doc](services/chronos/README.md) |
 
 ---

@@ -271,6 +271,10 @@ async def discover_tools(
     pgvector cosine-similarity search over all 2000+ registered tools
     across 60+ MCP servers.
 
+    Features robust "Cold Start" handling: if the MCP Host is up but
+    hasn't finished indexing (0 tools total), this function will wait
+    and retry the search.
+
     Args:
         timeout: HTTP timeout in seconds.
         query: Natural-language task description for semantic matching.
@@ -299,7 +303,7 @@ async def discover_tools(
         min_similarity=min_sim
     )
 
-    try:
+    async def _do_rag_search() -> list[dict[str, Any]]:
         async with httpx.AsyncClient(timeout=timeout) as client:
             resp = await client.post(
                 f"{mcp_url}/tools/search",
@@ -310,33 +314,73 @@ async def discover_tools(
                     f"Tool RAG search returned {resp.status_code}: {resp.text[:200]}"
                 )
                 return []
-            tools = resp.json().get("tools", [])
+            return resp.json().get("tools", [])
+
+    async def _check_total_tools() -> int:
+        """Check if the system has ANY tools registered (is it initialized?)."""
+        try:
+            async with httpx.AsyncClient(timeout=2.0) as client:
+                fb_resp = await client.get(f"{mcp_url}/tools", params={"limit": 1})
+                if fb_resp.status_code == 200:
+                    return len(fb_resp.json().get("tools", []))
+        except Exception:
+            pass
+        return 0
+
+    try:
+        # 1. Attempt Primary RAG Search
+        tools = await _do_rag_search()
+        
+        # 2. Cold Start Detection: If RAG found nothing, check if the system is empty
+        if not tools:
+            total_tools = await _check_total_tools()
+            if total_tools == 0:
+                # System is likely initializing (Race Condition).
+                # Retry loop: Wait for tools to appear.
+                logger.info("Tool RAG returned 0 items & Registry is empty. Waiting for MCP Host initialization...")
+                
+                start_time = asyncio.get_event_loop().time()
+                # Wait up to 15 seconds for tools to appear
+                while (asyncio.get_event_loop().time() - start_time) < 15.0:
+                    await asyncio.sleep(2.0)
+                    total_tools = await _check_total_tools()
+                    if total_tools > 0:
+                        logger.info(f"MCP Host initialized with {total_tools}+ tools. Retrying RAG search...")
+                        tools = await _do_rag_search()
+                        break
+                
+                if not tools and total_tools == 0:
+                    logger.warning("MCP Host failed to initialize tools within timeout.")
+
+        if tools:
             logger.info(f"Tool RAG search: {len(tools)} tools for query '{search_query[:60]}'")
-
-            # Static fallback: when RAG returns 0 tools (cold start / empty registry)
-            # fall back to GET /tools to give the LLM at least some tools to work with.
-            if not tools:
-                exec_cfg = get_kernel_config("kernel_cell_execute") or {}
-                fallback_limit = exec_cfg.get("rag_fallback_static_limit", 0)
-                if fallback_limit > 0:
-                    logger.warning(
-                        f"Tool RAG search returned 0 — static fallback (limit={fallback_limit})"
-                    )
-                    try:
-                        async with httpx.AsyncClient(timeout=timeout) as client:
-                            fb_resp = await client.get(
-                                f"{mcp_url}/tools",
-                                params={"limit": fallback_limit}
-                            )
-                            if fb_resp.status_code == 200:
-                                tools = fb_resp.json().get("tools", [])
-                                logger.info(
-                                    f"Static fallback: {len(tools)} tools available"
-                                )
-                    except Exception as fe:
-                        logger.warning(f"Static fallback failed: {fe}")
-
             return tools
+
+        # 3. Static Fallback (if RAG failed or found nothing even after initialization)
+        exec_cfg = get_kernel_config("kernel_cell_execute") or {}
+        fallback_limit = exec_cfg.get("rag_fallback_static_limit", 0)
+        
+        if fallback_limit > 0:
+            logger.warning(
+                f"Tool RAG search returned 0 — static fallback (limit={fallback_limit})"
+            )
+            try:
+                async with httpx.AsyncClient(timeout=timeout) as client:
+                    fb_resp = await client.get(
+                        f"{mcp_url}/tools",
+                        params={"limit": fallback_limit}
+                    )
+                    if fb_resp.status_code == 200:
+                        tools = fb_resp.json().get("tools", [])
+                        logger.info(
+                            f"Static fallback: {len(tools)} tools available"
+                        )
+                    return tools
+            except Exception as fe:
+                logger.warning(f"Static fallback failed: {fe}")
+
+        return []
+
     except httpx.TimeoutException:
         logger.warning("Tool RAG search timed out")
         return []
