@@ -401,327 +401,32 @@ async def researcher_node(state: GraphState) -> GraphState:
         ]
 
     # =========================================================================
-    # DAG Executor: Dependency-Driven Parallel Execution with Microplanner
     # =========================================================================
-    # Replaces the old phase-based loop. Tasks now fire as soon as their
-    # specific dependencies are satisfied, not when their entire phase completes.
-    # The microplanner inspects results after each node and can inject new tasks.
+    # DAG Executor: Dependency-Driven Parallel Execution via SwarmExecutor
+    # =========================================================================
+    # Logic extracted to kernel.cognition.swarm_executor for modularity.
     # =========================================================================
     if len(micro_tasks) >= 1:
         try:
-            from kernel.actions.agent_spawner import (
-                Domain,
-                SpawnPlan,
-                SubTask,
-                TaskType,
-                get_spawner,
-            )
-            from kernel.flow.dag_executor import DAGExecutor
-            from kernel.flow.microplanner import Microplanner
-            from kernel.core.prompt_factory import PromptContext, PromptFactory
-            from kernel.flow.workflow_nodes import (
-                NodeResult,
-                NodeStatus,
-                WorkflowNode,
-                parse_blueprint,
-            )
+            from kernel.cognition.swarm_executor import SwarmExecutor
 
-            # Build an LLM callback so spawner + microplanner can call the LLM
-            async def _llm_callback(system_prompt: str, user_message: str) -> str:
-                """LLM callback for agent spawner and microplanner."""
-                try:
-                    import os
+            swarm_exec = SwarmExecutor(job_id=state.get("job_id", "unknown"))
+            
+            (
+                dag_result, 
+                new_facts, 
+                new_sources, 
+                new_invocations, 
+                new_errors
+            ) = await swarm_exec.execute(micro_tasks, state, assembler)
 
-                    if not os.getenv("OPENROUTER_API_KEY"):
-                        return ""
-                    from shared.config import get_settings
-                    from shared.llm import LLMConfig, OpenRouterProvider
-                    from shared.llm.provider import LLMMessage, LLMRole
-
-                    app_cfg = get_settings()
-                    provider = OpenRouterProvider()
-                    cfg = LLMConfig(
-                        model=app_cfg.models.planner_model,
-                        temperature=0.3,
-                        max_tokens=32768,
-                    )
-                    msgs = [
-                        LLMMessage(role=LLMRole.SYSTEM, content=system_prompt),
-                        LLMMessage(role=LLMRole.USER, content=user_message),
-                    ]
-                    resp = await provider.complete(msgs, cfg)
-                    return resp.content
-                except Exception as e:
-                    logger.warning(f"LLM callback failed: {e}")
-                    return ""
-
-            spawner = get_spawner(llm_callback=_llm_callback)
-            prompt_factory = PromptFactory()
-
-            # Get complexity-aware limits
-            complexity_info = state.get("complexity", {})
-            max_parallel = complexity_info.get("max_parallel", 6)
-
-            # Convert micro_tasks (dicts) into WorkflowNodes
-            workflow_nodes = parse_blueprint(micro_tasks)
-
-            logger.info(
-                f"  DAG Executor: {len(workflow_nodes)} nodes, max_parallel={max_parallel}"
-            )
-
-            # Create node executor that bridges WorkflowNode   AgentSpawner
-            async def execute_workflow_node(
-                node: WorkflowNode,
-                args: dict,
-            ) -> NodeResult:
-                """Execute a single workflow node via the agent spawner."""
-                subtask = SubTask(
-                    subtask_id=node.id,
-                    query=node.description or f"{node.tool}: {str(args)[:100]}",
-                    domain=Domain.RESEARCH,
-                    task_type=TaskType.RESEARCH,
-                    preferred_tool=node.tool,
-                    arguments=args,
-                )
-
-                # Generate prompt with global context
-                try:
-                    ctx_pool = get_context_pool()
-                    global_facts = [f.get("text", "") for f in ctx_pool.fact_pool]
-                except Exception:
-                    global_facts = []
-
-                prompt_ctx = PromptContext(
-                    query=subtask.query,
-                    domain=subtask.domain,
-                    task_type=subtask.task_type,
-                    previous_findings=global_facts,
-                )
-                prompt = prompt_factory.generate(prompt_ctx)
-
-                plan = SpawnPlan(
-                    task_id=f"{state.get('job_id', 'node')}_{node.id}",
-                    subtasks=[subtask],
-                    prompts=[prompt],
-                    max_parallel=1,
-                )
-
-                swarm_result = await spawner.execute_swarm(plan)
-
-                # Convert SwarmResult   NodeResult
-                if swarm_result.successful > 0:
-                    agent_res = next(
-                        (r for r in swarm_result.agent_results if r.status == "completed"),
-                        None,
-                    )
-                    output = agent_res.result if agent_res else None
-
-                    # Store in context pool for downstream nodes
-                    try:
-                        ctx_pool = get_context_pool()
-                        ctx_pool.store_data(
-                            key=f"task_output_{node.id}",
-                            data=str(output),
-                            description=f"Output from node {node.id}",
-                        )
-                        ctx_pool.add_fact(
-                            text=str(output),
-                            source=f"task_{node.id}",
-                            task_id=node.id,
-                        )
-                    except Exception as e:
-                        logger.warning(f"Context pool update failed: {e}")
-
-                    _duration_ms = (agent_res.duration_seconds * 1000.0) if agent_res else 0.0
-                    _url_in_output = ""
-                    if agent_res and agent_res.source and agent_res.source.startswith("http"):
-                        _url_in_output = agent_res.source
-                    _dag_citation = _build_tool_citation(
-                        tool_name=node.tool or "dag_executor",
-                        server_name="swarm_agent",
-                        arguments=args,
-                        result_preview=str(output)[:500] if output else "",
-                        duration_ms=_duration_ms,
-                        invoked_at=agent_res.started_at if agent_res else None,
-                        source_url=_url_in_output,
-                    )
-                    return NodeResult(
-                        node_id=node.id,
-                        status=NodeStatus.COMPLETED,
-                        output=output,
-                        artifacts={node.output_artifact: str(output)}
-                        if node.output_artifact
-                        else {},
-                        metadata={
-                            "source": agent_res.source if agent_res else None,
-                            "prompt": agent_res.prompt_used[:200] if agent_res else "",
-                            "tool_citation": _dag_citation,
-                            "tool_name": node.tool,
-                            "arguments": args,
-                            "duration_ms": _duration_ms,
-                        },
-                    )
-                else:
-                    error_msg = "; ".join(
-                        r.error or "unknown"
-                        for r in swarm_result.agent_results
-                        if r.status != "completed"
-                    )
-                    return NodeResult(
-                        node_id=node.id,
-                        status=NodeStatus.FAILED,
-                        error=error_msg or "All agents failed",
-                    )
-
-            # Initialize microplanner for reactive replanning
-            microplanner = Microplanner(
-                query=query,
-                llm_callback=spawner.llm_callback,
-                max_replans=complexity_info.get("max_research_iterations", 3),
-            )
-
-            # Create and run DAG executor
-            dag_executor = DAGExecutor(
-                store=assembler.store,
-                node_executor=execute_workflow_node,
-                max_parallel=max_parallel,
-                microplanner=microplanner.checkpoint,
-            )
-
-            dag_result = await dag_executor.execute(workflow_nodes)
-
-            # Harvest results into facts/sources/tool_invocations
-            # CRITICAL: Filter out error outputs to prevent "error as fact" problem
-            for node_id, node_result in dag_result.node_results.items():
-                if node_result.status == NodeStatus.COMPLETED and node_result.output:
-                    output_text = str(node_result.output)
-
-                    # Strict Error Filtering (same as legacy executor)
-                    is_error = False
-                    for keyword in _STANDARD_ERRORS:
-                        if keyword in output_text.lower():
-                            is_error = True
-                            logger.warning(
-                                f"  Keeper: Filtering error output from {node_id}: "
-                                f"{output_text[:100]}"
-                            )
-                            break
-
-                    # Also skip empty or very short outputs
-                    if len(output_text.strip()) < 5:
-                        is_error = True
-
-                    # Only add valid facts
-                    if not is_error:
-                        metadata = node_result.metadata or {}
-                        tool_name = (
-                            metadata.get("tool_name")
-                            or metadata.get("source")
-                            or metadata.get("tool")
-                            or "dag_executor"
-                        )
-                        arguments = metadata.get("arguments") or metadata.get("args") or {}
-
-                        # Ensure tool_name is string, not None
-                        if not isinstance(tool_name, str):
-                            tool_name = "unknown_tool"
-
-                        tool_citation = metadata.get("tool_citation") or _build_tool_citation(
-                            tool_name=tool_name,
-                            server_name="swarm_agent",
-                            arguments=arguments,
-                            result_preview=output_text,
-                        )
-                        source_url = tool_citation.get("source_url", "")
-
-                        facts.append(
-                            {
-                                "text": output_text,
-                                "query": f"DAG Node {node_id}",
-                                "source": tool_name,
-                                "source_url": source_url,
-                                "task_id": node_id,
-                                "persist": True,
-                                "tool_citation": tool_citation,
-                            }
-                        )
-
-                        # Track unique sources (URL only when genuinely present)
-                        if source_url and source_url not in sources:
-                            sources.append(
-                                {
-                                    "url": source_url,
-                                    "title": f"DAG Node {node_id}",
-                                    "tool": tool_name,
-                                    "task_id": node_id,
-                                }
-                            )
-                    else:
-                        logger.debug(f"Keeper: Skipped error fact from {node_id}")
-
-                _ti_citation = (node_result.metadata or {}).get(
-                    "tool_citation"
-                ) or _build_tool_citation(
-                    tool_name=(node_result.metadata or {}).get("tool_name", "dag_executor"),
-                    server_name="swarm_agent",
-                    arguments=(node_result.metadata or {}).get("arguments", {}),
-                    result_preview=str(node_result.output or "")[:500],
-                    duration_ms=(node_result.metadata or {}).get("duration_ms", 0.0),
-                    is_error=node_result.status != NodeStatus.COMPLETED,
-                )
-                tool_invocations.append(
-                    {
-                        "task_id": node_id,
-                        "tool": (node_result.metadata or {}).get("tool_name", "dag_executor"),
-                        "success": node_result.status == NodeStatus.COMPLETED,
-                        "persist": True,
-                        "tool_citation": _ti_citation,
-                    }
-                )
-
-                # ERROR FEEDBACK LOOP: Capture failed nodes for LLM self-correction
-                if node_result.status == NodeStatus.FAILED:
-                    # Get workflow node to extract tool name and args
-                    workflow_node = next((n for n in workflow_nodes if n.id == node_id), None)
-                    if workflow_node:
-                        error_str = str(node_result.error or node_result.output or "Unknown error")[
-                            :500
-                        ]
-
-                        # Domain-specific suggestions belong in MCP server error messages
-                        suggestion = ""
-
-                        error_feedback.append(
-                            {
-                                "tool": workflow_node.tool or "unknown",
-                                "task_id": node_id,
-                                "error": error_str,
-                                "args": workflow_node.args or {},
-                                "description": workflow_node.description or "",
-                                "suggestion": suggestion,  # Dynamic suggestion for self-correction
-                            }
-                        )
-                        logger.warning(
-                            f"  Captured error for LLM feedback: {workflow_node.tool} - "
-                            f"{str(node_result.error or 'Unknown')[:100]}"
-                        )
-                    else:
-                        # Fallback if workflow node not found
-                        error_feedback.append(
-                            {
-                                "tool": "unknown",
-                                "task_id": node_id,
-                                "error": str(
-                                    node_result.error or node_result.output or "Unknown error"
-                                )[:500],
-                                "args": {},
-                                "description": "",
-                            }
-                        )
-                        logger.warning(
-                            f"  Captured error for LLM feedback: {node_id} - "
-                            f"{str(node_result.error or 'Unknown')[:100]}"
-                        )
+            # Merge results
+            facts.extend(new_facts)
+            for s in new_sources:
+                if s["url"] not in [exist.get("url") for exist in sources]:
+                    sources.append(s)
+            tool_invocations.extend(new_invocations)
+            error_feedback.extend(new_errors)
 
             logger.info(
                 f"  DAG complete: {dag_result.completed} ok, "
@@ -732,10 +437,10 @@ async def researcher_node(state: GraphState) -> GraphState:
 
         except ImportError as e:
             logger.warning(
-                f"  DAG Executor unavailable ({e}), falling back to legacy phase-based executor"
+                f"  SwarmExecutor unavailable ({e}), falling back to legacy phase-based executor"
             )
         except Exception as e:
-            logger.error(f"  DAG Executor failed ({e}), falling back to legacy executor")
+            logger.error(f"  SwarmExecutor failed ({e}), falling back to legacy executor")
 
     # =========================================================================
     # Legacy Phase-Based Executor (fallback when DAG executor is unavailable)

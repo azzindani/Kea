@@ -79,6 +79,7 @@ class ScoreCard(BaseModel):
     # === Self-Assessment ===
     self_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     data_gaps: list[str] = Field(default_factory=list)
+    high_uncertainty_topics: list[str] = Field(default_factory=list)
     assumptions: list[str] = Field(default_factory=list)
     caveats: list[str] = Field(default_factory=list)
 

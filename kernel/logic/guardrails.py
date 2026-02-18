@@ -52,3 +52,64 @@ async def check_tool_call(tool_name: str, arguments: dict) -> list[dict]:
     except Exception as e:
         logger.warning(f"Compliance check failed (non-blocking): {e}")
         return []
+
+
+def check_prompt_injection(user_input: str) -> list[str]:
+    """
+    Detect potential prompt injection attempts.
+    
+    Returns a list of warning messages if detected.
+    """
+    warnings = []
+    lower_input = user_input.lower()
+    
+    # Heuristic checks
+    risky_phrases = [
+        "ignore previous instructions",
+        "system override",
+        "you are now",
+        "developer mode",
+        "do anything now",
+        "forget all instructions",
+    ]
+    
+    for phrase in risky_phrases:
+        if phrase in lower_input:
+            warnings.append(f"Prompt Injection Risk: '{phrase}' detected.")
+            
+    # Length check (very long inputs might be obfuscation)
+    if len(user_input) > 10000:
+        warnings.append("Input too long (possible DoS/Overloading).")
+        
+    return warnings
+
+
+def detect_circular_reasoning(history: list[dict]) -> bool:
+    """
+    Detect if the agent is stuck in a loop.
+    
+    Args:
+        history: List of tool invocations or plan steps.
+        
+    Returns:
+        True if loop detected.
+    """
+    if len(history) < 3:
+        return False
+        
+    # Check for identical tool calls in sequence
+    last_3 = history[-3:]
+    
+    # Extract signatures (tool + args)
+    signatures = []
+    for item in last_3:
+        # Handle different history formats
+        tool = item.get("tool") or item.get("tool_name")
+        args = item.get("args") or item.get("arguments") or item.get("inputs")
+        signatures.append(f"{tool}:{str(args)}")
+        
+    if len(set(signatures)) == 1:
+        # All three are identical
+        return True
+        
+    return False

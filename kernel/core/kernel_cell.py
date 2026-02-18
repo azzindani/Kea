@@ -51,12 +51,16 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from kernel.actions.cell_communicator import CellCommunicator
-from kernel.core.cognitive_cycle import CognitiveCycle, CycleOutput
+from kernel.cognition.cycle import CognitiveCycle, CycleOutput
 from kernel.core.cognitive_profiles import (
     CognitiveProfile,
     child_level_for,
     get_cognitive_profile,
 )
+from kernel.awareness.context_fusion import ContextFusion
+from kernel.memory.episodic_memory import EpisodicMemory, Episode
+from kernel.memory.semantic_cache import SemanticCache
+from kernel.logic.guardrails import check_prompt_injection
 from kernel.logic.complexity import classify_complexity
 from kernel.memory.degradation import get_degrader
 from kernel.actions.delegation_protocol import (
@@ -286,6 +290,7 @@ class KernelCell:
         self.tool_executor = tool_executor
         self.knowledge = knowledge_retriever or get_knowledge_retriever()
         self.engine = inference_engine or get_inference_engine()
+        self.context_fusion = ContextFusion()
         self.parent = parent
         self.budget = budget or TokenBudget()
 
@@ -304,6 +309,10 @@ class KernelCell:
             cell_id=self.cell_id,
             max_focus=self.cognitive_profile.max_reasoning_steps,
         )
+
+        #   Memory (v2.0)  
+        self.episodic_memory = EpisodicMemory()
+        self.semantic_cache = SemanticCache()
 
         #   Communication Network (v2.0)  
         # Communicator: multi-directional messaging to parent/peers/children
@@ -463,7 +472,25 @@ class KernelCell:
                         str(guard.get_audit()),
                     )
 
-                    return self._package_output(scored_result, task_text)
+                    envelope_out = self._package_output(scored_result, task_text)
+                    
+                    # Phase 5.5: MEMORY (Episodic & Semantic) - Fire and forget
+                    asyncio.create_task(self.episodic_memory.store_episode(Episode(
+                        query=task_text,
+                        outcome=scored_result,
+                        confidence=self.score_card.self_confidence,
+                        job_id=self.cell_id,
+                        domain=self.identity.domain,
+                    )))
+                    
+                    if self.score_card.self_confidence > 0.8:
+                        asyncio.create_task(self.semantic_cache.put(
+                            query=task_text,
+                            content=scored_result,
+                            domain=self.identity.domain
+                        ))
+                    
+                    return envelope_out
 
         except Exception as e:
             logger.error(f"Cell {self.cell_id} failed: {e}")
@@ -491,6 +518,33 @@ class KernelCell:
             task_text = envelope.stdin.instruction.text
             domain_hints = envelope.stdin.context.domain_hints
 
+            # Guardrails: Prompt Injection (Phase 7)
+            warnings = check_prompt_injection(task_text)
+            if warnings:
+                logger.warning(f"Guardrail: Prompt Injection Detected: {warnings}")
+                task_text = f"[SYSTEM WARNING: PROMPT INJECTION ATTEMPT DETECTED: {warnings}]\n" + task_text
+
+        # Phase 1: INTAKE (Enhanced with Awareness)
+        # Extract user profile from metadata if available
+        user_profile: dict = {}
+        if envelope.stdin and envelope.stdin.context:
+            raw_profile = envelope.stdin.context.metadata.get("user_profile")
+            if isinstance(raw_profile, dict):
+                user_profile = raw_profile
+
+        awareness_envelope = self.context_fusion.fuse(
+            query=task_text,
+            user_profile=user_profile
+        )
+
+        # Retrieve episodic memory
+        past_episodes_objs = await self.episodic_memory.search(
+            query=task_text,
+            limit=3,
+            domain=self.identity.domain
+        )
+        past_episodes = [e.to_dict() for e in past_episodes_objs]
+
         # Build inference context
         context = InferenceContext(
             identity=self.identity,
@@ -499,6 +553,8 @@ class KernelCell:
             quality_bar=self._get_quality_bar(envelope),
             task_description=task_text,
             parent_cell_id=self.parent.cell_id if self.parent else "",
+            awareness=awareness_envelope,
+            past_episodes=past_episodes,
         )
 
         logger.info(
@@ -652,6 +708,7 @@ class KernelCell:
             tool_call=self._execute_tool_for_cycle,
             task_id=self.cell_id,
             communicator=self.comm,
+            awareness=context.awareness,  # Thread awareness into all phases
         )
 
         # Build context string and extract domain from envelope
@@ -737,6 +794,10 @@ class KernelCell:
         if cycle_output.framing:
             self.score_card.assumptions = cycle_output.framing.assumptions[:5]
             self.score_card.data_gaps = cycle_output.framing.unknown_gaps[:5]
+            
+        # Transfer epistemic awareness
+        if context.awareness and context.awareness.epistemic:
+            self.score_card.high_uncertainty_topics = context.awareness.epistemic.high_uncertainty_topics
 
         # Reconcile tool_call_count from cycle into score card.
         # The legacy self.state.tool_executions may under-count (auto-wire calls

@@ -1,18 +1,19 @@
 """
-Curiosity Engine.
+Curiosity Drive.
 
 Generates exploratory questions: WHY, WHAT-IF, and anomaly detection.
+Enhanced with Epistemic Awareness to target uncertainty.
 """
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Any
 
 from shared.logging import get_logger
-
 
 logger = get_logger(__name__)
 
@@ -26,6 +27,7 @@ class QuestionType(str, Enum):
     COMPARISON = "comparison"        # "Why is A different from B?"
     TREND = "trend"                  # "Why is X increasing?"
     GAP = "gap"                      # "Missing data on X"
+    EPISTEMIC = "epistemic"          # "We are unsure about X"
 
 
 @dataclass
@@ -58,47 +60,36 @@ class Fact:
 
 class CuriosityEngine:
     """
-    Generate exploratory questions from research findings.
-    
-    Drives deeper insight by asking:
-    - WHY questions (causal reasoning)
-    - WHAT-IF scenarios (counterfactual)
-    - Anomaly detection (data inconsistencies)
-    
-    Example:
-        engine = CuriosityEngine()
-        
-        facts = [
-            Fact(entity="Indonesia", attribute="nickel_production", value="1.6M tons"),
-            Fact(entity="Philippines", attribute="nickel_production", value="0.3M tons"),
-        ]
-        
-        questions = engine.generate_questions(facts)
-        #   "Why did Indonesia become the #1 producer?"
-        #   "What if Indonesia bans raw ore exports?"
+    Generate exploratory questions from research findings and epistemic state.
     """
     
     def __init__(self, max_questions: int = 5):
         self.max_questions = max_questions
         self._question_counter = 0
-    
+
     def generate_questions(
         self,
         facts: list[Fact],
+        epistemic_topics: list[str] | None = None,
         depth: int = 2,
     ) -> list[CuriosityQuestion]:
         """
-        Generate exploratory questions from facts.
-        
-        Args:
-            facts: List of research facts
-            depth: Exploration depth (1=shallow, 3=deep)
-            
-        Returns:
-            List of curiosity questions, sorted by priority
+        Generate exploratory questions from facts and uncertainty.
         """
         questions: list[CuriosityQuestion] = []
         
+        # 1. Epistemic Questions (Highest Priority)
+        if epistemic_topics:
+            for topic in epistemic_topics:
+                questions.append(CuriosityQuestion(
+                    question_id=self._next_id(),
+                    question_type=QuestionType.EPISTEMIC,
+                    text=f"We have high uncertainty about '{topic}'. Can we resolve this?",
+                    priority=0.9,
+                    entity=topic,
+                ))
+
+        # 2. Heuristic Questions from Facts
         for fact in facts:
             # Generate causal questions
             questions.extend(self._generate_causal(fact))
@@ -134,16 +125,6 @@ class CuriosityEngine:
             entity=fact.entity,
         ))
         
-        # What led to this
-        questions.append(CuriosityQuestion(
-            question_id=self._next_id(),
-            question_type=QuestionType.CAUSAL_WHY,
-            text=f"What factors contributed to {fact.entity}'s {fact.attribute}?",
-            priority=self._score_novelty(fact) * 0.8,
-            source_fact=f"{fact.entity}.{fact.attribute}",
-            entity=fact.entity,
-        ))
-        
         return questions
     
     def _generate_scenarios(self, fact: Fact) -> list[CuriosityQuestion]:
@@ -155,7 +136,7 @@ class CuriosityEngine:
             questions.append(CuriosityQuestion(
                 question_id=self._next_id(),
                 question_type=QuestionType.SCENARIO,
-                text=f"What if {fact.entity}'s {fact.attribute} changed by  30%?",
+                text=f"What if {fact.entity}'s {fact.attribute} changed by 30%?",
                 priority=self._score_impact(fact),
                 source_fact=f"{fact.entity}.{fact.attribute}={fact.value}",
                 entity=fact.entity,
@@ -194,10 +175,13 @@ class CuriosityEngine:
                 ]
                 
                 if numeric_values:
-                    values = [v for _, v in numeric_values]
+                    values = [v for _, v in numeric_values if v is not None]
+                    if not values: continue
+
                     mean = sum(values) / len(values)
                     
                     for fact, value in numeric_values:
+                        if value is None: continue
                         deviation = abs(value - mean) / mean if mean != 0 else 0
                         if deviation > 0.5:  # 50% deviation
                             questions.append(CuriosityQuestion(
@@ -214,8 +198,6 @@ class CuriosityEngine:
     def _generate_comparisons(self, facts: list[Fact]) -> list[CuriosityQuestion]:
         """Generate comparison questions."""
         questions = []
-        
-        # Get unique entities
         entities = list(set(f.entity for f in facts))
         
         if len(entities) >= 2:
@@ -233,8 +215,6 @@ class CuriosityEngine:
     def _detect_trends(self, facts: list[Fact]) -> list[CuriosityQuestion]:
         """Detect and question trends."""
         questions = []
-        
-        # Look for keywords suggesting trends
         trend_keywords = ["growth", "increase", "decrease", "trend", "change"]
         
         for fact in facts:
@@ -252,82 +232,37 @@ class CuriosityEngine:
         return questions
     
     def _next_id(self) -> str:
-        """Generate next question ID."""
         self._question_counter += 1
         return f"q_{self._question_counter}"
     
     def _score_novelty(self, fact: Fact) -> float:
-        """Score fact novelty (0-1)."""
-        # Lower confidence = more novel = higher priority
         return 1.0 - (fact.confidence * 0.5)
     
     def _score_impact(self, fact: Fact) -> float:
-        """Score potential impact (0-1)."""
-        # Numeric facts have higher scenario impact
         if self._is_numeric(fact.value):
             return 0.8
         return 0.5
     
     def _is_numeric(self, value: Any) -> bool:
-        """Check if value is numeric."""
         if isinstance(value, (int, float)):
             return True
         if isinstance(value, str):
-            # Try to extract number
-            import re
             return bool(re.search(r'\d+\.?\d*', value))
         return False
     
     def _to_number(self, value: Any) -> float | None:
-        """Convert value to number."""
         if isinstance(value, (int, float)):
             return float(value)
         if isinstance(value, str):
-            import re
             match = re.search(r'(\d+\.?\d*)', value.replace(',', ''))
             if match:
                 return float(match.group(1))
         return None
-    
-    def format_for_user(
-        self,
-        questions: list[CuriosityQuestion],
-        max_display: int = 3,
-    ) -> str:
-        """Format questions for user display."""
-        if not questions:
-            return ""
-        
-        lines = ["I found some interesting questions to explore deeper:"]
-        
-        for i, q in enumerate(questions[:max_display], 1):
-            icon = self._get_icon(q.question_type)
-            lines.append(f"{i}. {icon} {q.text}")
-        
-        lines.append("\nExplore any of these? [1/2/3/Skip]")
-        
-        return "\n".join(lines)
-    
-    def _get_icon(self, qtype: QuestionType) -> str:
-        """Get icon for question type."""
-        icons = {
-            QuestionType.CAUSAL_WHY: " ",
-            QuestionType.COUNTERFACTUAL: " ",
-            QuestionType.SCENARIO: " ",
-            QuestionType.ANOMALY: " ",
-            QuestionType.COMPARISON: " ",
-            QuestionType.TREND: " ",
-            QuestionType.GAP: " ",
-        }
-        return icons.get(qtype, " ")
-
 
 # Global instance
 _engine: CuriosityEngine | None = None
 
-
 def get_curiosity_engine() -> CuriosityEngine:
-    """Get or create global curiosity engine."""
     global _engine
     if _engine is None:
         _engine = CuriosityEngine()

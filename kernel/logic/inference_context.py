@@ -33,6 +33,7 @@ from shared.llm import LLMConfig, OpenRouterProvider
 from shared.llm.provider import LLMMessage, LLMResponse, LLMRole
 from shared.logging import get_logger
 from shared.prompts import get_kernel_config
+from kernel.awareness.context_fusion import AwarenessEnvelope
 
 logger = get_logger(__name__)
 
@@ -104,6 +105,12 @@ class InferenceContext:
     # TRACKING
     task_description: str = ""       # What this inference is for
     parent_cell_id: str = ""         # Which kernel cell initiated this
+    
+    # NEW: Situational Awareness (Phase 1)
+    awareness: AwarenessEnvelope | None = None
+
+    # NEW: Episodic Memory (Phase 3)
+    past_episodes: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def retrieval_query(self) -> str:
@@ -366,6 +373,10 @@ class KnowledgeEnhancedInference:
         # Assemble enhanced system prompt
         parts: list[str] = []
 
+        # 0. Situational Awareness (Crucial Context - First thing the model sees)
+        if context.awareness:
+            parts.append(context.awareness.to_system_prompt())
+
         # 1. Agent identity
         parts.append(context.identity.identity_prompt)
 
@@ -378,8 +389,19 @@ class KnowledgeEnhancedInference:
         knowledge_section = knowledge.to_prompt_section()
         if knowledge_section:
             parts.append(f"\n{knowledge_section}")
+        
+        # 3.5 Episodic Memory Injection
+        if context.past_episodes:
+            ep_parts = ["## RELEVANT PAST EXPERIENCES (LEARN FROM THESE)"]
+            for i, ep in enumerate(context.past_episodes):
+                ep_parts.append(
+                    f"\n[Episode {i+1}] Query: {ep.get('query', '')}\n"
+                    f"Outcome: {ep.get('outcome', '')[:300]}..."
+                )
+            parts.append("\n".join(ep_parts))
 
         # 4. Quality bar instruction
+         
         quality_instruction = self._quality_instruction(context.quality_bar)
         if quality_instruction:
             parts.append(quality_instruction)
