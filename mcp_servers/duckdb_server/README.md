@@ -1,6 +1,6 @@
 # 🦆 DuckDB Server ("The IT Department")
 
-The **DuckDB Server** is the **IT and Data Engineering Department** of the Kea v4.0 system. It provides a high-performance, in-process SQL OLAP engine capable of crunching millions of rows in milliseconds. It serves as the local "Data Warehouse" for the Orchestrator, allowing agents to perform complex joins, aggregations, and transformations on data fetched from other sources.
+The **DuckDB Server** is the **IT and Data Engineering Department** of the Kea v0.4.0 system. It provides a high-performance, in-process SQL OLAP engine capable of crunching millions of rows in milliseconds. It serves as the local "Data Warehouse" for the Orchestrator, allowing agents to perform complex joins, aggregations, and transformations on data fetched from other sources.
 
 ## ✨ Features
 

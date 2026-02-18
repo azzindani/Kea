@@ -15,11 +15,13 @@ from shared.mcp.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
-from mcp_servers.matplotlib_server.tools import (
-    basic_ops, stats_ops, scientific_ops, three_d_ops, 
-    specialty_ops, layout_ops, animation_ops, patch_ops, 
-    advanced_ops, super_ops
-)
+# from mcp_servers.matplotlib_server.tools import (
+#     basic_ops, stats_ops, scientific_ops, three_d_ops, 
+#     specialty_ops, layout_ops, animation_ops, patch_ops, 
+#     advanced_ops, super_ops
+# )
+# Note: Tools will be imported lazily inside each tool function to speed up startup.
+
 import structlog
 from typing import List, Dict, Any, Optional, Union
 
@@ -44,6 +46,7 @@ async def plot_line(x: VectorInput, y: VectorInput, title: Optional[str] = None,
     Standard line plot. Best for time series or continuous data.
     Returns path to saved image.
     """
+    from mcp_servers.matplotlib_server.tools import basic_ops
     return await basic_ops.plot_line(x, y, title, xlabel, ylabel, color, linestyle, marker, label, figsize)
 
 @mcp.tool()
@@ -54,6 +57,7 @@ async def plot_scatter(x: VectorInput, y: VectorInput, s: Optional[VectorInput] 
     Standard scatter plot. Best for correlation analysis.
     Returns path to saved image.
     """
+    from mcp_servers.matplotlib_server.tools import basic_ops
     return await basic_ops.plot_scatter(x, y, s, c, title, xlabel, ylabel, alpha, figsize)
 
 @mcp.tool()
@@ -64,6 +68,7 @@ async def plot_bar(x: VectorInput, height: VectorInput, title: Optional[str] = N
     Standard bar chart. Best for categorical comparison.
     Returns path to saved image.
     """
+    from mcp_servers.matplotlib_server.tools import basic_ops
     return await basic_ops.plot_bar(x, height, title, xlabel, ylabel, color, figsize)
 
 @mcp.tool()
@@ -74,6 +79,7 @@ async def plot_pie(x: VectorInput, labels: Optional[VectorInput] = None, title: 
     Standard pie chart. Best for part-to-whole comparison.
     Returns path to saved image.
     """
+    from mcp_servers.matplotlib_server.tools import basic_ops
     return await basic_ops.plot_pie(x, labels, title, figsize)
 
 @mcp.tool()
@@ -84,6 +90,7 @@ async def plot_area(x: VectorInput, y: DataInput, labels: Optional[List[str]] = 
     Standard area chart. Best for stacked trends.
     Returns path to saved image.
     """
+    from mcp_servers.matplotlib_server.tools import basic_ops
     return await basic_ops.plot_area(x, y, labels, title, figsize)
 
 @mcp.tool()
@@ -94,6 +101,7 @@ async def plot_step(x: VectorInput, y: VectorInput, where: str = 'pre', title: O
     Standard step chart. Best for discrete changes.
     Returns path to saved image.
     """
+    from mcp_servers.matplotlib_server.tools import basic_ops
     return await basic_ops.plot_step(x, y, where, title, figsize)
 
 # ==========================================
@@ -107,6 +115,7 @@ async def plot_hist(x: VectorInput, bins: int = 10, title: Optional[str] = None,
     Standard histogram. Best for distribution analysis.
     Returns path to saved image.
     """
+    from mcp_servers.matplotlib_server.tools import stats_ops
     return await stats_ops.plot_hist(x, bins, title, xlabel, color, figsize)
 
 @mcp.tool()
@@ -117,6 +126,7 @@ async def plot_boxplot(data: DataInput, labels: Optional[List[str]] = None, titl
     Standard boxplot. Best for statistical summary (quartiles, outliers).
     Returns path to saved image.
     """
+    from mcp_servers.matplotlib_server.tools import stats_ops
     return await stats_ops.plot_boxplot(data, labels, title, figsize)
 
 @mcp.tool()
@@ -127,6 +137,7 @@ async def plot_violin(data: DataInput, labels: Optional[List[str]] = None, title
     Standard violin plot. Combines boxplot and KDE.
     Returns path to saved image.
     """
+    from mcp_servers.matplotlib_server.tools import stats_ops
     return await stats_ops.plot_violin(data, labels, title, figsize)
 
 @mcp.tool()
@@ -137,6 +148,7 @@ async def plot_errorbar(x: VectorInput, y: VectorInput, yerr: VectorInput, title
     Standard error bar plot. Best for displaying uncertainty.
     Returns path to saved image.
     """
+    from mcp_servers.matplotlib_server.tools import stats_ops
     return await stats_ops.plot_errorbar(x, y, yerr, title, fmt, figsize)
 
 @mcp.tool()
@@ -147,6 +159,7 @@ async def plot_hexbin(x: VectorInput, y: VectorInput, gridsize: int = 50, title:
     Standard hexbin plot. Best for dense scatter data.
     Returns path to saved image.
     """
+    from mcp_servers.matplotlib_server.tools import stats_ops
     return await stats_ops.plot_hexbin(x, y, gridsize, title, figsize)
 
 # ==========================================
@@ -160,6 +173,7 @@ async def plot_contour(X: DataInput, Y: DataInput, Z: DataInput, levels: int = 1
     Standard contour plot. Best for 3D surface representation in 2D.
     Returns path to saved image.
     """
+    from mcp_servers.matplotlib_server.tools import scientific_ops
     return await scientific_ops.plot_contour(X, Y, Z, levels, title, figsize)
 
 @mcp.tool()
@@ -170,6 +184,7 @@ async def plot_contourf(X: DataInput, Y: DataInput, Z: DataInput, levels: int = 
     Standard filled contour plot.
     Returns path to saved image.
     """
+    from mcp_servers.matplotlib_server.tools import scientific_ops
     return await scientific_ops.plot_contourf(X, Y, Z, levels, title, figsize)
 
 @mcp.tool()
@@ -180,6 +195,7 @@ async def plot_heatmap(data: DataInput, title: Optional[str] = None, cmap: str =
     Standard heatmap. Best for matrix visualization.
     Returns path to saved image.
     """
+    from mcp_servers.matplotlib_server.tools import scientific_ops
     return await scientific_ops.plot_heatmap(data, title, cmap, figsize)
 
 @mcp.tool()
@@ -190,6 +206,7 @@ async def plot_stream(X: DataInput, Y: DataInput, U: DataInput, V: DataInput, ti
     Standard stream plot. Best for vector fields.
     Returns path to saved image.
     """
+    from mcp_servers.matplotlib_server.tools import scientific_ops
     return await scientific_ops.plot_stream(X, Y, U, V, title, figsize)
 
 @mcp.tool()
@@ -200,6 +217,7 @@ async def plot_quiver(X: DataInput, Y: DataInput, U: DataInput, V: DataInput, ti
     Standard quiver plot. Best for vector fields with arrows.
     Returns path to saved image.
     """
+    from mcp_servers.matplotlib_server.tools import scientific_ops
     return await scientific_ops.plot_quiver(X, Y, U, V, title, figsize)
 
 # ==========================================
@@ -213,6 +231,7 @@ async def plot_scatter3d(x: VectorInput, y: VectorInput, z: VectorInput, title: 
     3D scatter plot. Best for 3-variable correlation.
     Returns path to saved image.
     """
+    from mcp_servers.matplotlib_server.tools import three_d_ops
     return await three_d_ops.plot_scatter3d(x, y, z, title, figsize)
 
 @mcp.tool()
@@ -223,6 +242,7 @@ async def plot_surface(X: DataInput, Y: DataInput, Z: DataInput, title: Optional
     3D surface plot. Best for smooth 3-variable data.
     Returns path to saved image.
     """
+    from mcp_servers.matplotlib_server.tools import three_d_ops
     return await three_d_ops.plot_surface(X, Y, Z, title, figsize)
 
 @mcp.tool()
@@ -233,6 +253,7 @@ async def plot_wireframe(X: DataInput, Y: DataInput, Z: DataInput, title: Option
     3D wireframe plot. Faster than surface plot.
     Returns path to saved image.
     """
+    from mcp_servers.matplotlib_server.tools import three_d_ops
     return await three_d_ops.plot_wireframe(X, Y, Z, title, figsize)
 
 @mcp.tool()
@@ -243,6 +264,7 @@ async def plot_polar(theta: VectorInput, r: VectorInput, title: Optional[str] = 
     Polar plot. Best for cyclical or directional data.
     Returns path to saved image.
     """
+    from mcp_servers.matplotlib_server.tools import specialty_ops
     return await specialty_ops.plot_polar(theta, r, title, figsize)
 
 @mcp.tool()
@@ -253,6 +275,7 @@ async def plot_stem(x: VectorInput, y: VectorInput, title: Optional[str] = None,
     Stem plot. Best for discrete data points.
     Returns path to saved image.
     """
+    from mcp_servers.matplotlib_server.tools import specialty_ops
     return await specialty_ops.plot_stem(x, y, title, figsize)
 
 @mcp.tool()
@@ -263,6 +286,7 @@ async def plot_stair(y: VectorInput, title: Optional[str] = None, figsize: List[
     Stair plot. Best for step-function data.
     Returns path to saved image.
     """
+    from mcp_servers.matplotlib_server.tools import specialty_ops
     return await specialty_ops.plot_stair(y, title, figsize)
 
 # ==========================================
@@ -277,6 +301,7 @@ async def create_mosaic(layout: str, plots: Dict[str, Dict[str, Any]], figsize: 
     Args:
         layout: Semantic layout string (e.g. "AAB;CCD").
     """
+    from mcp_servers.matplotlib_server.tools import layout_ops
     return await layout_ops.create_mosaic(layout, plots, figsize, title)
 
 @mcp.tool()
@@ -287,6 +312,7 @@ async def create_animation(frames_data: List[DataInput], plot_type: str = 'line'
     Generates GIF/MP4 animation from frames.
     Returns path to video file.
     """
+    from mcp_servers.matplotlib_server.tools import animation_ops
     return await animation_ops.create_animation(frames_data, plot_type, x, title, interval, figsize)
 
 # ==========================================
@@ -300,6 +326,7 @@ async def draw_shapes(shapes: List[Dict[str, Any]], title: Optional[str] = None,
     Draws custom shapes (rectangles, circles, polygons).
     Returns path to saved image.
     """
+    from mcp_servers.matplotlib_server.tools import patch_ops
     return await patch_ops.draw_shapes(shapes, title, x_lim, y_lim, figsize)
 
 @mcp.tool()
@@ -310,6 +337,7 @@ async def plot_sankey(flows: VectorInput, labels: Optional[VectorInput] = None, 
     Sankey diagram for flow visualization.
     Returns path to saved image.
     """
+    from mcp_servers.matplotlib_server.tools import advanced_ops
     return await advanced_ops.plot_sankey(flows, labels, orientations, title, figsize)
 
 @mcp.tool()
@@ -320,6 +348,7 @@ async def plot_table(data: DataInput, title: Optional[str] = None, figsize: List
     Renders data frame as a static table image.
     Returns path to saved image.
     """
+    from mcp_servers.matplotlib_server.tools import advanced_ops
     return await advanced_ops.plot_table(data, title, figsize)
 
 @mcp.tool()
@@ -330,6 +359,7 @@ async def plot_broken_barh(xranges: List[tuple], yrange: tuple, facecolors: Opti
     Broken horizontal bar plot. Best for Gantt charts or intervals.
     Returns path to saved image.
     """
+    from mcp_servers.matplotlib_server.tools import advanced_ops
     return await advanced_ops.plot_broken_barh(xranges, yrange, facecolors, title, figsize)
 
 # ==========================================
@@ -343,6 +373,7 @@ async def create_dashboard(plots: List[Dict[str, Any]], layout: List[int] = [2, 
     Combines multiple plots into a single dashboard image.
     Returns path to saved image.
     """
+    from mcp_servers.matplotlib_server.tools import super_ops
     return await super_ops.create_dashboard(plots, layout, figsize)
 
 @mcp.tool()
@@ -352,6 +383,7 @@ async def set_style(style: str) -> str:
     [RAG Context]
     Sets global matplotlib style (e.g. 'seaborn', 'ggplot').
     """
+    from mcp_servers.matplotlib_server.tools import super_ops
     return await super_ops.set_style(style)
 
 @mcp.tool()
@@ -361,6 +393,7 @@ async def get_styles() -> List[str]:
     [RAG Context]
     Returns list of valid style names.
     """
+    from mcp_servers.matplotlib_server.tools import super_ops
     return await super_ops.get_styles()
 
 if __name__ == "__main__":

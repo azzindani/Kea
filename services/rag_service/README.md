@@ -1,70 +1,75 @@
-# 🗄️ RAG Service ("The Memory")
+# 🗄️ RAG Service ("The Library")
 
-The **RAG (Retrieval-Augmented Generation) Service** provides the reference intelligence and global knowledge orchestration layer for the Kea v4.0 system. It functions as the **Corporate Library & Controller**, managing access to massive, external, or multiple distinct RAG servers via API. It handles the ingestion of global datasets and feeds synthesized reference context into the research process.
-
-## ✨ Features
-
-- **Atomic Fact Model**: Stores information in a granular, structured format (Entity-Attribute-Value) to enable high-precision retrieval and contradiction resolution.
-- **Hybrid Search Engine**: Combines vector-based semantic search with discrete metadata filtering (e.g., entity, dataset, confidence score).
-- **GraphRAG Engine**: (Experimental) In-memory knowledge graph for tracking relationships between entities, facts, and sources, enabling provenance tracking and contradiction detection.
-- **Plug-and-Play Vector Stores**: Supports multiple backends including Qdrant, PostgreSQL (pgvector), and high-performance in-memory options.
-- **Hugging Face Integration**: Native `DatasetLoader` for streaming and ingesting massive-scale external datasets directly into the research memory.
-- **Provenance Tracking**: Maintains strict association between every fact and its source URL, title, and extraction timestamp.
+The **RAG (Retrieval-Augmented Generation) Service** provides the global knowledge orchestration layer for Kea. It functions as the **Librarian**, managing access to massive external datasets and multiple distinct RAG backends via a unified API.
 
 ## 📐 Architecture
 
-The RAG Service operates as a **Triple-Store Abstraction Layer**, managing three distinct types of data:
-
-1.  **Vector Store**: High-dimensional embeddings of facts for semantic similarity search.
-2.  **Metadata Store**: Structured properties (Confidence, Entity, Time Period) for deterministic filtering.
-3.  **Knowledge Graph**: Relational connections between entities and sources.
-
-### 🗼 Topology: Information Ingestion 
+The RAG Service operates as a **Federated Search Abstraction**. It decouples the source of information (Hugging Face, Local PDFs, Web Scrapes) from the Kernel's retrieval needs.
 
 ```mermaid
 graph TD
-    API[FastAPI Router] -->|Orchestrate| External[External RAG Servers]
-    API -->|Ingest| HF[Hugging Face Loader]
-    API -->|Synthesize| Synth[Context Synthesizer]
-    
-    HF -->|Batch| VectorDB[(Global Vector DB)]
-    External -->|Query| API
-    
-    Orchestrator[Orchestrator] -->|Context Request| API
-    API -->|Federated Search| External
-    API -->|Semantic Search| VectorDB
-    API -->|Inject| OrchOut[Synthesized Context]
+    subgraph RAG [RAG Service]
+        direction TB
+        API[FastAPI: /facts/search] --> Orch[Retrieval Orchestrator]
+        Orch --> Hybrid[Hybrid Search Engine]
+        
+        Hybrid --> Vector[Vector Store: Qdrant/pgvector]
+        Hybrid --> Meta[Metadata Filter]
+        Hybrid --> Ingest[Dataset Ingestor]
+    end
+
+    subgraph Sources [External Sources]
+        Ingest --> HF[Hugging Face Datasets]
+        Ingest --> Local[Local Artifact Bus]
+    end
 ```
+
+### Component Overview
+
+| Component | Responsibility | Cognitive Role |
+| :--- | :--- | :--- |
+| **Retrieval Orch** | Coordinates federated search across backends. | Semantic Search |
+| **Hybrid Engine** | Combines vector distance with metadata tagging. | Fact Retrieval |
+| **Dataset Ingestor**| Streams and indexes massive HF datasets. | Knowledge Ingestion |
+| **Metadata Store** | Manages tags (Source, Confidence, Time). | Relational Context |
+
+---
+
+## ✨ Key Features
+
+### 1. Atomic Fact Model
+Every finding in Kea is normalized into an `AtomicFact` (Entity-Attribute-Value). This normalization allows the Orchestrator's **Consensus Engine** to compare findings from different sources at a granular level, resolving contradictions before they reach the final report.
+
+### 2. High-Throughput Ingestion
+The `DatasetLoader` streams rows from Hugging Face or the local **Artifact Bus**, maps them to the atomic schema, and batch-inserts them into the vector store. This allows Kea to "learn" about a new domain (e.g., 10,000 regulatory documents) in minutes.
+
+### 3. Provenance & Citation Tracking
+Every fact stored in the Library maintains a strict association with its source URL, document title, and extraction timestamp. This ensures that every claim in a Kea-generated report can be traced back to a specific, verified origin.
+
+---
 
 ## 📁 Codebase Structure
 
-- **`main.py`**: FastAPI entrypoint (v0.2.0) hosting the facts, datasets, and knowledge API.
+- **`main.py`**: FastAPI entrypoint hosting the facts, datasets, and knowledge API.
 - **`core/`**: The implementation of the storage and loading logic.
-    - `fact_store.py`: Orchestrates the `AtomicFact` lifecycle across vector and metadata stores.
-    - `knowledge_store.py`: Semantic search for system-level knowledge (skills, rules, personas).
-    - `artifact_store.py`: Implementation of Local and S3 storage for large research files.
-    - `dataset_loader.py`: Integration with Hugging Face `datasets` for streaming ingestion.
+    - `fact_store.py`: The concrete implementation of the `FactStore` protocol.
+    - `knowledge_store.py`: Semantic search for system-level knowledge (skills/rules).
+    - `dataset_loader.py`: Integration with Hugging Face `datasets` for JIT ingestion.
+    - `artifact_store.py`: Interface for high-fidelity research data persistence.
+
+---
 
 ## 🧠 Deep Dive
 
-### 1. The Atomic Fact Pattern
-Every finding in Kea is normalized into an `AtomicFact` (Entity-Attribute-Value). This normalization allows the Orchestrator's **Consensus Engine** to compare findings from different sources at a granular level.
+### 1. Federated Semantic Search
+When the Kernel requests a fact, the RAG service doesn't just check one database. It performs **Composite Retrieval**:
+1.  **Global Knowledge**: Checks the long-term knowledge base.
+2.  **Job Context**: Checks the private fact store for the current research session.
+3.  **Metadata Overlay**: Filters results by time-period and confidence thresholds.
 
-### 2. High-Throughput Ingestion
-The `DatasetLoader` streams rows from Hugging Face, maps them to the atomic schema, and batch-inserts them into the vector store.
+### 2. Contradiction Detection
+The Library uses semantic clustering to identify contradictory facts (e.g., Source A says "Price is $10" while Source B says "Price is $12"). These are flagged for the **Keeper Node** in the Orchestrator to resolve during the "Context Hygiene" phase.
 
-### 3. Knowledge Store
-Unlike `FactStore` which manages dynamic research findings, the `KnowledgeStore` indexes static system assets from the `knowledge/` directory. This includes agent "Skills," compliance "Rules," and "Personas."
+---
+*The RAG Service provides the evidence that grounds Kea's reasoning in physical reality.*
 
-## 📚 Reference
-
-### API Interface (v0.2.0)
-
-| Endpoint | Method | Description |
-|:---------|:-------|:------------|
-| `/facts/search` | `POST` | Perform semantic and filtered search across facts. |
-| `/knowledge/search` | `POST` | Semantic search for system skills, rules, and personas. |
-| `/datasets/ingest` | `POST` | Trigger background ingestion from Hugging Face. |
-| `/entities` | `GET` | List all unique entities currently known. |
-| `/knowledge/sync` | `POST` | Sync vector index with files in `knowledge/` directory. |
-| `/health` | `GET` | Service status and initialization checks. |

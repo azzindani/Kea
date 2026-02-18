@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sys
 from datetime import datetime, timezone
 from enum import Enum
@@ -212,7 +213,18 @@ def setup_logging(config: LogConfig | None = None) -> None:
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("filelock").setLevel(logging.WARNING)
     logging.getLogger("multipart").setLevel(logging.WARNING)
+    logging.getLogger("multipart").setLevel(logging.WARNING)
     logging.getLogger("passlib").setLevel(logging.WARNING)
+
+    # Check for QUIET_LOGGERS env var (comma-separated list of loggers to silence)
+    # This allows subprocesses to inherit quiet settings from test runner
+    quiet_loggers_env = os.environ.get("QUIET_LOGGERS", "")
+    if quiet_loggers_env:
+        for logger_name in quiet_loggers_env.split(","):
+            logger_name = logger_name.strip()
+            if logger_name:
+                logging.getLogger(logger_name).setLevel(logging.WARNING)
+
     
     # Configure structlog to output to stderr
     try:

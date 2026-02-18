@@ -270,6 +270,7 @@ class PostgresKnowledgeRegistry:
             from shared.embedding.qwen3_reranker import create_reranker_provider
 
             self._reranker = create_reranker_provider()
+            self._rerank_lock = asyncio.Lock()
         return self._reranker
 
     async def search(
@@ -373,7 +374,8 @@ class PostgresKnowledgeRegistry:
                     reranker = await self._get_reranker()
                     # Use content (truncated) for reranking — same field used for embedding
                     docs = [r["content"][:4000] for r in initial_results]
-                    reranked = await reranker.rerank(query, docs, top_k=limit)
+                    async with self._rerank_lock:
+                        reranked = await reranker.rerank(query, docs, top_k=limit)
 
                     # Rebuild results ordered by reranker score
                     final_results = []

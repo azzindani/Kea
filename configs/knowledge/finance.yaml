@@ -1,0 +1,57 @@
+# Finance Domain Knowledge
+# Loaded by kernel cells with finance domain during intake.
+
+domain: finance
+
+procedures:
+  financial_analysis:
+    description: Standard financial analysis procedure
+    steps:
+      - Gather financial statements (10-K, 10-Q, earnings reports)
+      - Calculate key ratios (P/E, EV/EBITDA, ROE, debt/equity)
+      - Compare against industry benchmarks
+      - Analyze revenue trends and growth rates
+      - Assess cash flow health
+      - Evaluate management guidance and analyst consensus
+      - Identify red flags (unusual items, restatements)
+
+  valuation:
+    description: Company valuation methodology
+    steps:
+      - Determine appropriate valuation methodology (DCF, comps, precedent)
+      - For DCF — project free cash flows, determine WACC, calculate terminal value
+      - For comps — identify peer group, calculate trading multiples
+      - Triangulate between methods
+      - Apply appropriate discounts/premiums
+      - Provide valuation range (not single point)
+
+  market_analysis:
+    description: Market and sector analysis
+    steps:
+      - Define TAM, SAM, SOM
+      - Identify growth drivers and headwinds
+      - Analyze market concentration (HHI)
+      - Map value chain and profit pools
+      - Assess regulatory environment
+      - Evaluate technology disruption risks
+
+rules:
+  data_sources:
+    - SEC EDGAR for US public company filings
+    - Yahoo Finance / Bloomberg for market data
+    - Industry reports (IBISWorld, Statista) for market sizing
+    - Central bank data for macroeconomic indicators
+    - Always note the reporting period of financial data
+
+  accuracy_standards:
+    - Financial figures must match official filings
+    - Market cap and price data must note the as-of date
+    - Growth rates should specify the time period
+    - Forward estimates should cite the source (analyst consensus vs own)
+
+key_metrics:
+  profitability: [gross_margin, operating_margin, net_margin, roe, roa]
+  growth: [revenue_growth, earnings_growth, user_growth]
+  valuation: [pe_ratio, ev_ebitda, price_to_book, price_to_sales]
+  leverage: [debt_to_equity, interest_coverage, net_debt_to_ebitda]
+  efficiency: [asset_turnover, inventory_turnover, receivables_turnover]

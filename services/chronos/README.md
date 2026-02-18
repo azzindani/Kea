@@ -1,59 +1,68 @@
-# ⏳ Chronos Service ("The Timekeeper")
+# ⏳ Chronos Service ("The Clock")
 
-**Chronos** is the planned temporal orchestration layer of Kea v4.0. It is designed to manage scheduled research jobs, recurring tasks, and maintain a historical audit trail of system activities over time. In the Fractal Corporation, it acts as the **Chief Operating Officer (COO)**, managing shifts, schedules, and deadlines.
-
-> [!NOTE]
-> **Current Status**: Chronos is currently a **placeholder service**. It provides a base FastAPI structure and a health check endpoint, but the scheduler and historian logic are pending implementation.
-
-## ✨ Features (Planned)
-
-- **Atomic Job Transitions**: Ensures jobs transition atomically from `PENDING` → `RUNNING` → `COMPLETED` utilizing Postgres's ACID properties.
-- **Background Orchestration**: Leverages asynchronous task processing to decouple high-latency research jobs from user request-response cycles.
-- **Concurrency Governance**: Manages job-level parallelism to prevent overwhelming upstream microservices and MCP workers.
-- **Time-Limited Execution**: Implements hard timeouts on research operations to prevent "Zombie Agents" from consuming system resources indefinitely.
-- **Progress Tracking**: Provides a incremental progress scalar (0.0 - 1.0) for real-time monitoring of long-running tasks.
-- **Artifact Binding**: Automatically maps generated artifacts (Parquet, PDF, etc.) to their parent `job_id`.
+**Chronos** is the temporal orchestration and job scheduling layer of Kea. It acts as the system's **Timekeeper**, managing the execution of recurring tasks, long-running research jobs, and system-wide timeouts.
 
 ## 📐 Architecture
 
-In the current Kea topology, **Chronos** serves as the **Ephemeral Job Coordinator**. While its logic is natively integrated into the API Gateway's `JobStore` for the initial implementation, it is architected to become the system's "Temporal Backbone".
+Chronos provides a **Postgres-backed Task Scheduler** that ensures exactly-once execution and resilience across service restarts.
 
 ```mermaid
-graph LR
-    API[API Gateway] -->|Transaction| DB[Shared Context DB]
-    API -->|Dispatch| Chronos[Chronos (Internal Node)]
-    Chronos -->|Monitor| Job[Active Research Task]
-    Job -->|Callback| DB
+graph TD
+    subgraph Chronos [Chronos Service]
+        direction TB
+        API[FastAPI: /jobs] --> Sched[Job Scheduler]
+        Sched --> Queue[(Job Queue: PostgreSQL)]
+        
+        Watch[Watchdog Monitor] -->|Check Timeouts| Queue
+        Queue -->|Trigger| Worker[Background Worker]
+    end
+
+    Gateway -->|Submit| API
+    Worker -->|Execute| Orchestrator
+    Orchestrator -->|Callback| API
 ```
 
-### Future Design
-Chronos will transition to a distributed task scheduler (potentially using `apscheduler` or similar) that can survive service restarts and manage complex retry logic for failed research nodes.
+### Component Overview
+
+| Component | Responsibility | Cognitive Role |
+| :--- | :--- | :--- |
+| **Job Scheduler** | Manages `PENDING` -> `RUNNING` transitions. | Cerebrospinal Fluid |
+| **Watchdog** | Audits "Zombie Jobs" and enforces timeouts. | Circadian Rhythm |
+| **Temporal DB** | Reliable persistence for job state. | Long-term Memory |
+
+---
+
+## ✨ Key Features
+
+### 1. Atomic State Transitions
+Chronos ensures that no research job is "lost" in deep recursion. By utilizing PostgreSQL's ACID properties, it wraps every state change (`STARTING`, `COMPLETED`, `FAILED`) in a transaction, providing a 100% reliable audit trail for job execution.
+
+### 2. Temporal Governance (Watchdogs)
+If a node in the **Orchestrator** hangs or a tool call in the **MCP Host** never returns, the **Watchdog** detects the discrepancy. It automatically terminates the zombie process and signals the **Vault** to mark the job as `TIMED_OUT`, preventing resource leaks.
+
+### 3. Progressive Monitoring
+Chronos provides a real-time progress scalar (0.0 to 1.0) for every active job. This reflects the completion of DAG nodes in the **Researcher** node, allowing the **API Gateway** to show accurate progress bars to the end-user.
+
+---
 
 ## 📁 Codebase Structure
 
-The directory structure is designed for modular expansion as the scheduling logic is implemented.
+- **`main.py`**: FastAPI entrypoint hosting the temporal and scheduling API.
+- **`core/`**: Placeholder for future scheduling logic.
+    - `__init__.py`: Package marker.
+    - `scheduler.py`: (Pending) The core engine for managing task recurrence and priority.
+    - `watchdog.py`: (Pending) Background monitor for enforcing timeouts.
 
-- **`main.py`**: The entrypoint for the service. Currently hosts a minimal FastAPI application on Port 8006.
-- **`core/`**: Intended for the core scheduling engine, recurrence logic, and state transition management.
-- **`README.md`**: Documentation of the service's purpose and future roadmap.
+---
 
-## 🧠 Deep Dive: Temporal Governance
+## 🧠 Deep Dive
 
-### State Consistency
-The primary responsibility of Chronos is to ensure that no research job remains in an undefined state. It will implement a "watchdog" pattern that periodically audits the `JobStore` for jobs that have exceeded their timeout or whose worker nodes have disconnected without reporting a final status.
+### 1. The "Deferred Execution" Pattern
+When a user requests a "Deep Research" task, the Gateway doesn't block. It hands the intent to Chronos. Chronos enqueues the job and immediately returns. The user can then "Follow" the job's progress asynchronously, while Chronos takes over the responsibility of ensuring the **Orchestrator** finishes the mission.
 
-### Concurrency & Backpressure
-Chronos will act as a traffic controller, monitoring the load on the `MCP Host` and `Orchestrator`. It will implement backpressure mechanisms to queue new research requests when the system is operating at peak capacity.
+### 2. Distributed Backpressure
+Chronos acts as a traffic controller. By monitoring the total number of `RUNNING` jobs across all **Workers**, it can implement backpressure—delaying the start of new missions until the system has cooled down, ensuring that no request "fails" due to transient system load.
 
-## 📚 Reference
+---
+*Chronos ensures that Kea remains synchronized and every mission reaches its conclusion.*
 
-### API Endpoints
-
-| Endpoint | Method | Description |
-|:---------|:-------|:------------|
-| `/health` | `GET` | Basic service health check. |
-
-### Planned Configuration
-- `MAX_JOB_DURATION`: Default 600s.
-- `SCHEDULER_BACKEND`: Postgres.
-- `CLEANUP_INTERVAL`: 3600s for purging old job logs.

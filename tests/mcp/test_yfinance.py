@@ -36,6 +36,8 @@ async def test_yfinance_tools_dynamic():
             import json
             test_data_path = "mcp_servers/yfinance_server/data/TEST_QC_GENERIC.json"
             try:
+                # Ensure the directory exists
+                os.makedirs(os.path.dirname(test_data_path), exist_ok=True)
                 with open(test_data_path, "w") as f:
                     json.dump({"count": 5, "tickers": ["MSFT", "AAPL", "NVDA", "AMZN", "GOOG"]}, f)
                 

@@ -1,89 +1,86 @@
 # 📚 Shared Libraries ("The Foundation")
 
-The `shared/` directory is the **Standard Library** of the Kea v4.0 system. It contains the core primitives, data schemas, and infrastructure abstractions that ensure consistency and interoperability across all microservices. It is the common substrate upon which the entire "Fractal Corp" architecture is built.
-
-## ✨ Features
-
-- **Unified Configuration**: Strongly-typed settings using Pydantic `BaseSettings` with JIT spawning controls and hardware-aware defaults.
-- **Rich Domain Schemas**: Canonical models for `ResearchState`, `AtomicFact`, and a sophisticated `ToolOutput` container for n8n-style data chaining.
-- **Messaging System**: Async `MessageBus` (`messaging.py`) for inter-agent communication (Request/Response, Broadcast).
-- **Task Dispatcher**: Persistent "Fire and Forget" task queue (`dispatcher.py`) backed by PostgreSQL for managing massive batches of micro-tasks.
-- **Hardware-Aware Adaptive Execution**: Automated system profiling (CPU, RAM, GPU) to optimize worker counts and batch sizes.
-- **Zero-Trust Structured Logging**: OpenTelemetry-ready JSON logging with trace correlation across service boundaries.
-- **LLM & MCP Abstractions**: Standardized interfaces for multi-provider LLM access and Model Context Protocol clients.
+The `shared/` directory is the **Standard Library** of the Kea v0.4.0 system. It contains the core primitives, data schemas, and infrastructure abstractions that ensure consistency and interoperability across all microservices.
 
 ## 📐 Architecture
 
-The Shared Library acts as the "Glue" and "Substrate" for the distributed system.
+The Shared Library acts as the "Standard Substrate". It provides a common language for both the **Brain** (Reasoning) and the **Body** (Execution).
 
 ```mermaid
 graph TD
-    subgraph Services [Kea Microservices]
-        Gateway[API Gateway]
-        Orch[Orchestrator]
-        Host[MCP Host]
-        Vault[Vault]
-        Manager[Swarm Manager]
+    subgraph Services [Kea Services]
+        Gateway
+        Orchestrator
+        MCPHost
+        RAG
+        Vault
     end
 
-    subgraph Shared [shared/ Library]
-        Config[config.py<br/>Global Settings]
-        Schemas[schemas.py<br/>Domain Models]
-        Bus[messaging.py<br/>Event Bus]
-        Dispatch[dispatcher.py<br/>Task Queue]
-        Hardware[hardware/<br/>Resource Monitoring]
-        Logging[logging/<br/>Observability]
+    subgraph Shared [shared/ Foundation]
+        direction TB
+        S1[Schemas & Models]
+        S2[Hardware & Environment]
+        S3[LLM & Embedding Connectors]
+        S4[Logging & Tracing]
+        S5[Messaging & Task Queues]
     end
 
-    Gateway -.-> Shared
-    Orch -.-> Shared
-    Host -.-> Shared
-    Vault -.-> Shared
-    Manager -.-> Shared
+    Services --> S1
+    Services --> S2
+    Services --> S3
+    Services --> S4
+    Services --> S5
 ```
 
-## 📁 Codebase Structure
+### Component Overview
 
-- **`config.py`**: Centralized configuration management using pydantic-settings.
-- **`schemas.py`**: Canonical data models for research, jobs, and tools.
-- **`environment.py`**: Dynamic environment detection and mode management (Dev, Prod, Test).
-- **`hardware/`**: Real-time hardware profiling and adaptive execution strategies.
-- **`embedding/`**: Abstraction layer for vector embeddings (OpenAI, Hugging Face, Voyage).
-- **`messaging.py`**: Implementation of the intra-service Message Bus.
-- **`dispatcher.py`**: SQL-backed task queue for managing massive parallel batches.
-- **`logging/`**: Structured JSON logging and OpenTelemetry metrics integration.
-- **`mcp/`**: Core protocol implementation for Model Context Protocol.
-- **`llm/`**: Standardized interface for multi-provider LLM access.
+| Module | Responsibility | Key File |
+| :--- | :--- | :--- |
+| **Schemas** | Canonical Pydantic models for the entire system. | `schemas.py` |
+| **Hardware** | Real-time system profiling and adaptive scaling. | `hardware/` |
+| **LLM Interface** | Standardized multi-provider LLM connector. | `llm/` |
+| **MCP** | Model Context Protocol implementation and utilities. | `mcp/` |
+| **Messaging** | Intra-service Message Bus (Upward/Downward/Lateral). | `messaging.py` |
+| **Dispatcher** | Persistent PostgreSQL-backed task queue. | `dispatcher.py` |
+| **Logging** | Structured JSON logging with trace correlation. | `logging/` |
 
-## 🧠 Deep Dive
+---
+
+## ✨ Key Features
 
 ### 1. Hardware-Aware Adaptive Execution (`hardware/`)
 Kea doesn't just run; it *adapts*. The `HardwareDetector` profiles the system (CPU cores, RAM availability, VRAM) on startup. This profile is used to calculate the `optimal_worker_count` for MCP servers and research swarms, preventing system OOMs on limited hardware while maximizing throughput on enterprise-grade clusters.
 
-### 2. The Task Dispatcher (`dispatcher.py`)
-For high-scale research (e.g., "Analyze 1,000 documents"), the system avoids blocking. It Enqueues `ExecutionTask` objects into the PostgreSQL-backed dispatcher. These tasks are then picked up by background **Workers**, with their progress and results tracked persistently.
+### 2. Rich Domain Schemas (`schemas.py`)
+Centralized Pydantic models ensure that a `ResearchState` produced by the **Orchestrator** is perfectly understood by the **Vault** and the **Gateway**. It includes models for:
+- **ResearchState**: The global context object for a job.
+- **AtomicFact**: A single, cited piece of evidence.
+- **ToolOutput**: Container for text, data, and files from MCP tools.
 
-### 3. Environment & Mode Management (`environment.py`)
-The system supports multiple modes of operation seamlessly (Dev, Production, Staging). The `EnvironmentConfig` handles secret loading, service URL resolution, and logging levels dynamically based on the `ENV` variable.
+### 3. Unified Discovery & Routing
+The `service_registry.py` and `environment.py` modules manage how services find each other. They support multiple environments (Local, Docker, K8s) and ensure that `SERVICE_URL_VAULT` is always pointing to the right instance without hardcoding.
 
-## 📚 Reference
+---
 
-### Core Primitive Reference
+## 📁 Component Details
 
-| Class | Description | Key Fields |
-|:------|:------------|:-----------|
-| `ResearchState` | The LangGraph state object. | `job_id`, `facts`, `sub_queries`, `report` |
-| `AtomicFact` | High-fidelity data point. | `entity`, `attribute`, `value`, `confidence` |
-| `Message` | Inter-agent communication. | `from_agent`, `to_agent`, `content`, `type` |
-| `ToolOutput` | Rich n8n-style result. | `text`, `data`, `files`, `next_input` |
+### `schemas.py`
+The "Single Source of Truth." If you want to know what a "Job" or an "Artifact" looks like, this is the first place to look.
 
-### Service Port Registry
+### `config.py`
+Manages strongly-typed settings using `pydantic-settings`. It supports `.env` files and environment variable overrides for every parameter in the system.
 
-| Service | Default Port | Environment Variable Override |
-|:--------|:-------------|:------------------------------|
-| Gateway | 8000 | `SERVICE_URL_GATEWAY` |
-| Orchestrator | 8001 | `SERVICE_URL_ORCHESTRATOR` |
-| MCP Host | 8002 | `SERVICE_URL_MCP_HOST` |
-| RAG Service | 8003 | `SERVICE_URL_RAG_SERVICE` |
-| Vault | 8004 | `SERVICE_URL_VAULT` |
-| Swarm Manager| 8005 | `SERVICE_URL_SWARM_MANAGER` |
+### `hardware/`
+Contains the logic for detecting available resources. It provides decorators and utilities to throttle execution based on system pressure.
+
+### `llm/` & `embedding/`
+Abstract away the differences between OpenAI, Anthropic, Voyage, and Hugging Face. They handle retry logic, rate limits, and cost tracking.
+
+### `mcp/`
+Implementation of the Model Context Protocol. It includes schema inferrers and registry logic used by the MCP Host.
+
+### `logging/`
+Advanced structured logging using `structlog`. It ensures that every log entry carries a `trace_id` so we can follow a single request across 7 different services.
+
+---
+*The shared library ensures that Kea remains a single, cohesive organism rather than a collection of disjointed scripts.*

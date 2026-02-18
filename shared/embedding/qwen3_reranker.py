@@ -218,6 +218,24 @@ class LocalReranker(RerankerProvider):
         # Batching configuration (to prevent OOM)
         BATCH_SIZE = 16 
         
+        # Check VRAM pressure and adjust batch size
+        try:
+            from shared.hardware.detector import detect_hardware
+            hw = detect_hardware()
+            if hw.cuda_available:
+                hw.refresh_vram()
+                pressure = hw.vram_pressure()
+                if pressure > 0.8:
+                    BATCH_SIZE = 2
+                    logger.warning(f"Reranker: VRAM pressure high ({pressure*100:.1f}%), reducing batch to {BATCH_SIZE}")
+                elif pressure > 0.6:
+                    BATCH_SIZE = 4
+                    logger.info(f"Reranker: VRAM pressure moderate ({pressure*100:.1f}%), reducing batch to {BATCH_SIZE}")
+                else:
+                    BATCH_SIZE = 8 # Conservative default
+        except Exception:
+            pass 
+        
         all_scores = []
         
         # Process in batches

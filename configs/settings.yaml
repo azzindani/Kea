@@ -1,7 +1,7 @@
 # Application Settings
 app:
   name: "Kea Research Engine"
-  version: "0.1.0"
+  version: "0.4.0"
   environment: "${ENVIRONMENT:development}"
 
 # Logging Configuration
@@ -15,7 +15,7 @@ llm:
   default_provider: "openrouter"
   default_model: "${OPENROUTER_MODEL:nvidia/nemotron-3-nano-30b-a3b:free}"
   temperature: 0.7
-  max_tokens: 16384
+  max_tokens: 32768
   enable_reasoning: true
 
 # Embedding Configuration (Priority: Local -> API Fallback)
@@ -41,6 +41,7 @@ mcp:
     uv_enabled: true
     idle_timeout: 300  # 5 minutes
     max_servers: 20
+    connect_timeout: 300
   
   servers:
     - name: "scraper_server"
@@ -270,13 +271,13 @@ rate_limits:
 # Model Identity Configuration
 models:
   # The default model for most tasks
-  default_model: "nvidia/nemotron-3-nano-30b-a3b:free"
+  default_model: "${MODELS_DEFAULT_MODEL:nvidia/nemotron-3-nano-30b-a3b:free}"
   app_name: "Kea Research Engine"
   
   # Specialized models (can be same as default)
-  planner_model: "nvidia/nemotron-3-nano-30b-a3b:free"
-  critic_model: "nvidia/nemotron-3-nano-30b-a3b:free"
-  generator_model: "nvidia/nemotron-3-nano-30b-a3b:free"
+  planner_model: "${MODELS_PLANNER_MODEL:nvidia/nemotron-3-nano-30b-a3b:free}"
+  critic_model: "${MODELS_CRITIC_MODEL:nvidia/nemotron-3-nano-30b-a3b:free}"
+  generator_model: "${MODELS_GENERATOR_MODEL:nvidia/nemotron-3-nano-30b-a3b:free}"
 
 # Governance & Safety
 governance:
@@ -291,7 +292,7 @@ timeouts:
   llm_completion: 60.0
   llm_streaming: 120.0
   tool_execution: 300.0
-  long: 600.0
+  long: 1200.0
 
 # Loop Safety Controls
 loop_safety:

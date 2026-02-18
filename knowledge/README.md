@@ -20,35 +20,20 @@ This directory contains the **Liquid Intelligence** of Kea. It is a collection o
 
 ## 🛠️ Integration Guide
 
-This library is designed to be consumed by the **Kea Orchestrator** via a **Context RAG** system.
+This library is designed to be consumed by the **Kea Kernel** (via the `knowledge` and `logic` subsystems) to ground reasoning in domain-specific expertise.
 
 ### 1. The Skill Schema (Pure Context)
-Every file in `skills/` must follow this format to ensure high-quality context injection.
-**Note**: We purposely DO NOT include hardcoded tool lists here. Tool selection is the responsibility of the Orchestrator's Registry, not the Knowledge layer.
+All files in `skills/` must adhere to the **[Kea Skill Standard (v1.0)](skills/README.md)**.
 
-```markdown
----
-name: "Skill Name"
-description: "Optimized for vector embedding (what is this skill for?)"
-domain: "finance"
-tags: ["tag1", "tag2"]
----
+**Key Requirements**:
+*   **Frontmatter**: Must include `name`, `description` (semantic-optimized), and `domain`.
+*   **Role**: Define the high-status expert persona.
+*   **Reasoning**: Step-by-step tool-agnostic logic.
+*   **Atomic**: Focus on a single niche domain.
+*   **Tool-Agnostic**: Zero mention of specific MCP tool names or function signatures.
 
-# Role
-[Strict System Prompt Identity, e.g., "You are a Senior Forensic Accountant."]
-
-## Core Concepts
-[3-5 bullet points defining the mental model. How does an expert think about this problem?]
-
-## Reasoning Framework
-[Step-by-step logic chain to follow. e.g., "1. Verify Source, 2. Triangulate Data..."]
-
-## Output Standards
-[Strict formatting or quality requirements. e.g., "Always cite SEC filing sections."]
-
-## Example
-[Few-Shot Chain of Thought showing the *reasoning process*, not just the result.]
-```
+> [!TIP]
+> Refer to **[knowledge/skills/README.md](skills/README.md)** for the full specification, design principles, and examples.
 
 ### 2. Retrieval Strategy
 1.  **Index**: Embed the `description` and `content` of these files into `pgvector`.

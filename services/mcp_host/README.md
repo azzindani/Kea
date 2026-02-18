@@ -1,89 +1,77 @@
 # 🔌 MCP Host Service ("The Hands")
 
-The **MCP Host Service** is the multi-process execution engine of Kea v4.0. It acts as the **Department Head** responsible for staffing and tooling. It manages the lifecycle of ephemeral tool processes, handles JSON-RPC communication, and provides a governed high-throughput interface for tool execution. It implements the "Pure MCP" architecture, ensuring the core system remains decoupled from tool-specific dependencies.
-
-## ✨ Features
-
-- **JIT (Just-In-Time) Spawning**: Automatically discovers and spawns MCP servers only when their tools are requested, optimizing resource usage.
-- **Hardware-Aware Governance**: Real-time monitoring of CPU, RAM, and VRAM with automatic task throttling to prevent system OOMs.
-- **Static Tool Discovery**: Uses AST (Abstract Syntax Tree) analysis to discover tool signatures without needing to execute the server code first.
-- **Parallel Dispatch Engine**: Handles concurrent tool execution with fan-out support and fire-and-forget background tasks.
-- **Persistent Tool Registry**: Automatically indexes discovered tools into a PostgreSQL (pgvector) database for semantic search at scale.
-- **Sandboxed Execution**: Leverages `uv` for isolated, high-performance environment management with automatic dependency resolution.
+The **MCP Host Service** is the multi-process execution engine of Kea v0.4.0. It acts as the system's **Workforce**, managing the lifecycle of ephemeral tool processes and providing a governed high-throughput interface for the **Kea Kernel**.
 
 ## 📐 Architecture
 
-The MCP Host operates as a **Process Supervisor** and **JSON-RPC Proxy**. It bridges the gap between the high-level Orchestrator and low-level Stdio-based MCP Servers.
-
-### 🗼 Topology: Supervisor-Worker Model
+The MCP Host operates as a **Process Supervisor** and **JSON-RPC Proxy**. It bridges the gap between high-level reasoning and low-level system execution.
 
 ```mermaid
 graph TD
-    Router[FastAPI Router] -->|Sync| Executor[Parallel Executor]
-    Router -->|Async| Dispatcher[Task Dispatcher]
-    
-    Dispatcher -->|Enqueue| DB[(Postgres Queue)]
-    
-    subgraph "Supervisor Loop"
-        Governor[Hardware Governor] -->|Monitor| Stats[CPU/RAM/VRAM]
-        DB -->|Fetch| Supervisor[Supervisor Engine]
-        Supervisor -->|Check Capacity| Governor
+    subgraph Host [MCP Host Service]
+        direction TB
+        API[FastAPI: /tools/execute] --> Executor[Parallel Task Executor]
+        Executor --> Registry[Session Registry]
+        
+        subgraph Governance [Governance Loop]
+            Governor[Hardware Governor] -->|Monitor| Stats[CPU/RAM/VRAM]
+            Stats --> Throttler{Throttle?}
+        end
+        
+        Registry -->|Spawns| WorkerPool[JIT Process Pool]
+        Throttler -->|Signal| Executor
     end
-    
-    Supervisor -->|Spawn| Registry[Session Registry]
-    Executor -->|Request| Registry
-    
-    subgraph "Process Pool"
-        Registry -->|Stdio| S1[Scraper Server]
-        Registry -->|Stdio| S2[Python Server]
-        Registry -->|Stdio| S3[Search Server]
+
+    subgraph Tools [MCP Servers]
+        WorkerPool --> S1[Scraper]
+        WorkerPool --> S2[Finance]
+        WorkerPool --> S3[Python]
     end
 ```
 
+### Component Overview
+
+| Component | Responsibility | Performance Impact |
+| :--- | :--- | :--- |
+| **Session Registry**| JIT spawning and process lifecycle management. | High (Cold Start) |
+| **Hardware Governor**| CPU/RAM/VRAM monitoring and task throttling. | Medium |
+| **Postgres Registry**| Static tool indexing and semantic discovery. | Low |
+| **Parallel Executor**| Concurrency management and result aggregation. | High |
+
+---
+
+## ✨ Key Features
+
+### 1. JIT (Just-In-Time) Spawning
+MCP Servers are not kept running. Instead, they are spawned only when a tool is requested. The **Session Registry** manages the handshake and caches the session for subsequent calls, ensuring that system resources are used only when "work" is being done.
+
+### 2. Hardware-Aware Governance
+The **Governor** monitors system pressure in real-time. If VRAM is saturated or CPU load exceeds 90%, the Host automatically queues new tool calls instead of spawning new processes, effectively preventing "Agent Cascades" from crashing the host machine.
+
+### 3. Static Tool Discovery (AST Parsing)
+Kea can discover 1,000+ tools in milliseconds without executing a single file. It uses Python's `ast` module to scan the tool library and extract JSON schemas directly from the source code, which are then indexed into **pgvector** for semantic search.
+
+---
+
 ## 📁 Codebase Structure
 
-The service is divided into a lightweight API layer and a robust core orchestration engine.
+- **`main.py`**: FastAPI entrypoint hosting the execution and discovery endpoints.
+- **`core/`**: The implementation of the worker orchestration logic.
+    - `session_registry.py`: Logic for `uv run` process management and hands-free handshake.
+    - `supervisor_engine.py`: The health loop and priority-based task dispatcher.
+    - `postgres_registry.py`: Persistence for tool metadata and indexed vector search.
+    - `tool_registry.py`: The concrete implementation of the `ToolRegistry` protocol.
 
-- **`main.py`**: FastAPI entrypoint hosting the execution and dispatching endpoints.
-- **`core/`**: The implementation of the MCP hosting logic.
-    - `session_registry.py`: Manages JIT spawning, process termination, and AST-based tool discovery.
-    - `supervisor_engine.py`: Implements the governance loop, hardware health checks, and priority-based dispatching.
-    - `parallel_executor.py`: Provides utilities for concurrent execution of multiple tools.
-    - `postgres_registry.py`: Persistence layer for tool metadata and semantic search indexing.
-    - `background.py`: Background workers for processing dispatched batch tasks.
-    - `models.py`: Pydantic data models for the internal and external API.
-    - `tool_registry.py`: Interface for tool registration and access.
+---
 
 ## 🧠 Deep Dive
 
-### 1. JIT Discovery & Spawning Logic
-The `SessionRegistry` performs a two-stage discovery process:
-1.  **Static Analysis (AST)**: On startup, it scans the `mcp_servers/` directory and parses the Python source code of each server to extract tool names and docstrings using the `ast` module. This allows the system to know about 1,000+ tools without starting a single process.
-2.  **JIT Spawning**: When a tool is called (e.g., "yfinance.fetch"), the registry checks for an active session. If none exists, it uses `uv run` to spawn the server in a pristine environment, waiting until the JSON-RPC handshake is complete before routing the call.
+### 1. The "Sandbox" Philosophy
+The MCP Host treats every server as a potential security risk. By running servers via `uv` in isolated environments, it ensures that one tool's dependencies do not corrupt another. Future versions will support Docker-based sandboxing for even tighter isolation.
 
-### 2. Hardware-Aware Governance
-The `SupervisorEngine` implements a "Corporate Budget" for system resources:
-- **Resource Costing**: Each task is assigned a `resource_cost`. The supervisor ensures the total cost of active tasks never exceeds the `max_concurrent_cost` setting.
-- **Automatic Throttling**: If CPU > 90%, RAM > 95%, or VRAM is critical, the supervisor pauses dispatching new tasks until the system cools down.
-- **Skip-Locked Concurrency**: Uses Postgres `FOR UPDATE SKIP LOCKED` to allow multiple MCP Host instances to pull from the same task queue without collisions.
+### 2. High-Throughput Batching
+For massive research tasks (e.g., "Check status for 50 URLs"), the Host supports **Batch Execution**. This allows the Researcher node to send 50 requests in a single HTTP payload; the Host then parallelizes these across the available process pool, significantly reducing the bottleneck of tool execution.
 
-### 3. Isolation & Dependency Management
-Kea utilizes `uv` to manage the complexity of tool dependencies. If an MCP server directory contains a `pyproject.toml`, the host runs it in "Project Mode", ensuring it has its own isolated environment. Otherwise, it runs in "Global Mode" using the Kea environment.
+---
+*The MCP Host provides the physical capabilities that allow Kea's thoughts to become actions.*
 
-## 📚 Reference
-
-### API Interface
-
-| Endpoint | Method | Description |
-|:---------|:-------|:------------|
-| `/tools` | `GET` | List all discovered tools across all servers. |
-| `/tools/execute` | `POST` | Synchronous execution of a single tool. |
-| `/tools/batch` | `POST` | Parallel synchronous execution of multiple tools. |
-| `/tools/dispatch` | `POST` | Asynchronous (Fire-and-Forget) execution. Returns `batch_id`. |
-| `/tools/batch/{id}` | `GET` | Retrieve the status and results of an asynchronous batch. |
-
-### Governance Defaults
-- **Poll Interval**: 1s (configurable).
-- **Max RAM**: 90% (configurable).
-- **Grace Period**: 120s for `uv` dependency installation during first spawn.
-- **Concurrency**: Governed by `max_concurrent_cost` in `settings.yaml`.

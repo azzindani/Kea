@@ -3,13 +3,19 @@ import httpx
 import os
 import io
 import json
-from docx import Document
+try:
+    from docx import Document
+except ImportError:
+    Document = None
+
 from shared.logging.structured import get_logger
 
 logger = get_logger(__name__)
 
 async def parse_docx(url: str) -> str:
     """Parse DOCX file."""
+    if Document is None:
+        return "Error: python-docx is not installed. Word parsing is unavailable."
     try:
         if url.startswith(("http://", "https://")):
             async with httpx.AsyncClient(timeout=60) as client:

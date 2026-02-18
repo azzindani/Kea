@@ -161,6 +161,7 @@ class StressTestRunner:
         self._initialized = True
         logger.info("="*60)
 
+
     async def cleanup(self) -> None:
         """Cleanup resources."""
         if self.client:
@@ -279,7 +280,7 @@ class StressTestRunner:
         # DEBUG: Show exactly what we're sending
         print(f"\n{'='*70}")
         print(f"DEBUG: API REQUEST - query.prompt =")
-        print(f"{query.prompt[:200]}..." if len(query.prompt) > 200 else query.prompt)
+        print(f"{query.prompt[:2000]}..." if len(query.prompt) > 2000 else query.prompt)
         print(f"{'='*70}\n")
         
         response = await self.api_client.post(

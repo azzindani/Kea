@@ -7,6 +7,7 @@ Replaces static configuration with auto-discovery and on-demand spawning.
 import asyncio
 import os
 import sys
+import ast
 from pathlib import Path
 from typing import Dict, List, Any
 import dataclasses
@@ -99,7 +100,9 @@ class SessionRegistry:
                 await self.pg_registry.sync_tools(self.discovered_tools)
                 # Clear buffer to free memory, or keep if we want to query them locally later?
                 # RAG is persistent, so we can clear. but keep for debugging if needed.
-                self.discovered_tools.clear() 
+                # Clear buffer to free memory, or keep if we want to query them locally later?
+                # KEEPING for static listing (fix for "No tools found" error)
+                # self.discovered_tools.clear() 
             except Exception as e:
                 logger.error(f"❌ Failed to sync discovered tools to RAG: {e}")
 
@@ -206,18 +209,89 @@ class SessionRegistry:
                         docstring = ast.get_docstring(node)
                         description = docstring or f"Tool: {tool_name} from {server_name}"
                         
-                        # Create a lightweight Tool object for RAG indexing
-                        # We don't need full schema here, just name + desc for semantic search.
-                        # Full schema is fetched JIT by AgentSpawner.
+                        # Extract Schema from AST
+                        try:
+                            input_schema = self._extract_schema_from_node(node)
+                        except Exception as e:
+                            logger.warning(f"   ⚠️ Schema extraction failed for {tool_name}: {e}")
+                            input_schema = {}
+
+                        # Create a Tool object with SCHEMA for RAG indexing and Planning
                         tool_obj = Tool(
                             name=tool_name,
                             description=description,
-                            inputSchema={}, # Empty schema is fine for RAG indexing
+                            inputSchema=input_schema, 
                         )
                         SessionRegistry._shared_discovered_tools.append(tool_obj)
 
         except Exception as e:
             logger.warning(f"Static scan failed for {server_name}: {e}")
+
+    def _extract_schema_from_node(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> dict:
+        """
+        Extract JSON schema from AST function node.
+        Crucial for RAG to know about parameters and for Planner to know how to call the tool.
+        """
+        import ast
+        
+        properties = {}
+        required = []
+        
+        # Parse arguments
+        args = node.args.args
+        
+        # Handle 'self' or 'cls' exclusion if it's a method (though FastMCP usually decorates standalone functions)
+        # But we don't have enough context to know if it's a method, assume simple functions for now
+        # or filter 'self' if present.
+        
+        for arg in args:
+            if arg.arg in ('self', 'cls'):
+                continue
+                
+            param_name = arg.arg
+            param_type = "string" # Default
+            
+            # Try to infer type from annotation
+            if arg.annotation:
+                try:
+                    type_str = ast.unparse(arg.annotation)
+                    # rudimentary mapping
+                    if type_str in ('int', 'float', 'complex'):
+                        param_type = "number"
+                    elif type_str == 'bool':
+                        param_type = "boolean"
+                    elif type_str in ('dict', 'Dict'):
+                        param_type = "object"
+                    elif type_str.startswith(('list', 'List')):
+                        param_type = "array"
+                except:
+                    pass
+            
+            properties[param_name] = {
+                "type": param_type,
+                "description": f"Parameter {param_name}" 
+            }
+            required.append(param_name)
+            
+        # Handle defaults (remove from required)
+        # node.args.defaults corresponds to the last N args
+        if node.args.defaults:
+            num_defaults = len(node.args.defaults)
+            # The args that have defaults are the last num_defaults ones
+            # args list: [a, b, c, d]
+            # defaults list: [1, 2] -> c has default 1, d has default 2
+            # args with defaults: args[-num_defaults:]
+            
+            args_with_defaults = args[-num_defaults:]
+            for arg in args_with_defaults:
+                if arg.arg in required:
+                    required.remove(arg.arg)
+
+        return {
+            "type": "object",
+            "properties": properties,
+            "required": required
+        }
 
     async def get_session(self, server_name: str) -> MCPClient:
         """
@@ -358,58 +432,118 @@ class SessionRegistry:
 
     async def list_all_tools(self) -> List[dict]:
         """
-        Aggregates tools from ALL registered servers.
-        Syncs them to Postgres for RAG.
-        Parallelized for faster startup.
+        Lists all available tools using STATIC metadata to avoid spawning servers.
+        JIT servers are only spawned when a tool is actually executed.
         """
-        all_tools_dict = []
-        all_tools_objs = []
-        
-        async def _fetch_server_tools(name: str):
-            try:
-                session = await self.get_session(name)
-                return name, await session.list_tools()
-            except Exception as e:
-                logger.warning(f"⚠️ Could not fetch tools from {name}: {e}")
-                return name, []
+        # Optimized: Use pre-calculated static tools if available
+        if self.discovered_tools:
+            logger.debug(f"⚡ Returning {len(self.discovered_tools)} statically discovered tools (No Spawn)")
+            return [
+                {
+                    **t.model_dump(), 
+                    "server": self.tool_to_server.get(t.name, "unknown")
+                }
+                for t in self.discovered_tools
+            ]
 
-        # Gather all tools concurrently
-        # Limit concurrency to 5 to avoid CPU/IO storm if starting fresh
-        # But for 'list_tools' calls on active sessions, it's fast.
-        # For fresh JIT spawns, we want some parallelism but not 50.
-        
-        semaphore = asyncio.Semaphore(5)
-        
-        async def _bounded_fetch(name):
-            async with semaphore:
-                return await _fetch_server_tools(name)
+        # Fallback: If no static tools found, strictly avoid spawning everything.
+        # Just return empty, forcing rely on manual registration or explicit static scan.
+        logger.warning("⚠️ No tools found in static registry. Check MCP directory structure.")
+        return []
 
-        tasks = [_bounded_fetch(name) for name in self.server_configs.keys()]
-        results = await asyncio.gather(*tasks)
+    async def list_tools_for_server(self, server_name: str) -> List[dict]:
+        """
+        List tools for a specific server, spawning it JIT if needed.
+        """
+        try:
+            session = await self.get_session(server_name)
+            tools = await session.list_tools()
+            
+            tool_dicts = []
+            for tool in tools:
+                t = tool.model_dump()
+                t['server'] = server_name
+                tool_dicts.append(t)
+                
+                # Update cache
+                self.tool_to_server[tool.name] = server_name
+                
+            return tool_dicts
+        except Exception as e:
+            logger.warning(f"Failed to list tools for {server_name}: {e}")
+            return []
+
+    async def execute_tool_ephemeral(self, server_name: str, tool_name: str, arguments: dict) -> Any:
+        """
+        Executes a tool with a strictly ephemeral lifecycle:
+        1. Spawn Server (JIT)
+        2. Execute Tool
+        3. Terminate Server (Immediate Unload)
         
-        for name, tools in results:
-             for tool in tools:
-                tool_dict = tool.model_dump()
-                tool_dict['server'] = name
-                all_tools_dict.append(tool_dict)
-                
-                self.tool_to_server[tool.name] = name
-                all_tools_objs.append(tool)
-                
-        # Sync to RAG (Backgroundable, but fast enough for small sets)
-        if self.pg_registry and all_tools_objs:
+        This satisfies the 'Artifact Mode' requirement where resources are freed immediately.
+        """
+        try:
+            # 1. Spawn/Get Session
+            session = await self.get_session(server_name)
+            
+            # 2. Execute
+            logger.info(f"▶️ Executing {tool_name} on {server_name}...")
+            result = await session.call_tool(tool_name, arguments)
+            
+            return result
+        finally:
+            # 3. Unload/Terminate immediately
+            logger.info(f"🛑 Ephemeral cleanup: Stopping {server_name}...")
+            await self.stop_server(server_name)
+            
+    async def stop_server(self, server_name: str) -> bool:
+        """
+        Stop a specific server to free resources.
+        """
+        stopped = False
+        if server_name in self.active_sessions:
             try:
-                await self.pg_registry.sync_tools(all_tools_objs)
+                await self.active_sessions[server_name].close()
+                del self.active_sessions[server_name]
+                stopped = True
             except Exception as e:
-                logger.error(f"Failed to sync tools to RAG: {e}")
+                logger.warning(f"Error closing session for {server_name}: {e}")
+
+        if server_name in self.active_processes:
+            try:
+                proc = self.active_processes[server_name]
+                proc.terminate()
+                await proc.wait()
+                del self.active_processes[server_name]
+                logger.info(f"🛑 Stopped server process: {server_name}")
+                stopped = True
+            except Exception as e:
+                logger.error(f"Error terminating process for {server_name}: {e}")
                 
-        return all_tools_dict
+        return stopped
+
+    async def execute_tool(self, tool_name: str, arguments: dict) -> Any:
+        """
+        Execute a tool by name (finding the server automatically).
+        Implementation of ToolRegistry protocol.
+        """
+        server_name = self.get_server_for_tool(tool_name)
+        if not server_name:
+             # Try to find it via search if not in cache?
+             # For now, just fail or default
+             raise ValueError(f"Tool '{tool_name}' not found in registry")
+        
+        # Use ephemeral execution or persistent session?
+        # For internal kernel calls, let's use get_session (persistent/JIT)
+        session = await self.get_session(server_name)
+        result = await session.call_tool(tool_name, arguments)
+        return result
 
     def get_server_for_tool(self, tool_name: str) -> str | None:
         """Get the server name that provides a tool."""
         return self.tool_to_server.get(tool_name)
 
-    async def search_tools(self, query: str, limit: int = 1000) -> List[dict]:
+    async def search_tools(self, query: str, limit: int = 1000, min_similarity: float = 0.0) -> List[dict]:
         """
         Semantic search for tools using Postgres Vector DB.
         Enables scaling to 10k+ tools.
@@ -417,12 +551,13 @@ class SessionRegistry:
         Args:
             query: Search query for tool discovery
             limit: Max results (default 1000 for large tool registries)
+            min_similarity: Minimum cosine similarity (0.0 to 1.0)
         """
         if not self.pg_registry:
             logger.warning("Search unavailable: Postgres Registry not initialized.")
             return []
             
-        return await self.pg_registry.search_tools(query, limit)
+        return await self.pg_registry.search_tools(query, limit, min_similarity)
 
     async def shutdown(self):
         """Cleanup all processes"""

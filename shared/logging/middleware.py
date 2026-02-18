@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import time
 import uuid
+import os
 from typing import Callable
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -57,7 +58,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         
         # Verbose Mode: Log Body
         import os
-        if os.getenv("KEA_LOG_NO_TRUNCATE") == "1":
+        if os.getenv("LOG_NO_TRUNCATE") == "1":
             try:
                 # Read and reset body
                 body_bytes = await request.body()
@@ -70,7 +71,8 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             except Exception:
                 start_log_data["body"] = "<error reading body>"
 
-        logger.info("Request started", extra=start_log_data)
+        if not os.path.exists(".quiet_logs"):
+            logger.debug("Request started", extra=start_log_data)
         
         start_time = time.perf_counter()
         
@@ -79,15 +81,16 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             duration = time.perf_counter() - start_time
             
             # Log request completion
-            logger.info(
-                "Request completed",
-                extra={
-                    "method": request.method,
-                    "path": request.url.path,
-                    "status_code": response.status_code,
-                    "duration_ms": round(duration * 1000, 2),
-                }
-            )
+            if not os.path.exists(".quiet_logs"):
+                logger.debug(
+                    "Request completed",
+                    extra={
+                        "method": request.method,
+                        "path": request.url.path,
+                        "status_code": response.status_code,
+                        "duration_ms": round(duration * 1000, 2),
+                    }
+                )
             
             # Record metrics
             record_api_request(

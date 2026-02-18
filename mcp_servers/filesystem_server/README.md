@@ -1,6 +1,6 @@
 # 📂 Filesystem Server ("The Operations Team")
 
-The **Filesystem Server** is the **Operations Department** of the Kea v4.0 system. It manages the "Virtual Filesystem" (VFS), providing a familiar unix-like interface (`ls`, `mkdir`, `write`) for agents to organize their work.
+The **Filesystem Server** is the **Operations Department** of the Kea v0.4.0 system. It manages the "Virtual Filesystem" (VFS), providing a familiar unix-like interface (`ls`, `mkdir`, `write`) for agents to organize their work.
 
 Crucially, this is NOT just a wrapper around `os.path`. It is a **Database-Backed Virtual Layer** that maps logical paths (e.g., `/project_alpha/financials.csv`) to physical artifacts on the **Artifact Bus** (The Vault).
 

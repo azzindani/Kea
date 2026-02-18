@@ -1,0 +1,57 @@
+# General Research Domain Knowledge
+# Loaded by kernel cells during intake for domain-agnostic research tasks.
+
+domain: general
+
+procedures:
+  research_methodology:
+    description: Standard research methodology for any topic
+    steps:
+      - Define the research question precisely
+      - Identify 3-5 authoritative data sources
+      - Collect data from multiple perspectives
+      - Cross-reference facts between sources
+      - Identify data gaps and limitations
+      - Synthesize findings into coherent narrative
+      - Assess confidence levels for each claim
+
+  competitive_analysis:
+    description: Framework for analyzing competitive landscapes
+    steps:
+      - Identify the industry and market boundaries
+      - Map all major players (top 10-20)
+      - Analyze market share distribution
+      - Assess barriers to entry
+      - Evaluate differentiation strategies
+      - Identify emerging threats and opportunities
+      - Produce competitive matrix
+
+  trend_analysis:
+    description: Framework for identifying and evaluating trends
+    steps:
+      - Collect historical data points (5+ years when available)
+      - Identify patterns and inflection points
+      - Assess driving forces behind trends
+      - Evaluate sustainability of trends
+      - Project future trajectories with confidence ranges
+      - Identify potential disruptions
+
+rules:
+  source_quality:
+    - Prefer primary sources over secondary sources
+    - Government data and peer-reviewed papers are highest quality
+    - News articles are moderate quality (verify with multiple sources)
+    - Social media and forums are low quality (use only for sentiment)
+    - Always note the recency of data
+
+  confidence_calibration:
+    - "0.9+ requires multiple independent sources agreeing"
+    - "0.7-0.9 requires at least 2 credible sources"
+    - "0.5-0.7 is acceptable for single-source claims with caveats"
+    - "Below 0.5 should be flagged as uncertain"
+
+  output_standards:
+    - Every claim must cite its source
+    - Quantitative claims need specific numbers (not just 'large' or 'growing')
+    - Conflicting data must be acknowledged, not hidden
+    - Data gaps must be explicitly stated

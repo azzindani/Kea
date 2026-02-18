@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI, HTTPException
 import fastapi
 import uvicorn
@@ -5,9 +8,10 @@ from contextlib import asynccontextmanager
 
 from shared.logging import get_logger
 from services.mcp_host.core.models import (
-    ToolRequest, 
-    BatchToolRequest, 
-    ToolResponse
+    ToolRequest,
+    BatchToolRequest,
+    ToolResponse,
+    ToolSearchRequest,
 )
 
 logger = get_logger(__name__)
@@ -52,12 +56,54 @@ async def health():
 
 
 @app.get("/tools")
-async def list_tools():
-    """List all available tools."""
+async def list_tools(server: str | None = None, limit: int | None = None):
+    """List available tools, optionally filtered by server (JIT) or limited."""
     from services.mcp_host.core.session_registry import get_session_registry
     registry = get_session_registry()
-    tools = await registry.list_all_tools()
+    
+    if server:
+        # JIT: Only list tools for this specific server
+        tools = await registry.list_tools_for_server(server)
+    else:
+        # Full scan (legacy behavior, wakes all servers)
+        tools = await registry.list_all_tools()
+        
+    if limit and limit > 0:
+        tools = tools[:limit]
+        
     return {"tools": tools}
+
+
+@app.post("/tools/search")
+async def search_tools(request: ToolSearchRequest):
+    """
+    Semantic tool search via pgvector RAG.
+
+    Returns tools ranked by cosine similarity to the query — no hardcoded
+    keywords or domain lists. Covers all 2000+ tools across 60+ MCP servers.
+    """
+    from services.mcp_host.core.session_registry import get_session_registry
+
+    registry = get_session_registry()
+    tools = await registry.search_tools(
+        query=request.query, 
+        limit=request.limit,
+        min_similarity=request.min_similarity
+    )
+    return {"tools": tools}
+
+
+@app.post("/server/{server_name}/stop")
+async def stop_server(server_name: str):
+    """Stop a specific server to free resources."""
+    from services.mcp_host.core.session_registry import get_session_registry
+    registry = get_session_registry()
+    
+    success = await registry.stop_server(server_name)
+    if success:
+        return {"status": "stopped", "server": server_name}
+    else:
+        return {"status": "not_running", "server": server_name}
 
 
 @app.post("/tools/execute", response_model=ToolResponse)
@@ -79,8 +125,12 @@ async def execute_tool(request: ToolRequest):
         if not server_name:
              raise ValueError(f"Tool {request.tool_name} not found in any server")
 
-        session = await registry.get_session(server_name)
-        result = await session.call_tool(request.tool_name, request.arguments)
+        # Ephemeral Execution (Spawn -> Run -> Stop)
+        result = await registry.execute_tool_ephemeral(
+            server_name, 
+            request.tool_name, 
+            request.arguments
+        )
         
         return ToolResponse.from_mcp_result(request.tool_name, result)
         
@@ -125,8 +175,12 @@ async def execute_batch(request: BatchToolRequest):
             if not server_name:
                 raise ValueError(f"Tool {task.tool_name} not found")
                 
-            session = await registry.get_session(server_name)
-            res = await session.call_tool(task.tool_name, task.arguments)
+            # Ephemeral Execution
+            res = await registry.execute_tool_ephemeral(
+                server_name, 
+                task.tool_name, 
+                task.arguments
+            )
             return ToolResponse.from_mcp_result(task.tool_name, res)
         except Exception as e:
             return ToolResponse(

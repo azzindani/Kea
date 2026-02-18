@@ -1,5 +1,11 @@
 import httpx
-import fitz # PyMuPDF
+try:
+    import fitz  # PyMuPDF
+except ImportError:
+    try:
+        import pymupdf as fitz
+    except ImportError:
+        fitz = None
 import json
 from shared.logging.structured import get_logger
 
@@ -10,6 +16,9 @@ async def parse_pdf(url: str, pages: str = "all", extract_tables: bool = False) 
     Parse PDF file.
     pages: 'all', '1-5', '1,3,5'
     """
+    if fitz is None:
+        return "Error: PyMuPDF (fitz) is not installed. PDF parsing is unavailable."
+
     try:
         # Download PDF
         headers = {

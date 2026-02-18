@@ -18,36 +18,61 @@ def get_nlp(model_name: str = "en_core_web_sm") -> spacy.language.Language:
             with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
                 LOADED_MODELS[model_name] = spacy.load(model_name)
         except OSError:
-            # Attempt download via spacy's CLI
-            # NOTE: This often fails in restricted or uv-managed environments if pip is not in PATH
+            # Attempt download
             try:
                 import subprocess
                 import sys
                 
-                # Check if pip is available before trying spacy.cli.download
-                pip_available = False
+                # 1. Try to determine the best installer (uv or pip)
+                installer_cmd = None
+                
+                # Check for uv
                 try:
-                    subprocess.run([sys.executable, "-m", "pip", "--version"], capture_output=True, check=True)
-                    pip_available = True
+                    subprocess.run(["uv", "--version"], capture_output=True, check=True)
+                    installer_cmd = ["uv", "pip", "install"]
                 except (subprocess.CalledProcessError, FileNotFoundError):
-                    logger.warning("pip_not_available_for_download")
-
-                if not pip_available:
-                    # If pip is missing, spacy.cli.download will definitely fail with OSError
-                    raise OSError(f"Cannot download '{model_name}': pip is not available in the current environment.")
-
-                with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                    # Check for pip
                     try:
-                        spacy.cli.download(model_name)
-                    except SystemExit:
-                        raise OSError(f"Failed to download model '{model_name}': pip might be missing or permission denied.")
+                        subprocess.run([sys.executable, "-m", "pip", "--version"], capture_output=True, check=True)
+                        installer_cmd = [sys.executable, "-m", "pip", "install"]
+                    except (subprocess.CalledProcessError, FileNotFoundError):
+                        pass
+
+                if installer_cmd:
+                    logger.info("downloading_spacy_model", model=model_name, tool=installer_cmd[0])
+                    
+                    if installer_cmd[0] == "uv":
+                        # For uv, we try to install the PyPI package version.
+                        # Naming convention: usually en-core-web-sm (dashes)
+                        pypi_names = [
+                            model_name.replace("_", "-"),  # en-core-web-sm
+                            model_name                      # en_core_web_sm
+                        ]
+                        
+                        success = False
+                        for name in pypi_names:
+                            try:
+                                subprocess.run([*installer_cmd, name], check=True, capture_output=True)
+                                success = True
+                                break
+                            except subprocess.CalledProcessError:
+                                continue
+                        
+                        if not success:
+                            raise OSError(f"Could not find a valid package for '{model_name}' on PyPI using 'uv'.")
+                    else:
+                        # Fallback to spacy's own downloader if pip is present
+                        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                            spacy.cli.download(model_name)
                     
                     LOADED_MODELS[model_name] = spacy.load(model_name)
+                else:
+                    raise OSError(f"Neither 'uv' nor 'pip' are available to download '{model_name}'.")
+
             except Exception as e:
                 logger.error("failed_to_download_model", model=model_name, error=str(e))
                 raise OSError(f"Failed to download model '{model_name}': {str(e)}. "
-                             "Please install it manually using 'pip install <model_url>' "
-                             "or ensure 'pip' is available.")
+                             "Please install it manually or ensure 'uv' or 'pip' is available.")
     return LOADED_MODELS[model_name]
 
 def load_model(model_name: str = "en_core_web_sm") -> str:

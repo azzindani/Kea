@@ -15,5 +15,5 @@ dependencies = [
     "wrapt",
 ]
 
-[tool.uv]
-dev-dependencies = []
+[dependency-groups]
+dev = []

@@ -1,0 +1,24 @@
+prompt: |
+  Critique this answer:
+
+  {answer}
+
+  Based on {fact_count} facts from {source_count} sources.
+
+  Provide:
+  1. Strengths (what's good)
+  2. Weaknesses (what's problematic)
+  3. Missing elements
+  4. Suggestions for improvement
+
+fallback: |
+  ## Critique
+
+  Answer length: {length} characters
+
+  Observations:
+  - Answer reviewed for basic structure
+  - Source citations: {citations}
+  - Confidence stated: {confidence}
+
+  Note: Full critique requires LLM integration.

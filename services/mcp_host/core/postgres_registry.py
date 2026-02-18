@@ -32,11 +32,9 @@ class PostgresToolRegistry:
         self.table_name = table_name
         self.embedder = create_embedding_provider(use_local=True)
         self._pool: asyncpg.Pool | None = None
-        self._db_url = os.getenv("DATABASE_URL")
+        from shared.config import get_settings
+        self._db_url = get_settings().database_url
         self._initialized = False
-        
-        if not self._db_url:
-            raise ValueError("DATABASE_URL environment variable is required for PostgresToolRegistry")
             
     async def _get_pool(self) -> asyncpg.Pool:
         """Get or create connection pool with thread-safe initialization."""
@@ -203,25 +201,33 @@ class PostgresToolRegistry:
                     else:
                         logger.error(f"Registry embedding failed after {max_retries} attempts: {e}")
 
-    async def search_tools(self, query: str, limit: int = 1000) -> List[Dict[str, Any]]:
+    async def search_tools(self, query: str, limit: int = 1000, min_similarity: float = 0.0) -> List[Dict[str, Any]]:
         """Semantic search for tools.
         
         Args:
             query: Search query for tool discovery
             limit: Max results (default 1000 for large tool registries)
+            min_similarity: Minimum cosine similarity (0.0 to 1.0)
         """
         try:
             pool = await self._get_pool()
             query_emb = await self.embedder.embed_query(query)
             
+            # Convert similarity threshold to distance threshold
+            # Cosine distance = 1 - Cosine Similarity
+            # So dist < 1 - min_sim
+            max_distance = 1.0 - min_similarity
+            
             async with pool.acquire() as conn:
                 await register_vector(conn)
                 
                 rows = await conn.fetch(f"""
-                    SELECT schema_json FROM {self.table_name}
-                    ORDER BY embedding <=> $1
+                    SELECT schema_json, (embedding <=> $1) as distance 
+                    FROM {self.table_name}
+                    WHERE (embedding <=> $1) < $3
+                    ORDER BY distance ASC
                     LIMIT $2
-                """, query_emb, limit)
+                """, query_emb, limit, max_distance)
                 
                 return [json.loads(row['schema_json']) for row in rows]
                 

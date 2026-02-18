@@ -44,24 +44,51 @@ class ResourceGovernor:
         # State
         self._last_state: SystemState | None = None
         
+        # Prime CPU stats
+        psutil.cpu_percent(interval=None)
+        
+    async def get_system_state(self) -> SystemState:
+        """Alias for check_health to match public API expectations."""
+        return await self.check_health()
+
+    @property
+    def _active_agents(self) -> int:
+        """Return the active agent count from the last health check."""
+        if self._last_state:
+            return self._last_state.active_agents
+        return 0
+
     async def check_health(self) -> SystemState:
         """Get current system health snapshot."""
         # 1. Hardware Metrics
+        from shared.hardware.detector import detect_hardware
+        profile = detect_hardware()
+        
         cpu = psutil.cpu_percent(interval=None)
-        ram = psutil.virtual_memory().percent
+        ram = profile.memory_pressure() * 100
         
         # 2. Db / Agent Metrics
         pool = await get_db_pool()
-        async with pool.acquire() as conn:
-            # Approximate active agents by counting processing jobs
-            active_agents = await conn.fetchval("""
-                SELECT COUNT(*) FROM job_queue 
-                WHERE status = 'processing'
-            """) or 0
-            
-            # DB Connections (approximate from pool stats if available, or just query pg_stat_activity)
-            # For now, let's trust the pool is managed, but we can query PG
-            db_conns = await conn.fetchval("SELECT count(*) FROM pg_stat_activity")
+        active_agents = 0
+        db_conns = 0
+        
+        try:
+            async with pool.acquire() as conn:
+                # Approximate active agents by counting processing jobs in micro_tasks (v4 Core)
+                # Fallback to 0 if table doesn't exist yet
+                try:
+                    active_agents = await conn.fetchval("""
+                        SELECT COUNT(*) FROM micro_tasks 
+                        WHERE status = 'processing'
+                    """) or 0
+                except Exception:
+                    # Table might not be created yet if no tasks have run
+                    active_agents = 0
+                
+                # DB Connections
+                db_conns = await conn.fetchval("SELECT count(*) FROM pg_stat_activity")
+        except Exception as e:
+            logger.error(f"Failed to fetch DB metrics: {e}")
             
         status = "HEALTHY"
         if cpu > self.MAX_CPU or ram > self.MAX_RAM or active_agents >= self.MAX_AGENTS:

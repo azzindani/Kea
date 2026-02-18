@@ -4,6 +4,9 @@ Knowledge Retriever.
 High-level API for retrieving domain-specific knowledge context
 and formatting it for injection into LLM system prompts.
 
+Routes all knowledge searches through the RAG Service REST API (port 8003)
+to maintain microservice isolation — no direct database access.
+
 Usage:
     retriever = get_knowledge_retriever()
     context = await retriever.retrieve_context(
@@ -19,8 +22,10 @@ import asyncio
 import time
 from typing import Any
 
-from shared.config import get_settings
+import httpx
+
 from shared.logging import get_logger
+from shared.service_registry import ServiceName, ServiceRegistry
 
 logger = get_logger(__name__)
 
@@ -32,38 +37,17 @@ class KnowledgeRetriever:
     """
     Retrieves and formats knowledge context for LLM prompt injection.
 
-    Wraps PostgresKnowledgeRegistry with caching and formatting logic.
+    Calls the RAG Service's /knowledge/search endpoint — no direct DB access.
     """
 
     def __init__(self) -> None:
-        self._registry: Any = None
-        self._available = False
-        self._init_attempted = False
-        
         # Simple in-memory cache: (key) -> (timestamp, result)
-        # Key: (query, domain, category, tags_tuple, limit, enable_reranking)
+        # Key: (query, domain, category, tags_tuple, limit)
         self._cache: dict[tuple, tuple[float, str]] = {}
         self._cache_ttl = 60.0  # 60s TTL
 
-    async def _ensure_registry(self) -> bool:
-        """Lazily initialize the registry connection."""
-        if self._init_attempted:
-            return self._available
-
-        self._init_attempted = True
-        try:
-            from shared.knowledge.registry import PostgresKnowledgeRegistry
-
-            self._registry = PostgresKnowledgeRegistry()
-            # Test the connection by getting the pool
-            await self._registry._get_pool()
-            self._available = True
-            logger.info("KnowledgeRetriever: Connected to knowledge registry")
-        except Exception as e:
-            logger.warning(f"KnowledgeRetriever: Unavailable ({e}). Proceeding without.")
-            self._available = False
-
-        return self._available
+    def _rag_url(self) -> str:
+        return ServiceRegistry.get_url(ServiceName.RAG_SERVICE)
 
     async def retrieve_context(
         self,
@@ -73,7 +57,7 @@ class KnowledgeRetriever:
         category: str | None = None,
         tags: list[str] | None = None,
         min_similarity: float = 0.3,
-        enable_reranking: bool = True,
+        enable_reranking: bool = False,
     ) -> str:
         """
         Retrieve formatted knowledge context for prompt injection.
@@ -81,16 +65,12 @@ class KnowledgeRetriever:
         Features:
         - In-memory caching (60s TTL)
         - Structured logging of selected items
-        - Reranking pass-through
+        - Routes through RAG Service API — no direct Postgres access
         """
-        if not await self._ensure_registry():
-            return ""
-
-        # Check cache
-        # Sort tags for stable key
+        # Check cache first
         tags_tuple = tuple(sorted(tags)) if tags else None
-        cache_key = (query, domain, category, tags_tuple, limit, enable_reranking)
-        
+        cache_key = (query, domain, category, tags_tuple, limit)
+
         now = time.time()
         if cache_key in self._cache:
             timestamp, cached_result = self._cache[cache_key]
@@ -98,46 +78,70 @@ class KnowledgeRetriever:
                 logger.debug(f"Knowledge Cache Hit: {category}/{domain} for '{query[:30]}...'")
                 return cached_result
 
+        payload: dict[str, Any] = {"query": query, "limit": limit}
+        if domain:
+            payload["domain"] = domain
+        if category:
+            payload["category"] = category
+        if tags:
+            payload["tags"] = tags
+        
+        payload["enable_reranking"] = enable_reranking
+
+        label = f"category={category or 'all'} domain={domain or 'any'}"
+        logger.debug(f"KnowledgeRetriever: querying RAG Service [{label}] q='{query[:60]}'")
+
         try:
-            results = await asyncio.wait_for(
-                self._registry.search(
-                    query=query,
-                    limit=limit,
-                    domain=domain,
-                    category=category,
-                    tags=tags,
-                    enable_reranking=enable_reranking,
-                ),
-                timeout=10.0,
-            )
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(
+                    f"{self._rag_url()}/knowledge/search",
+                    json=payload,
+                )
+                if resp.status_code != 200:
+                    logger.warning(
+                        f"KnowledgeRetriever: RAG Service returned {resp.status_code} [{label}]"
+                    )
+                    return ""
+                results: list[dict[str, Any]] = resp.json()
 
             if not results:
+                logger.debug(f"KnowledgeRetriever: no items found [{label}]")
                 return ""
 
-            # Structured logging for visibility
             log_items = [
-                f"{r['knowledge_id']} ({r.get('similarity', 0.0):.2f})" 
-                for r in results
+                f"{r.get('knowledge_id', '?')} ({r.get('similarity', 0.0):.2f})" for r in results
             ]
-            logger.info(
-                f"Knowledge Retrieved ({category or 'all'}): {len(results)} items -> {log_items}"
-            )
+            logger.info(f"KnowledgeRetriever: {len(results)} items [{label}] -> {log_items}")
 
-            # Filter by similarity threshold
             relevant = [r for r in results if r.get("similarity", 0) >= min_similarity]
+            
+            # Fallback logic: if no items meet strict threshold, return what we found
+            # The user explicitly requested "real output... make it fall back"
+            if not relevant and results:
+                logger.warning(
+                    f"KnowledgeRetriever: Strict threshold {min_similarity} yielded 0 items. "
+                    f"Falling back to {len(results)} items with low similarity [{label}]"
+                )
+                relevant = results
 
+            # Final check (should only be empty if results was empty)
             if not relevant:
+                logger.debug(
+                    f"KnowledgeRetriever: all {len(results)} items below "
+                    f"similarity threshold {min_similarity} [{label}]"
+                )
                 return ""
 
             formatted = self._format_context(relevant)
-            
-            # Update cache
+            logger.info(
+                f"KnowledgeRetriever: injecting {len(relevant)} knowledge items "
+                f"({len(formatted)} chars) into system prompt [{label}]"
+            )
             self._cache[cache_key] = (now, formatted)
-            
             return formatted
 
-        except asyncio.TimeoutError:
-            logger.warning("KnowledgeRetriever: Search timed out")
+        except httpx.TimeoutException:
+            logger.warning("KnowledgeRetriever: RAG Service request timed out")
             return ""
         except Exception as e:
             logger.warning(f"KnowledgeRetriever: Search failed ({e})")
@@ -216,8 +220,13 @@ class KnowledgeRetriever:
         return "\n\n".join(parts)
 
     async def is_available(self) -> bool:
-        """Check if the knowledge registry is available."""
-        return await self._ensure_registry()
+        """Check if the RAG Service knowledge endpoint is reachable."""
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                resp = await client.get(f"{self._rag_url()}/health")
+                return resp.status_code == 200
+        except Exception:
+            return False
 
     def _format_context(self, items: list[dict[str, Any]]) -> str:
         """Format retrieved knowledge items into a prompt-ready string."""

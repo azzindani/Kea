@@ -1,7 +1,34 @@
-# 🔌 Playwright Server
+# 🌐 Playwright MCP Server ("The Eyes")
 
-The `playwright_server` is an MCP server providing tools for **Playwright Server** functionality.
-It is designed to be used within the Kea ecosystem.
+The **Playwright Server** is the high-fidelity web automation and extraction engine of Kea v0.4.0. It provides "Silicon Eyes" for agents, enabling them to browse the modern web, interact with complex SPAs (Single Page Applications), handle authentication, and extract structured data with human-like behavioral patterns.
+
+## 📐 Architecture
+
+The server manages a persistent browser context (Chromium by default), allowing for session-aware navigation where cookies and localStorage are preserved across multiple tool calls.
+
+```mermaid
+graph TD
+    Client[Orchestrator] -->|Command| API[Playwright Server]
+    API --> Browser[Persistent Browser Context]
+    
+    subgraph "Capabilities"
+        Browser --> Interaction[Click/Type/Hover]
+        Browser --> Extraction[Scrape/Links/Tables]
+        Browser --> Artifacts[Screenshots/PDFs]
+        Browser --> Debug[Console/Network/Tracing]
+    end
+    
+    Extraction --> Vault[(The Vault)]
+```
+
+## ✨ Features
+
+- **Stealth Interaction**: Built-in support for human-like input (delay, hover, smooth scrolling) to bypass basic anti-bot detection.
+- **Session Persistence**: `save_session` and `load_session` tools allow agents to maintain login states across research turns.
+- **Advanced Scraping**: Dedicated tools for `scrape_infinite_scroll` and `scrape_pagination` for high-volume data collection.
+- **Multi-Modal Output**: Generates screenshots and PDFs for visual verification and archival.
+- **Diagnostics & SEO**: Built-in `audit_accessibility` and `audit_seo` for technical website analysis.
+- **Network Control**: Ability to `block_resources` (images/CSS) to save bandwidth and speed up extraction.
 
 ## 🧰 Tools
 

@@ -13,28 +13,45 @@ The `services/` directory is the engine room of the Kea system. It follows a **F
 
 ## 🏗️ The 7-Service "Fractal Corp"
 
+Kea cognition is built on a **"Brain vs Body"** topology, where core reasoning is isolated from microservice execution.
+
 ```mermaid
 graph TD
     User((User)) -->|Rest API| Gateway[API Gateway]
     
-    subgraph "Nerve Center"
-        Gateway -->|Route| Orchestrator[Orchestrator]
-        Orchestrator -->|Jobs| Chronos[Chronos]
+    subgraph "The Brain (Reasoning)"
+        Gateway --> Orchestrator[Orchestrator Service]
+        subgraph Kernel [Isolated Kernel]
+            Orchestrator --> Cell[KernelCell]
+        end
+        Orchestrator --> Chronos[Chronos]
     end
     
-    subgraph "Execution & Memory"
+    subgraph "The Body (Execution & Persistence)"
         Orchestrator -->|Execute| Host[MCP Host]
         Orchestrator -->|Learn| RAG[RAG Service]
         Orchestrator -->|Audit| Vault[Vault]
     end
     
-    subgraph "Oversight"
+    subgraph "The Conscience (Oversight)"
         Host -->|Check| Manager[Swarm Manager]
         Orchestrator -->|Policy| Manager
     end
     
-    Host -->|JSON-RPC| Tools[33+ MCP Servers]
+    Host -->|JSON-RPC| Tools[68+ MCP Servers]
 ```
+
+---
+
+## 🔄 Lifecycle of a Research Request
+
+1.  **Ingress**: The **API Gateway** receives a natural language query (e.g., "Analyze the tech sector for SOC2 compliance").
+2.  **Dispatch**: A job is created in the **Vault** and dispatched to the **Orchestrator**.
+3.  **Planning**: The Orchestrator's **Kernel** (Planner Node) uses the **RAG Service** (Library) to discover relevant tools and corporate knowledge.
+4.  **Governance**: The proposed plan is checked by the **Swarm Manager** (Conscience) for compliance with organizational standards.
+5.  **Execution**: The **MCP Host** (Hands) spawns JIT tool servers to fetch real-world data, streaming results back to the Vault.
+6.  **Consensus**: The Orchestrator runs the **Generator-Critic-Judge** triad to verify the findings.
+7.  **Synthesis**: The final report is formatted and served back to the user via the Gateway.
 
 ---
 
@@ -42,23 +59,27 @@ graph TD
 
 | Service | Persona | Role | Documentation |
 |:--------|:--------|:-----|:--------------|
-| **[api_gateway](api_gateway/README.md)** | **The Mouth** | Entry point, Auth, & Routing | [📖 View Doc](api_gateway/README.md) |
-| **[orchestrator](orchestrator/README.md)** | **The Brain** | Reasoning & Graph State | [📖 View Doc](orchestrator/README.md) |
-| **[mcp_host](mcp_host/README.md)** | **The Hands** | Tool execution & JIT Spawning| [📖 View Doc](mcp_host/README.md) |
-| **[rag_service](rag_service/README.md)** | **The Library**| Semantic search & HF Datasets | [📖 View Doc](rag_service/README.md) |
-| **[vault](vault/README.md)** | **The Memory** | Audit logs & Checkpoints | [📖 View Doc](vault/README.md) |
-| **[swarm_manager](swarm_manager/README.md)** | **The Conscience**| Compliance & Oversight | [📖 View Doc](swarm_manager/README.md) |
-| **[chronos](chronos/README.md)** | **The Clock** | Scheduling & Time | [📖 View Doc](chronos/README.md) |
+| **[kernel](../kernel/README.md)** | **The Logic** | Isolated Reasoning Engine (Pure Brain) | [🧠 View Doc](../kernel/README.md) |
+| **[api_gateway](api_gateway/README.md)** | **The Mouth** | Perimeter Security, Auth, & Public API | [📖 View Doc](api_gateway/README.md) |
+| **[orchestrator](orchestrator/README.md)** | **The Nervous System** | Graph Orchestration & Kernel Wrapper | [📖 View Doc](orchestrator/README.md) |
+| **[mcp_host](mcp_host/README.md)** | **The Hands** | JIT Tool Execution & Process Supervision | [📖 View Doc](mcp_host/README.md) |
+| **[rag_service](rag_service/README.md)** | **The Library** | Multi-Source Knowledge & Dataset Ingestion | [📖 View Doc](rag_service/README.md) |
+| **[vault](vault/README.md)** | **The Memory** | Immutable Audit Trail & State Checkpointing | [📖 View Doc](vault/README.md) |
+| **[swarm_manager](swarm_manager/README.md)** | **The Conscience** | Governance, Compliance & HITL Oversight | [📖 View Doc](swarm_manager/README.md) |
+| **[chronos](chronos/README.md)** | **The Clock** | Job Scheduling & Temporal Management | [📖 View Doc](chronos/README.md) |
 
 ---
 
 ## 🧠 Deep Dive
 
 ### 1. The "Split-Brain" Protocol
-Kea separates **Reasoning** (LLM) from **Execution** (Python/Tool) at the process level. The Orchestrator can *propose* a tool call, but the **MCP Host** validates the call against the **Swarm Manager's** policies before spawning the ephemeral JIT environment. This prevents "Prompt Injection" from escaping into the host OS.
+Kea separates **Reasoning** (LLM-based logic in the Orchestrator) from **Execution** (Python/Tool logic in the MCP Host) at the process level. The Orchestrator can *propose* a tool call, but the **MCP Host** validates the call against the **Swarm Manager's** policies before spawning the ephemeral JIT environment. This prevents "Prompt Injection" from escaping into the host operating system.
 
-### 2. Service Discovery
-Services do not hardcode each other's URLs. Instead, they use the `shared.service_registry` which dynamically resolves service locations based on the `ENVIRONMENT` (Dev/Prod) and allows for zero-downtime service rotation.
+### 2. Service-to-Service Security
+Services do not hardcode each other's credentials. The **API Gateway** acts as the single source of truth for identity. Internal services trust requests that carry verified identity headers (X-User-ID) injected by the Gateway, ensuring a zero-trust architecture inside the pod/cluster.
+
+### 3. Hardware-Aware Scaling
+Every service in the "Body" is aware of the substrate it runs on. Through the `shared.hardware` library, services like the **MCP Host** and **RAG Service** automatically throttle their concurrency and memory usage based on real-time system pressure (CPU/RAM/VRAM).
 
 ---
 
@@ -66,12 +87,15 @@ Services do not hardcode each other's URLs. Instead, they use the `shared.servic
 
 ### Local Development Ports
 
-| service | port | internal path |
-|:--------|:-----|:--------------|
-| gateway | 8000 | `/api/v1` |
-| brain | 8001 | `/research` |
-| hands | 8002 | `/tools` |
-| library | 8003 | `/data` |
-| memory | 8004 | `/vault` |
-| manager | 8005 | `/swarm` |
-| clock | 8006 | `/jobs` |
+| service | port | internal path | nickname |
+|:--------|:-----|:--------------|:---------|
+| gateway | 8000 | `/api/v1` | The Mouth |
+| brain | 8001 | `/research` | The Nervous System |
+| hands | 8002 | `/tools` | The Hands |
+| library | 8003 | `/data` | The Library |
+| memory | 8004 | `/vault` | The Memory |
+| manager | 8005 | `/swarm` | The Conscience |
+| clock | 8006 | `/jobs` | The Clock |
+
+---
+*The Kea Services architecture ensures that corporate intelligence is distributed, governed, and resilient.*

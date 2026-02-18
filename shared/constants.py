@@ -1,5 +1,5 @@
 """
-Enterprise-scale constants for Kea v4.0.
+Enterprise-scale constants for Kea v0.4.0.
 
 Central constants file defining limits that replace hardcoded values across the codebase.
 These are designed for 100K+ tool handling and enterprise-scale operations.
