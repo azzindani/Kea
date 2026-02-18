@@ -123,6 +123,18 @@ class PerceptionResult(BaseModel):
         description="Intent path: A (memory) | B (verify) | C (synthesis) | D (deep research)",
     )
 
+    @field_validator("implicit_expectations", "key_entities", mode="before")
+    @classmethod
+    def parse_list_fields(cls, v: Any) -> list[str]:
+        """Handle LLM returning a single string instead of a list."""
+        if isinstance(v, str):
+            if "\n" in v:
+                return [line.strip("- *") for line in v.split("\n") if line.strip()]
+            return [v]
+        if isinstance(v, list):
+            return [str(item) for item in v]
+        return []
+
 
 class ExploreResult(BaseModel):
     """Output of the EXPLORE phase   pre-planning reconnaissance."""
@@ -198,11 +210,31 @@ class PlanResult(BaseModel):
     needs_clarification: bool = Field(default=False)
     clarification_questions: list[str] = Field(default_factory=list)
 
-    # Explicit DAG workflow (v0.4.0)
     workflow: list[WorkflowStep] = Field(
         default_factory=list,
         description="Explicit DAG definition for parallel execution",
     )
+
+    @field_validator("workflow", mode="before")
+    @classmethod
+    def parse_workflow(cls, v: Any) -> list[dict[str, Any]]:
+        """Handle LLM returning a list of strings instead of list of objects."""
+        if not isinstance(v, list):
+            return []
+            
+        cleaned_wf = []
+        for i, item in enumerate(v):
+            if isinstance(item, str):
+                cleaned_wf.append({
+                    "id": f"step_{i+1}",
+                    "step": item,
+                    "tool": None,
+                    "args": {},
+                    "depends_on": [f"step_{i}" for i in range(1, i+1)] if i > 0 else []
+                })
+            else:
+                cleaned_wf.append(item)
+        return cleaned_wf
 
     # Restored from old Planner node: explicit tool assignment per step.
     # Each entry maps step index (0-based) to {"tool": "<name>", "args_hint": {...}}.

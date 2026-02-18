@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from kernel.cognition.base import BasePhase, CycleContext
 from shared.prompts import get_agent_prompt
@@ -36,6 +36,27 @@ class PlanResult(BaseModel):
         default_factory=list,
         description="Potential failure modes",
     )
+
+    @field_validator("steps", mode="before")
+    @classmethod
+    def parse_steps(cls, v: Any) -> list[dict[str, Any]]:
+        """Handle LLM returning a list of strings instead of list of objects."""
+        if not isinstance(v, list):
+            return []
+            
+        cleaned_steps = []
+        for i, item in enumerate(v):
+            if isinstance(item, str):
+                cleaned_steps.append({
+                    "step_id": f"step_{i+1}",
+                    "description": item,
+                    "tool": None,
+                    "args": {},
+                    "depends_on": [f"step_{i}" for i in range(1, i+1)] if i > 0 else []
+                })
+            else:
+                cleaned_steps.append(item)
+        return cleaned_steps
 
 
 class Planner(BasePhase):

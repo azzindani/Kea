@@ -27,8 +27,6 @@ class CriticAgent:
     def __init__(self):
         self.name = "Critic"
         self.role = "The Pessimist"
-        self.name = "Critic"
-        self.role = "The Pessimist"
         self.system_prompt = get_agent_prompt("critic")
         self._embedding_provider = None
 
@@ -37,7 +35,7 @@ class CriticAgent:
             self._embedding_provider = get_embedding_provider()
         return self._embedding_provider
 
-    async def _measure_alignment(self, answer: str, facts: list[dict]) -> float:
+    async def _measure_alignment(self, answer: str, facts: list[Any]) -> float:
         """Measure semantic alignment between answer and facts."""
         try:
             if not facts:
@@ -49,7 +47,15 @@ class CriticAgent:
             answer_emb = await provider.embed_query(answer[:1000]) # Truncate for speed
             
             # Embed facts (batch)
-            fact_texts = [f.get("text", "")[:500] for f in facts[:10]] # Top 10 facts
+            fact_texts = []
+            for f in facts[:10]: # Top 10 facts
+                if isinstance(f, dict):
+                    # Try common fact keys
+                    text = f.get("text") or f.get("content") or f.get("value") or str(f)
+                    fact_texts.append(str(text)[:500])
+                else:
+                    fact_texts.append(str(f)[:500])
+            
             if not fact_texts:
                 return 0.5
                 

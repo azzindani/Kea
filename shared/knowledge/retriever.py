@@ -144,7 +144,7 @@ class KnowledgeRetriever:
             logger.warning("KnowledgeRetriever: RAG Service request timed out")
             return ""
         except Exception as e:
-            logger.warning(f"KnowledgeRetriever: Search failed ({e})")
+            logger.warning(f"KnowledgeRetriever: Search failed: {type(e).__name__}: {e}")
             return ""
 
     async def search_raw(
@@ -178,7 +178,7 @@ class KnowledgeRetriever:
                     return resp.json()
                 return []
         except Exception as e:
-            logger.warning(f"KnowledgeRetriever: Raw search failed ({e})")
+            logger.warning(f"KnowledgeRetriever: Raw search failed: {type(e).__name__}: {e}")
             return []
 
     async def retrieve_skills(

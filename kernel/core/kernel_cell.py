@@ -1270,12 +1270,11 @@ class KernelCell:
         """Run quality assurance appropriate to this level."""
         gate = get_quality_gate(self.identity.level)
 
-        if self.identity.level in ("intern", "staff"):
-            # Staff/Intern: self-review only (cost-effective)
-            self.score_card = await self._self_review(content, task_text)
+        # Baseline: Always run self-review to populate all 7 dimensions
+        self.score_card = await self._self_review(content, task_text)
 
-        else:
-            # Manager+: use consensus engine for quality check
+        if self.identity.level not in ("intern", "staff"):
+            # Manager+: refine accuracy/confidence using consensus engine
             try:
                 from kernel.logic.consensus import ConsensusEngine
 
@@ -1288,8 +1287,9 @@ class KernelCell:
                     sources=[],
                 )
 
-                self.score_card.accuracy = consensus.get("confidence", 0.5)
-                self.score_card.self_confidence = consensus.get("confidence", 0.5)
+                # Update accuracy and confidence from consensus
+                self.score_card.accuracy = consensus.get("confidence", self.score_card.accuracy)
+                self.score_card.self_confidence = consensus.get("confidence", self.score_card.self_confidence)
                 self.budget.consume(500 * max_rounds)
 
                 # If consensus produced a better answer, use it
@@ -1297,8 +1297,7 @@ class KernelCell:
                     content = consensus["final_answer"]
 
             except Exception as e:
-                logger.warning(f"Consensus failed, using self-review: {e}")
-                self.score_card = await self._self_review(content, task_text)
+                logger.warning(f"Consensus failed, sticking with self-review scores: {e}")
 
         # Check quality gate
         if not gate.passes(self.score_card):

@@ -27,8 +27,7 @@ fallback: |
   Note: Full generation requires LLM integration.
 
 revision_header: |
-  
-    REVISION REQUESTED
+  REVISION REQUESTED
   The Critic identified issues with your previous answer. Address these points:
 
   {feedback}

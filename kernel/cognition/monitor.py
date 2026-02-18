@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from kernel.cognition.base import BasePhase, CycleContext
 from shared.prompts import get_agent_prompt
@@ -29,6 +29,18 @@ class MonitorResult(BaseModel):
     gaps: list[str] = Field(default_factory=list)
     reasoning: str = Field(default="")
     curiosity_questions: list[str] = Field(default_factory=list)
+
+    @field_validator("gaps", "curiosity_questions", mode="before")
+    @classmethod
+    def parse_list_fields(cls, v: Any) -> list[str]:
+        """Handle LLM returning a single string instead of a list."""
+        if isinstance(v, str):
+            if "\n" in v:
+                return [line.strip("- *") for line in v.split("\n") if line.strip()]
+            return [v]
+        if isinstance(v, list):
+            return [str(item) for item in v]
+        return []
 
 
 class Monitor(BasePhase):

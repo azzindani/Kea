@@ -19,8 +19,8 @@ class DatasetLoader:
             # Disable caching to save disk space for large crawls
             self._datasets.disable_caching()
         except ImportError:
-            logger.error("datasets library not found. Install with `pip install datasets`")
-            raise
+            logger.warning("datasets library not found. Ingestion from Hugging Face Hub will be unavailable.")
+            self._datasets = None
 
     async def stream_dataset(
         self, 
@@ -47,6 +47,10 @@ class DatasetLoader:
                 "title": "entity",
                 "url": "source_url"
             }
+
+        if not self._datasets:
+            logger.error("Cannot stream dataset: datasets library not installed")
+            return
 
         logger.info(f"Streaming dataset {dataset_name} [{split}] (max: {max_rows})...")
         
