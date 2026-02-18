@@ -76,8 +76,10 @@ class ContextFusion:
         
         logger.info(
             "Awareness context fused",
-            temporal_anchor=t_ctx.anchor,
-            country=s_ctx.country_code
+            extra={
+                "temporal_anchor": t_ctx.anchor,
+                "country": s_ctx.country_code
+            }
         )
         return envelope
 

@@ -116,8 +116,10 @@ class SpatialDetector:
         
         logger.debug(
             "Spatial analysis complete", 
-            country=country, 
-            jurisdiction=context.jurisdiction
+            extra={
+                "country": country, 
+                "jurisdiction": context.jurisdiction
+            }
         )
         return context
 

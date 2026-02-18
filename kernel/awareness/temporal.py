@@ -123,8 +123,10 @@ class TemporalDetector:
         
         logger.debug(
             "Temporal analysis complete", 
-            anchor=anchor.value, 
-            market_open=is_market
+            extra={
+                "anchor": anchor.value, 
+                "market_open": is_market
+            }
         )
         return context
 
