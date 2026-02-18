@@ -14,6 +14,9 @@ from typing import Any
 from shared.logging import get_logger
 
 
+from kernel.logic.signal_bus import emit_signal, SignalType
+from shared.embedding.model_manager import get_embedding_provider
+
 logger = get_logger(__name__)
 
 
@@ -78,6 +81,34 @@ class QueryClassifier:
     # URL pattern for multimodal detection
     URL_PATTERN = r'https?://[^\s<>"{}|\\^`\[\]]+'
     
+    # Semantic Examples for Centroids (Phase 1: Hardcoded, Phase 2: Load from Vault)
+    SEMANTIC_EXAMPLES = {
+        QueryType.CASUAL: [
+            "Hello, how are you?", "Good morning", "Thanks for your help", "Hi there", "Bye",
+            "nice to meet you", "what's up", "cool", "ok thanks"
+        ],
+        QueryType.UTILITY: [
+            "Translate this to Spanish", "Summarize this text", "Fix the formatting", "What does this mean?", "Make it a bullet list",
+            "rewrite this", "convert to json", "explain this code", "tl;dr"
+        ],
+        QueryType.KNOWLEDGE: [
+            "Who is the CEO of Apple?", "What is the capital of France?", "When was Python created?", "How far is the moon?",
+            "definition of photosynthesis", "who won the 1994 world cup"
+        ],
+        QueryType.RESEARCH: [
+            "Compare the financials of Tesla and BYD", "Analyze the impact of AI on healthcare", "Find latest news on quantum computing", 
+            "Deep dive into battery technology trends", "investigate the market for evs", "report on recent cybersecurity threats"
+        ],
+        QueryType.UNSAFE: [
+            "How to hack a wifi", "Generate a virus", "Steal credit card numbers", "Bypass security", "Kill a process",
+            "make a bomb", "illegal drugs"
+        ],
+        QueryType.SYSTEM: [
+            "Clear my history", "Reset settings", "Configure the model", "System status", "Help me",
+            "show configuration", "change model"
+        ]
+    }
+
     def __init__(self):
         """Initialize classifier."""
         import re
@@ -96,9 +127,139 @@ class QueryClassifier:
         self.UNSAFE_PATTERNS = patterns.get("unsafe", [])
         self.SYSTEM_PATTERNS = patterns.get("system", [])
         
+        # Embedding provider (lazy loaded)
+        self._embedding_provider = None
+        self._centroids: dict[str, list[float]] = {}
+        
         logger.debug("QueryClassifier initialized with vocab patterns")
+
+    async def _get_provider(self):
+        """Get or initialize embedding provider."""
+        if self._embedding_provider is None:
+            self._embedding_provider = get_embedding_provider()
+        return self._embedding_provider
+
+    async def _ensure_centroids(self):
+        """Compute centroids for each query type if not already done."""
+        if self._centroids:
+            return
+
+        # Try to load from Vault first (Phase 7)
+        try:
+            from shared.knowledge.retriever import get_knowledge_retriever
+            retriever = get_knowledge_retriever()
+            
+            # Fetch all classifier examples
+            # We expect keys like "query_classifier_casual", "query_classifier_research", etc.
+            vault_items = await retriever.search_raw(
+                query="query_classifier", 
+                limit=20, 
+                domain="kernel", 
+                category="example"
+            )
+            
+            if vault_items:
+                logger.info(f"QueryClassifier: Loaded {len(vault_items)} example sets from Vault")
+                
+                # Map vault items to QueryType
+                # Key format: "query_classifier_{type}" (e.g. "query_classifier_casual")
+                for item in vault_items:
+                    meta = item.get("metadata", {})
+                    examples = meta.get("list", [])
+                    if not examples:
+                        continue
+                        
+                    # Extract type from tag or name
+                    tags = item.get("tags", [])
+                    q_type_str = ""
+                    for t in tags:
+                        if t.startswith("query_classifier_"):
+                            q_type_str = t.replace("query_classifier_", "")
+                            break
+                    
+                    if not q_type_str:
+                        continue
+                        
+                    # Find enum
+                    try:
+                        q_type = QueryType(q_type_str)
+                        # Override hardcoded examples
+                        self.SEMANTIC_EXAMPLES[q_type] = examples
+                    except ValueError:
+                        pass
+                        
+        except Exception as e:
+            logger.warning(f"Failed to load examples from Vault: {e}")
+
+        provider = await self._get_provider()
+        
+        for q_type, examples in self.SEMANTIC_EXAMPLES.items():
+            try:
+                # Embed all examples
+                embeddings = await provider.embed(examples)
+                if not embeddings:
+                    continue
+                
+                # Compute centroid (average vector)
+                dim = len(embeddings[0])
+                centroid = [0.0] * dim
+                for emb in embeddings:
+                    for i in range(dim):
+                        centroid[i] += emb[i]
+                
+                # Normalize centroid
+                count = len(embeddings)
+                if count > 0:
+                    magnitude = 0.0
+                    for i in range(dim):
+                        centroid[i] /= count
+                        magnitude += centroid[i] ** 2
+                    
+                    magnitude = magnitude ** 0.5
+                    if magnitude > 0:
+                        for i in range(dim):
+                            centroid[i] /= magnitude
+                            
+                self._centroids[q_type.value] = centroid
+                
+            except Exception as e:
+                logger.warning(f"Failed to compute centroid for {q_type}: {e}")
+        
+        logger.info(f"Computed intent centroids for {len(self._centroids)} types")
+
+    def _create_result(
+        self, 
+        q_type: QueryType, 
+        confidence: float, 
+        bypass: bool, 
+        patterns: list[str], 
+        metadata: dict = None,
+        extracted_urls: list[str] = None
+    ) -> ClassificationResult:
+        """Helper to create result and emit signal."""
+        # Emit Signal
+        try:
+            emit_signal(
+                SignalType.CLASSIFICATION,
+                "QueryClassifier",
+                q_type.value,
+                confidence,
+                patterns=patterns,
+                metadata=metadata or {}
+            )
+        except Exception as e:
+            logger.warning(f"Failed to emit classification signal: {e}")
+
+        return ClassificationResult(
+            query_type=q_type,
+            confidence=confidence,
+            bypass_graph=bypass,
+            detected_patterns=patterns,
+            extracted_urls=extracted_urls or [],
+            metadata=metadata or {}
+        )
     
-    def classify(
+    async def classify(
         self, 
         query: str, 
         attachments: list[Any] = None,
@@ -106,6 +267,8 @@ class QueryClassifier:
     ) -> ClassificationResult:
         """
         Classify a user query.
+        
+        v2.0: Uses Embedding-based Neural Classification with Heuristic Fallback.
         
         Args:
             query: User's input text
@@ -120,103 +283,148 @@ class QueryClassifier:
         
         # Check for attachments   multimodal
         if attachments:
-            return ClassificationResult(
-                query_type=QueryType.MULTIMODAL,
-                confidence=1.0,
-                bypass_graph=False,
-                detected_patterns=["has_attachments"],
-                metadata={"attachment_count": len(attachments)},
+            return self._create_result(
+                QueryType.MULTIMODAL, 
+                1.0, 
+                False, 
+                ["has_attachments"], 
+                metadata={"attachment_count": len(attachments)}
             )
         
         # Check for URLs   multimodal
         urls = self._extract_urls(query)
         if urls:
-            return ClassificationResult(
-                query_type=QueryType.MULTIMODAL,
-                confidence=0.9,
-                bypass_graph=False,
-                detected_patterns=["contains_urls"],
-                extracted_urls=urls,
+            return self._create_result(
+                QueryType.MULTIMODAL,
+                0.9,
+                False,
+                ["contains_urls"],
                 metadata={"url_count": len(urls)},
+                extracted_urls=urls
             )
+        
+        # --------------------------------------------------------------------
+        # Step 1: Neural Classification (Primary)
+        # --------------------------------------------------------------------
+        try:
+            provider = await self._get_provider()
+            await self._ensure_centroids()
+            
+            # Embed query
+            query_emb = await provider.embed_query(query_lower)
+            
+            # Find best match
+            best_score = -1.0
+            best_type = None
+            scores = {}
+            
+            for type_val, centroid in self._centroids.items():
+                score = self._cosine_similarity(query_emb, centroid)
+                scores[type_val] = score
+                if score > best_score:
+                    best_score = score
+                    best_type = type_val
+            
+            # Calibrate confidence (Platt scaling approximation)
+            confidence = self._calibrate_confidence(best_score)
+            
+            # Threshold for accepting neural result (0.6 is a conservative start)
+            if best_score > 0.6 and best_type:
+                q_type = QueryType(best_type)
+                
+                # Heuristic Override: If "unsafe" pattern matches, ALWAYS trigger unsafe
+                if self._matches_patterns(query_lower, self.UNSAFE_PATTERNS):
+                    return self._create_result(
+                        QueryType.UNSAFE,
+                        0.99,
+                        True,
+                        ["unsafe_override"],
+                        metadata={"neural_score": best_score}
+                    )
+                
+                # Determine bypass
+                bypass = q_type in [QueryType.CASUAL, QueryType.UTILITY, QueryType.UNSAFE, QueryType.SYSTEM]
+                if q_type == QueryType.KNOWLEDGE:
+                    bypass = True # Simple knowledge usually bypasses graph
+                
+                detected.append("neural_match")
+                
+                return self._create_result(
+                    q_type,
+                    confidence,
+                    bypass,
+                    detected,
+                    metadata={"neural_scores": scores, "top_score": best_score}
+                )
+                
+        except Exception as e:
+            logger.warning(f"Neural classification failed: {e}. Falling back to heuristics.")
+
+        # --------------------------------------------------------------------
+        # Step 2: Heuristic Fallback (Legacy)
+        # --------------------------------------------------------------------
         
         # Check unsafe first (highest priority)
         if self._matches_patterns(query_lower, self.UNSAFE_PATTERNS):
             detected.append("unsafe_content")
-            return ClassificationResult(
-                query_type=QueryType.UNSAFE,
-                confidence=0.95,
-                bypass_graph=True,
-                detected_patterns=detected,
-            )
+            return self._create_result(QueryType.UNSAFE, 0.95, True, detected)
         
         # Check casual (high priority for UX)
         if self._is_casual(query_lower):
             detected.append("casual_conversation")
-            return ClassificationResult(
-                query_type=QueryType.CASUAL,
-                confidence=0.9,
-                bypass_graph=True,
-                detected_patterns=detected,
-            )
+            return self._create_result(QueryType.CASUAL, 0.9, True, detected)
         
         # Check system commands
         if self._matches_patterns(query_lower, self.SYSTEM_PATTERNS):
             detected.append("system_command")
-            return ClassificationResult(
-                query_type=QueryType.SYSTEM,
-                confidence=0.85,
-                bypass_graph=True,
-                detected_patterns=detected,
-            )
+            return self._create_result(QueryType.SYSTEM, 0.85, True, detected)
         
         # Check utility (translation, summarization, etc.)
         if self._matches_patterns(query_lower, self.UTILITY_PATTERNS):
             detected.append("utility_request")
-            return ClassificationResult(
-                query_type=QueryType.UTILITY,
-                confidence=0.85,
-                bypass_graph=True,
-                detected_patterns=detected,
-            )
+            return self._create_result(QueryType.UTILITY, 0.85, True, detected)
         
         # Check research (explicit research intent)
         if self._matches_patterns(query_lower, self.RESEARCH_PATTERNS):
             detected.append("research_request")
-            return ClassificationResult(
-                query_type=QueryType.RESEARCH,
-                confidence=0.9,
-                bypass_graph=False,
-                detected_patterns=detected,
-            )
+            return self._create_result(QueryType.RESEARCH, 0.9, False, detected)
         
         # Check simple knowledge
         if self._matches_patterns(query_lower, self.KNOWLEDGE_PATTERNS):
             detected.append("knowledge_question")
-            return ClassificationResult(
-                query_type=QueryType.KNOWLEDGE,
-                confidence=0.8,
-                bypass_graph=True,  # Simple Q&A doesn't need graph
-                detected_patterns=detected,
-            )
+            return self._create_result(QueryType.KNOWLEDGE, 0.8, True, detected)
         
         # Default: if query is short, likely casual/knowledge
         # If long or complex, likely research
         if len(query.split()) <= 5:
-            return ClassificationResult(
-                query_type=QueryType.KNOWLEDGE,
-                confidence=0.6,
-                bypass_graph=True,
-                detected_patterns=["short_query"],
-            )
+            return self._create_result(QueryType.KNOWLEDGE, 0.6, True, ["short_query"])
         
         # Default to research for longer queries
-        return ClassificationResult(
-            query_type=QueryType.RESEARCH,
-            confidence=0.5,
-            bypass_graph=False,
-            detected_patterns=["default_research"],
-        )
+        return self._create_result(QueryType.RESEARCH, 0.5, False, ["default_research"])
+    
+    def _cosine_similarity(self, vec1: list[float], vec2: list[float]) -> float:
+        """Compute cosine similarity between two normalized vectors."""
+        dot = sum(a * b for a, b in zip(vec1, vec2))
+        return dot # Assumes normalized vectors
+        
+    def _calibrate_confidence(self, score: float) -> float:
+        """
+        Calibrate raw cosine score to probability (Platt scaling approximation).
+        
+        Sigmoid-like curve:
+        0.5 -> 0.3
+        0.6 -> 0.5
+        0.7 -> 0.8
+        0.8 -> 0.95
+        """
+        # Simple polynomial approximation for now until we have data
+        if score < 0.5:
+            return 0.3
+        if score > 0.9:
+            return 0.99
+        
+        # Linear interp between 0.5 (0.3) and 0.9 (0.99)
+        return 0.3 + (score - 0.5) * (0.69 / 0.4)
     
     def _extract_urls(self, text: str) -> list[str]:
         """Extract URLs from text."""
@@ -377,7 +585,7 @@ async def classify_and_handle(
         (classification, response) - response is None if needs graph processing
     """
     classifier = get_classifier()
-    result = classifier.classify(query, attachments, context)
+    result = await classifier.classify(query, attachments, context)
     
     if result.bypass_graph and result.query_type in [
         QueryType.CASUAL, 

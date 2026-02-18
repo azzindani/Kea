@@ -10,6 +10,8 @@ from shared.llm import LLMConfig, OpenRouterProvider
 from shared.llm.provider import LLMMessage, LLMRole
 from shared.logging import get_logger
 from shared.prompts import get_agent_prompt
+from shared.embedding.model_manager import get_embedding_provider
+from kernel.logic.signal_bus import emit_signal, SignalType
 
 logger = get_logger(__name__)
 
@@ -25,7 +27,44 @@ class CriticAgent:
     def __init__(self):
         self.name = "Critic"
         self.role = "The Pessimist"
+        self.name = "Critic"
+        self.role = "The Pessimist"
         self.system_prompt = get_agent_prompt("critic")
+        self._embedding_provider = None
+
+    async def _get_provider(self):
+        if self._embedding_provider is None:
+            self._embedding_provider = get_embedding_provider()
+        return self._embedding_provider
+
+    async def _measure_alignment(self, answer: str, facts: list[dict]) -> float:
+        """Measure semantic alignment between answer and facts."""
+        try:
+            if not facts:
+                return 0.5
+            
+            provider = await self._get_provider()
+            
+            # Embed answer
+            answer_emb = await provider.embed_query(answer[:1000]) # Truncate for speed
+            
+            # Embed facts (batch)
+            fact_texts = [f.get("text", "")[:500] for f in facts[:10]] # Top 10 facts
+            if not fact_texts:
+                return 0.5
+                
+            fact_embs = await provider.embed(fact_texts)
+            
+            # Find max alignment (support)
+            max_sim = 0.0
+            for f_emb in fact_embs:
+                dot = sum(a * b for a, b in zip(answer_emb, f_emb))
+                max_sim = max(max_sim, dot)
+                
+            return max_sim
+        except Exception as e:
+            logger.warning(f"Critic alignment check failed: {e}")
+            return 0.0
 
     async def _get_knowledge_context(self, query: str) -> str:
         """Retrieve domain-specific rules and knowledge for critique."""
@@ -101,6 +140,21 @@ class CriticAgent:
             ]
 
             response = await provider.complete(messages, config)
+
+            # Measure fact alignment (HALLUCINATION CHECK)
+            alignment_score = await self._measure_alignment(answer, facts)
+            logger.info(f"Critic: Fact alignment score = {alignment_score:.2f}")
+
+            # Emit Adversarial Signal
+            emit_signal(
+                SignalType.ADVERSARIAL,
+                "CriticAgent",
+                "CRITIQUE_GENERATED",
+                confidence=0.9, # Confidence in the critique itself
+                alignment_score=alignment_score,
+                critique_length=len(response.content),
+                has_citations="source" in response.content.lower()
+            )
 
             logger.info(f"Critic: Critique complete ({len(response.content)} chars):\n{response.content[:2000]}")
             return response.content

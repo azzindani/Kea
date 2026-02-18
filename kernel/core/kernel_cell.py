@@ -528,7 +528,7 @@ class KernelCell:
             return ProcessingMode.SOLO
 
         #   Fast path: use existing heuristic classifier (FREE)  
-        heuristic = classify_complexity(task_text)
+        heuristic = await classify_complexity(task_text)
         tier_name = heuristic.tier.value  # trivial | low | medium | high | extreme
 
         # Load the tier mode mapping from config (cached)

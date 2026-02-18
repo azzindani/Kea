@@ -147,6 +147,40 @@ class KnowledgeRetriever:
             logger.warning(f"KnowledgeRetriever: Search failed ({e})")
             return ""
 
+    async def search_raw(
+        self,
+        query: str,
+        limit: int = 5,
+        domain: str | None = None,
+        category: str | None = None,
+        tags: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Retrieve raw knowledge items without formatting.
+        
+        Useful for programmatic usage (e.g., loading examples for classifiers).
+        """
+        payload: dict[str, Any] = {"query": query, "limit": limit}
+        if domain:
+            payload["domain"] = domain
+        if category:
+            payload["category"] = category
+        if tags:
+            payload["tags"] = tags
+            
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(
+                    f"{self._rag_url()}/knowledge/search",
+                    json=payload,
+                )
+                if resp.status_code == 200:
+                    return resp.json()
+                return []
+        except Exception as e:
+            logger.warning(f"KnowledgeRetriever: Raw search failed ({e})")
+            return []
+
     async def retrieve_skills(
         self,
         query: str,

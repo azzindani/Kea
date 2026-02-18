@@ -155,7 +155,7 @@ class ConversationResearchPipeline:
         bypass_research = False
 
         if self._classifier:
-            classification = self._classifier.classify(content)
+            classification = await self._classifier.classify(content)
             # Handle both enum and string query_type
             qt = classification.query_type
             query_type = qt.value if hasattr(qt, "value") else str(qt)

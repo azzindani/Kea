@@ -672,7 +672,7 @@ async def planner_node(state: dict[str, Any]) -> dict[str, Any]:
     try:
         from kernel.logic.complexity import classify_complexity
 
-        complexity = classify_complexity(query)
+        complexity = await classify_complexity(query)
         state["complexity"] = {
             "tier": complexity.tier.value,
             "entity_count": complexity.entity_count,

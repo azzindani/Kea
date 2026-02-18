@@ -281,6 +281,31 @@ def _scan_yaml_knowledge_dir(
                     }
                 )
 
+        # ── Examples (v2.0) ──────────────────────────────────────────────────
+        if not category_filter or category_filter == "example":
+            for ex_key, ex_list in (data.get("examples") or {}).items():
+                if not isinstance(ex_list, list):
+                    continue
+                    
+                desc = ex_key.replace("_", " ").title()
+                content = "\n".join(ex_list)
+                
+                items.append(
+                    {
+                        "knowledge_id": f"domain_config/{domain}/examples/{ex_key}",
+                        "name": f"Examples: {desc}",
+                        "description": f"Semantic examples for {desc}",
+                        "domain": domain,
+                        "category": "example",
+                        "tags": [domain, "example", ex_key],
+                        "content": content,
+                        "metadata": {
+                            "source_file": str(yaml_file.name),
+                            "list": ex_list  # Store raw list for programmatic loading
+                        },
+                    }
+                )
+
     return items
 
 

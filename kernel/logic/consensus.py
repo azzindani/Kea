@@ -11,6 +11,7 @@ from shared.logging import get_logger
 from kernel.agents.generator import GeneratorAgent
 from kernel.agents.critic import CriticAgent
 from kernel.agents.judge import JudgeAgent
+from kernel.logic.signal_bus import emit_signal, SignalType
 
 logger = get_logger(__name__)
 
@@ -88,13 +89,33 @@ class ConsensusEngine:
             # Adaptive threshold: degrade by 0.05 per round (0.95   0.90   0.85...)
             adaptive_threshold = max(0.95 - (round_num * 0.05), 0.60)
             
+            # DELTA CHECK: How much did confidence change?
+            last_conf = history[-2]["confidence"] if len(history) > 1 else 0.0
+            delta = abs(judgment["confidence"] - last_conf)
+            
+            # Emit Signal
+            emit_signal(
+                SignalType.CONVERGENCE,
+                "ConsensusEngine",
+                judgment["verdict"].upper(),
+                judgment["confidence"],
+                round=round_num + 1,
+                delta=delta,
+                threshold=adaptive_threshold
+            )
+            
             # Check if we can stop early with adaptive threshold
             if judgment["verdict"] == "Accept" and judgment["confidence"] >= adaptive_threshold:
                 logger.info(f"Consensus: Accepted (conf {judgment['confidence']:.2f} >= threshold {adaptive_threshold:.2f}) in round {round_num + 1}")
                 break
             
-            if judgment["verdict"] == "Reject" and round_num >= 1:
-                logger.info("Consensus: Rejected but continuing with best effort")
+            # Allow early exit if confidence is plateauing high (diminishing returns)
+            if round_num >= 2 and delta < 0.02 and judgment["confidence"] > 0.8:
+                logger.info(f"Consensus: Convergence plateau (delta {delta:.3f} < 0.02) at high confidence. Stopping.")
+                break
+            
+            if judgment["verdict"] == "Reject" and round_num >= 4: # Increased max strict rounds
+                logger.info("Consensus: Max strict rounds reached. Continuing with best effort.")
                 break
         
         # Final result

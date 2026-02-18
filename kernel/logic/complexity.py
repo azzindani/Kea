@@ -17,6 +17,8 @@ from functools import cache
 
 from shared.logging import get_logger
 from shared.prompts import get_complexity_config
+from shared.embedding.model_manager import get_embedding_provider
+from kernel.logic.signal_bus import emit_signal, SignalType
 
 logger = get_logger(__name__)
 
@@ -35,6 +37,24 @@ class ComplexityTier(str, Enum):
     HIGH = "high"          # Multi-entity, multi-source, deep analysis
     EXTREME = "extreme"    # Portfolio-scale, cross-domain, recursive
 
+# Centroids for embedding-based complexity
+COMPLEXITY_EXAMPLES = {
+    ComplexityTier.TRIVIAL: [
+        "What is the capital of France?",
+        "Who is the CEO of Apple?", 
+        "Convert 100 USD to EUR",
+        "Define quantum mechanics",
+        "When was Python released?"
+    ],
+    ComplexityTier.EXTREME: [
+        "Conduct a comprehensive due diligence on Tesla including financial modeling, competitive landscape, and regulatory risks",
+        "Build a cross-domain analysis of AI impact on healthcare, finance, and logistics over the next decade",
+        "Develop a multi-agent system architecture for autonomous trading with backtesting and risk management",
+        "Perform a global macroeconomic analysis of emerging markets vs developed economies with sector-specific deep dives",
+        "Synthesize a meta-analysis of all cancer research papers from 2023-2024 focusing on immunotherapy breakthroughs"
+    ]
+}
+
 
 @dataclass
 class ComplexityScore:
@@ -44,6 +64,7 @@ class ComplexityScore:
     depth_score: float = 0.2    # How deep the analysis needs to go
     breadth_score: float = 0.2  # How many data sources / domains
     computation_score: float = 0.1  # How much computation is needed
+    embedding_score: float = 0.0 # Semantic complexity (v2.0)
 
     # Derived tier
     tier: ComplexityTier = ComplexityTier.LOW
@@ -59,8 +80,14 @@ class ComplexityScore:
     def composite(self) -> float:
         """Composite score from 0.0 to 1.0."""
         entity_factor = min(1.0, self.entity_count / 10)
-        return (entity_factor + self.depth_score + self.breadth_score +
-                self.computation_score) / 4.0
+        
+        # Weighted blend (embedding score gets 30% weight if present)
+        heuristic_score = (entity_factor + self.depth_score + self.breadth_score + self.computation_score) / 4.0
+        
+        if self.embedding_score > 0:
+            return (heuristic_score * 0.7) + (self.embedding_score * 0.3)
+            
+        return heuristic_score
 
 
 # ============================================================================
@@ -112,7 +139,88 @@ COMPUTATION_PATTERNS = [
 ]
 
 
-def classify_complexity(
+# Embedding State (Module Level)
+_embedding_provider = None
+_complexity_centroids = {}
+
+async def _get_provider():
+    global _embedding_provider
+    if _embedding_provider is None:
+        _embedding_provider = get_embedding_provider()
+    return _embedding_provider
+
+async def _ensure_centroids():
+    global _complexity_centroids
+    if _complexity_centroids:
+        return
+
+    # Phase 7: Load from Vault
+    global COMPLEXITY_EXAMPLES
+    try:
+        from shared.knowledge.retriever import get_knowledge_retriever
+        retriever = get_knowledge_retriever()
+        
+        vault_items = await retriever.search_raw(
+            query="complexity",
+            limit=5, 
+            domain="kernel", 
+            category="example"
+        )
+        
+        if vault_items:
+            # Look for complexity_trivial and complexity_extreme
+            for item in vault_items:
+                meta = item.get("metadata", {})
+                examples = meta.get("list", [])
+                tags = item.get("tags", [])
+                
+                if not examples:
+                    continue
+                    
+                if "complexity_trivial" in tags:
+                    COMPLEXITY_EXAMPLES[ComplexityTier.TRIVIAL] = examples
+                elif "complexity_extreme" in tags:
+                    COMPLEXITY_EXAMPLES[ComplexityTier.EXTREME] = examples
+                    
+            logger.info("Complexity: Loaded semantic examples from Vault")
+
+    except Exception as e:
+        logger.warning(f"Failed to load complexity examples from Vault: {e}")
+
+    try:
+        provider = await _get_provider()
+        for tier, examples in COMPLEXITY_EXAMPLES.items():
+            embeddings = await provider.embed(examples)
+            if not embeddings:
+                continue
+                
+            # Compute centroid
+            dim = len(embeddings[0])
+            centroid = [0.0] * dim
+            for emb in embeddings:
+                for i in range(dim):
+                    centroid[i] += emb[i]
+            
+            # Normalize
+            count = len(embeddings)
+            magnitude = 0.0
+            for i in range(dim):
+                centroid[i] /= count
+                magnitude += centroid[i] ** 2
+            
+            magnitude = magnitude ** 0.5
+            if magnitude > 0:
+                for i in range(dim):
+                    centroid[i] /= magnitude
+                    
+            _complexity_centroids[tier] = centroid
+            
+        logger.debug("Computed complexity centroids")
+    except Exception as e:
+        logger.warning(f"Failed to compute complexity centroids: {e}")
+
+
+async def classify_complexity(
     query: str,
     available_tools: list[str] | None = None,
 ) -> ComplexityScore:
@@ -139,6 +247,36 @@ def classify_complexity(
     # 1. Entity Count
     # ================================================================
     score.entity_count = _count_entities(query)
+
+    # ================================================================
+    # 1.5. Embedding Score (v2.0)
+    # ================================================================
+    try:
+        await _ensure_centroids()
+        provider = await _get_provider()
+        query_emb = await provider.embed_query(query)
+        
+        # Distance to poles
+        trivial_score = 0.0
+        extreme_score = 0.0
+        
+        if ComplexityTier.TRIVIAL in _complexity_centroids:
+            trivial_sim = _cosine_similarity(query_emb, _complexity_centroids[ComplexityTier.TRIVIAL])
+            trivial_score = max(0.0, trivial_sim)
+            
+        if ComplexityTier.EXTREME in _complexity_centroids:
+            extreme_sim = _cosine_similarity(query_emb, _complexity_centroids[ComplexityTier.EXTREME])
+            extreme_score = max(0.0, extreme_sim)
+        
+        # Embedding Score: 0 (matches trivial) -> 1 (matches extreme)
+        # Shift range: Trivial (~0.8 sim) -> 0.0, Extreme (~0.8 sim) -> 1.0
+        # Simple projection
+        score.embedding_score = extreme_score - (trivial_score * 0.5) 
+        score.embedding_score = max(0.0, min(1.0, score.embedding_score + 0.2)) # Bias slightly up
+        
+    except Exception as e:
+        logger.debug(f"Embedding complexity scoring failed: {e}")
+        score.embedding_score = 0.0
 
     # ================================================================
     # 2. Depth Score
@@ -183,6 +321,25 @@ def classify_complexity(
         f"  max_subtasks={score.max_subtasks} max_phases={score.max_phases} "
         f"max_depth={score.max_depth}"
     )
+
+    # Emit Signal
+    try:
+        emit_signal(
+            SignalType.COMPLEXITY,
+            "ComplexityClassifier",
+            score.tier.value,
+            composite,
+            entity_count=score.entity_count,
+            embedding_score=score.embedding_score,
+            limits={
+                "subtasks": score.max_subtasks,
+                "phases": score.max_phases,
+                "depth": score.max_depth,
+                "parallel": score.max_parallel
+            }
+        )
+    except Exception as e:
+        logger.warning(f"Failed to emit complexity signal: {e}")
 
     return score
 
@@ -251,6 +408,11 @@ def _score_patterns(query: str, patterns: list[tuple[str, float]]) -> float:
     # Blend: mostly the max match, but slightly boosted by having multiple matches
     blended = max_score * 0.7 + min(1.0, total_score / len(patterns)) * 0.3
     return min(1.0, blended)
+
+
+def _cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
+    """Compute cosine similarity."""
+    return sum(a * b for a, b in zip(vec1, vec2))
 
 
 def _set_dynamic_limits(score: ComplexityScore) -> None:
