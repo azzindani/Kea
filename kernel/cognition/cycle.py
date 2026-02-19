@@ -118,10 +118,12 @@ class CognitiveCycle:
         # 1. PERCEIVE
         perceiver = Perceiver(self.context)
         perception = await perceiver.run()
+        logger.info(f"Phase 1: PERCEIVE complete. Intent: {perception.intent_path}")
         
         # 2. FRAME
         framer = Framer(self.context)
         framing = await framer.run(perception)
+        logger.info(f"Phase 2: FRAME complete. Assumptions: {len(framing.assumptions)}")
 
         # ── Epistemic Feedback Loop (Phase 4) ──
         # Framer identified knowledge gaps → update the epistemic state so
@@ -135,9 +137,11 @@ class CognitiveCycle:
         # 3. PLAN
         planner = Planner(self.context)
         plan = await planner.run(perception, framing)
+        logger.info(f"Phase 3: PLAN complete. Steps: {len(plan.steps)}")
         
         # Check for delegation/clarification
         if getattr(plan, "needs_delegation", False):
+            logger.info("Cycle interrupt: Delegation requested")
             return CycleOutput(
                 needs_delegation=True,
                 perception=perception,
@@ -149,6 +153,7 @@ class CognitiveCycle:
 
         if getattr(plan, "needs_clarification", False):
              # Simplified: just return request
+             logger.info("Cycle interrupt: Clarification requested")
              return CycleOutput(
                 needs_clarification=True,
                 clarification_questions=getattr(plan, "clarification_questions", []),
@@ -162,10 +167,12 @@ class CognitiveCycle:
         # 4. EXECUTE
         executor = Executor(self.context)
         exec_result = await executor.run(plan)
+        logger.info(f"Phase 4: EXECUTE complete. Tools called: {self.context.tool_call_count}")
         
         # 5. MONITOR
         monitor = Monitor(self.context)
         monitor_result = await monitor.run()
+        logger.info(f"Phase 5: MONITOR complete. Confidence: {monitor_result.confidence:.2f}, Decision: {monitor_result.decision}")
         
         # 6. ADAPT (Loop logic simplified for V2 Refactor)
         if monitor_result.decision == "replan":
@@ -185,6 +192,7 @@ class CognitiveCycle:
         # 7. PACKAGE
         packager = Packager(self.context)
         package = await packager.run(perception, framing)
+        logger.info(f"Phase 7: PACKAGE complete.")
         
         # Construct Output
         return CycleOutput(

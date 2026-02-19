@@ -24,7 +24,7 @@ class MonitorResult(BaseModel):
     on_track: bool = Field(default=True)
     drift_detected: bool = Field(default=False)
     drift_description: str = Field(default="")
-    confidence: float = Field(default=0.0)
+    confidence: float = Field(default=0.5)
     decision: str = Field(description="continue | replan | synthesize")
     gaps: list[str] = Field(default_factory=list)
     reasoning: str = Field(default="")
@@ -80,6 +80,7 @@ class Monitor(BasePhase):
             result = MonitorResult(
                 on_track=True,
                 decision="continue",
+                confidence=0.7,  # Fallback: assume reasonably confident if we can't parse failure
                 reasoning="Parsing failed, assuming safe to continue."
             )
             
