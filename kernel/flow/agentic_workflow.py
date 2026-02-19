@@ -583,7 +583,7 @@ async def run_agentic_workflow(
             "Analyze TSLA financials",
             tool_executor=execute_tool
         )
-        print(result.final_answer)
+        logger.info(result.final_answer)
     """
     workflow = AgenticWorkflow(tool_executor, **kwargs)
     return await workflow.run(query)

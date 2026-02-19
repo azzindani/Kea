@@ -24,11 +24,17 @@ from pydantic import BaseModel, Field
 
 from kernel.flow.graph import GraphState, compile_research_graph
 from shared.config import get_settings
-from shared.logging import get_logger
+from shared.logging import get_logger, setup_logging, LogConfig
 from shared.logging.middleware import RequestLoggingMiddleware
 from shared.prompts import get_agent_prompt, get_kernel_config
 from shared.schemas import ResearchStatus
 from shared.service_registry import ServiceName, ServiceRegistry
+
+# Initialize structured logging globally
+setup_logging(LogConfig(
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    service_name="orchestrator",
+))
 
 logger = get_logger(__name__)
 

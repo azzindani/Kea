@@ -2328,7 +2328,7 @@ async def run_kernel(
             tool_executor=mcp_host.call_tool,
             budget=50000,
         )
-        print(result.stdout.content)
+        logger.info(result.stdout.content)
     """
     # Reset communication network for this session
     reset_message_bus()

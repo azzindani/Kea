@@ -27,7 +27,14 @@ from services.vault.core.audit_trail import AuditEventType, get_audit_trail
 from services.vault.core.checkpointing import get_checkpoint_store
 from services.vault.core.postgres_store import PostgresVectorStore
 from services.vault.core.vector_store import Document
-from shared.logging import get_logger
+from shared.logging import get_logger, setup_logging, LogConfig
+import os
+
+# Initialize structured logging globally
+setup_logging(LogConfig(
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    service_name="vault",
+))
 
 logger = get_logger(__name__)
 

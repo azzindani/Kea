@@ -1436,8 +1436,8 @@ async def run_agentic_research(
 
     Example:
         result = await run_agentic_research("Analyze TSLA financials")
-        print(result["final_answer"])
-        print(f"Completed in {len(result['reasoning_steps'])} steps")
+        logger.info(result["final_answer"])
+        logger.info(f"Completed in {len(result['reasoning_steps'])} steps")
     """
     from kernel.interfaces.tool_registry import get_tool_registry
     from kernel.flow.agentic_workflow import AgenticWorkflow

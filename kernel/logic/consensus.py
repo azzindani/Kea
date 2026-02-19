@@ -72,7 +72,12 @@ class ConsensusEngine:
             current_answer = generator_output
             
             # Critic phase
-            critic_feedback = await self.critic.critique(generator_output, facts, sources)
+            critic_feedback = await self.critic.critique(
+                answer=generator_output, 
+                facts=facts, 
+                sources=sources, 
+                query=query
+            )
             
             # Judge phase
             judgment = await self.judge.judge(query, generator_output, critic_feedback, facts=facts)

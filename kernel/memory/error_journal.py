@@ -18,6 +18,7 @@ Version: 0.4.0   Part of Kernel Recursion (Phase 1)
 from __future__ import annotations
 
 import uuid
+from pydantic import BaseModel, Field
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
@@ -152,7 +153,7 @@ class ErrorJournal:
 
         # Check convergence
         if journal.is_converged():
-            print("All errors resolved!")
+            logger.info("All errors resolved!")
     """
 
     def __init__(self) -> None:

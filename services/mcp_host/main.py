@@ -6,13 +6,14 @@ import fastapi
 import uvicorn
 from contextlib import asynccontextmanager
 
-from shared.logging import get_logger
-from services.mcp_host.core.models import (
-    ToolRequest,
-    BatchToolRequest,
-    ToolResponse,
-    ToolSearchRequest,
-)
+from shared.logging import get_logger, setup_logging, LogConfig
+import os
+
+# Initialize structured logging globally
+setup_logging(LogConfig(
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    service_name="mcp_host",
+))
 
 logger = get_logger(__name__)
 

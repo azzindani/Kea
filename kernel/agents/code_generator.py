@@ -342,18 +342,18 @@ def generate_fallback_code(task_description: str, facts: list[dict] | None = Non
 import pandas as pd
 
 # Check if we have data inputs
-print("Analyzing request: {desc[:50]}...")
+logger.info(f"Analyzing request: {desc[:50]}...")
 
 try:
     import yfinance as yf
-    print("Environment has yfinance. Attempting to fetch relevant data if needed.")
+    logger.info("Environment has yfinance. Attempting to fetch relevant data if needed.")
     
     # Simple heuristic to fetch data if tickers are mentioned in description
     import re
     tickers = re.findall(r'[A-Z]{{4}}(?:\.[A-Z]{{2}})?', "{desc}")
     
     if tickers:
-        print(f"Detected tickers: {{tickers}}")
+        logger.info(f"Detected tickers: {tickers}")
         data = []
         for t in tickers:
             try:
@@ -378,16 +378,16 @@ try:
                 
         if data:
             df = pd.DataFrame(data)
-            print("Fetched Live Data:")
-            print(df.to_markdown())
+            logger.info("Fetched Live Data:")
+            logger.info(f"\n{df.to_markdown()}")
         else:
-            print("Could not fetch live data for detected tickers.")
+            logger.warning("Could not fetch live data for detected tickers.")
     else:
-        print("No tickers detected in task description for auto-fetch.")
+        logger.info("No tickers detected in task description for auto-fetch.")
 
 except ImportError:
-    print("yfinance not available in this sandbox. Please use 'finance_server' tools to collect data first.")
+    logger.warning("yfinance not available in this sandbox. Please use 'finance_server' tools to collect data first.")
 
-print("\\nNOTE: To prevent hallucinations, specific data retrieval tools should be used.")
+logger.info("\nNOTE: To prevent hallucinations, specific data retrieval tools should be used.")
 '''
     return code

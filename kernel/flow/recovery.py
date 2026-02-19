@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import asyncio
 import random
-import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
@@ -120,7 +119,7 @@ def retry(
         async def fetch_data(url: str) -> dict:
             ...
         
-        @retry(max_attempts=5, on_error=lambda e, n: print(f"Retry {n}: {e}"))
+        @retry(max_attempts=5, on_error=lambda e, n: logger.warning(f"Retry {n}: {e}"))
         async def risky_operation():
             ...
     """
