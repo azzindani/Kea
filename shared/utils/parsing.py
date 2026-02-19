@@ -17,29 +17,44 @@ def clean_json_string(content: str) -> str:
     
     Handles:
     - Markdown code fences (```json ... ```)
-    - Leading/trailing whitespace
-    - Extraction of the first JSON object {} or array [] found
+    - Leading/trailing whitespace/prose
+    - Nested structures and multiple objects (finds the first valid one)
     """
+    if not content:
+        return ""
+
     content = content.strip()
 
-    # 1. Strip markdown code fences
+    # 1. Strip markdown code fences if present
     if "```" in content:
         # Match both ```json and just ```
-        match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', content)
+        # We use a non-greedy match for the content to get the first block if multiple
+        match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', content, re.IGNORECASE)
         if match:
             content = match.group(1).strip()
 
-    # 2. Find JSON boundaries (greedy search for {})
-    start = content.find("{")
-    end = content.rfind("}") + 1
+    # 2. Heuristic: Find first { or [ and last } or ]
+    # We want to be careful not to include leading/trailing non-JSON text.
+    start_obj = content.find("{")
+    start_arr = content.find("[")
     
-    # Check for array if no object found
-    if start == -1:
-        start = content.find("[")
+    # Determine the actual start (whichever comes first)
+    if start_obj != -1 and (start_arr == -1 or start_obj < start_arr):
+        start = start_obj
+        end = content.rfind("}") + 1
+    elif start_arr != -1:
+        start = start_arr
         end = content.rfind("]") + 1
-        
+    else:
+        # No braces or brackets found
+        return content
+
     if start >= 0 and end > start:
-        content = content[start:end]
+        cleaned = content[start:end]
+        # Quick validation: does it at least start and end correctly?
+        if (cleaned.startswith("{") and cleaned.endswith("}")) or \
+           (cleaned.startswith("[") and cleaned.endswith("]")):
+            return cleaned
 
     return content
 

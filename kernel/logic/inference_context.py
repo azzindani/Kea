@@ -112,6 +112,9 @@ class InferenceContext:
     # NEW: Episodic Memory (Phase 3)
     past_episodes: list[dict[str, Any]] = field(default_factory=list)
 
+    # INTERNAL: Cache for retrieved knowledge (v4.3 optimized)
+    _knowledge_cache: KnowledgeBundle | None = field(default=None, init=False, repr=False)
+
     @property
     def retrieval_query(self) -> str:
         """The query to use for knowledge retrieval."""
@@ -284,6 +287,11 @@ class KnowledgeEnhancedInference:
         context: InferenceContext,
     ) -> KnowledgeBundle:
         """Retrieve role-specific knowledge from the knowledge registry."""
+        # Use cached bundle if available (v4.3 Optimization)
+        # Prevents redundant RAG calls for every phase/node in a single cell.
+        if context._knowledge_cache is not None:
+            return context._knowledge_cache
+
         query = context.retrieval_query
         if not query:
             return KnowledgeBundle()
@@ -336,7 +344,10 @@ class KnowledgeEnhancedInference:
                     f"role={context.identity.role} domain={domain}"
                 )
 
+            # Store in cache
+            context._knowledge_cache = bundle
             return bundle
+
 
         except Exception as e:
             logger.warning(f"Knowledge retrieval failed: {e}")

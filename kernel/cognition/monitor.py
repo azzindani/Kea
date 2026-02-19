@@ -141,6 +141,24 @@ class Monitor(BasePhase):
             result.decision = "replan"
             result.reasoning = "Detected circular loop in tool execution."
             
+        # ── Synchronize with Working Memory (Phase 8) ──
+        # Ensure confidence and gaps are written back to memory so the 
+        # KernelCell's scorecard can reflect them.
+        try:
+            # Set overall confidence
+            self.context.memory.set_confidence("overall", result.confidence)
+            
+            # Store data gaps
+            for gap in result.gaps:
+                self.context.memory.ask(
+                    f"gap_{hash(gap) % 10000}",
+                    gap,
+                    target="tool",
+                    context="Identified during monitoring"
+                )
+        except Exception as e:
+            self.logger.warning(f"Failed to sync monitor results to memory: {e}")
+
         return result
 
     def _summarize_execution(self) -> str:
