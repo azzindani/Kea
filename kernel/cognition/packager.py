@@ -41,8 +41,8 @@ class Packager(BasePhase):
             f"Framing: {framing.restatement}\n"
             f"Facts Gathered:\n{facts_text}\n\n"
             f"Create a comprehensive WorkPackage JSON with: "
-            f"summary, detailed_content, sources, confidence_score (0.0-1.0), "
-            f"data_gaps, artifacts (if any)."
+            f"summary, overall_confidence (0.0-1.0), key_findings, "
+            f"recommendations, artifacts (if any), and metadata."
         )
 
         # Call LLM
@@ -60,7 +60,6 @@ class Packager(BasePhase):
             self.logger.warning(f"Packaging parsing failed: {e}")
             return WorkPackage(
                 summary="Packaging failed.",
-                detailed_content=self.context.task_text,
-                sources=[],
-                confidence_score=0.0
+                overall_confidence=0.0,
+                key_findings=["Failed to package results properly."],
             )

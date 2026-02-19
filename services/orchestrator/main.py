@@ -49,7 +49,7 @@ else:
     USE_KERNEL = vocab_settings.get("use_kernel_default", True)
 
 
-def _kernel_level_from_complexity(query: str, depth: int) -> str:
+async def _kernel_level_from_complexity(query: str, depth: int) -> str:
     """Determine starting kernel level from query complexity.
 
     Mapping is loaded from ``kernel.yaml`` ``kernel_cell.complexity_level_mapping``
@@ -58,7 +58,7 @@ def _kernel_level_from_complexity(query: str, depth: int) -> str:
     try:
         from kernel.logic.complexity import classify_complexity
 
-        score = classify_complexity(query)
+        score = await classify_complexity(query)
         tier = score.tier.value
 
         v_esc = orchestrator_vocab.get("escalation", {})
@@ -304,7 +304,7 @@ async def start_research(request: ResearchRequest):
             from kernel.actions.tool_bridge import create_tool_executor
 
             # Determine starting level and domain
-            level = _kernel_level_from_complexity(request.query, request.depth)
+            level = await _kernel_level_from_complexity(request.query, request.depth)
             domain = _domain_from_query(request.query)
 
             # Budget scales with depth
@@ -494,7 +494,7 @@ async def stream_research(query: str, depth: int = 2, max_sources: int = 10):
                 v_streaming = orchestrator_vocab.get("streaming", {}).get("phases", {})
                 yield f"data: {json.dumps({'event': 'phase', 'phase': v_streaming.get('kernel', 'kernel_processing')})}\n\n"
 
-                level = _kernel_level_from_complexity(query, depth)
+                level = await _kernel_level_from_complexity(query, depth)
                 domain = _domain_from_query(query)
                 base_budget = int(
                     get_kernel_config("kernel_cell.budget.default_max_tokens") or vocab_settings.get("base_budget", 30000)

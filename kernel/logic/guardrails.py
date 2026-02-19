@@ -103,12 +103,14 @@ def detect_circular_reasoning(history: list[dict]) -> bool:
     # Extract signatures (tool + args)
     signatures = []
     for item in last_3:
+        if not isinstance(item, dict):
+            continue
         # Handle different history formats
         tool = item.get("tool") or item.get("tool_name")
         args = item.get("args") or item.get("arguments") or item.get("inputs")
         signatures.append(f"{tool}:{str(args)}")
         
-    if len(set(signatures)) == 1:
+    if len(signatures) == 3 and len(set(signatures)) == 1:
         # All three are identical
         return True
         
