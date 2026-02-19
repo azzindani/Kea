@@ -23,7 +23,7 @@ class Packager(BasePhase):
     Packaging Phase: Creating the final deliverable.
     """
 
-    async def run(self, perception: Any, framing: Any) -> WorkPackage:
+    async def run(self, perception: Any, framing: Any, **kwargs) -> WorkPackage:
         """Execute packaging logic."""
         
         # System Prompt
@@ -54,8 +54,8 @@ class Packager(BasePhase):
             # But here we are simulating raw call + parse.
             # In real KEI, we'd pass response_model=WorkPackage.
             # Let's assume the wrapper handles it or we parse JSON.
-            result = WorkPackage.model_validate_json(response)
-            return result
+            from shared.utils.parsing import parse_llm_json
+            return parse_llm_json(response, WorkPackage)
         except Exception as e:
             self.logger.warning(f"Packaging parsing failed: {e}")
             return WorkPackage(

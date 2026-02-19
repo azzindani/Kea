@@ -64,7 +64,7 @@ class Planner(BasePhase):
     Planning Phase: Defining the execution path.
     """
 
-    async def run(self, perception: Any, framing: Any, feedback: str = "") -> PlanResult:
+    async def run(self, perception: Any, framing: Any, feedback: str = "", **kwargs) -> PlanResult:
         """Execute planning logic."""
         
         # System Prompt
@@ -95,7 +95,8 @@ class Planner(BasePhase):
         response = await self.context.llm_call(sys_prompt, user_prompt)
         
         try:
-            result = PlanResult.model_validate_json(response)
+            from shared.utils.parsing import parse_llm_json
+            result = parse_llm_json(response, PlanResult)
             
             # Simple validation: ensure steps have IDs
             for i, step in enumerate(result.steps):

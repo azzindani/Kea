@@ -23,6 +23,8 @@ graph TD
         S3[LLM & Embedding Connectors]
         S4[Logging & Tracing]
         S5[Messaging & Task Queues]
+        S6[Database & Persistence]
+        S7[Tenant & User Auth]
     end
 
     Services --> S1
@@ -30,6 +32,8 @@ graph TD
     Services --> S3
     Services --> S4
     Services --> S5
+    Services --> S6
+    Services --> S7
 ```
 
 ### Component Overview
@@ -42,7 +46,10 @@ graph TD
 | **MCP** | Model Context Protocol implementation and utilities. | `mcp/` |
 | **Messaging** | Intra-service Message Bus (Upward/Downward/Lateral). | `messaging.py` |
 | **Dispatcher** | Persistent PostgreSQL-backed task queue. | `dispatcher.py` |
+| **Database** | Asynchronous PostgreSQL connection pooling (`asyncpg`). | `database/` |
 | **Logging** | Structured JSON logging with trace correlation. | `logging/` |
+| **Tenants** | Multi-tenancy isolation and compliance context. | `tenants/` |
+| **Users** | Identity, RBAC, and API key management. | `users/` |
 
 ---
 
@@ -59,6 +66,9 @@ Centralized Pydantic models ensure that a `ResearchState` produced by the **Orch
 
 ### 3. Unified Discovery & Routing
 The `service_registry.py` and `environment.py` modules manage how services find each other. They support multiple environments (Local, Docker, K8s) and ensure that `SERVICE_URL_VAULT` is always pointing to the right instance without hardcoding.
+
+### 4. Enterprise-Grade Persistence (`database/`)
+A centralized connection pooling system based on `asyncpg`. It provides health monitoring, singleton-per-loop lifecycle management, and fail-safe startup logic.
 
 ---
 
@@ -82,5 +92,12 @@ Implementation of the Model Context Protocol. It includes schema inferrers and r
 ### `logging/`
 Advanced structured logging using `structlog`. It ensures that every log entry carries a `trace_id` so we can follow a single request across 7 different services.
 
+### `conversations/` & `sessions/`
+Manage the lifecycle of user interactions. `conversations/` handles message persistence and vector-indexed history, while `sessions/` manages ephemeral state and JWT/Cookie authentication.
+
+### `tenants/` & `users/`
+The security backbone. `tenants/` ensures strict data partitioning between organizations, while `users/` handles RBAC, profiles, and secure API keys.
+
 ---
 *The shared library ensures that Kea remains a single, cohesive organism rather than a collection of disjointed scripts.*
+

@@ -51,7 +51,7 @@ class Framer(BasePhase):
     Framing Phase: Setting boundaries and identifying gaps.
     """
 
-    async def run(self, perception: Any) -> FramingResult:
+    async def run(self, perception: Any, **kwargs) -> FramingResult:
         """Execute framing logic."""
         
         # Tool context
@@ -78,8 +78,8 @@ class Framer(BasePhase):
         response = await self.context.llm_call(sys_prompt, user_prompt)
         
         try:
-            result = FramingResult.model_validate_json(response)
-            return result
+            from shared.utils.parsing import parse_llm_json
+            return parse_llm_json(response, FramingResult)
         except Exception as e:
             self.logger.warning(f"Framing parsing failed: {e}")
             return FramingResult(

@@ -49,7 +49,7 @@ class Monitor(BasePhase):
     Enhanced with Curiosity Drive.
     """
 
-    async def run(self) -> MonitorResult:
+    async def run(self, **kwargs) -> MonitorResult:
         """Execute monitoring logic."""
         
         # System Prompt
@@ -73,7 +73,8 @@ class Monitor(BasePhase):
         
         result = None
         try:
-            result = MonitorResult.model_validate_json(response)
+            from shared.utils.parsing import parse_llm_json
+            result = parse_llm_json(response, MonitorResult)
         except Exception as e:
             self.logger.warning(f"Monitor parsing failed: {e}")
             result = MonitorResult(

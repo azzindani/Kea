@@ -14,7 +14,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
-from kernel.cognition.base import BasePhase, CycleContext
+from kernel.cognition.base import BasePhase
 from shared.prompts import get_agent_prompt
 
 
@@ -53,7 +53,7 @@ class Perceiver(BasePhase):
     Perception Phase: Restating and understanding the task.
     """
 
-    async def run(self) -> PerceptionResult:
+    async def run(self, **kwargs) -> PerceptionResult:
         """Execute perception logic."""
         
         # System Prompt
@@ -76,10 +76,8 @@ class Perceiver(BasePhase):
         response = await self.context.llm_call(sys_prompt, user_prompt)
         
         try:
-            # Simple parsing of JSON
-            result = PerceptionResult.model_validate_json(response)
-            return result
-
+            from shared.utils.parsing import parse_llm_json
+            return parse_llm_json(response, PerceptionResult)
         except Exception as e:
             self.logger.warning(f"Perception parsing failed: {e}. Fallback to raw.")
             return PerceptionResult(

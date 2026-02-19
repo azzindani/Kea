@@ -21,12 +21,12 @@ Features:
 
 from __future__ import annotations
 
-import json
-import re
 from dataclasses import dataclass, field
-from typing import Any, TypeVar
+from typing import Any, Type, TypeVar
 
 from pydantic import BaseModel, Field
+
+from shared.utils.parsing import parse_llm_json
 
 from shared.knowledge.retriever import KnowledgeRetriever, get_knowledge_retriever
 from shared.llm import LLMConfig, OpenRouterProvider
@@ -485,31 +485,13 @@ class KnowledgeEnhancedInference:
     # Internal: Structured Parse
     # ------------------------------------------------------------------ #
 
-    def _parse_structured(self, content: str, schema: type[T]) -> T:
+    def _parse_structured(self, content: str, schema: Type[T]) -> T:
         """
         Parse LLM response content into a Pydantic model.
 
-        Handles common LLM formatting quirks:
-        - Markdown code fences around JSON
-        - Leading/trailing whitespace
-        - Nested JSON extraction
+        Handles common LLM formatting quirks (markdown fences, whitespace).
         """
-        content = content.strip()
-
-        # Strip markdown code fences
-        if "```" in content:
-            match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', content)
-            if match:
-                content = match.group(1).strip()
-
-        # Find JSON object boundaries
-        start = content.find("{")
-        end = content.rfind("}") + 1
-        if start >= 0 and end > start:
-            content = content[start:end]
-
-        # Parse and validate
-        return schema.model_validate_json(content)
+        return parse_llm_json(content, schema)
 
 
 # ============================================================================
