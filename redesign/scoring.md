@@ -7,7 +7,7 @@ flowchart TB
  subgraph sInput["Input Context"]
         nInput["Content / Agent Output"]
         nQuery["Original Query / Goal"]
-        nMeta["Metadata (User Role, Time, Source)"]
+        nMeta["Metadata (User Role, Time, Source, Location)"]
   end
 
  subgraph s2["Scoring Mechanism"]
