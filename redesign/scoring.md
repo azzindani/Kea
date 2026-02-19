@@ -35,7 +35,7 @@ flowchart TB
         nAggregator["Weighted Aggregator"]
   end
 
- subgraph sOutput["Kernel Decision"]
+ subgraph sOutput["Output / Kernel Decision"]
         nFinalScore["FINAL SCORE (0.0 - 1.0)"]
   end
 
