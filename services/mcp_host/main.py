@@ -9,6 +9,11 @@ from contextlib import asynccontextmanager
 from shared.logging import get_logger, setup_logging, LogConfig
 import os
 
+import asyncio
+from services.mcp_host.core.models import (
+    ToolRequest, BatchToolRequest, ToolResponse, ToolSearchRequest, ToolOutput
+)
+
 # Initialize structured logging globally
 setup_logging(LogConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
@@ -26,7 +31,6 @@ async def lifespan(app: FastAPI):
     
     # Static RAG Population (Background)
     # Ensure MCP Host also populates the registry for standard API usage
-    import asyncio
     asyncio.create_task(registry.register_discovered_tools())
     
     # Start the Supervisor (The Factory Manager)
@@ -137,7 +141,6 @@ async def execute_tool(request: ToolRequest):
         
     except Exception as e:
         logger.error(f"Tool execution failed: {e}")
-        from shared.schemas import ToolOutput
         return ToolResponse(
             tool_name=request.tool_name,
             output=ToolOutput(
@@ -156,7 +159,6 @@ async def execute_batch(request: BatchToolRequest):
     Execute multiple tools in parallel (Fan-Out).
     """
     from services.mcp_host.core.session_registry import get_session_registry
-    from shared.schemas import ToolOutput
     registry = get_session_registry()
     
     # We can't use registry directly for parallel calls efficiently unless we implement `call_tools_parallel`
