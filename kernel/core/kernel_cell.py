@@ -1279,12 +1279,25 @@ class KernelCell:
                 from kernel.logic.consensus import ConsensusEngine
 
                 max_rounds = 1 if self.identity.level == "manager" else 2
+                # v0.4.1 Optimization: Pass pre-retrieved knowledge to avoid redundant RAG calls
+                knowledge_context = ""
+                if self._active_inference_context and self._active_inference_context.knowledge:
+                    knowledge_context = self._active_inference_context.knowledge.to_prompt_section()
+
+                # Get real facts from working memory for accurate consensus
+                raw_facts = self.working_memory.all_facts
+                consensus_facts = []
+                for k, v in list(raw_facts.items())[:20]:  # Cap at 20 facts for consensus speed
+                    consensus_facts.append({"key": k, "value": v})
+
                 engine = ConsensusEngine(max_rounds=max_rounds)
 
                 consensus = await engine.reach_consensus(
                     query=task_text,
-                    facts=[content[:2000]],
+                    facts=consensus_facts or [{"text": content[:2000]}],
                     sources=[],
+                    knowledge_context=knowledge_context,
+                    initial_answer=content,
                 )
 
                 # Update accuracy and confidence from consensus

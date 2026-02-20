@@ -88,7 +88,14 @@ class CriticAgent:
         except Exception:
             return ""
 
-    async def critique(self, answer: str, facts: list, sources: list, query: str = "") -> str:
+    async def critique(
+        self,
+        answer: str,
+        facts: list,
+        sources: list,
+        query: str = "",
+        knowledge_context: str | None = None,
+    ) -> str:
         """
         Critique a generated answer.
 
@@ -97,6 +104,7 @@ class CriticAgent:
             facts: Available facts
             sources: Source references
             query: Original research query (for knowledge retrieval)
+            knowledge_context: Optional pre-retrieved knowledge context
 
         Returns:
             Critique with specific feedback
@@ -118,8 +126,10 @@ class CriticAgent:
                 max_tokens=32768,
             )
 
-            # Retrieve domain knowledge (especially rules) for informed critique
-            knowledge_context = await self._get_knowledge_context(query or answer[:200])
+            # Retrieve domain knowledge (especially rules) for informed critique if not provided
+            if knowledge_context is None:
+                knowledge_context = await self._get_knowledge_context(query or answer[:200])
+                
             system_prompt = self.system_prompt
             if knowledge_context:
                 system_prompt += f"\n\n{knowledge_context}"
@@ -127,7 +137,7 @@ class CriticAgent:
                     f"Critic: Injecting {len(knowledge_context)} chars of domain knowledge into system prompt"
                 )
             else:
-                logger.debug("Critic: No domain knowledge retrieved   using base system prompt")
+                logger.debug("Critic: No domain knowledge retrieved — using base system prompt")
 
             from shared.vocab import load_vocab
             vocab = load_vocab("critic")

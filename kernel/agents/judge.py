@@ -51,6 +51,7 @@ class JudgeAgent:
         generator_output: str,
         critic_feedback: str,
         facts: list[dict] | None = None,
+        knowledge_context: str | None = None,
     ) -> dict[str, Any]:
         """
         Judge between Generator and Critic.
@@ -60,6 +61,7 @@ class JudgeAgent:
             generator_output: The Generator's answer
             critic_feedback: The Critic's critique
             facts: Optional list of facts for quality-based confidence calculation
+            knowledge_context: Optional pre-retrieved knowledge context
 
         Returns:
             Dict with verdict, final_answer, confidence
@@ -85,8 +87,10 @@ class JudgeAgent:
                 max_tokens=32768,
             )
 
-            # Retrieve domain knowledge for informed judgment
-            knowledge_context = await self._get_knowledge_context(query)
+            # Retrieve domain knowledge for informed judgment if not provided
+            if knowledge_context is None:
+                knowledge_context = await self._get_knowledge_context(query)
+                
             system_prompt = self.system_prompt
             if knowledge_context:
                 system_prompt += f"\n\n{knowledge_context}"
@@ -94,7 +98,7 @@ class JudgeAgent:
                     f"Judge: Injecting {len(knowledge_context)} chars of domain knowledge into system prompt"
                 )
             else:
-                logger.debug("Judge: No domain knowledge retrieved   using base system prompt")
+                logger.debug("Judge: No domain knowledge retrieved — using base system prompt")
 
             from shared.vocab import load_vocab
             vocab = load_vocab("judgment")
@@ -143,7 +147,7 @@ class JudgeAgent:
             # This prevents false confidence when all facts are errors or no facts exist
             if fact_based_confidence is not None:
                 if fact_based_confidence == 0.0:
-                    # NO facts or ALL facts are errors   confidence must be 0%
+                    # NO facts or ALL facts are errors — confidence must be 0%
                     confidence = 0.0
                     logger.warning(
                         f"Judge: No valid facts collected! Setting confidence to 0% "
@@ -160,10 +164,16 @@ class JudgeAgent:
             logger.info(f"Judge: Verdict={verdict}, Confidence={confidence:.2f}")
             logger.info(f"Judge Reasoning: {content[:2000]}")
 
+            # v0.4.1 Fix: final_answer should be the generator output if accepted/revised,
+            # NOT the judge's reasoning string, unless it's a rejection/error.
+            final_ans = generator_output
+            if verdict == "Reject":
+                final_ans = f"REJECTED: {content}"
+
             return {
                 "verdict": verdict,
                 "reasoning": content,
-                "final_answer": content,
+                "final_answer": final_ans,
                 "confidence": confidence,
             }
 

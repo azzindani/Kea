@@ -38,6 +38,8 @@ class ConsensusEngine:
         query: str,
         facts: list,
         sources: list,
+        knowledge_context: str | None = None,
+        initial_answer: str | None = None,
     ) -> dict[str, Any]:
         """
         Run the consensus loop until agreement or max rounds.
@@ -46,6 +48,8 @@ class ConsensusEngine:
             query: Research question
             facts: Collected facts
             sources: Source references
+            knowledge_context: Optional pre-retrieved knowledge context
+            initial_answer: Optional already-generated answer to start with
             
         Returns:
             Dict with final_answer, confidence, rounds, history
@@ -60,27 +64,41 @@ class ConsensusEngine:
             
             # Generator phase
             if round_num == 0:
-                generator_output = await self.generator.generate(query, facts, sources)
+                if initial_answer:
+                    generator_output = initial_answer
+                    logger.info("Consensus: Using provided initial answer")
+                else:
+                    generator_output = await self.generator.generate(
+                        query, facts, sources, knowledge_context=knowledge_context
+                    )
             else:
                 # Incorporate previous feedback
                 generator_output = await self.generator.generate(
                     f"{query}\n\nPrevious feedback: {history[-1].get('critique', '')}",
                     facts,
-                    sources
+                    sources,
+                    knowledge_context=knowledge_context,
                 )
             
             current_answer = generator_output
             
             # Critic phase
             critic_feedback = await self.critic.critique(
-                answer=generator_output, 
-                facts=facts, 
-                sources=sources, 
-                query=query
+                answer=generator_output,
+                facts=facts,
+                sources=sources,
+                query=query,
+                knowledge_context=knowledge_context,
             )
             
             # Judge phase
-            judgment = await self.judge.judge(query, generator_output, critic_feedback, facts=facts)
+            judgment = await self.judge.judge(
+                query,
+                generator_output,
+                critic_feedback,
+                facts=facts,
+                knowledge_context=knowledge_context,
+            )
             
             # Record history
             history.append({

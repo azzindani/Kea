@@ -44,7 +44,12 @@ class GeneratorAgent:
             return ""
 
     async def generate(
-        self, query: str, facts: list, sources: list, revision_feedback: str = None
+        self,
+        query: str,
+        facts: list,
+        sources: list,
+        revision_feedback: str = None,
+        knowledge_context: str | None = None,
     ) -> str:
         """
         Generate a comprehensive answer from facts.
@@ -53,6 +58,8 @@ class GeneratorAgent:
             query: Research question
             facts: Collected facts
             sources: Source references
+            revision_feedback: Optional feedback for revision
+            knowledge_context: Optional pre-retrieved knowledge context
 
         Returns:
             Generated answer text
@@ -74,14 +81,16 @@ class GeneratorAgent:
                 max_tokens=32768,
             )
 
-            # Retrieve domain knowledge to enhance generation
-            knowledge_context = await self._get_knowledge_context(query)
+            # Retrieve domain knowledge to enhance generation if not provided
+            if knowledge_context is None:
+                knowledge_context = await self._get_knowledge_context(query)
+                
             if knowledge_context:
                 logger.info(
                     f"Generator: Injecting {len(knowledge_context)} chars of domain knowledge into system prompt"
                 )
             else:
-                logger.debug("Generator: No domain knowledge retrieved   using base system prompt")
+                logger.debug("Generator: No domain knowledge retrieved — using base system prompt")
 
             # Format facts with full tool call schema as citation
             facts_text = ""
