@@ -30,7 +30,7 @@ graph TD
 ## 🧠 Deep Dive
 
 ### 1. High-Throughput Ingestion
-The `HFSync` implementation uses asynchronous streams and batch-parallelism to maximize throughput during initial knowledge loading. It handles schema mapping on-the-fly, allowing Kea to "Learn" from any public dataset on the web with minimal configuration.
+The `HFSync` implementation uses asynchronous streams and batch-parallelism to maximize throughput during initial knowledge loading. It handles schema mapping on-the-fly, allowing Project to "Learn" from any public dataset on the web with minimal configuration.
 
 ### 2. Artifact Integrity
 For regulated research, the storage layer calculates and verifies SHA-256 checksums for every artifact. This ensures that the PDF an agent "reads" in Phase 1 is the exact same file synthesized in the final Report phase, preventing invisible data corruption.

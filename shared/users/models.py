@@ -161,7 +161,7 @@ class APIKey:
     """
     API Key for programmatic access.
     
-    Keys are prefixed with "kea_" for identification.
+    Keys are prefixed with "project_" for identification.
     The raw key is only returned once at creation - only hash is stored.
     """
     key_id: str
@@ -193,7 +193,7 @@ class APIKey:
         Returns:
             (APIKey, raw_key) - raw_key is only available at creation
         """
-        raw_key = f"kea_{secrets.token_urlsafe(32)}"
+        raw_key = f"project_{secrets.token_urlsafe(32)}"
         key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
         
         api_key = cls(
@@ -212,7 +212,7 @@ class APIKey:
     @classmethod
     def verify(cls, raw_key: str, stored_hash: str) -> bool:
         """Verify raw key against stored hash."""
-        if not raw_key.startswith("kea_"):
+        if not raw_key.startswith("project_"):
             return False
         check_hash = hashlib.sha256(raw_key.encode()).hexdigest()
         return secrets.compare_digest(check_hash, stored_hash)

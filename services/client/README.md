@@ -1,6 +1,6 @@
 # Research Client SDK
 
-A robust Python client for the Kea Research Platform. This SDK provides programmatic access to the research capabilities, handling authentication, job submission, polling, and result retrieval.
+A robust Python client for the Project Research Platform. This SDK provides programmatic access to the research capabilities, handling authentication, job submission, polling, and result retrieval.
 
 ## Features
 
@@ -15,10 +15,10 @@ The quickest way to run a research job is via the included CLI tool:
 
 ```bash
 # Run against local development environment
-python scripts/cli.py --query "Analyze the impact of AI on healthcare" --env dev
+python services/client/cli.py --query "Analyze the impact of AI on healthcare" --env dev
 
 # Enable verbose logging
-python scripts/cli.py --query "Research Tesla's financial health" --verbose
+python services/client/cli.py --query "Research Tesla's financial health" --verbose
 ```
 
 ### Options
@@ -90,7 +90,7 @@ By default, the client uses test credentials. You can provide your own:
 
 ```python
 client = ResearchClient(
-    base_url="https://api.kea.ai",
+    base_url="https://api.project.ai",
     email="myuser@example.com",
     password="secure_password",
     name="My User"

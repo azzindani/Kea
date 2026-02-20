@@ -220,7 +220,7 @@ async def main():
     """Run comprehensive system health check."""
     start_time = time.time()
     
-    print_banner("🦜 KEA SYSTEM HEALTH CHECK")
+    print_banner("🦜 PROJECT SYSTEM HEALTH CHECK")
     print(f"\nTimestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"Python: {sys.version.split()[0]}")
     

@@ -283,7 +283,7 @@ async def test_regulatory():
 async def main():
     """Run all simulation tests."""
     print("\n" + "=" * 60)
-    print("🚀 KEA MCP SERVERS - REAL SIMULATION TESTS")
+    print("🚀 PROJECT MCP SERVERS - REAL SIMULATION TESTS")
     print("=" * 60)
     print("\nTesting all 12 new MCP servers with real API calls...")
     

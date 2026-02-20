@@ -63,7 +63,7 @@ Every request passes through a rigid middleware stack:
 
 - **`main.py`**: FastAPI entrypoint. Mounts all routers and configures the global middleware stack.
 - **`routes/`**: Polymorphic API modules.
-    - `conversations.py`: High-level chat interface for "Kea Conversations."
+    - `conversations.py`: High-level chat interface for "Project Conversations."
     - `jobs.py`: Submits and tracks long-running autonomous missions.
     - `interventions.py`: The interface for human governance and decision points.
     - `mcp.py`: Management of MCP tools and Direct Execution endpoints.

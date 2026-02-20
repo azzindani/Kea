@@ -23,7 +23,7 @@ class DataType(str, Enum):
     """
     Semantic data types for tool I/O.
     
-    Goes beyond basic JSON types to include Kea-specific types
+    Goes beyond basic JSON types to include Project-specific types
     like file paths, dataframes, and images.
     """
     # Basic types

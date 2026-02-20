@@ -188,7 +188,7 @@ class EnvironmentConfig:
         if not database_url:
             logger.warning(
                 "DATABASE_URL not set. PostgreSQL is required. "
-                "Set DATABASE_URL=postgresql://user:pass@localhost:5432/kea"
+                "Set DATABASE_URL=postgresql://user:pass@localhost:5432/project"
             )
         
         return cls(

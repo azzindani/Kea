@@ -1,12 +1,12 @@
 [project]
 name = "research-engine"
 version = "0.1.0"
-description = "Kea: Distributed Autonomous Research Engine - A microservices-based AI system for deep research"
+description = "Project: Distributed Autonomous Research Engine - A microservices-based AI system for deep research"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
-    {name = "Kea Team"}
+    {name = "Project Team"}
 ]
 keywords = ["ai", "research", "mcp", "langgraph", "rag"]
 
@@ -87,7 +87,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["services", "mcp_servers", "shared", "workers", "knowledge"]
+packages = ["services", "mcp_servers", "shared", "knowledge"]
 
 [tool.ruff]
 line-length = 100

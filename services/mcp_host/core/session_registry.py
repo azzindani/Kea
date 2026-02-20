@@ -112,7 +112,7 @@ class SessionRegistry:
         Treats every .py file (excluding __init__) as an MCP Server.
         """
         # Determine path relative to this file:
-        # services/mcp_host/core/session_registry.py -> ... -> Kea/mcp_servers
+        # services/mcp_host/core/session_registry.py -> ... -> Project/mcp_servers
         try:
             # Go up 4 levels from core/session_registry.py to root
             root_path = Path(__file__).resolve().parents[3]
@@ -145,8 +145,8 @@ class SessionRegistry:
         """Register a server script configuration."""
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"
-        env["KEA_SERVER_NAME"] = server_name
-        env["PYTHONPATH"] = str(Path(__file__).resolve().parents[3]) # Add Kea root to pythonpath
+        env["PROJECT_SERVER_NAME"] = server_name
+        env["PYTHONPATH"] = str(Path(__file__).resolve().parents[3]) # Add Project root to pythonpath
         
         SessionRegistry._shared_server_configs[server_name] = ServerConfig(
             name=server_name,
@@ -342,7 +342,7 @@ class SessionRegistry:
             # Determine CWD and if we are isolated
             server_dir = config.script_path.parent
             has_pyproject = (server_dir / "pyproject.toml").exists()
-            cwd = None # Default to inheriting current process CWD (Kea Root)
+            cwd = None # Default to inheriting current process CWD (Project Root)
             
             # Check if we have a pre-configured command in settings.yaml
             configured_cmd = None

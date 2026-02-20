@@ -23,7 +23,7 @@ logger = get_logger(__name__)
 @dataclass
 class HFConfig:
     """HuggingFace Hub configuration."""
-    repo_id: str = ""  # e.g., "username/kea-research"
+    repo_id: str = ""  # e.g., "username/project-research"
     token: str = ""    # HF_TOKEN env var
     private: bool = True
     

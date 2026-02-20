@@ -56,11 +56,8 @@ The Orchestrator utilizes the **Vault**'s checkpointer. Every state transition i
 
 ## 📁 Codebase Structure
 
-- **`main.py`**: Entrypoint for the service. Manages the `/research` and `/chat` pipelines and streams progress via SSE.
-- **`kernel/` Dependency**: The Orchestrator is a wrapper around the **Kea Kernel**. It imports its core logic from:
-    - `kernel.nodes`: Logic for Planner, Keeper, Synthesizer.
-    - `kernel.agents`: Specialized Personas (Generator, Critic, Judge).
-    - `kernel.flow`: The LangGraph definitions and compilation logic.
+- **`main.py`**: Entrypoint for the service. Currently in **REDESIGN** mode.
+- **Redesign Status**: The previously used `kernel/` and `workers/` packages have been removed as part of a system-wide simplification. The service currently serves as a skeleton for the new orchestration logic.
 
 ---
 

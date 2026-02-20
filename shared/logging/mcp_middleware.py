@@ -54,7 +54,7 @@ class MCPLoggingMiddleware:
             method = request.method
             request_id = str(request.id) if request.id else "notification"
             
-            if os.getenv("KEA_LOG_NO_TRUNCATE") == "1" and request.params:
+            if os.getenv("PROJECT_LOG_NO_TRUNCATE") == "1" and request.params:
                 # Log full parameters in verbose mode
                 # Note: We duplicate params here for visibility, normally only method/id are logged
                 logger.info(
@@ -151,7 +151,7 @@ class MCPLoggingMiddleware:
         if is_error and result.content:
             log_data["error_preview"] = result.content[0].text[:200]
         
-        no_truncate = os.getenv("KEA_LOG_NO_TRUNCATE") == "1"
+        no_truncate = os.getenv("PROJECT_LOG_NO_TRUNCATE") == "1"
         if no_truncate:
              log_data["arguments"] = arguments
              # Flatten content list into readable string

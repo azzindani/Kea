@@ -1,7 +1,7 @@
 """
 Stress Test Queries.
 
-20 massive-scale research queries designed to push Kea to its limits.
+20 massive-scale research queries designed to push Project to its limits.
 """
 
 from dataclasses import dataclass

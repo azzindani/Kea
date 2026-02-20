@@ -79,7 +79,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Kea RAG Service",
+    title="Project RAG Service",
     description="External Knowledge Engine (Hugging Face Integration)",
     version="0.2.0",
     lifespan=lifespan,

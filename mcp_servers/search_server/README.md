@@ -1,6 +1,6 @@
 # 🔍 Search Server (MCP)
 
-The **Search Server** is the primary discovery engine for Kea. It provides high-quality web and news search capabilities by integrating with major search providers like Tavily and Brave Search.
+The **Search Server** is the primary discovery engine for Project. It provides high-quality web and news search capabilities by integrating with major search providers like Tavily and Brave Search.
 
 ## 🛠️ Tools
 

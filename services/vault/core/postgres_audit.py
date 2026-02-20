@@ -13,6 +13,7 @@ import asyncpg
 
 from services.vault.core.audit_trail import AuditBackend, AuditEntry, AuditEventType
 from shared.logging import get_logger
+from shared.database.connection import get_db_pool
 
 logger = get_logger(__name__)
 
@@ -21,52 +22,44 @@ class PostgresBackend(AuditBackend):
     
     def __init__(self, table_name: str = "audit_trail"):
         self.table_name = table_name
-        self._pool: asyncpg.Pool | None = None
-        self._db_url = os.getenv("DATABASE_URL")
-        
-        if not self._db_url:
-            raise ValueError("DATABASE_URL environment variable is required for PostgresBackend")
+        self._initialized = False
 
-    async def _get_pool(self) -> asyncpg.Pool:
-        """Get or create connection pool."""
-        if self._pool is None:
-            # Limit pool size to prevent connection exhaustion
-            self._pool = await asyncpg.create_pool(
-                self._db_url,
-                min_size=1,
-                max_size=5,  # Audit is low-frequency
-            )
+    async def _ensure_schema(self, pool: asyncpg.Pool):
+        """Ensure database schema exists."""
+        if self._initialized:
+            return
             
-            async with self._pool.acquire() as conn:
-                # Create table
-                # We use JSONB for details
-                await conn.execute(f"""
-                    CREATE TABLE IF NOT EXISTS {self.table_name} (
-                        entry_id TEXT PRIMARY KEY,
-                        timestamp TIMESTAMPTZ NOT NULL,
-                        event_type TEXT NOT NULL,
-                        actor TEXT NOT NULL,
-                        action TEXT NOT NULL,
-                        resource TEXT,
-                        details JSONB,
-                        parent_id TEXT,
-                        session_id TEXT,
-                        checksum TEXT NOT NULL,
-                        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-                    )
-                """)
+        async with pool.acquire() as conn:
+            # Create table
+            # We use JSONB for details
+            await conn.execute(f"""
+                CREATE TABLE IF NOT EXISTS {self.table_name} (
+                    entry_id TEXT PRIMARY KEY,
+                    timestamp TIMESTAMPTZ NOT NULL,
+                    event_type TEXT NOT NULL,
+                    actor TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    resource TEXT,
+                    details JSONB,
+                    parent_id TEXT,
+                    session_id TEXT,
+                    checksum TEXT NOT NULL,
+                    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            # Indexes
+            await conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{self.table_name}_ts ON {self.table_name}(timestamp)")
+            await conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{self.table_name}_type ON {self.table_name}(event_type)")
+            await conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{self.table_name}_session ON {self.table_name}(session_id)")
                 
-                # Indexes
-                await conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{self.table_name}_ts ON {self.table_name}(timestamp)")
-                await conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{self.table_name}_type ON {self.table_name}(event_type)")
-                await conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{self.table_name}_session ON {self.table_name}(session_id)")
-                
-        return self._pool
+        self._initialized = True
 
     async def write(self, entry: AuditEntry) -> bool:
         """Write entry to Postgres."""
         try:
-            pool = await self._get_pool()
+            pool = await get_db_pool()
+            await self._ensure_schema(pool)
             
             async with pool.acquire() as conn:
                 await conn.execute(f"""
@@ -102,7 +95,8 @@ class PostgresBackend(AuditBackend):
         limit: int = 1000,
     ) -> list[AuditEntry]:
         """Query entries from Postgres."""
-        pool = await self._get_pool()
+        pool = await get_db_pool()
+        await self._ensure_schema(pool)
         
         conditions = []
         params = []
@@ -171,7 +165,8 @@ class PostgresBackend(AuditBackend):
 
     async def get_by_id(self, entry_id: str) -> AuditEntry | None:
         """Get single entry by ID."""
-        pool = await self._get_pool()
+        pool = await get_db_pool()
+        await self._ensure_schema(pool)
         
         async with pool.acquire() as conn:
             row = await conn.fetchrow(f"SELECT * FROM {self.table_name} WHERE entry_id = $1", entry_id)
@@ -193,6 +188,7 @@ class PostgresBackend(AuditBackend):
 
     async def count(self) -> int:
         """Get total entry count."""
-        pool = await self._get_pool()
+        pool = await get_db_pool()
+        await self._ensure_schema(pool)
         async with pool.acquire() as conn:
             return await conn.fetchval(f"SELECT COUNT(*) FROM {self.table_name}")

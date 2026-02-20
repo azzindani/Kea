@@ -1,7 +1,7 @@
 # 🔌 Geopy Server
 
 The `geopy_server` is an MCP server providing tools for **Geopy Server** functionality.
-It is designed to be used within the Kea ecosystem.
+It is designed to be used within the Project ecosystem.
 
 ## 🧰 Tools
 

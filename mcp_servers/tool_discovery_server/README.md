@@ -1,6 +1,6 @@
 # 🛠️ Tool Discovery Agent Server
 
-The **Tool Discovery Agent** is the meta-layer of the Kea ecosystem. It provides tools for searching, evaluating, and auto-integrating new software packages (PyPI, npm), enabling the system to recursively expand its own capabilities.
+The **Tool Discovery Agent** is the meta-layer of the Project ecosystem. It provides tools for searching, evaluating, and auto-integrating new software packages (PyPI, npm), enabling the system to recursively expand its own capabilities.
 
 ## 🏗️ Architecture
 
@@ -13,7 +13,7 @@ graph TD
     Search --> Eval[Integration Evaluator]
     Eval --> Stub[Stub Generator]
     
-    Stub -->|Python Code| Kea[Kea Ecosystem]
+    Stub -->|Python Code| Project[Project Ecosystem]
 ```
 
 ## ✨ Features

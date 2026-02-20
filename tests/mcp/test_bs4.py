@@ -18,7 +18,7 @@ async def test_bs4_real_simulation():
         <head><title>Test Page</title></head>
         <body>
             <div id="main" class="container">
-                <h1>Welcome to Kea</h1>
+                <h1>Welcome to Project</h1>
                 <p class="desc">Autonomous <b>Research</b> Engine</p>
                 <ul id="features">
                     <li data-id="1">Microservices</li>

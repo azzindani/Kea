@@ -19,17 +19,17 @@ logger = get_logger(__name__)
 # ============================================================================
 
 SYSTEM_INFO = Info(
-    "kea_system",
+    "project_system",
     "System information",
 )
 
 ACTIVE_USERS = Gauge(
-    "kea_active_users",
+    "project_active_users",
     "Number of active users (sessions in last 24h)",
 )
 
 ACTIVE_CONVERSATIONS = Gauge(
-    "kea_active_conversations",
+    "project_active_conversations",
     "Number of active conversations (messages in last 24h)",
 )
 
@@ -39,20 +39,20 @@ ACTIVE_CONVERSATIONS = Gauge(
 # ============================================================================
 
 AUTH_ATTEMPTS = Counter(
-    "kea_auth_attempts_total",
+    "project_auth_attempts_total",
     "Total authentication attempts",
     ["method", "status"],
 )
 
 AUTH_LATENCY = Histogram(
-    "kea_auth_latency_seconds",
+    "project_auth_latency_seconds",
     "Authentication latency",
     ["method"],
     buckets=[0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5],
 )
 
 ACTIVE_SESSIONS = Gauge(
-    "kea_active_sessions",
+    "project_active_sessions",
     "Number of active sessions",
 )
 
@@ -62,18 +62,18 @@ ACTIVE_SESSIONS = Gauge(
 # ============================================================================
 
 CONVERSATIONS_CREATED = Counter(
-    "kea_conversations_created_total",
+    "project_conversations_created_total",
     "Total conversations created",
 )
 
 MESSAGES_SENT = Counter(
-    "kea_messages_sent_total",
+    "project_messages_sent_total",
     "Total messages sent",
     ["role"],  # user, assistant
 )
 
 MESSAGE_LENGTH = Histogram(
-    "kea_message_length_chars",
+    "project_message_length_chars",
     "Message length in characters",
     ["role"],
     buckets=[10, 50, 100, 250, 500, 1000, 2500, 5000],
@@ -85,38 +85,38 @@ MESSAGE_LENGTH = Histogram(
 # ============================================================================
 
 RESEARCH_REQUESTS = Counter(
-    "kea_research_requests_total",
+    "project_research_requests_total",
     "Total research requests",
     ["query_type", "status"],
 )
 
 RESEARCH_DURATION = Histogram(
-    "kea_research_duration_seconds",
+    "project_research_duration_seconds",
     "Research duration",
     ["query_type"],
     buckets=[1, 5, 10, 30, 60, 120, 300],
 )
 
 RESEARCH_CONFIDENCE = Histogram(
-    "kea_research_confidence",
+    "project_research_confidence",
     "Research confidence score",
     buckets=[0.1, 0.25, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 1.0],
 )
 
 SOURCES_PER_RESEARCH = Histogram(
-    "kea_sources_per_research",
+    "project_sources_per_research",
     "Number of sources per research",
     buckets=[1, 2, 5, 10, 15, 20, 30],
 )
 
 CACHE_HITS = Counter(
-    "kea_cache_hits_total",
+    "project_cache_hits_total",
     "Total cache hits",
     ["cache_type"],  # research, context
 )
 
 CACHE_MISSES = Counter(
-    "kea_cache_misses_total",
+    "project_cache_misses_total",
     "Total cache misses",
     ["cache_type"],
 )
@@ -127,13 +127,13 @@ CACHE_MISSES = Counter(
 # ============================================================================
 
 TOOL_CALLS = Counter(
-    "kea_tool_calls_total",
+    "project_tool_calls_total",
     "Total MCP tool calls",
     ["tool_name", "status"],
 )
 
 TOOL_DURATION = Histogram(
-    "kea_tool_duration_seconds",
+    "project_tool_duration_seconds",
     "Tool execution duration",
     ["tool_name"],
     buckets=[0.1, 0.5, 1, 2, 5, 10, 30],
@@ -145,7 +145,7 @@ TOOL_DURATION = Histogram(
 # ============================================================================
 
 RATE_LIMIT_HITS = Counter(
-    "kea_rate_limit_hits_total",
+    "project_rate_limit_hits_total",
     "Total rate limit hits",
     ["limit_type"],  # user, ip
 )
@@ -156,7 +156,7 @@ RATE_LIMIT_HITS = Counter(
 # ============================================================================
 
 ERRORS = Counter(
-    "kea_errors_total",
+    "project_errors_total",
     "Total errors",
     ["error_type", "endpoint"],
 )

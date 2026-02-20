@@ -42,7 +42,7 @@ mcp = FastMCP("duckdb_server", dependencies=["pandas", "duckdb", "pyarrow"])
 # 1. Core
 # ==========================================
 @mcp.tool()
-def connect_db(path: str = "kea_data.duckdb") -> str: 
+def connect_db(path: str = "project_data.duckdb") -> str: 
     """CONNECTS to database. [ACTION]
     
     [RAG Context]

@@ -1,7 +1,7 @@
 # 🔌 Seaborn Server
 
 The `seaborn_server` is an MCP server providing tools for **Seaborn Server** functionality.
-It is designed to be used within the Kea ecosystem.
+It is designed to be used within the Project ecosystem.
 
 ## 🧰 Tools
 

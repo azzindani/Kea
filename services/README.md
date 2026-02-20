@@ -13,7 +13,7 @@ The `services/` directory is the engine room of the Kea system. It follows a **F
 
 ## 🏗️ The 7-Service "Fractal Corp"
 
-Kea cognition is built on a **"Brain vs Body"** topology, where core reasoning is isolated from microservice execution.
+Project cognition is built on a **"Brain vs Body"** topology, where core reasoning is isolated from microservice execution.
 
 ```mermaid
 graph TD
@@ -73,7 +73,7 @@ graph TD
 ## 🧠 Deep Dive
 
 ### 1. The "Split-Brain" Protocol
-Kea separates **Reasoning** (LLM-based logic in the Orchestrator) from **Execution** (Python/Tool logic in the MCP Host) at the process level. The Orchestrator can *propose* a tool call, but the **MCP Host** validates the call against the **Swarm Manager's** policies before spawning the ephemeral JIT environment. This prevents "Prompt Injection" from escaping into the host operating system.
+Project separates **Reasoning** (LLM-based logic in the Orchestrator) from **Execution** (Python/Tool logic in the MCP Host) at the process level. The Orchestrator can *propose* a tool call, but the **MCP Host** validates the call against the **Swarm Manager's** policies before spawning the ephemeral JIT environment. This prevents "Prompt Injection" from escaping into the host operating system.
 
 ### 2. Service-to-Service Security
 Services do not hardcode each other's credentials. The **API Gateway** acts as the single source of truth for identity. Internal services trust requests that carry verified identity headers (X-User-ID) injected by the Gateway, ensuring a zero-trust architecture inside the pod/cluster.

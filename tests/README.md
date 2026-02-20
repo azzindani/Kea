@@ -1,6 +1,6 @@
 # 🧪 Test Suite ("The Quality Gate")
 
-The Kea Test Suite is a multi-layered verification system designed to ensure the stability, accuracy, and compliance of the Fractal Corp microservices architecture. It covers everything from atomic function units to massive 50-agent research simulations.
+The Project Test Suite is a multi-layered verification system designed to ensure the stability, accuracy, and compliance of the Fractal Corp microservices architecture. It covers everything from atomic function units to massive 50-agent research simulations.
 
 ---
 

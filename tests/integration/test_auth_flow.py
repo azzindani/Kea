@@ -257,7 +257,7 @@ class TestAPIKeyAuth:
         assert response.status_code == 200
         data = response.json()
         assert "raw_key" in data  # Only shown once
-        assert data["raw_key"].startswith("kea_")
+        assert data["raw_key"].startswith("project_")
     
     @pytest.mark.asyncio
     async def test_access_with_api_key(self, async_client, test_user):

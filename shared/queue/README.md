@@ -1,6 +1,6 @@
 # 📥 Shared Persistent Queue
 
-The `shared/queue` module provides a reliable, persistent task management system for Kea's asynchronous research jobs. It implements a **Producer-Consumer** pattern backed by PostgreSQL, ensuring that no task is lost even during service crashes or network outages.
+The `shared/queue` module provides a reliable, persistent task management system for Project's asynchronous research jobs. It implements a **Producer-Consumer** pattern backed by PostgreSQL, ensuring that no task is lost even during service crashes or network outages.
 
 ## ✨ Features
 
@@ -35,7 +35,7 @@ graph TD
 ## 🧠 Deep Dive
 
 ### 1. Reliable Task Processing
-Unlike memory-based queues, Kea's queue ensures that a task is only marked as "Completed" after a successful worker callback. If a worker process dies mid-task, the `Visibility Timeout` mechanism ensures the task is automatically re-enqueued for another worker to pick up.
+Unlike memory-based queues, Project's queue ensures that a task is only marked as "Completed" after a successful worker callback. If a worker process dies mid-task, the `Visibility Timeout` mechanism ensures the task is automatically re-enqueued for another worker to pick up.
 
 ### 2. Multi-Worker Concurrency
 The system is designed to scale horizontally. You can spin up 100 `ResearchWorker` pods, and each will use the `postgres_queue` to safely pull unique tasks without collisions, enabling massive parallel research operations across a GPU cluster.

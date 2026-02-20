@@ -1,7 +1,7 @@
 """
 Stress Test Fixtures.
 
-Pytest fixtures and configuration for stress testing Kea.
+Pytest fixtures and configuration for stress testing Project.
 Includes API client with authentication support.
 """
 
@@ -36,7 +36,7 @@ TEST_USER_NAME = "Stress Test User"
 
 def pytest_configure(config):
     """Configure pytest for stress tests."""
-    # Setup Kea logging with console format for readable output
+    # Setup Project logging with console format for readable output
     from shared.logging import setup_logging, LogConfig
     from shared.logging.structured import LogLevel
     
@@ -449,7 +449,7 @@ async def bootstrap_services():
             logging.error("❌ Failed to verify all services. Tearing down...")
             for p in procs:
                 p.terminate()
-            pytest.fail("Could not bootstrap Kea microservices.")
+            pytest.fail("Could not bootstrap Project microservices.")
 
     yield {"api_gateway": True, "custom_procs": len(procs) > 0}
 

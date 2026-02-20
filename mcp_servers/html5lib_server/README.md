@@ -1,7 +1,7 @@
 # 🔌 Html5Lib Server
 
 The `html5lib_server` is an MCP server providing tools for **Html5Lib Server** functionality.
-It is designed to be used within the Kea ecosystem.
+It is designed to be used within the Project ecosystem.
 
 ## 🧰 Tools
 

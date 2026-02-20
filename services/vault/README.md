@@ -41,7 +41,7 @@ graph TD
 The Vault calculates a SHA-256 checksum for every decision made by the system. These logs are "Chained" (each entry contains the hash of the previous one), creating a mathematically verifiable record of research provenance for regulated industries.
 
 ### 2. LangGraph State Checkpointing
-The **State Checkpointer** allows Kea to handle missions that last for hours. Every node transition in the **Orchestrator** is saved as a `jsonb` blob. If the system experiences a power failure or restart, it can resume from the exact last transition point.
+The **State Checkpointer** allows Project to handle missions that last for hours. Every node transition in the **Orchestrator** is saved as a `jsonb` blob. If the system experiences a power failure or restart, it can resume from the exact last transition point.
 
 ### 3. The Artifact Bus (Architecture)
 While the Vault doesn't have a file named `artifact_bus.py`, the **Vector Store** and **Postgres Store** act together to serve this function. Heavy artifacts are stored as `Documents` in the vector database, allowing agents to retrieve massive files via semantic search rather than downloading them locally.

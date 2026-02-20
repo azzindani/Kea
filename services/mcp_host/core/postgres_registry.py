@@ -19,6 +19,7 @@ from pgvector.asyncpg import register_vector
 from shared.logging import get_logger
 from shared.mcp.protocol import Tool
 from shared.embedding.qwen3_embedding import create_embedding_provider
+from shared.database.connection import get_db_pool
 
 logger = get_logger(__name__)
 
@@ -31,15 +32,12 @@ class PostgresToolRegistry:
     def __init__(self, table_name: str = "tool_registry"):
         self.table_name = table_name
         self.embedder = create_embedding_provider(use_local=True)
-        self._pool: asyncpg.Pool | None = None
-        from shared.config import get_settings
-        self._db_url = get_settings().database_url
         self._initialized = False
             
-    async def _get_pool(self) -> asyncpg.Pool:
-        """Get or create connection pool with thread-safe initialization."""
-        if self._pool is not None and self._initialized:
-            return self._pool
+    async def _ensure_schema(self, pool: asyncpg.Pool):
+        """Ensure database schema exists with thread-safe initialization."""
+        if self._initialized:
+            return
         
         # Use class-level lock to prevent race conditions
         if PostgresToolRegistry._init_lock is None:
@@ -47,17 +45,10 @@ class PostgresToolRegistry:
         
         async with PostgresToolRegistry._init_lock:
             # Double-check pattern
-            if self._pool is not None and self._initialized:
-                return self._pool
+            if self._initialized:
+                return
             
-            # Create connection pool with limits to prevent exhaustion
-            self._pool = await asyncpg.create_pool(
-                self._db_url,
-                min_size=1,
-                max_size=10,  # Limit connections per component
-            )
-            
-            async with self._pool.acquire() as conn:
+            async with pool.acquire() as conn:
                 # Use advisory lock to prevent concurrent schema modifications
                 await conn.execute("SELECT pg_advisory_lock(12345)")
                 try:
@@ -89,8 +80,6 @@ class PostgresToolRegistry:
                     await conn.execute("SELECT pg_advisory_unlock(12345)")
             
             self._initialized = True
-                
-        return self._pool
 
     def _compute_hash(self, tool_schema: Dict[str, Any]) -> str:
         """Compute stable hash for tool schema."""
@@ -104,7 +93,8 @@ class PostgresToolRegistry:
         if not tools:
             return
 
-        pool = await self._get_pool()
+        pool = await get_db_pool()
+        await self._ensure_schema(pool)
         logger.info(f"Registry (Postgres): Syncing {len(tools)} tools...")
         
         # 1. Identify what needs embedding
@@ -210,7 +200,8 @@ class PostgresToolRegistry:
             min_similarity: Minimum cosine similarity (0.0 to 1.0)
         """
         try:
-            pool = await self._get_pool()
+            pool = await get_db_pool()
+            await self._ensure_schema(pool)
             query_emb = await self.embedder.embed_query(query)
             
             # Convert similarity threshold to distance threshold

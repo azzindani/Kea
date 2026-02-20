@@ -5,7 +5,7 @@ import json
 
 # Initialize Identity Globally
 # Real usage requires valid email.
-set_identity("Kea Agent <kea@antigravity.dev>")
+set_identity("Project Agent <project@antigravity.dev>")
 
 def dict_to_result(data: dict, title: str = "Result") -> ToolResult:
     # Custom serializer for edgar objects might be needed, but they usually have .to_dict() or we extract fields

@@ -1,7 +1,7 @@
 # 🔌 Rapidfuzz Server
 
 The `rapidfuzz_server` is an MCP server providing tools for **Rapidfuzz Server** functionality.
-It is designed to be used within the Kea ecosystem.
+It is designed to be used within the Project ecosystem.
 
 ## 🧰 Tools
 

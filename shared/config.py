@@ -113,22 +113,6 @@ class RerankerSettings(BaseModel):
     max_length: int = 32768
 
 
-class ConfidenceSettings(BaseModel):
-    """Adaptive confidence loop configuration."""
-
-    initial_threshold: float = 0.95
-    degradation_rate: float = 0.05
-    min_threshold: float = 0.60
-    max_loops: int = 32768
-
-
-class LoopSafetySettings(BaseModel):
-    """Loop safety controls."""
-
-    max_global_iterations: int = 32768
-    max_facts_threshold: int = 32768
-
-
 class TimeoutSettings(BaseModel):
     """Standardized timeouts for the entire system."""
 
@@ -146,9 +130,6 @@ class ModelDefaults(BaseModel):
 
     default_model: str = "nvidia/nemotron-3-nano-30b-a3b:free"
     app_name: str = "research-engine"
-    planner_model: str = "nvidia/nemotron-3-nano-30b-a3b:free"
-    critic_model: str = "nvidia/nemotron-3-nano-30b-a3b:free"
-    generator_model: str = "nvidia/nemotron-3-nano-30b-a3b:free"
 
 
 class GovernanceSettings(BaseModel):
@@ -204,8 +185,6 @@ class Settings(BaseSettings):
     research: ResearchSettings = Field(default_factory=ResearchSettings)
     embedding: EmbeddingSettings = Field(default_factory=EmbeddingSettings)
     reranker: RerankerSettings = Field(default_factory=RerankerSettings)
-    confidence: ConfidenceSettings = Field(default_factory=ConfidenceSettings)
-    loop_safety: LoopSafetySettings = Field(default_factory=LoopSafetySettings)
 
     # New Configs (Deep Audit Fixes)
     timeouts: TimeoutSettings = Field(default_factory=TimeoutSettings)
@@ -277,8 +256,6 @@ class Settings(BaseSettings):
             self._update_nested_config("research", yaml_config, ResearchSettings)
             self._update_nested_config("embedding", yaml_config, EmbeddingSettings)
             self._update_nested_config("reranker", yaml_config, RerankerSettings)
-            self._update_nested_config("confidence", yaml_config, ConfidenceSettings)
-            self._update_nested_config("loop_safety", yaml_config, LoopSafetySettings)
             self._update_nested_config("timeouts", yaml_config, TimeoutSettings)
             self._update_nested_config("models", yaml_config, ModelDefaults)
             self._update_nested_config("governance", yaml_config, GovernanceSettings)

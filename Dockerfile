@@ -1,5 +1,5 @@
 # ============================================================================
-# Multi-stage Dockerfile for Kea Research Engine
+# Multi-stage Dockerfile for Project Research Engine
 # ============================================================================
 
 # Base image with Python dependencies
@@ -75,13 +75,6 @@ CMD ["python", "-m", "services.swarm_manager.main"]
 FROM base as chronos
 EXPOSE 8006
 CMD ["python", "-m", "services.chronos.main"]
-
-# ============================================================================
-# Background Worker
-# ============================================================================
-FROM base as worker
-
-CMD ["python", "-m", "workers.research_worker"]
 
 # ============================================================================
 # Development (all-in-one with hot reload)

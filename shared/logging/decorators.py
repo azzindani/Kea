@@ -48,7 +48,7 @@ def log_execution(
             
             # Log start
             extra: dict[str, Any] = {"function": func_name}
-            no_truncate = os.getenv("KEA_LOG_NO_TRUNCATE", "0") == "1"
+            no_truncate = os.getenv("PROJECT_LOG_NO_TRUNCATE", "0") == "1"
             
             if log_args:
                 if no_truncate:
@@ -93,7 +93,7 @@ def log_execution(
             func_name = func.__name__
             
             extra: dict[str, Any] = {"function": func_name}
-            no_truncate = os.getenv("KEA_LOG_NO_TRUNCATE", "0") == "1"
+            no_truncate = os.getenv("PROJECT_LOG_NO_TRUNCATE", "0") == "1"
 
             if log_args:
                 if no_truncate:

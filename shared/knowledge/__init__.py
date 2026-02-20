@@ -1,7 +1,7 @@
 """
 Knowledge Package.
 
-Context engineering for Kea - provides dynamic knowledge retrieval
+Context engineering for Project - provides dynamic knowledge retrieval
 from the knowledge/ directory (skills, rules, personas) using pgvector
 semantic search, mirroring the RAG tool retrieval pattern.
 """

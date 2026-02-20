@@ -24,7 +24,7 @@ from shared.logging.metrics import set_system_info
 from shared.environment import get_environment_config
 
 from services.api_gateway.routes import (
-    jobs, memory, mcp, system, artifacts, interventions, llm, graph,
+    jobs, memory, mcp, system, artifacts, interventions, llm,
     auth, users, conversations,
 )
 from services.api_gateway.middleware.auth import create_auth_middleware
@@ -101,8 +101,8 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI app
 app = FastAPI(
-    title="Kea Research Engine API",
-    description="API Gateway for the Kea Distributed Autonomous Research Engine",
+    title="Project Research Engine API",
+    description="API Gateway for the Project Distributed Autonomous Research Engine",
     version="0.3.0",
     lifespan=lifespan,
     docs_url="/docs",
@@ -199,7 +199,6 @@ app.include_router(system.router, prefix="/api/v1/system", tags=["System"])
 app.include_router(artifacts.router, prefix="/api/v1/artifacts", tags=["Artifacts"])
 app.include_router(interventions.router, prefix="/api/v1/interventions", tags=["HITL"])
 app.include_router(llm.router, prefix="/api/v1/llm", tags=["LLM"])
-app.include_router(graph.router, prefix="/api/v1/graph", tags=["Graph"])
 
 
 # ============================================================================
@@ -211,7 +210,7 @@ async def root():
     """API root."""
     env_config = get_environment_config()
     return {
-        "name": "Kea Research Engine",
+        "name": "Project Research Engine",
         "version": "0.3.0",
         "environment": env_config.mode.value,
         "docs": "/docs",

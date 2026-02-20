@@ -271,7 +271,7 @@ class APIKeyManager:
     
     async def validate_key(self, raw_key: str) -> APIKey | None:
         """Validate API key and return if valid."""
-        if not raw_key or not raw_key.startswith("kea_"):
+        if not raw_key or not raw_key.startswith("project_"):
             return None
         
         key_prefix = raw_key[:12]

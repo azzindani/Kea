@@ -1,6 +1,6 @@
 # 🔢 Shared Embedding & Reranking
 
-The `shared/embedding` module provides the neural foundation for Kea's retrieval capabilities. It abstracts the models used for generating vector representations of text and the reranking logic used for high-fidelity fact selection.
+The `shared/embedding` module provides the neural foundation for Project's retrieval capabilities. It abstracts the models used for generating vector representations of text and the reranking logic used for high-fidelity fact selection.
 
 ## ✨ Features
 

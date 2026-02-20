@@ -85,12 +85,12 @@ class Span:
 class Trace:
     """A distributed trace."""
     trace_id: str
-    service_name: str = "kea"
+    service_name: str = "project"
     spans: list[Span] = field(default_factory=list)
     _current_span: Span | None = None
     
     @classmethod
-    def create(cls, service_name: str = "kea") -> "Trace":
+    def create(cls, service_name: str = "project") -> "Trace":
         """Create new trace."""
         trace = cls(
             trace_id=str(uuid.uuid4()),
@@ -144,7 +144,7 @@ class TracingMiddleware(BaseHTTPMiddleware):
     Adds trace ID header and logs request spans.
     """
     
-    def __init__(self, app, service_name: str = "kea"):
+    def __init__(self, app, service_name: str = "project"):
         super().__init__(app)
         self.service_name = service_name
     

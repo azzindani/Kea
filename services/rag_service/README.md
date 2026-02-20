@@ -1,6 +1,6 @@
 # 🗄️ RAG Service ("The Library")
 
-The **RAG (Retrieval-Augmented Generation) Service** provides the global knowledge orchestration layer for Kea. It functions as the **Librarian**, managing access to massive external datasets and multiple distinct RAG backends via a unified API.
+The **RAG (Retrieval-Augmented Generation) Service** provides the global knowledge orchestration layer for Project. It functions as the **Librarian**, managing access to massive external datasets and multiple distinct RAG backends via a unified API.
 
 ## 📐 Architecture
 
@@ -41,10 +41,10 @@ graph TD
 Every finding in Kea is normalized into an `AtomicFact` (Entity-Attribute-Value). This normalization allows the Orchestrator's **Consensus Engine** to compare findings from different sources at a granular level, resolving contradictions before they reach the final report.
 
 ### 2. High-Throughput Ingestion
-The `DatasetLoader` streams rows from Hugging Face or the local **Artifact Bus**, maps them to the atomic schema, and batch-inserts them into the vector store. This allows Kea to "learn" about a new domain (e.g., 10,000 regulatory documents) in minutes.
+The `DatasetLoader` streams rows from Hugging Face or the local **Artifact Bus**, maps them to the atomic schema, and batch-inserts them into the vector store. This allows Project to "learn" about a new domain (e.g., 10,000 regulatory documents) in minutes.
 
 ### 3. Provenance & Citation Tracking
-Every fact stored in the Library maintains a strict association with its source URL, document title, and extraction timestamp. This ensures that every claim in a Kea-generated report can be traced back to a specific, verified origin.
+Every fact stored in the Library maintains a strict association with its source URL, document title, and extraction timestamp. This ensures that every claim in a Project-generated report can be traced back to a specific, verified origin.
 
 ---
 
@@ -71,5 +71,5 @@ When the Kernel requests a fact, the RAG service doesn't just check one database
 The Library uses semantic clustering to identify contradictory facts (e.g., Source A says "Price is $10" while Source B says "Price is $12"). These are flagged for the **Keeper Node** in the Orchestrator to resolve during the "Context Hygiene" phase.
 
 ---
-*The RAG Service provides the evidence that grounds Kea's reasoning in physical reality.*
+*The RAG Service provides the evidence that grounds Project's reasoning in physical reality.*
 

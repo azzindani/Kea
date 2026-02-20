@@ -307,7 +307,7 @@
     "schemaVersion": 38,
     "style": "dark",
     "tags": [
-        "kea",
+        "project",
         "research"
     ],
     "templating": {
@@ -317,7 +317,7 @@
         "from": "now-1h",
         "to": "now"
     },
-    "title": "Kea Research Engine",
-    "uid": "kea-research-engine",
+    "title": "Project Research Engine",
+    "uid": "project-research-engine",
     "version": 1
 }

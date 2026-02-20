@@ -1,10 +1,10 @@
-# 🦜 Project Kea v0.4.0: Autonomous Enterprise Operating System
+# 🦜 Kea v0.4.0: Autonomous Enterprise Operating System
 
 > **"Not just a Chatbot. A Research Factory."**
 
 Kea v0.4.0 represents the evolution from a "Distributed Autonomous Research Engine" (DARE) to a **Generative ERP (Enterprise Resource Planning)** system. It simulates a **100,000+ Employee Corporation** where the "Employees" are silicon, the "Departments" are microservices, and the "Workflows" are generated Just-In-Time.
 
-Instead of writing linear "To-Do Lists," Kea architects and executes **Directed Acyclic Graphs (DAGs)**, enabling complex, non-linear problem solving at an enterprise scale.
+Instead of writing linear "To-Do Lists," Project architects and executes **Directed Acyclic Graphs (DAGs)**, enabling complex, non-linear problem solving at an enterprise scale.
 
 ---
 
@@ -89,10 +89,10 @@ Instead of a mess of Python functions, specialized "Departments" handle domain l
 Whether running on a $2/mo VPS or a $30k H100 cluster, the `shared/hardware` layer profiles the host machine. It automatically adjusts swarm concurrency, batch sizes, and memory limits to maximize throughput without crashing the host.
 
 ### 3. The Artifact Bus (Vault-Centric Execution)
-In a true microservices architecture, services do not share a common filesystem. Kea solves this via the **Vault & Artifact Bus**.
+In a true microservices architecture, services do not share a common filesystem. Project solves this via the **Vault & Artifact Bus**.
 - **Research Persistence Engine**: The Vault stores everything related to the *active work*: multi-user conversational data, job checkpoints, tasks (audit logs), and performance-critical research artifacts.
 - **Embedded Artifacts**: When data is collected (webscrapes, PDFs, etc.), it flows through the Artifact Bus into the Vault, where it is vectorized and indexed for JIT context retrieval during the research project.
-- **Zero Disk Dependency**: Services are stateless; they pull what they need from the Vault over the network (API), enabling Kea to scale across clusters.
+- **Zero Disk Dependency**: Services are stateless; they pull what they need from the Vault over the network (API), enabling Project to scale across clusters.
 
 ### 4. Multi-Source RAG Controller (Reference Intelligence)
 The **RAG Service** acts as the system's global "Reference Library," separate from the Vault's active research storage.

@@ -1,7 +1,7 @@
 # 🔌 Zipfile Server
 
 The `zipfile_server` is an MCP server providing tools for **Zipfile Server** functionality.
-It is designed to be used within the Kea ecosystem.
+It is designed to be used within the Project ecosystem.
 
 ## 🧰 Tools
 

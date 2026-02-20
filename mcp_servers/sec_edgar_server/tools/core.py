@@ -5,7 +5,7 @@ import os
 import shutil
 
 # Central Storage
-SEC_DATA_DIR = r"D:\Antigravity\Kea\sec_data"
+SEC_DATA_DIR = r"D:\Antigravity\Project\sec_data"
 
 class SecCore:
     _instance = None
@@ -15,8 +15,8 @@ class SecCore:
         # UserAgent required: "Name <Email>"
         # Using a generic one for the Agent. User should ideally configure this.
         # But for 'works out of the box', we use a placeholder.
-        # "Kea Agent <kea@antigravity.dev>"
-        return Downloader("Kea Agent", "kea@antigravity.dev", SEC_DATA_DIR)
+        # "Project Agent <project@antigravity.dev>"
+        return Downloader("Project Agent", "project@antigravity.dev", SEC_DATA_DIR)
 
     @staticmethod
     def get_download_path(ticker: str, filing_type: str) -> str:

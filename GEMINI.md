@@ -1,4 +1,4 @@
-# Kea Development Guidelines for Gemini
+# Project Development Guidelines for Gemini
 
 ## 🎭 Role & Persona
 
@@ -119,7 +119,7 @@ return JobResponse(status=ResearchStatus.COMPLETED)
 ## 📁 Project Structure
 
 ```
-Kea/
+Project/
 ├── kernel/             # [BRAIN] Isolated Core Reasoning Engine. Pure logic.
 ├── services/           # [BODY] I/O, Networking, and Tool implementation. 
 ├── shared/             # [MODELS] schemas.py, config.py. No heavy logic.
@@ -130,7 +130,6 @@ Kea/
 ├── migrations/         # [DB] Alembic versions.
 ├── k8s/                # [OPS] Kubernetes manifests.
 ├── references/         # [DOCS] Static reference materials.
-├── scripts/            # [UTILS] Developer utilities.
 └── tests/              # ⚠️ DO NOT TOUCH (Forbidden)
 ```
 **Strict Path Rules**:
@@ -152,7 +151,7 @@ Kea/
 | **Tier 2** | **System Body** | `services/`, `shared/` | Infrastructure, API routing, and core schemas. |
 | **Tier 3** | **Execution Engine** | `workers/`, `configs/` | Background processing and operational settings. |
 | **Tier 4** | **Intelligence** | `knowledge/`, `mcp_servers/`| Skills, rules, and external tool integrations. |
-| **Tier 5** | **Support** | `migrations/`, `k8s/`, `scripts/` | DB versioning, orchestration, and utilities. |
+| **Tier 5** | **Support** | `migrations/`, `k8s/` | DB versioning, orchestration, and support manifests. |
 
 **Rule**: Unless explicitly requested, your primary focus for improvements, fixes, and refactors should be **Tiers 1-3**. Tiers 4-5 are considered stable and should only be modified when explicitly instructed.
 

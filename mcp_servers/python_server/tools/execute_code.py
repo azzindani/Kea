@@ -51,7 +51,7 @@ async def execute_code_tool(arguments: dict) -> ToolResult:
     import subprocess
     
     # Create isolated temp directory
-    temp_dir = tempfile.mkdtemp(prefix="kea_sandbox_")
+    temp_dir = tempfile.mkdtemp(prefix="project_sandbox_")
     script_path = os.path.join(temp_dir, "script.py")
     
     try:

@@ -1,4 +1,4 @@
-# Kea Development Guidelines for Claude
+# Project Development Guidelines for Claude
 
 ## 🎭 Role & Persona
 
@@ -119,7 +119,7 @@ return JobResponse(status=ResearchStatus.COMPLETED)
 ## 📁 Project Structure
 
 ```
-Kea/
+Project/
 ├── kernel/             # [BRAIN] Isolated Core Reasoning Engine. Pure logic.
 ├── services/           # [BODY] I/O, Networking, and Tool implementation. 
 ├── shared/             # [MODELS] schemas.py, config.py. No heavy logic.

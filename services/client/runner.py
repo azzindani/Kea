@@ -7,7 +7,7 @@ Handles job submission, polling, and result management.
 import asyncio
 import json
 import uuid
-from typing import Any, Dict, Optional
+from typing import Optional
 
 from shared.logging import get_logger
 from services.client.api import ResearchClient
@@ -29,21 +29,15 @@ class ResearchRunner:
     async def run_query(
         self, 
         query: str,
-        seed_facts: list[dict] | None = None,
-        error_feedback: list[dict] | None = None,
     ) -> JobMetrics:
         """
         Run a single research query and return metrics.
         
         Args:
             query: The research query to run
-            seed_facts: Optional facts from previous attempt to build upon
-            error_feedback: Optional errors from previous attempt to learn from
         """
         job_id = str(uuid.uuid4())
-        seed_count = len(seed_facts) if seed_facts else 0
-        error_count = len(error_feedback) if error_feedback else 0
-        logger.info(f"🚀 Starting Research Job {job_id}: '{query}' (seed_facts={seed_count}, errors={error_count})")
+        logger.info(f"🚀 Starting Research Job {job_id}: '{query}'")
         
         self.metrics.start_job(job_id, query)
         
@@ -57,12 +51,6 @@ class ResearchRunner:
                 "depth": 2,
                 "max_sources": 50,
             }
-            
-            # Add seed context if provided (for cross-attempt sharing)
-            if seed_facts:
-                payload["seed_facts"] = seed_facts
-            if error_feedback:
-                payload["error_feedback"] = error_feedback
             
             response = await self.client.post("/api/v1/jobs/", json=payload)
             if response.status_code != 200:
@@ -98,11 +86,6 @@ class ResearchRunner:
                     data = status_resp.json()
                     status = data.get("status", "unknown").lower()
                     
-                    # Update metrics from server progress
-                    if "metrics" in data:
-                        srv_metrics = data["metrics"]
-                        # Sync tokens/tools if server provides them in real-time
-                        pass
                     
                     logger.debug(f"Job {job_id} status: {status}")
                     
@@ -121,22 +104,18 @@ class ResearchRunner:
             if status == "completed":
                 result_resp = await self.client.get(f"/api/v1/jobs/{job_id}/result")
                 if result_resp.status_code == 200:
-                   result_data = result_resp.json()
-                   
-                   # Store the report
-                   self.metrics._current_job.report = result_data.get("report")
-                   
-                   # API returns these at top level (not nested in metrics)
-                   # JobResult schema: job_id, status, report, confidence, facts_count, sources_count, facts, errors
-                   self.metrics._current_job.confidence = result_data.get("confidence", 0.0)
-                   self.metrics._current_job.facts_count = result_data.get("facts_count", 0)
-                   self.metrics._current_job.sources_count = result_data.get("sources_count", 0)
-                   
-                   # Store facts and errors for cross-attempt context sharing
-                   self.metrics._current_job.facts = result_data.get("facts", [])
-                   self.metrics._current_job.errors = result_data.get("errors", [])
-                   
-                   logger.info(f"Result received: confidence={result_data.get('confidence')}, facts={result_data.get('facts_count')}, sources={result_data.get('sources_count')}")
+                    result_data = result_resp.json()
+                    
+                    # Store the report
+                    self.metrics._current_job.report = result_data.get("report")
+                    
+                    # API returns these at top level (not nested in metrics)
+                    self.metrics._current_job.confidence = result_data.get("confidence", 0.0)
+                    self.metrics._current_job.facts_count = result_data.get("facts_count", 0)
+                    self.metrics._current_job.sources_count = result_data.get("sources_count", 0)
+                    
+                    
+                    logger.info(f"Result received: confidence={result_data.get('confidence')}, facts={result_data.get('facts_count')}, sources={result_data.get('sources_count')}")
                 
                 self.metrics.end_job(success=True)
                 logger.info(f"✅ Job {job_id} Completed Successfully")
@@ -145,9 +124,9 @@ class ResearchRunner:
                 error_msg = f"Job finished with status: {status}"
                 # Try to get error details
                 if status == "failed":
-                     status_resp = await self.client.get(f"/api/v1/jobs/{job_id}")
-                     if status_resp.status_code == 200:
-                         error_msg = status_resp.json().get("error", error_msg)
+                    status_resp = await self.client.get(f"/api/v1/jobs/{job_id}")
+                    if status_resp.status_code == 200:
+                        error_msg = status_resp.json().get("error", error_msg)
                 
                 self.metrics.end_job(success=False, error=error_msg)
                 logger.error(f"❌ Job {job_id} Failed: {error_msg}")

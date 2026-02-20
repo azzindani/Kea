@@ -1,7 +1,7 @@
 # 🔌 Google Search Server
 
 The `google_search_server` is an MCP server providing tools for **Google Search Server** functionality.
-It is designed to be used within the Kea ecosystem.
+It is designed to be used within the Project ecosystem.
 
 ## 🧰 Tools
 

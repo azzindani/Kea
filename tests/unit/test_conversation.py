@@ -139,9 +139,9 @@ class TestConversationSession:
         
         summary = session.get_summary()
         
-        # Summary uses "User" and "Kea" prefixes
+        # Summary uses "User" and "Project" prefixes
         assert "User" in summary
-        assert "Kea" in summary
+        assert "Project" in summary
         
         print("\n✅ Summary generation works")
 

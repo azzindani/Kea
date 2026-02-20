@@ -1,4 +1,4 @@
-# 📚 Kea 'Liquid Intelligence' Library Manifest
+# 📚 Project 'Liquid Intelligence' Library Manifest
 > **Total Skills Available**: 202
 
 This document is an automatically generated index of all available 'Pure Context' skills.

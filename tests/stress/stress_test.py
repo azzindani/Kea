@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Kea Stress Test Runner (API-Based).
+Project Stress Test Runner (API-Based).
 
 Runs stress tests via API Gateway endpoints, properly exercising
 the full microservices stack with authentication.
@@ -621,7 +621,7 @@ def list_queries() -> None:
 async def main_cli() -> None:
     """CLI entry point for direct execution."""
     parser = argparse.ArgumentParser(
-        description="Kea Stress Test Runner (API-Based)",
+        description="Project Stress Test Runner (API-Based)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -650,8 +650,8 @@ Prerequisites:
     args = parser.parse_args()
     
     if args.verbose:
-        os.environ["KEA_LOG_NO_TRUNCATE"] = "1"
-        print("⚡ VERBOSE MODE: KEA_LOG_NO_TRUNCATE=1 (Full Payloads Enabled)")
+        os.environ["PROJECT_LOG_NO_TRUNCATE"] = "1"
+        print("⚡ VERBOSE MODE: PROJECT_LOG_NO_TRUNCATE=1 (Full Payloads Enabled)")
         # Ensure third-party noisy loggers stay quiet(er) or become verbose?
         # User wants "naked", so let's allow DEBUG from httpx if they really want it, 
         # but usually we just want OUR debugs. 

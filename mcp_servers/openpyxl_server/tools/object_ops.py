@@ -44,7 +44,7 @@ async def add_comment(arguments: dict) -> ToolResult:
         path = arguments['file_path']
         cell = arguments['cell']
         text = arguments['text']
-        author = arguments.get('author', 'Kea Agent')
+        author = arguments.get('author', 'Project Agent')
         sheet_name = arguments.get('sheet_name')
         
         wb = _get_wb(path)

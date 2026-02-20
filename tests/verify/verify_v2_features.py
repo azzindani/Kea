@@ -266,7 +266,7 @@ def verify_hardware():
 async def main():
     """Run all v2.x verification tests."""
     print("\n" + "=" * 60)
-    print("🚀 KEA v2.x FEATURES VERIFICATION")
+    print("🚀 PROJECT v2.x FEATURES VERIFICATION")
     print("=" * 60)
     print("\nRunning standalone Python verification (no pytest)...")
     

@@ -119,19 +119,6 @@ services:
   # Background Workers
   # =========================================================================
 
-  research-worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: worker
-    command: python -m workers.research_worker
-    environment:
-      - ENVIRONMENT=development
-      - LOG_LEVEL=DEBUG
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - DATABASE_URL=postgresql://user:password@postgres:5432/research_engine
-    depends_on:
-      - postgres
 
   # =========================================================================
   # Infrastructure

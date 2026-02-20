@@ -1,2 +1,2 @@
 # Tests Package
-"""Test suite for Kea Research Engine."""
+"""Test suite for Project Research Engine."""

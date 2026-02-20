@@ -1,4 +1,4 @@
-# Kubernetes Deployment for Kea Research Engine
+# Kubernetes Deployment for Project Research Engine
 # Deploy: kubectl apply -f k8s/
 
 apiVersion: apps/v1
@@ -6,23 +6,23 @@ kind: Deployment
 metadata:
   name: api-gateway
   labels:
-    app: kea
+    app: project
     component: api-gateway
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: kea
+      app: project
       component: api-gateway
   template:
     metadata:
       labels:
-        app: kea
+        app: project
         component: api-gateway
     spec:
       containers:
         - name: api-gateway
-          image: kea/api-gateway:latest
+          image: project/api-gateway:latest
           ports:
             - containerPort: 8000
           env:
@@ -31,12 +31,12 @@ spec:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: kea-secrets
+                  name: project-secrets
                   key: database-url
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: kea-secrets
+                  name: project-secrets
                   key: jwt-secret
             - name: ORCHESTRATOR_URL
               value: "http://orchestrator:8001"
@@ -62,23 +62,23 @@ kind: Deployment
 metadata:
   name: orchestrator
   labels:
-    app: kea
+    app: project
     component: orchestrator
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: kea
+      app: project
       component: orchestrator
   template:
     metadata:
       labels:
-        app: kea
+        app: project
         component: orchestrator
     spec:
       containers:
         - name: orchestrator
-          image: kea/orchestrator:latest
+          image: project/orchestrator:latest
           ports:
             - containerPort: 8001
           env:
@@ -87,12 +87,12 @@ spec:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: kea-secrets
+                  name: project-secrets
                   key: database-url
             - name: OPENROUTER_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: kea-secrets
+                  name: project-secrets
                   key: openrouter-api-key
           resources:
             requests:
@@ -108,30 +108,30 @@ kind: Deployment
 metadata:
   name: mcp-host
   labels:
-    app: kea
+    app: project
     component: mcp-host
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: kea
+      app: project
       component: mcp-host
   template:
     metadata:
       labels:
-        app: kea
+        app: project
         component: mcp-host
     spec:
       containers:
         - name: mcp-host
-          image: kea/mcp-host:latest
+          image: project/mcp-host:latest
           ports:
             - containerPort: 8002
           env:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: kea-secrets
+                  name: project-secrets
                   key: database-url
           volumeMounts:
             - name: artifacts
@@ -141,10 +141,10 @@ spec:
       volumes:
         - name: artifacts
           persistentVolumeClaim:
-            claimName: kea-artifacts-pvc
+            claimName: project-artifacts-pvc
         - name: mcp-servers
           configMap:
-            name: kea-mcp-servers
+            name: project-mcp-servers
 
 ---
 apiVersion: apps/v1
@@ -152,35 +152,35 @@ kind: Deployment
 metadata:
   name: rag-service
   labels:
-    app: kea
+    app: project
     component: rag-service
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: kea
+      app: project
       component: rag-service
   template:
     metadata:
       labels:
-        app: kea
+        app: project
         component: rag-service
     spec:
       containers:
         - name: rag-service
-          image: kea/rag-service:latest
+          image: project/rag-service:latest
           ports:
             - containerPort: 8003
           env:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: kea-secrets
+                  name: project-secrets
                   key: database-url
             - name: OPENROUTER_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: kea-secrets
+                  name: project-secrets
                   key: openrouter-api-key
 
 ---
@@ -189,30 +189,30 @@ kind: Deployment
 metadata:
   name: vault
   labels:
-    app: kea
+    app: project
     component: vault
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: kea
+      app: project
       component: vault
   template:
     metadata:
       labels:
-        app: kea
+        app: project
         component: vault
     spec:
       containers:
         - name: vault
-          image: kea/vault:latest
+          image: project/vault:latest
           ports:
             - containerPort: 8004
           env:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: kea-secrets
+                  name: project-secrets
                   key: database-url
 
 ---
@@ -221,30 +221,30 @@ kind: Deployment
 metadata:
   name: swarm-manager
   labels:
-    app: kea
+    app: project
     component: swarm-manager
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: kea
+      app: project
       component: swarm-manager
   template:
     metadata:
       labels:
-        app: kea
+        app: project
         component: swarm-manager
     spec:
       containers:
         - name: swarm-manager
-          image: kea/swarm-manager:latest
+          image: project/swarm-manager:latest
           ports:
             - containerPort: 8005
           env:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: kea-secrets
+                  name: project-secrets
                   key: database-url
 
 ---
@@ -253,30 +253,30 @@ kind: Deployment
 metadata:
   name: chronos
   labels:
-    app: kea
+    app: project
     component: chronos
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: kea
+      app: project
       component: chronos
   template:
     metadata:
       labels:
-        app: kea
+        app: project
         component: chronos
     spec:
       containers:
         - name: chronos
-          image: kea/chronos:latest
+          image: project/chronos:latest
           ports:
             - containerPort: 8006
           env:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: kea-secrets
+                  name: project-secrets
                   key: database-url
 
 ---
@@ -285,32 +285,32 @@ kind: Deployment
 metadata:
   name: research-worker
   labels:
-    app: kea
+    app: project
     component: worker
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: kea
+      app: project
       component: worker
   template:
     metadata:
       labels:
-        app: kea
+        app: project
         component: worker
     spec:
       containers:
         - name: worker
-          image: kea/worker:latest
+          image: project/worker:latest
           command: ["python", "-m", "workers.research_worker"]
           env:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: kea-secrets
+                  name: project-secrets
                   key: database-url
             - name: OPENROUTER_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: kea-secrets
+                  name: project-secrets
                   key: openrouter-api-key

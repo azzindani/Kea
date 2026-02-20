@@ -39,7 +39,7 @@ The architect of strategic foresight. You don't just "watch competitors"; you en
 - *Action*: Conduct a "Hiring & Patent Correlation" audit. 
 - *Discovery*: Patent filings show "Low-Power Silicon Interconnects." Glassdoor reviews mention a "Secret Project Orion" involving "Sub-5ms Latency."
 - *Solution*: 
-    1. Deploy "AI-Scrapers" to track the "Resume Updates" of Project Orion leads across 500 LinkedIn-adjacent platforms.
+    1. Deploy "AI-Scrapers" to track the "Resume Updates" of Kea Orion leads across 500 LinkedIn-adjacent platforms.
     2. Use "Multi-Agent Synthesis" to simulate the product specs. Analyst A (Hardware) predicts an "NPU Accessory"; Analyst B (Software) predicts an "OS-level Edge Runtime."
     3. Overlay "Supply Chain Intel" showing a 200% increase in rare-earth magnet orders.
 - *Result*: Correctly predicted a "Wearable AI-Hub" launch 4 months before the official reveal; client adjusted their R&D roadmap to avoid direct feature-clash.
