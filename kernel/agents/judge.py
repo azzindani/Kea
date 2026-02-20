@@ -314,8 +314,13 @@ class JudgeAgent:
             confidence = max(0.0, min(1.0, (avg_score + 1) / 2))
             
             # Heuristic penalty: if we have very few facts, confidence ceiling
-            if total_facts < 3:
-                confidence = min(confidence, 0.6)
+            # Thresholds loaded from config to avoid hardcoding
+            from shared.prompts import get_kernel_config
+            fq_cfg = (get_kernel_config("kernel_cell.fact_quality") or {})
+            min_facts_threshold = fq_cfg.get("min_facts_for_full_confidence", 3)
+            low_fact_cap = fq_cfg.get("low_fact_confidence_cap", 0.75)
+            if total_facts < min_facts_threshold:
+                confidence = min(confidence, low_fact_cap)
 
             logger.info(
                 f"Fact Quality Reward: avg_score={avg_score:.2f} -> confidence={confidence:.2f} (facts={total_facts})"

@@ -453,6 +453,7 @@ class CognitiveCycle:
         tool_call: Callable[[str, dict[str, Any]], Awaitable[Any]],
         task_id: str = "",
         communicator: Any | None = None,
+        awareness: Any | None = None,
     ) -> None:
         self.profile = profile
         self.memory = memory
@@ -463,6 +464,10 @@ class CognitiveCycle:
         # Communication (v2.0)   typed as Any to avoid circular import
         # Actual type: CellCommunicator | None
         self.comm = communicator
+
+        # Situational Awareness (Phase 1) — threaded from InferenceContext
+        # Typed as Any to avoid circular import with AwarenessEnvelope
+        self.awareness = awareness
 
         # Internal state
         self.current_phase = CyclePhase.PERCEIVE
@@ -1525,17 +1530,6 @@ class CognitiveCycle:
             topic = f"step_{step_idx}"
             self.memory.set_confidence(topic, confidence)
 
-        # Try DAG-based parallel execution for complex queries  
-        dag_executed = await self._try_dag_execution(task, context, plan, available_tools)
-        if dag_executed:
-            return  # DAG completed successfully
-
-        # Fallback to standard execution loop
-        max_steps = self.profile.max_reasoning_steps
-        monitor_interval = max(
-            1,
-            max_steps // (self.profile.max_self_monitor_checks + 1),
-        )
 
     
     async def _try_dag_execution(
@@ -2642,10 +2636,25 @@ class CognitiveCycle:
                      if "url" in t.get("args", {}):
                          sources_list.append({"url": t["args"]["url"], "title": t["tool"]})
 
+                # v0.4.1 Optimization: Pre-retrieve knowledge once to avoid
+                # redundant RAG calls in each Generator/Critic/Judge round
+                _pkg_knowledge_ctx: str | None = None
+                try:
+                    import asyncio
+                    from shared.knowledge.retriever import get_knowledge_retriever
+                    _pkg_retriever = get_knowledge_retriever()
+                    _pkg_knowledge_ctx = await asyncio.wait_for(
+                        _pkg_retriever.retrieve_skills(perception.task_text, limit=2),
+                        timeout=3.0,
+                    )
+                except Exception:
+                    _pkg_knowledge_ctx = None
+
                 consensus_result = await engine.reach_consensus(
                     query=perception.task_text,
                     facts=[v for k, v in self.memory.all_facts.items()],
                     sources=sources_list,
+                    knowledge_context=_pkg_knowledge_ctx,
                 )
                 
                 final_content = consensus_result.get("final_answer", "")

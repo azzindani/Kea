@@ -93,6 +93,11 @@ kernel_cell:
     vp_rounds: 2
     ceo_rounds: 3
 
+  # Fact Quality Scoring (used by Judge._calculate_fact_quality)
+  fact_quality:
+    min_facts_for_full_confidence: 3  # Below this, apply confidence ceiling
+    low_fact_confidence_cap: 0.75     # Max confidence when facts < min threshold
+
   # Quality Bar Instructions (injected into every LLM call by inference engine)
   quality_instructions:
     draft: >
