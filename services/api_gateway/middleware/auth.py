@@ -16,7 +16,7 @@ from typing import Optional
 from fastapi import Request, HTTPException, Depends
 from fastapi.security import HTTPBearer, APIKeyHeader
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.config import get_settings
 from shared.users import User, UserRole
 from shared.users.manager import get_user_manager, get_api_key_manager

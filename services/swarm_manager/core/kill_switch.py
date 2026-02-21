@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Callable
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 
 logger = get_logger(__name__)

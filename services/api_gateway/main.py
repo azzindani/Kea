@@ -18,7 +18,7 @@ from fastapi.responses import JSONResponse
 from prometheus_client import make_asgi_app
 
 from shared.config import get_settings
-from shared.logging import setup_logging, get_logger, LogConfig, RequestLoggingMiddleware, set_system_info
+from shared.logging.main import setup_logging, get_logger, LogConfig, RequestLoggingMiddleware, set_system_info
 from shared.environment import get_environment_config
 
 from services.api_gateway.routes import (

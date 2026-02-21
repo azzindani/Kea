@@ -12,7 +12,7 @@ class TestStructuredLogging:
     
     def test_get_logger(self):
         """Get logger by name."""
-        from shared.logging import get_logger
+        from shared.logging.main import get_logger
         
         logger = get_logger("test_module")
         
@@ -21,7 +21,7 @@ class TestStructuredLogging:
     
     def test_log_levels(self):
         """Logger supports all levels."""
-        from shared.logging import get_logger
+        from shared.logging.main import get_logger
         
         logger = get_logger("test_levels")
         
@@ -37,7 +37,7 @@ class TestLogConfig:
     
     def test_create_config(self):
         """Create log config."""
-        from shared.logging import LogConfig
+        from shared.logging.main import LogConfig
         
         config = LogConfig(
             level="DEBUG",
@@ -50,7 +50,7 @@ class TestLogConfig:
     
     def test_setup_logging(self):
         """Setup logging from config."""
-        from shared.logging import setup_logging, LogConfig
+        from shared.logging.main import setup_logging, LogConfig
         
         config = LogConfig(
             level="INFO",
@@ -67,7 +67,7 @@ class TestLogContext:
     
     def test_set_context(self):
         """Set log context using LogContext object."""
-        from shared.logging import LogContext
+        from shared.logging.main import LogContext
         from shared.logging.context import set_context, get_context
         
         ctx = LogContext(trace_id="trace-123", request_id="req-456")
@@ -83,7 +83,7 @@ class TestLogDecorator:
     
     def test_decorator_sync(self):
         """Decorator works on sync functions (with parentheses)."""
-        from shared.logging import log_execution
+        from shared.logging.main import log_execution
         
         @log_execution()  # Note: requires parentheses - it's a decorator factory
         def test_func(x, y):
@@ -96,7 +96,7 @@ class TestLogDecorator:
     @pytest.mark.asyncio
     async def test_decorator_async(self):
         """Decorator works on async functions."""
-        from shared.logging import log_execution
+        from shared.logging.main import log_execution
         
         @log_execution()  # Note: requires parentheses
         async def test_async_func(x):

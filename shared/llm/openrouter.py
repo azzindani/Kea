@@ -59,7 +59,7 @@ class OpenRouterProvider(LLMProvider):
         self.site_url = site_url
         
         if not self.api_key:
-            raise ValueError("OpenRouter API key is required in settings.yaml or via Environment mapping.")
+            raise ValueError("OpenRouter API key is required in environment variables or via shared.config defaults.")
     
     def _get_headers(self) -> dict[str, str]:
         """Get request headers."""

@@ -74,7 +74,7 @@ def llm_config():
 @pytest.fixture
 def logger():
     """Get test logger."""
-    from shared.logging import get_logger
+    from shared.logging.main import get_logger
     return get_logger("test.real")
 
 

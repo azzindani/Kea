@@ -56,7 +56,7 @@ from mcp_servers.sec_edgar_server.tools.timeline import get_filing_timeline
 
 logger = structlog.get_logger()
 
-from shared.logging import setup_logging
+from shared.logging.main import setup_logging
 setup_logging()
 
 mcp = FastMCP(

@@ -149,7 +149,7 @@ You **MUST** use the provided `setup_logging` utility to ensure logs are routed 
 
 ```python
 # In server.py
-from shared.logging import setup_logging
+from shared.logging.main import setup_logging
 setup_logging()  # <--- CALL THIS IMMEDIATELY
 
 mcp = FastMCP("my_server")

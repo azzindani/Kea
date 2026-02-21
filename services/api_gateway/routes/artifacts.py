@@ -10,7 +10,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, UploadFile, File, Depends, Response
 from pydantic import BaseModel, Field
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from services.api_gateway.clients.rag_service import RAGServiceClient
 
 

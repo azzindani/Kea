@@ -15,7 +15,7 @@ if root_path not in sys.path:
 
 from shared.mcp.fastmcp import FastMCP
 from typing import List, Dict, Any, Union, Optional
-from shared.logging import setup_logging, get_logger
+from shared.logging.main import setup_logging, get_logger
 setup_logging()
 logger = get_logger(__name__)
 

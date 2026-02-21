@@ -5,7 +5,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import yfinance as yf
 from mcp.server.fastmcp import Image
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 # Clear MPLBACKEND before importing matplotlib
 os.environ.pop('MPLBACKEND', None)

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from services.rag_service.core.artifact_store import ArtifactStore, Artifact, LocalArtifactStore
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.database.connection import get_database_pool
 
 import asyncpg

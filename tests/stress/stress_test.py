@@ -51,7 +51,7 @@ from services.client.api import ResearchClient
 from tests.stress.conftest import API_GATEWAY_URL, ORCHESTRATOR_URL
 
 from shared.hardware.detector import detect_hardware, HardwareProfile
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 
 logger = get_logger(__name__)

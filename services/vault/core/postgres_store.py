@@ -15,7 +15,7 @@ import asyncpg
 from pgvector.asyncpg import register_vector
 
 from services.vault.core.vector_store import VectorStore, Document, SearchResult
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.database.connection import get_db_pool
 
 logger = get_logger(__name__)

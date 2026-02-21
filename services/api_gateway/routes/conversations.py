@@ -11,7 +11,7 @@ from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.users import User
 from shared.conversations import get_conversation_manager, MessageRole
 from services.api_gateway.middleware.auth import get_current_user, get_current_user_required

@@ -15,7 +15,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 from shared.config import get_settings
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 # Pre-import transformers to avoid threading issues in Colab/Kaggle
 # These imports happen at module load time, before any threads spawn

@@ -11,7 +11,7 @@ import os
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 logger = get_logger(__name__)
 

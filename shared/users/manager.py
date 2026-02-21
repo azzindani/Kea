@@ -11,7 +11,7 @@ from typing import Any
 import asyncio
 import os
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.database.connection import get_database_pool
 from shared.users.models import User, UserRole, APIKey, USERS_TABLE_SQL, API_KEYS_TABLE_SQL
 

@@ -1,7 +1,7 @@
 
 import ccxt.async_support as ccxt
 import ccxt.async_support as ccxt
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from mcp_servers.ccxt_server.tools.exchange_manager import get_exchange_instance
 import json
 

@@ -8,7 +8,7 @@ from mcp_servers.ccxt_server.tools import (
     public, metadata, aggregator, derivatives, historical, account, private, trading, exchange_manager
 )
 from typing import List, Dict, Any, Optional
-from shared.logging import setup_logging, get_logger
+from shared.logging.main import setup_logging, get_logger
 import ccxt.async_support as ccxt
 import asyncio
 

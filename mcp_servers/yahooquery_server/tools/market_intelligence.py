@@ -1,7 +1,7 @@
 
 from yahooquery import get_trending
 from shared.mcp.protocol import ToolResult, TextContent
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 import json
 
 logger = get_logger(__name__)

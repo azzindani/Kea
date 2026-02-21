@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Dict, List, Any
 import dataclasses
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.mcp.client import MCPClient
 from shared.mcp.protocol import Tool
 from shared.mcp.transport import SubprocessTransport
@@ -344,19 +344,8 @@ class SessionRegistry:
             has_pyproject = (server_dir / "pyproject.toml").exists()
             cwd = None # Default to inheriting current process CWD (Project Root)
             
-            # Check if we have a pre-configured command in settings.yaml
-            configured_cmd = None
-            if settings.mcp and settings.mcp.servers:
-                for srv in settings.mcp.servers:
-                    if srv.name == server_name and srv.enabled and srv.command:
-                        import shlex
-                        configured_cmd = shlex.split(srv.command)
-                        logger.info(f"⚡ Using configured command for {server_name}")
-                        break
-
-            if configured_cmd:
-                cmd = configured_cmd
-            elif uv_path:
+            # Determine command (UV or standard python)
+            if uv_path:
                 logger.info(f"⚡ Using UV for {server_name}")
                 
                 if has_pyproject:

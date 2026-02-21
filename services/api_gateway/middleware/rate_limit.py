@@ -18,7 +18,7 @@ from typing import Callable
 from fastapi import Request, Response, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.config import get_settings
 
 

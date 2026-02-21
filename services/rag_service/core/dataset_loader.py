@@ -7,7 +7,7 @@ import asyncio
 from typing import AsyncGenerator, Any
 
 from shared.schemas import AtomicInsight
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 logger = get_logger(__name__)
 

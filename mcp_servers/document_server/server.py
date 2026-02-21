@@ -25,7 +25,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
 from typing import List, Dict, Any, Optional
 from mcp_servers.document_server.tools import pdf, word, excel, html, json_tool
-from shared.logging import setup_logging, get_logger
+from shared.logging.main import setup_logging, get_logger
 setup_logging()
 logger = get_logger(__name__)
 

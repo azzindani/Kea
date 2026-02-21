@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 import httpx
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.config import get_settings
 
 

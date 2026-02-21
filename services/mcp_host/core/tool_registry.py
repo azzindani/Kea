@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 from typing import Any, List, Dict
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from services.mcp_host.core.postgres_registry import PostgresToolRegistry
 
 logger = get_logger(__name__)

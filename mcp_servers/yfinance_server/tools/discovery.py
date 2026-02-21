@@ -3,7 +3,7 @@ import asyncio
 import yfinance as yf
 import pandas as pd
 from mcp_servers.yfinance_server.utils.ticker_cache import TickerCache
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 logger = get_logger(__name__)
 

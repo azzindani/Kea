@@ -24,7 +24,7 @@ from typing import List, Optional
 logger = structlog.get_logger()
 
 # Create the FastMCP server
-from shared.logging import setup_logging
+from shared.logging.main import setup_logging
 setup_logging()
 # Direct stdout to stderr for the server instance to avoid breaking protocol
 import sys

@@ -24,7 +24,7 @@ from typing import Any
 
 import httpx
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.service_registry import ServiceName, ServiceRegistry
 
 logger = get_logger(__name__)

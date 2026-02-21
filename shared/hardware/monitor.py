@@ -13,7 +13,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Callable
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 
 logger = get_logger(__name__)

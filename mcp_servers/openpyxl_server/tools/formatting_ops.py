@@ -4,7 +4,7 @@ from openpyxl.formatting.rule import ColorScaleRule, CellIsRule, FormulaRule, Ru
 from openpyxl.styles import PatternFill, Font, Border, Side
 from openpyxl.styles.differential import DifferentialStyle
 from shared.mcp.protocol import ToolResult, TextContent
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 import os
 import json
 

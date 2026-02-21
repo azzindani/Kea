@@ -16,7 +16,7 @@ from pathlib import Path
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from shared.logging import setup_logging, LogConfig, LogLevel, get_logger
+from shared.logging.main import setup_logging, LogConfig, LogLevel, get_logger
 from services.sdk.api import AutonomousClient
 from services.sdk.runner import JobRunner
 from services.sdk.metrics import MetricsCollector

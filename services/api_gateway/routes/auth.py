@@ -11,7 +11,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from pydantic import BaseModel, EmailStr, Field
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.users import User
 from shared.users.manager import get_user_manager
 from shared.sessions import get_session_manager, get_jwt_manager

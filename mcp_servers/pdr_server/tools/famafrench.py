@@ -3,7 +3,7 @@ import pandas_datareader.data as web
 import pandas_datareader.famafrench as ff
 from contextlib import contextmanager
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 import pandas as pd
 import datetime
 

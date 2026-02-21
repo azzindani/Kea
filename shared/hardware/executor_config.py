@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .detector import HardwareProfile, detect_hardware
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 
 logger = get_logger(__name__)

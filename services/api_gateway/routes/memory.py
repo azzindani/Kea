@@ -11,7 +11,7 @@ import httpx
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.service_registry import ServiceName, ServiceRegistry
 
 logger = get_logger(__name__)

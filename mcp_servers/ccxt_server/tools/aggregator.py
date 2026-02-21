@@ -5,7 +5,7 @@ import pandas as pd
 import ccxt.async_support as ccxt
 import asyncio
 import pandas as pd
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from mcp_servers.ccxt_server.tools.exchange_manager import get_exchange_instance
 
 logger = get_logger(__name__)

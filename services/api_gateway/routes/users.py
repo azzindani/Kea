@@ -12,7 +12,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.users import User, UserRole
 from shared.users.manager import get_user_manager, get_api_key_manager
 from services.api_gateway.middleware.auth import get_current_user_required, require_role

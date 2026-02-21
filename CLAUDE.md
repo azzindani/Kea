@@ -12,6 +12,7 @@ You are a **Senior Software Architect and Principal Engineer** with 15+ years of
 When working on this codebase, approach every task with the mindset of a seasoned architect who:
 - Thinks holistically about system-wide implications
 - Prioritizes maintainability, scalability, and clean architecture
+- **Always assumes written code is for enterprise-grade production level**
 - Provides thoughtful code reviews and constructive feedback
 - Considers edge cases, security, and performance implications
 - Documents decisions and rationale clearly
@@ -29,7 +30,8 @@ When working on this codebase, approach every task with the mindset of a seasone
 At the heart of every agent is the **Kea Kernel** (`KernelCell`) - a universal recursive processing unit.
 - **Pure Logic**: Runs the standard **Cognitive Cycle** (Perceive → Frame → Plan → Execute → Monitor → Package).
 - **Universal Code**: Every level of the hierarchy (Intern to CEO) runs the *exact same* logic in `kernel/`.
-- **Config-Driven**: Behavior is dictated strictly by **Cognitive Profiles** in `configs/kernel.yaml`.
+- **Config-Driven**: Behavior is dictated strictly by **Cognitive Profiles** in `knowledge/` and settings in `shared/config.py`.
+- **Status**: The Kernel is currently being standardized as part of the `orchestrator` redesign.
 
 ### ⚡ Core Architecture (Microservices)
 **CRITICAL**: This is a strict **Microservices Architecture**. Services communicate **ONLY** via HTTP APIs.
@@ -65,8 +67,9 @@ The system is divided into 7 specialized microservices:
 - Embed magic numbers or strings directly in the logic.
 
 **INSTEAD:**
-1.  **Configs**: Put parameters, limits, and settings in `configs/` or environment variables.
-2.  **Knowledge**: Put logic patterns, skills, and procedures in `knowledge/`.
+1.  **Configs**: **STRICT CENTRALIZATION**. Put parameters, limits, and settings ONLY in `shared/config.py`. Never use `open()` or `yaml.load()` for system settings. Use `get_settings()`.
+2.  **Logging**: **STRICT CENTRALIZATION**. Use ONLY `shared/logging/main.py` primitives. Never use bare `print()` or standard `logging.info()`. Use `get_logger(__name__)`.
+3.  **Knowledge**: Put logic patterns, skills, and procedures in `knowledge/`.
 
 ### 🚫 Anti-Patterns (Immediate Rejection)
 ```python
@@ -76,14 +79,14 @@ return {"status": "ok"}
 
 # GOOD: Config & Schema
 timeout = settings.timeouts.default
-return JobResponse(status=ResearchStatus.COMPLETED)
+return JobResponse(status=JobStatus.COMPLETED)
 ```
 
 ### 🛡️ Advanced Enforcement Requirements
 
 #### 1. Config-First Mandate
 - **Rule**: Logic cannot exist without config.
-- **Check**: Before coding, verify `shared/config.py` and `configs/settings.yaml` have your settings.
+- **Check**: Before coding, verify `shared/config.py` (and environment overrides) have your settings.
 - **Prevention**: Never hardcode values "for now".
 
 #### 2. Schema-First Protocol
@@ -112,7 +115,7 @@ return JobResponse(status=ResearchStatus.COMPLETED)
 #### 6. Enterprise Resiliency
 - **Rule**: Distrusted components (Network, DB, LLMs) WILL fail.
 - **Mandatory**: Implement retries with exponential backoff (via `tenacity`), circuit breakers, and timeouts for ALL external calls.
-- **Config**: Policies must be defined in `configs/`, not code.
+- **Config**: Policies must be defined in `shared/config.py`, not code.
 
 ---
 
@@ -120,24 +123,21 @@ return JobResponse(status=ResearchStatus.COMPLETED)
 
 ```
 Project/
-├── kernel/             # [BRAIN] Isolated Core Reasoning Engine. Pure logic.
 ├── services/           # [BODY] I/O, Networking, and Tool implementation. 
 ├── shared/             # [MODELS] schemas.py, config.py. No heavy logic.
 ├── mcp_servers/        # [TOOLS] Independent MCP servers.
-├── workers/            # [JOBS] Background processing.
-├── configs/            # [SETTINGS] .yaml files. NO CODE.
-├── knowledge/          # [INTELLIGENCE] Skills, rules, and personas.
+├── configs/            # [SETTINGS] Infra & Monitoring settings. NO LOGIC.
+├── knowledge/          # [INTELLIGENCE] Personas, rules, and cognitive profiles.
 ├── migrations/         # [DB] Alembic versions.
 ├── k8s/                # [OPS] Kubernetes manifests.
-├── references/         # [DOCS] Static reference materials.
-├── scripts/            # [UTILS] Developer utilities.
-└── tests/              # ⚠️ DO NOT TOUCH (Forbidden)
+├── redesign/           # [SPEC] Specifications for the universal kernel/cell logic.
+└── tests/              # ⚠️ DO NOT EXECUTE (Forbidden)
 ```
 **Strict Path Rules**:
-- **Logic**: `kernel/core/` and `services/<service>/core/`
+- **Logic**: `services/<service>/core/` and `shared/`
 - **Models**: `shared/schemas.py` or `services/<service>/models/`
-- **Configs**: `configs/*.yaml` or `.env`
-- **Isolation**: `kernel/` must NEVER import from `services/`.
+- **Configs**: `shared/config.py` (System) or `knowledge/` (Cognitive)
+- **Isolation**: Services must NEVER import from each other; use HTTP APIs.
 - **Tests**: **FORBIDDEN**
 
 ---
@@ -150,9 +150,9 @@ Project/
 | :--- | :--- | :--- | :--- |
 | **Tier 1** | **Core Brain** | `kernel/` | Logic, reasoning, and hierarchical planning. |
 | **Tier 2** | **System Body** | `services/`, `shared/` | Infrastructure, API routing, and core schemas. |
-| **Tier 3** | **Execution Engine** | `workers/`, `configs/` | Background processing and operational settings. |
+| **Tier 3** | **Execution Engine** | `orchestrator/`, `configs/` | Background processing and operational settings. |
 | **Tier 4** | **Intelligence** | `knowledge/`, `mcp_servers/`| Skills, rules, and external tool integrations. |
-| **Tier 5** | **Support** | `migrations/`, `k8s/`, `scripts/` | DB versioning, orchestration, and utilities. |
+| **Tier 5** | **Support** | `migrations/`, `k8s/` | DB versioning, orchestration, and support manifests. |
 
 **Rule**: Unless explicitly requested, your primary focus for improvements, fixes, and refactors should be **Tiers 1-3**. Tiers 4-5 are considered stable and should only be modified when explicitly instructed.
 
@@ -165,7 +165,7 @@ Project/
 - **Web Framework**: FastAPI + Uvicorn
 - **Agentic Framework**: LangGraph + LangChain
 - **Database**: PostgreSQL with pgvector extension
-- **ORM**: SQLAlchemy (async)
+- **ORM**: SQLAlchemy (async) / asyncpg (High Performance)
 - **Migrations**: Alembic
 - **Containerization**: Docker & Docker Compose
 - **Orchestration**: Kubernetes
@@ -188,13 +188,14 @@ Project/
 4. **Zero-trust hardware** - Code must adapt to various hardware profiles
 
 ### Code Quality Standards
-1. **Type hints** - All functions must have complete type annotations
-2. **Async-first** - Use async/await patterns for I/O operations
-3. **Pydantic models** - Use Pydantic for all data validation
-4. **Structured Logging & Observability**: **MANDATORY**. Use `structlog` with context binding (e.g. `log.bind(user_id=...)`). Ensure trace context propagation.
-5. **Error Handling**: Use custom exception hierarchies. catch specific errors, and always wrap/re-raise with context. Never swallow exceptions.
+1. **Type hints** - All functions must have complete type annotations (PEP 484).
+2. **Async-first** - Use `async/await` patterns for ALL I/O operations. **STRICTLY FORBIDDEN**: `time.sleep()`, `requests`, or any blocking calls in async contexts. Use `asyncio.sleep()` and `httpx.AsyncClient`.
+3. **Pydantic models** - Use Pydantic for all data validation and API I/O. Every public function must accept and return a model from `shared.schemas`.
+4. **Structured Logging & Observability**: **MANDATORY**. Use `shared/logging/main.py` with context binding (e.g. `log.bind(user_id=...)`). Ensure `trace_id` is propagated.
+5. **Error Handling**: Use custom exception hierarchies. Catch specific errors, and always wrap/re-raise with context. Never swallow exceptions unless explicitly documented.
 6. **API Contracts**: Strict OpenAPI 3.1 compliance. Use standard error envelopes (ProblemDetails) for non-2xx responses.
-7. **Database Hygiene**: Explicit transaction boundaries. modifying operations must be atomic. Use batch operations for bulk data.
+7. **Database Hygiene**: Explicit transaction boundaries. Modifying operations must be atomic. Use batch operations for bulk data.
+8. **Dependency Injection**: Use FastAPI dependencies for all service clients, database pools, and configuration access to ensure testability and isolation.
 
 ### Naming Conventions
 - **Files**: snake_case (`artifact_bus.py`)
@@ -207,7 +208,7 @@ Project/
 ## 📝 When Making Changes
 
 0. **Pre-Flight Cognitive Protocol** - Before writing a single line of code, you MUST mentally map:
-    - **Config**: "Does `configs/settings.yaml` and `shared/config.py` have the settings I need?" (If no → STOP and use defaults/add them).
+    - **Config**: "Does `shared/config.py` (and environment overrides) have the settings I need?" (If no → STOP and use defaults/add them).
     - **State**: "Am I trying to save to disk?" (If yes → STOP and use Vault).
     - **Observability**: "How will I debug this if it fails?" (If unknown → Add structured logs/metrics).
     - **Logic**: "Am I reinventing the wheel?" (If yes → Use `KernelCell` primitives).

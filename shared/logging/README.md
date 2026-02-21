@@ -35,7 +35,7 @@ graph TD
 
 ### Setup
 ```python
-from shared.logging import setup_logging, LogConfig
+from shared.logging.main import setup_logging, LogConfig
 
 # Initialize globally at service startup
 setup_logging(LogConfig(service_name="orchestrator", level="info"))
@@ -43,7 +43,7 @@ setup_logging(LogConfig(service_name="orchestrator", level="info"))
 
 ### Basic Logging
 ```python
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 logger = get_logger(__name__)
 logger.info("Operation completed", extra={"status": "success", "delay_ms": 120})

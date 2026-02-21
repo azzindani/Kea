@@ -1,7 +1,7 @@
 
 from openpyxl import load_workbook, Workbook
 from shared.mcp.protocol import ToolResult, TextContent
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 import os
 import json
 

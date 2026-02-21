@@ -24,7 +24,7 @@ from typing import Dict, Any, List
 logger = structlog.get_logger()
 
 # Create the FastMCP server
-from shared.logging import setup_logging
+from shared.logging.main import setup_logging
 setup_logging()
 
 mcp = FastMCP("portfolio_server", dependencies=["pyportfolioopt", "pandas", "numpy", "matplotlib", "scipy"])

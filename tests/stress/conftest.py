@@ -37,7 +37,7 @@ TEST_USER_NAME = "Stress Test User"
 def pytest_configure(config):
     """Configure pytest for stress tests."""
     # Setup Project logging with console format for readable output
-    from shared.logging import setup_logging, LogConfig
+    from shared.logging.main import setup_logging, LogConfig
     from shared.logging.structured import LogLevel
     
     # Use console format (not JSON) for test readability

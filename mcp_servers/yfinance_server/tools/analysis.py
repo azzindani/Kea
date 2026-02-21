@@ -3,7 +3,7 @@ import pandas as pd
 import yfinance as yf
 import numpy as np
 from typing import List, Optional
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 logger = get_logger(__name__)
 

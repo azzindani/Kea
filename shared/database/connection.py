@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, AsyncIterator
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.environment import get_environment_config
 
 

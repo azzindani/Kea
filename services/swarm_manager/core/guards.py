@@ -11,7 +11,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 
 logger = get_logger(__name__)

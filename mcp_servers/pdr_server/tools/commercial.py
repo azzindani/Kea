@@ -1,7 +1,7 @@
 
 import pandas_datareader.data as web
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 import datetime
 import os
 

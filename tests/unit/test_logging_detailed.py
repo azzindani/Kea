@@ -49,7 +49,7 @@ class TestLogDecorators:
     
     def test_log_execution_sync(self):
         """Decorator on sync function."""
-        from shared.logging import log_execution
+        from shared.logging.main import log_execution
         
         @log_execution()
         def add(a, b):
@@ -61,7 +61,7 @@ class TestLogDecorators:
     @pytest.mark.asyncio
     async def test_log_execution_async(self):
         """Decorator on async function."""
-        from shared.logging import log_execution
+        from shared.logging.main import log_execution
         
         @log_execution()
         async def multiply(a, b):
@@ -72,7 +72,7 @@ class TestLogDecorators:
     
     def test_log_execution_with_exception(self):
         """Decorator logs exceptions."""
-        from shared.logging import log_execution
+        from shared.logging.main import log_execution
         
         @log_execution()
         def fail():
@@ -87,7 +87,7 @@ class TestStructuredLogger:
     
     def test_create_logger(self):
         """Create structured logger using get_logger."""
-        from shared.logging import get_logger
+        from shared.logging.main import get_logger
         
         logger = get_logger("test.structured")
         
@@ -95,7 +95,7 @@ class TestStructuredLogger:
     
     def test_log_with_context(self):
         """Log with extra context."""
-        from shared.logging import get_logger
+        from shared.logging.main import get_logger
         
         logger = get_logger("test.context")
         
@@ -104,7 +104,7 @@ class TestStructuredLogger:
     
     def test_log_levels(self):
         """All log levels work."""
-        from shared.logging import get_logger
+        from shared.logging.main import get_logger
         
         logger = get_logger("test.levels")
         

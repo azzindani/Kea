@@ -25,7 +25,7 @@ import structlog
 logger = structlog.get_logger()
 
 # Create the FastMCP server
-from shared.logging import setup_logging
+from shared.logging.main import setup_logging
 setup_logging()
 
 mcp = FastMCP("regulatory_server", dependencies=["httpx"])

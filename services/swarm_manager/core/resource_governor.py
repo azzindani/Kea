@@ -14,7 +14,7 @@ import psutil
 from dataclasses import dataclass
 from typing import Literal
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.database.connection import get_db_pool
 
 logger = get_logger(__name__)

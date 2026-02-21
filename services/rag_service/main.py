@@ -20,7 +20,7 @@ from services.rag_service.core import (
 from services.rag_service.core.dataset_loader import DatasetLoader
 from services.rag_service.core.knowledge_store import KnowledgeStore, create_knowledge_store
 from shared.config import get_settings
-from shared.logging import LogConfig, get_logger, setup_logging, RequestLoggingMiddleware
+from shared.logging.main import LogConfig, get_logger, setup_logging, RequestLoggingMiddleware
 from shared.schemas import AtomicInsight
 
 logger = get_logger(__name__)

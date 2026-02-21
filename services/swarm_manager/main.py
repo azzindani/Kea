@@ -29,7 +29,7 @@ from services.swarm_manager.core.compliance import ComplianceStandard, get_compl
 from services.swarm_manager.core.guards import get_resource_guard
 from services.swarm_manager.core.kill_switch import get_kill_switch
 from services.swarm_manager.core.supervisor import get_supervisor
-from shared.logging import get_logger, setup_logging, LogConfig, RequestLoggingMiddleware
+from shared.logging.main import get_logger, setup_logging, LogConfig, RequestLoggingMiddleware
 import os
 
 # Initialize standardized logging

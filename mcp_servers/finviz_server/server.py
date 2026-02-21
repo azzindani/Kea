@@ -17,7 +17,7 @@ from mcp_servers.finviz_server.tools import (
     strategy, charts, financials, bulk_ta
 )
 from typing import List, Dict, Any, Optional
-from shared.logging import setup_logging, get_logger
+from shared.logging.main import setup_logging, get_logger
 setup_logging()
 logger = get_logger(__name__)
 

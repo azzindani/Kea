@@ -12,7 +12,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from services.api_gateway.clients.mcp_client import MCPClient, get_mcp_client
 
 

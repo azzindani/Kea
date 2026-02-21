@@ -7,7 +7,7 @@ import uvicorn
 from prometheus_client import make_asgi_app
 from contextlib import asynccontextmanager
 
-from shared.logging import get_logger, setup_logging, LogConfig, RequestLoggingMiddleware
+from shared.logging.main import get_logger, setup_logging, LogConfig, RequestLoggingMiddleware
 import os
 
 import asyncio

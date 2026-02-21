@@ -1,6 +1,6 @@
 
 from web3 import Web3, AsyncWeb3
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.mcp.protocol import ToolResult, TextContent
 
 logger = get_logger(__name__)

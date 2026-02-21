@@ -11,7 +11,7 @@ import os
 from datetime import datetime
 from typing import Any
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.database.connection import get_database_pool
 from shared.conversations.models import (
     Conversation, Message, MessageRole,

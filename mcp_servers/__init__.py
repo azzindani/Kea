@@ -10,7 +10,7 @@ Uses ACTUAL EXPORT DETECTION to find real class names.
 from pathlib import Path
 from typing import Dict, Any
 import importlib
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 logger = get_logger(__name__)
 

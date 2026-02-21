@@ -12,7 +12,7 @@ from typing import Any, Optional
 
 import httpx
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.config import get_settings
 from shared.service_registry import ServiceRegistry, ServiceName
 

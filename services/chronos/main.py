@@ -19,7 +19,7 @@ from fastapi import FastAPI, HTTPException
 from prometheus_client import make_asgi_app
 from pydantic import BaseModel, Field
 
-from shared.logging import get_logger, setup_logging, LogConfig, RequestLoggingMiddleware
+from shared.logging.main import get_logger, setup_logging, LogConfig, RequestLoggingMiddleware
 from shared.service_registry import ServiceName, ServiceRegistry
 from shared.config import get_settings
 

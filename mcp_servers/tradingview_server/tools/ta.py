@@ -2,7 +2,7 @@
 from tradingview_ta import TA_Handler, Interval, Exchange
 from shared.mcp.protocol import ToolResult, TextContent
 import json
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 logger = get_logger(__name__)
 

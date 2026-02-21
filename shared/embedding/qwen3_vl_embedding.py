@@ -13,7 +13,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 from dataclasses import dataclass
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 
 logger = get_logger(__name__)

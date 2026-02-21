@@ -1,7 +1,7 @@
 
 from finvizfinance.forex import Forex
 from finvizfinance.crypto import Crypto
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 logger = get_logger(__name__)
 

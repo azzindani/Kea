@@ -18,7 +18,7 @@ class ServiceName(str, Enum):
 class ServiceRegistry:
     """
     Registry for service locations.
-    Pulls from configs/settings.yaml (shared.config).
+    Pulls from shared.config (managed via Environment Variables or defaults).
     """
     
     @classmethod
@@ -39,7 +39,7 @@ class ServiceRegistry:
         url = os.getenv(env_key)
         
         if not url:
-            raise ValueError(f"Service location for '{service.value}' is not configured in settings.yaml or environment variables.")
+            raise ValueError(f"Service location for '{service.value}' is not configured in environment variables or shared.config defaults.")
         return url
 
     @classmethod
@@ -49,7 +49,7 @@ class ServiceRegistry:
         try:
             # Extract port if present (e.g. http://localhost:8000 -> 8000)
             if ":" in url.replace("://", ""):
-                 return int(url.split(":")[-1].split("/")[0])
+                return int(url.split(":")[-1].split("/")[0])
             # Default fallback ports if no port in URL
             return 80
         except (ValueError, IndexError):

@@ -16,7 +16,7 @@ import numpy as np
 import asyncpg
 from pgvector.asyncpg import register_vector
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.mcp.protocol import Tool
 from shared.embedding.qwen3_embedding import create_embedding_provider
 from shared.database.connection import get_db_pool

@@ -46,7 +46,7 @@ from mcp_servers.mibian_server.tools import exotics
 from mcp_servers.mibian_server.tools import american
 from mcp_servers.mibian_server.tools import barriers
 
-from shared.logging import setup_logging
+from shared.logging.main import setup_logging
 setup_logging()
 
 mcp = FastMCP("mibian_server")

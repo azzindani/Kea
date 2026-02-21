@@ -24,7 +24,7 @@ from pydantic import BaseModel, Field
 from services.vault.core.audit_trail import AuditEventType, get_audit_trail
 from services.vault.core.postgres_store import PostgresVectorStore
 from services.vault.core.vector_store import Document
-from shared.logging import get_logger, setup_logging, LogConfig, RequestLoggingMiddleware
+from shared.logging.main import get_logger, setup_logging, LogConfig, RequestLoggingMiddleware
 import os
 
 # Initialize structured logging globally

@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from services.sdk.api import AutonomousClient
 from services.sdk.metrics import MetricsCollector, JobMetrics
 

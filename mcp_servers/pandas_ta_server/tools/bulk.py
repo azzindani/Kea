@@ -2,7 +2,7 @@
 from mcp_servers.pandas_ta_server.tools.core import process_ohlcv, df_to_json
 import pandas_ta as ta
 import pandas as pd
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 logger = get_logger(__name__)
 

@@ -4,7 +4,7 @@ from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.worksheet.table import Table, TableStyleInfo
 from openpyxl.workbook.defined_name import DefinedName
 from shared.mcp.protocol import ToolResult, TextContent
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 import os
 import json
 

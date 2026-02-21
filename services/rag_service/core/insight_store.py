@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 from services.vault.core.vector_store import VectorStore, Document, create_vector_store
 from shared.schemas import AtomicInsight
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 
 logger = get_logger(__name__)

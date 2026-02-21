@@ -4,7 +4,7 @@ The `configs/` directory is the centralized repository for the "Body" and "Intel
 
 ## ✨ Features
 
-- **Centralized Settings**: `settings.yaml` provides a single source of truth for API keys, database URLs, and environment-wide defaults.
+- **Integrated Settings**: `shared/config.py` provides a single source of truth for database URLs and environment-wide defaults, fully overridable via Environment Variables.
 - **Monitoring**: Integration with Prometheus, Alertmanager, and Grafana for system observability.
 - **Microservice Isolation**: Each configuration block is designed to be consumed by specific services without creating tight coupling.
 
@@ -18,7 +18,7 @@ Project treats configuration as dynamic data that fuels the static microservices
 
 ```mermaid
 graph TD
-    YAML[settings.yaml] --> Config[shared/config.py]
+    Env[.env / Environment Variables] --> Config[shared/config.py]
     Config --> Services[Microservices]
     
     Knowledge[knowledge/skills] --> Orch[Orchestrator]
@@ -31,7 +31,7 @@ graph TD
 ## 📁 Codebase Structure
 
 ### Core Execution
-- **`settings.yaml`**: Main environment configuration (Services, DBs, Auth).
+- **`shared/config.py`**: Main environment configuration schema and defaults.
 
 ### Monitoring & Infrastructure
 - **`prometheus.yml`**: Scrape targets and metric collection frequencies.
@@ -47,7 +47,7 @@ graph TD
 
 | File | Purpose | Priority Override |
 | :--- | :--- | :--- |
-| `settings.yaml` | Service Ports, URLs, Keys | Environment Variables (.env) |
+| `shared/config.py` | Service Ports, URLs, Defaults | Environment Variables (.env) |
 
 ---
 *The Configuration Library ensures that Kea's behavior is flexible, domain-aware, and strictly governed. Intelligence (Roles, Reasoning, Skills) and Execution Metadata (Tool Schemas, JIT dependencies) are handled autonomously by the /knowledge layer and the MCP Host respectively.*

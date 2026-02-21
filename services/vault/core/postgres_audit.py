@@ -12,7 +12,7 @@ import asyncio
 import asyncpg
 
 from services.vault.core.audit_trail import AuditBackend, AuditEntry, AuditEventType
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.database.connection import get_db_pool
 
 logger = get_logger(__name__)

@@ -13,9 +13,8 @@ from pathlib import Path
 from typing import Any
 import re
 
-import yaml
-from pydantic import BaseModel, Field
-from pydantic_settings import BaseSettings
+from pydantic import BaseModel, Field, AliasChoices
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Environment(str, Enum):
@@ -35,20 +34,20 @@ class AppSettings(BaseModel):
 
 class ServiceSettings(BaseModel):
     """Registry of microservice locations."""
-    gateway: str | None = None
-    orchestrator: str | None = None
-    mcp_host: str | None = None
-    rag_service: str | None = None
-    vault: str | None = None
-    swarm_manager: str | None = None
-    chronos: str | None = None
+    gateway: str = "http://localhost:8000"
+    orchestrator: str = "http://localhost:8001"
+    mcp_host: str = "http://localhost:8002"
+    rag_service: str = "http://localhost:8003"
+    vault: str = "http://localhost:8004"
+    swarm_manager: str = "http://localhost:8005"
+    chronos: str = "http://localhost:8006"
 
 
 class LLMSettings(BaseModel):
     """LLM configuration."""
     default_provider: str = "openrouter"
-    default_model: str = "nvidia/nemotron-3-nano-30b-a3b:free"
-    fallback_model: str = "stepfun/step-3.5-flash:free"
+    default_model: str = Field(default="nvidia/nemotron-3-nano-30b-a3b:free")
+    fallback_model: str = Field(default="stepfun/step-3.5-flash:free")
     temperature: float = 0.7
     max_tokens: int = 32768
     enable_reasoning: bool = True
@@ -64,7 +63,7 @@ class LoggingSettings(BaseModel):
 
 class DatabaseSettings(BaseModel):
     """Database configuration."""
-    url: str = ""
+    url: str = "postgresql://localhost/system_db"
     min_connections: int = 5
     max_connections: int = 20
     connection_timeout: float = 30.0
@@ -225,7 +224,7 @@ class CircuitBreakerSettings(BaseModel):
 class S3Settings(BaseModel):
     """S3 Storage settings."""
     bucket: str = "system-artifacts"
-    endpoint: str = ""
+    endpoint: str = "http://localhost:9000"
     access_key: str = ""
     secret_key: str = ""
 
@@ -244,12 +243,13 @@ class SecuritySettings(BaseModel):
 class Settings(BaseSettings):
     """
     Main settings class.
-    Loads from environment variables and settings.yaml.
+    Loads from environment variables and .env files.
     """
-    # Legacy/Root Aliases (for backward compatibility and easy Env mapping)
-    openrouter_api_key: str = ""
-    database_url: str = ""
-    redis_url: str = ""
+    # Root Aliases (Mapping environment variables directly to root fields or nested models)
+    openrouter_api_key: str = Field(default="", validation_alias=AliasChoices("OPENROUTER_API_KEY", "LLM_OPENROUTER_API_KEY"))
+    database_url: str = Field(default="", validation_alias=AliasChoices("DATABASE_URL", "DATABASE_URL"))
+    jwt_secret: str = Field(default="", validation_alias=AliasChoices("JWT_SECRET", "AUTH_JWT_SECRET"))
+    redis_url: str = Field(default="", validation_alias=AliasChoices("REDIS_URL"))
     
     # Nested configs
     app: AppSettings = AppSettings()
@@ -274,90 +274,22 @@ class Settings(BaseSettings):
     rag: RAGSettings = RAGSettings()
     vault_settings: VaultSettings = VaultSettings()
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        extra = "ignore"
-        env_nested_delimiter = "__" # Double underscore for nesting
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        env_nested_delimiter="__"
+    )
 
     def __init__(self, **data: Any) -> None:
         super().__init__(**data)
-        self._load_yaml_config()
-        self._sync_aliases()
-
-    def _sync_aliases(self):
-        """Sync root aliases to nested models if provided."""
+        # Post-load sync
         if self.openrouter_api_key:
             self.llm.openrouter_api_key = self.openrouter_api_key
         if self.database_url:
             self.database.url = self.database_url
-        if self.app.environment:
-            # Simple conversion to str if needed
-            pass
-
-    def _update_nested_config(self, field_name: str, yaml_data: dict[str, Any], model_class: type[BaseModel]) -> None:
-        """Merge YAML config with existing Env-loaded config."""
-        if field_name not in yaml_data:
-            return
-
-        current_val = getattr(self, field_name)
-        # Combine existing (from Env) with YAML
-        env_overrides = current_val.model_dump(exclude_unset=True)
-        new_data = yaml_data[field_name].copy()
-        new_data.update(env_overrides)
-        setattr(self, field_name, model_class(**new_data))
-
-    def _load_yaml_config(self) -> None:
-        """Load configuration from configs/settings.yaml."""
-        config_path = Path("configs/settings.yaml")
-        if not config_path.exists():
-            return
-
-        try:
-            with open(config_path) as f:
-                yaml_content = f.read()
-            
-            # Env var substitution: ${VAR_NAME:default}
-            pattern = re.compile(r'\$\{([^}:]+)(?::([^}]*))?\}')
-            yaml_with_env = pattern.sub(
-                lambda m: os.getenv(m.group(1), m.group(2) or ""), 
-                yaml_content
-            )
-            yaml_config = yaml.safe_load(yaml_with_env)
-
-            if not yaml_config:
-                return
-
-            # Apply all nested updates
-            models_to_update = {
-                "app": AppSettings,
-                "services": ServiceSettings,
-                "llm": LLMSettings,
-                "logging": LoggingSettings,
-                "database": DatabaseSettings,
-                "mcp": MCPSettings,
-                "embedding": EmbeddingSettings,
-                "reranker": RerankerSettings,
-                "timeouts": TimeoutSettings,
-                "governance": GovernanceSettings,
-                "auth": AuthSettings,
-                "kernel": KernelSettings,
-                "api": ApiSettings,
-                "feature_flags": FeatureFlags,
-                "s3": S3Settings,
-                "security": SecuritySettings,
-                "chronos": ChronosSettings,
-                "circuit_breaker": CircuitBreakerSettings,
-                "rate_limit": RateLimitSettings,
-                "rag": RAGSettings,
-                "vault": VaultSettings,
-            }
-            
-            for field_name, model_cls in models_to_update.items():
-                self._update_nested_config(field_name, yaml_config, model_cls)
-
-        except Exception:
-            pass
+        if self.jwt_secret:
+            self.auth.jwt_secret = self.jwt_secret
 
 @lru_cache()
 def get_settings() -> Settings:
