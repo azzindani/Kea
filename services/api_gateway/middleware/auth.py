@@ -17,6 +17,7 @@ from fastapi import Request, HTTPException, Depends
 from fastapi.security import HTTPBearer, APIKeyHeader
 
 from shared.logging import get_logger
+from shared.config import get_settings
 from shared.users import User, UserRole
 from shared.users.manager import get_user_manager, get_api_key_manager
 from shared.sessions import get_session_manager, get_jwt_manager
@@ -26,9 +27,21 @@ from shared.tenants import TenantContext, set_tenant_context
 logger = get_logger(__name__)
 
 
-# Security schemes
-api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+# Security schemes initialized below
+api_key_header: APIKeyHeader | None = None
 bearer_scheme = HTTPBearer(auto_error=False)
+
+
+def get_api_key_header() -> APIKeyHeader:
+    """Lazy initialize API key header from settings."""
+    global api_key_header
+    if api_key_header is None:
+        settings = get_settings()
+        api_key_header = APIKeyHeader(
+            name=settings.auth.api_key_header_name,
+            auto_error=False
+        )
+    return api_key_header
 
 
 class AuthMiddleware:
@@ -42,8 +55,9 @@ class AuthMiddleware:
     4. Anonymous (fallback)
     """
     
-    def __init__(self, allow_anonymous: bool = True):
-        self.allow_anonymous = allow_anonymous
+    def __init__(self, allow_anonymous: bool | None = None):
+        settings = get_settings()
+        self.allow_anonymous = allow_anonymous if allow_anonymous is not None else settings.auth.allow_anonymous
     
     async def __call__(self, request: Request, call_next):
         """Process request authentication."""
@@ -53,7 +67,8 @@ class AuthMiddleware:
         auth_method = None
         
         # 1. API Key
-        api_key = request.headers.get("X-API-Key")
+        settings = get_settings()
+        api_key = request.headers.get(settings.auth.api_key_header_name)
         if api_key:
             user = await self._auth_api_key(api_key)
             auth_method = "api_key"
@@ -151,7 +166,8 @@ async def get_current_user(request: Request) -> User:
     
     if user is None:
         # Try to authenticate
-        api_key = request.headers.get("X-API-Key")
+        settings = get_settings()
+        api_key = request.headers.get(settings.auth.api_key_header_name)
         if api_key:
             key_manager = await get_api_key_manager()
             key = await key_manager.validate_key(api_key)

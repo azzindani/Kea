@@ -1,12 +1,12 @@
 # 🔑 Shared Session Management
 
-The `shared/sessions` module provides a lightweight state management system for tracking user interactions and ephemeral research contexts. It functions as the "Short-Term Memory" and "Identity Persistence" layer for the Kea system.
+The `shared/sessions` module provides a lightweight state management system for tracking user interactions and ephemeral execution contexts. It functions as the "Short-Term Memory" and "Identity Persistence" layer for the Kea system.
 
 ## ✨ Features
 
 - **Multi-Backend Session Storage**: Abstract interface supporting both in-memory (Dev) and PostgreSQL/Redis (Prod) session persistence.
 - **JWT & Cookie Integration**: Works with the API Gateway to manage session tokens, lifetimes, and security rotations.
-- **Context Pinning**: Allows specific research variables or "active projects" to be pinned to a user session for rapid retrieval.
+- **Context Pinning**: Allows specific system variables or "active projects" to be pinned to a user session for rapid retrieval.
 - **Automated Expiry**: Built-in TTL (Time-To-Live) management for ephemeral tokens and guest sessions.
 
 ## 📐 Architecture
@@ -29,10 +29,10 @@ graph TD
 ## 🧠 Deep Dive
 
 ### 1. Stateless Scaling
-By storing session data in a shared database rather than local memory, the Kea system can scale horizontally across multiple K8s pods. A user can start a research job on `gateway-pod-1` and check status on `gateway-pod-2` without any loss of context.
+By storing session data in a shared database rather than local memory, the Kea system can scale horizontally across multiple K8s pods. A user can start a system job on `gateway-pod-1` and check status on `gateway-pod-2` without any loss of context.
 
 ### 2. Session Scoping
-Sessions in Kea can be scoped to specific domains or departments. This allows an admin to grant a temporary "Finance Department" session to a researcher, which automatically expires after the research job is completed, following the principle of least privilege.
+Sessions in Kea can be scoped to specific domains or departments. This allows an admin to grant a temporary "Finance Department" session to a user, which automatically expires after the system job is completed, following the principle of least privilege.
 
 ## 📚 Reference
 

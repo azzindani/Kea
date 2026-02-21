@@ -67,8 +67,8 @@ async def lifespan(_app: FastAPI):
     
     # Setup logging
     setup_logging(LogConfig(
-        level=env_config.log_level,
-        format=settings.log_format,
+        level=settings.logging.level,
+        format=settings.logging.format,
         service_name="api_gateway",
     ))
     
@@ -105,7 +105,7 @@ settings = get_settings()
 # Create FastAPI app
 app = FastAPI(
     title=settings.app.name,
-    description="API Gateway for the Project Distributed Autonomous Research Engine",
+    description="API Gateway for the Project Distributed Autonomous Engine",
     version=settings.app.version,
     lifespan=lifespan,
     docs_url="/docs",
@@ -118,13 +118,12 @@ app = FastAPI(
 # ============================================================================
 
 # 1. CORS (innermost - runs last)
-env_config = get_environment_config()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_cors_origins(),
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
+    allow_methods=settings.security.cors_methods,
+    allow_headers=settings.security.cors_headers,
 )
 
 # 2. Logging

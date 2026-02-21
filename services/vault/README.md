@@ -1,10 +1,10 @@
 # 🏦 The Vault ("The Memory")
 
-The **Vault Service** is the research persistence and data transport layer of the Kea v0.4.0 system. It serves as the system's **Long-Term Memory** and **Immutable Audit Trail**.
+The **Vault Service** is the persistence and data transport layer of the Kea v0.4.0 system. It serves as the system's **Long-Term Memory** and **Immutable Audit Trail**.
 
 ## 📐 Architecture
 
-The Vault provides a unified interface for system persistence needs: **Audit Logs** and **Research Artifacts**.
+The Vault provides a unified interface for system persistence needs: **Audit Logs** and **System Artifacts**.
 
 ```mermaid
 graph TD
@@ -17,7 +17,7 @@ graph TD
         Bus -->|Storage| S3[Object Storage / MinIO]
     end
 
-    Researchers -->|Data| Bus
+    Observers -->|Data| Bus
     SwarmManager -->|Logs| Trail
 ```
 
@@ -26,7 +26,7 @@ graph TD
 | Component | Responsibility | Cognitive Role |
 | :--- | :--- | :--- |
 | **Audit Trail** | Immutable logging of every system decision. | Procedural Memory |
-| **Artifact Bus** | High-speed transport for research files. | Sensory Buffet |
+| **Artifact Bus** | High-speed transport for system files. | Sensory Buffet |
 | **Integrity Mgr** | Cryptographic verification of log entries. | Conscience |
 
 ---
@@ -34,7 +34,7 @@ graph TD
 ## ✨ Key Features
 
 ### 1. Immutable Audit Trail
-The Vault calculates a SHA-256 checksum for every decision made by the system. These logs are "Chained" (each entry contains the hash of the previous one), creating a mathematically verifiable record of research provenance for regulated industries.
+The Vault calculates a SHA-256 checksum for every decision made by the system. These logs are "Chained" (each entry contains the hash of the previous one), creating a mathematically verifiable record of system provenance for regulated industries.
 
 ### 2. The Artifact Bus (Architecture)
 While the Vault doesn't have a file named `artifact_bus.py`, the **Vector Store** and **Postgres Store** act together to serve this function. Heavy artifacts are stored as `Documents` in the vector database, allowing agents to retrieve massive files via semantic search rather than downloading them locally.
@@ -57,4 +57,4 @@ While the Vault doesn't have a file named `artifact_bus.py`, the **Vector Store*
 The Vault is designed as a "Write-Once, Read-Many" system for audit data. Once an entry is committed, it cannot be modified or deleted via the API. This ensures that even if an agent "hallucinates" or a service is compromised, the history of what actually happened remains pristine.
 
 ---
-*The Vault ensures that no finding is lost and every decision is accountable.*
+*The Vault ensures that no insight is lost and every decision is accountable.*

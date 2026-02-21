@@ -214,7 +214,7 @@ class AuditTrail:
         # Log an event
         await audit.log(
             AuditEventType.QUERY_RECEIVED,
-            action="User submitted research query",
+            action="User submitted autonomous query",
             actor="user_123",
             details={"query": "Tesla financials"},
             session_id="session_456",

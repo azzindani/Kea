@@ -27,8 +27,14 @@ class Session:
     tenant_id: str = "default"
     
     created_at: datetime = field(default_factory=datetime.utcnow)
-    expires_at: datetime = field(default_factory=lambda: datetime.utcnow() + timedelta(hours=24))
+    expires_at: datetime = field(init=False)
     last_activity: datetime = field(default_factory=datetime.utcnow)
+    
+    def __post_init__(self):
+        """Initialize expiration from settings."""
+        from shared.config import get_settings
+        settings = get_settings()
+        self.expires_at = self.created_at + timedelta(hours=settings.auth.session_hours)
     
     device_info: str = ""
     ip_address: str = ""
@@ -167,7 +173,7 @@ class JWTManager:
         self.secret_key = secret_key or settings.auth.jwt_secret or secrets.token_hex(32)
         self.access_token_minutes = access_token_minutes or settings.auth.access_token_minutes
         self.refresh_token_days = refresh_token_days or settings.auth.refresh_token_days
-        self.algorithm = "HS256"
+        self.algorithm = settings.auth.jwt_algorithm
     
     def create_access_token(
         self,

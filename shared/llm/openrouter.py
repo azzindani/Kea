@@ -79,7 +79,7 @@ class OpenRouterProvider(LLMProvider):
     ) -> dict[str, Any]:
         """Build the request body."""
         settings = get_settings()
-        default_model = settings.models.default_model or DEFAULT_MODEL
+        default_model = settings.llm.default_model or DEFAULT_MODEL
         
         body: dict[str, Any] = {
             "model": config.model or default_model,

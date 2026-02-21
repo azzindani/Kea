@@ -40,7 +40,7 @@ The system is divided into 7 specialized microservices:
 | **Orchestrator** | LangGraph State & Reasoning Engine |
 | **MCP Host** | Tool Execution & JIT Spawning |
 | **RAG Service** | Multi-Source Knowledge Controller |
-| **Vault** | Research Persistence & Context Engine |
+| **Vault** | System Persistence & Context Engine |
 | **Swarm Manager** | Governance & Compliance |
 | **Chronos** | Scheduling & Future Tasks |
 

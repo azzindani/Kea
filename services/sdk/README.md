@@ -1,6 +1,6 @@
-# Research Client SDK
+# Autonomous SDK
 
-A robust Python client for the Project Research Platform. This SDK provides programmatic access to the research capabilities, handling authentication, job submission, polling, and result retrieval.
+A robust Python client for the Autonomous System Platform. This SDK provides programmatic access to the system capabilities, handling authentication, job submission, polling, and result retrieval.
 
 ## Features
 
@@ -11,21 +11,21 @@ A robust Python client for the Project Research Platform. This SDK provides prog
 
 ## CLI Usage
 
-The quickest way to run a research job is via the included CLI tool:
+The quickest way to run a job is via the included CLI tool:
 
 ```bash
 # Run against local development environment
-python services/client/cli.py --query "Analyze the impact of AI on healthcare" --env dev
+python services/sdk/cli.py --query "Analyze the impact of AI on healthcare" --env dev
 
 # Enable verbose logging
-python services/client/cli.py --query "Research Tesla's financial health" --verbose
+python services/sdk/cli.py --query "Analyze Tesla's financial health" --verbose
 ```
 
 ### Options
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--query` | The research question or topic (Required) | - |
+| `--query` | The prompt or task (Required) | - |
 | `--env` | Environment to target (`dev`, `prod`, `local`) | `dev` |
 | `--url` | Custom API URL (overrides `--env`) | - |
 | `--verbose`, `-v` | Enable debug logging | `False` |
@@ -40,25 +40,25 @@ You can use the SDK in your own Python applications (e.g., Streamlit, FastAPI, S
 
 ```python
 import asyncio
-from services.client.api import ResearchClient
-from services.client.runner import ResearchRunner
-from services.client.metrics import MetricsCollector
+from services.sdk.api import AutonomousClient
+from services.sdk.runner import JobRunner
+from services.sdk.metrics import MetricsCollector
 
 async def main():
     # Initialize client
-    client = ResearchClient(base_url="http://localhost:8000")
+    client = AutonomousClient(base_url="http://localhost:8000")
     await client.initialize()
     
     # Setup runner
     metrics = MetricsCollector()
-    runner = ResearchRunner(client, metrics)
+    runner = JobRunner(client, metrics)
     
-    # Run a research job
-    print("Starting research...")
-    job_metrics = await runner.run_query("Analyze the latest EV battery trends")
+    # Run a job
+    print("Starting job...")
+    job_metrics = await runner.execute_task("Analyze the latest EV battery trends")
     
     if job_metrics.success:
-        print("✅ Research Complete!")
+        print("✅ Job Complete!")
         print(f"Duration: {job_metrics.duration_ms / 1000:.1f}s")
         print(f"Efficiency Ratio: {job_metrics.efficiency_ratio:.2f}")
     else:
@@ -72,7 +72,7 @@ if __name__ == "__main__":
 
 ### 2. Accessing Metrics
 
-The `JobMetrics` object returned by `run_query` contains detailed performance data:
+The `JobMetrics` object returned by `execute_task` contains detailed performance data:
 
 ```python
 # Access detailed metrics
@@ -81,7 +81,7 @@ print(f"Tool Iterations: {job_metrics.tool_iterations}")
 print(f"Peak Memory: {job_metrics.peak_memory_mb:.1f} MB")
 
 # Export to JSON
-metrics.export("research_metrics.json")
+metrics.export("system_metrics.json")
 ```
 
 ### 3. Custom Authentication
@@ -89,8 +89,8 @@ metrics.export("research_metrics.json")
 By default, the client uses test credentials. You can provide your own:
 
 ```python
-client = ResearchClient(
-    base_url="https://api.project.ai",
+client = AutonomousClient(
+    base_url="https://api.system.local",
     email="myuser@example.com",
     password="secure_password",
     name="My User"

@@ -89,7 +89,7 @@ def upgrade() -> None:
         sa.Column('content', sa.Text, nullable=False),
         sa.Column('intent', sa.String(50), nullable=True),
         sa.Column('attachments', sa.Text, default='[]'),
-        sa.Column('sources', sa.Text, default='[]'),
+        sa.Column('origins', sa.Text, default='[]'),
         sa.Column('tool_calls', sa.Text, default='[]'),
         sa.Column('confidence', sa.Float, nullable=True),
         sa.Column('created_at', sa.DateTime, server_default=sa.func.now()),
@@ -97,9 +97,9 @@ def upgrade() -> None:
     op.create_index('ix_messages_conversation', 'messages', ['conversation_id'])
     op.create_index('ix_messages_created', 'messages', ['created_at'])
     
-    # Research jobs table
+    # System jobs table
     op.create_table(
-        'research_jobs',
+        'system_jobs',
         sa.Column('job_id', sa.String(36), primary_key=True),
         sa.Column('user_id', sa.String(36), sa.ForeignKey('users.user_id', ondelete='SET NULL'), nullable=True),
         sa.Column('conversation_id', sa.String(36), sa.ForeignKey('conversations.conversation_id', ondelete='SET NULL'), nullable=True),
@@ -107,17 +107,17 @@ def upgrade() -> None:
         sa.Column('status', sa.String(20), default='pending'),  # pending, running, completed, failed
         sa.Column('result', sa.Text, nullable=True),
         sa.Column('confidence', sa.Float, nullable=True),
-        sa.Column('sources_count', sa.Integer, default=0),
+        sa.Column('origin_count', sa.Integer, default=0),
         sa.Column('duration_ms', sa.Integer, nullable=True),
         sa.Column('created_at', sa.DateTime, server_default=sa.func.now()),
         sa.Column('completed_at', sa.DateTime, nullable=True),
     )
-    op.create_index('ix_jobs_user', 'research_jobs', ['user_id'])
-    op.create_index('ix_jobs_status', 'research_jobs', ['status'])
+    op.create_index('ix_jobs_user', 'system_jobs', ['user_id'])
+    op.create_index('ix_jobs_status', 'system_jobs', ['status'])
 
 
 def downgrade() -> None:
-    op.drop_table('research_jobs')
+    op.drop_table('system_jobs')
     op.drop_table('messages')
     op.drop_table('conversations')
     op.drop_table('sessions')

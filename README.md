@@ -1,6 +1,6 @@
 # 🦜 Kea v0.4.0: Autonomous Enterprise Operating System
 
-> **"Not just a Chatbot. A Research Factory."**
+> **"Not just a Chatbot. A Processing Factory."**
 
 Kea v0.4.0 represents the evolution from a "Distributed Autonomous Research Engine" (DARE) to a **Generative ERP (Enterprise Resource Planning)** system. It simulates a **100,000+ Employee Corporation** where the "Employees" are silicon, the "Departments" are microservices, and the "Workflows" are generated Just-In-Time.
 
@@ -16,8 +16,8 @@ Instead of writing linear "To-Do Lists," Project architects and executes **Direc
 | **Tools** | Static list of Python functions | **"Departments"** (Isolated Microservices) |
 | **Data Flow** | Text in a chat window | **Artifact Bus** (Postgres/S3 via Vault API) |
 | **Planning** | Linear Steps (1, 2, 3...) | **Topological Sort** (Parallel execution paths) |
-| **Storage** | Local Directories / Temp Files | **The Vault** (Research Persistence & Context Engine) |
-| **Role** | Research Assistant | **Autonomous CIO** (Architects the solution) |
+| **Storage** | Local Directories / Temp Files | **The Vault** (System Persistence & Context Engine) |
+| **Role** | Assistant | **Autonomous CIO** (Architects the solution) |
 
 ---
 
@@ -70,7 +70,7 @@ Each service acts as a distinct corporate persona with a specific mandate.
 | **Orchestrator** | The Nervous System | Kernel Wrapper & State Machine | [📖 View Doc](services/orchestrator/README.md) |
 | **MCP Host** | The Hands | Tool Execution & JIT Spawning | [📖 View Doc](services/mcp_host/README.md) |
 | **RAG Service** | The Library | Multi-Source Knowledge Controller | [📖 View Doc](services/rag_service/README.md) |
-| **Vault** | The Memory | Research Persistence & Context Engine | [📖 View Doc](services/vault/README.md) |
+| **Vault** | The Memory | System Persistence & Context Engine | [📖 View Doc](services/vault/README.md) |
 | **Swarm Manager**| The Conscience | Governance & Compliance | [📖 View Doc](services/swarm_manager/README.md) |
 | **Chronos** | The Clock | Scheduling & Future Tasks | [📖 View Doc](services/chronos/README.md) |
 
@@ -90,12 +90,12 @@ Whether running on a $2/mo VPS or a $30k H100 cluster, the `shared/hardware` lay
 
 ### 3. The Artifact Bus (Vault-Centric Execution)
 In a true microservices architecture, services do not share a common filesystem. Project solves this via the **Vault & Artifact Bus**.
-- **Research Persistence Engine**: The Vault stores everything related to the *active work*: multi-user conversational data, job checkpoints, tasks (audit logs), and performance-critical research artifacts.
-- **Embedded Artifacts**: When data is collected (webscrapes, PDFs, etc.), it flows through the Artifact Bus into the Vault, where it is vectorized and indexed for JIT context retrieval during the research project.
+- **System Persistence Engine**: The Vault stores everything related to the *active work*: multi-user conversational data, job checkpoints, tasks (audit logs), and performance-critical system artifacts.
+- **Embedded Artifacts**: When data is collected (webscrapes, PDFs, etc.), it flows through the Artifact Bus into the Vault, where it is vectorized and indexed for JIT context retrieval during the system project.
 - **Zero Disk Dependency**: Services are stateless; they pull what they need from the Vault over the network (API), enabling Project to scale across clusters.
 
 ### 4. Multi-Source RAG Controller (Reference Intelligence)
-The **RAG Service** acts as the system's global "Reference Library," separate from the Vault's active research storage.
+The **RAG Service** acts as the system's global "Reference Library," separate from the Vault's active storage.
 - **Federated Knowledge**: It orchestrates access to massive, external, or multiple distinct RAG servers via API requests.
 - **Context Synthesis**: It filters and synthesizes the most relevant knowledge from these global sources before passing it to the Orchestrator, ensuring high-density, low-noise prompts.
 

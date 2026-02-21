@@ -10,9 +10,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Awaitable
+from typing import Callable, Awaitable
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 
 logger = get_logger(__name__)
@@ -479,14 +479,14 @@ class ProceduralAgent:
         agent = ProceduralAgent()
         
         # Define procedure
-        proc = Procedure("research_flow", "Research Procedure", "Steps for research")
+        proc = Procedure("system_flow", "System Procedure", "Steps for execution")
         proc.add_step(ProcedureStep("1", "Query Classification", "Classify query type"))
         proc.add_step(ProcedureStep("2", "Security Check", "Validate inputs"))
         
         agent.register_procedure(proc)
         
         # Execute
-        async for step_result in agent.execute_procedure("research_flow", context):
+        async for step_result in agent.execute_procedure("system_flow", context):
             print(step_result)
     """
     
@@ -507,8 +507,8 @@ class ProceduralAgent:
             research = Procedure(
                 "standard_research",
                 p_data.get("name", "Standard Research Procedure"),
-                p_data.get("description", "Steps for research"),
-                compliance_standards=[ComplianceStandard.ISO_9001],
+                p_data.get("description", "Steps for system execution"),
+                compliance_standards=["ISO_9001"],
             )
             for s in p_data.get("steps", []):
                 research.add_step(ProcedureStep(s["id"], s["name"], s.get("description", "")))
@@ -521,7 +521,7 @@ class ProceduralAgent:
                 "data_access",
                 p_data.get("name", "Data Access Procedure"),
                 p_data.get("description", "Steps for data access"),
-                compliance_standards=[ComplianceStandard.ISO_27001, ComplianceStandard.GDPR],
+                compliance_standards=["ISO_27001", "GDPR"],
             )
             for s in p_data.get("steps", []):
                 data_access.add_step(ProcedureStep(s["id"], s["name"], s.get("description", "")))

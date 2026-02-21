@@ -54,12 +54,12 @@ graph TD
 ## ✨ Key Features
 
 ### 1. Hardware-Aware Adaptive Execution (`hardware/`)
-Project doesn't just run; it *adapts*. The `HardwareDetector` profiles the system (CPU cores, RAM availability, VRAM) on startup. This profile is used to calculate the `optimal_worker_count` for MCP servers and research swarms, preventing system OOMs on limited hardware while maximizing throughput on enterprise-grade clusters.
+Project doesn't just run; it *adapts*. The `HardwareDetector` profiles the system (CPU cores, RAM availability, VRAM) on startup. This profile is used to calculate the `optimal_worker_count` for MCP servers and execution swarms, preventing system OOMs on limited hardware while maximizing throughput on enterprise-grade clusters.
 
 ### 2. Rich Domain Schemas (`schemas.py`)
-Centralized Pydantic models ensure that a `ResearchState` produced by the **Orchestrator** is perfectly understood by the **Vault** and the **Gateway**. It includes models for:
-- **ResearchState**: The global context object for a job.
-- **AtomicFact**: A single, cited piece of evidence.
+Centralized Pydantic models ensure that an `ExecutionState` produced by the **Orchestrator** is perfectly understood by the **Vault** and the **Gateway**. It includes models for:
+- **ExecutionState**: The global context object for a job.
+- **AtomicInsight**: A single, cited piece of evidence.
 - **ToolOutput**: Container for text, data, and files from MCP tools.
 
 ### 3. Unified Discovery & Routing

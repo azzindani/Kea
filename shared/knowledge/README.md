@@ -1,6 +1,6 @@
 # 📖 Shared Knowledge Registry
 
-The `shared/knowledge` module manages the system's "Built-in" intelligence. Unlike the RAG Service (which handles dynamic research findings), this module focuses on static, version-controlled assets like agent skills, organizational rules, and persona definitions.
+The `shared/knowledge` module manages the system's "Built-in" intelligence. Unlike the RAG Service (which handles dynamic system findings), this module focuses on static, version-controlled assets like agent skills, organizational rules, and persona definitions.
 
 ## ✨ Features
 

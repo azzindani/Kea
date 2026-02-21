@@ -39,7 +39,7 @@ graph TD
 - **`alerting/`**: YAML definitions for automated health alerts.
 
 ### Domain Vocabulary
-- **`vocab/`**: Specialized vocabulary and taxonomy mappings for standardized research terminology (e.g., Compliance).
+- **`vocab/`**: Specialized vocabulary and taxonomy mappings for standardized system terminology (e.g., Compliance).
 
 ---
 

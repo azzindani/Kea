@@ -1,9 +1,9 @@
-# Kea Configuration
+# System Configuration
 # Values here override the defaults in shared/config.py
 
 # Application Identity
 app:
-  name: "Project Research Engine"
+  name: "Autonomous OS"
   version: "0.4.0"
   environment: "${ENVIRONMENT:development}"
 
@@ -11,7 +11,7 @@ app:
 logging:
   level: "${LOG_LEVEL:INFO}"
   format: "${LOG_FORMAT:json}"
-  service_name: "research-engine"
+  service_name: "system-core"
 
 # LLM Selection
 llm:
@@ -34,18 +34,55 @@ services:
 
 # Infrastructure
 database:
-  url: "${DATABASE_URL:postgresql://localhost/research_engine}"
+  url: "${DATABASE_URL:postgresql://localhost/system_db}"
 
 # Security
 auth:
   jwt_secret: "${JWT_SECRET}"
+  jwt_algorithm: "${JWT_ALGORITHM:HS256}"
+  allow_anonymous: ${ALLOW_ANONYMOUS:true}
+  api_key_header_name: "${API_KEY_HEADER:X-API-Key}"
 
 security:
   cors_origins: ["${CORS_ORIGINS:*}"]
+  cors_methods: ["${CORS_METHODS:GET,POST,PUT,DELETE,OPTIONS}"]
+  cors_headers: ["${CORS_HEADERS:*}"]
+  hsts_max_age: ${HSTS_MAX_AGE:31536000}
+  hsts_include_subdomains: ${HSTS_SUBDOMAINS:true}
+  csp_policy: "${CSP_POLICY:default-src 'self'}"
+  max_body_size_mb: ${MAX_BODY_SIZE_MB:10}
 
-# Storage
-s3:
-  bucket: "${S3_BUCKET:research-artifacts}"
-  endpoint: "${S3_ENDPOINT}"
-  access_key: "${S3_ACCESS_KEY}"
-  secret_key: "${S3_SECRET_KEY}"
+# Kernel Operational Parameters
+kernel:
+  default_depth: 2
+  default_max_steps: 20
+  max_depth: 5
+  max_steps: 100
+
+# RAG & Knowledge Parameters
+rag:
+  default_min_score: 0.5
+  default_limit: 20
+  max_limit: 100
+
+# MCP & Tool Parameters
+mcp:
+  discovery_timeout: 10.0
+  search_limit: 1000
+  min_similarity: 0.0
+
+rate_limit:
+  enabled: ${RATE_LIMIT_ENABLED:true}
+  requests_per_minute: ${RATE_LIMIT_RPM:60}
+  requests_per_hour: ${RATE_LIMIT_RPH:1000}
+  burst_size: ${RATE_LIMIT_BURST:10}
+
+# Fault Tolerance
+circuit_breaker:
+  failure_threshold: ${CIRCUIT_FAILURE_THRESHOLD:5}
+  reset_timeout: ${CIRCUIT_RESET_TIMEOUT:30.0}
+
+# Scheduling
+chronos:
+  poll_interval: ${CHRONOS_POLL_INTERVAL:60.0}
+  due_tolerance: ${CHRONOS_DUE_TOLERANCE:30.0}

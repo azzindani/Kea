@@ -1,5 +1,5 @@
 """
-Research Metrics Collection.
+System Metrics Collection.
 
 Tracks resource usage, efficiencies, and performance metrics.
 """
@@ -34,7 +34,7 @@ class ResourceSnapshot:
 
 @dataclass
 class JobMetrics:
-    """Metrics for a single research job execution."""
+    """Metrics for a single system job execution."""
     job_id: str
     query: str
     start_time: str = ""
@@ -63,8 +63,8 @@ class JobMetrics:
     error: Optional[str] = None
     report: Optional[str] = None
     confidence: float = 0.0
-    facts_count: int = 0
-    sources_count: int = 0
+    insight_count: int = 0
+    origin_count: int = 0
     efficiency_ratio: float = 0.0
     
     def calculate_efficiency(self):
@@ -82,7 +82,7 @@ class JobMetrics:
 
 class MetricsCollector:
     """
-    Collects and tracks metrics for research jobs.
+    Collects and tracks metrics for system jobs.
     """
     
     def __init__(self):

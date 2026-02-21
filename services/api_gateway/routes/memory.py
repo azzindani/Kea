@@ -1,8 +1,8 @@
 """
 Memory API Routes.
 
-Endpoints for fact storage and semantic search.
-Delegates to RAG Service for fact queries and knowledge graph.
+Endpoints for insight storage and semantic search.
+Delegates to RAG Service for insight queries and knowledge graph.
 """
 
 from __future__ import annotations
@@ -41,16 +41,16 @@ class SearchRequest(BaseModel):
     domain: str | None = None
 
 
-class FactResponse(BaseModel):
-    """Atomic fact response."""
+class InsightResponse(BaseModel):
+    """Atomic insight response."""
 
-    fact_id: str
+    insight_id: str
     entity: str
     attribute: str
     value: str
     unit: str | None
     period: str | None
-    source_url: str
+    origin_url: str
     confidence_score: float
 
 
@@ -60,13 +60,13 @@ class FactResponse(BaseModel):
 
 
 @router.post("/search")
-async def search_facts(request: SearchRequest) -> dict:
-    """Semantic search for atomic facts — delegates to RAG Service /facts/search."""
-    logger.info(f"Searching facts via RAG: {request.query[:50]}")
+async def search_insights(request: SearchRequest) -> dict:
+    """Semantic search for atomic insights — delegates to RAG Service /insights/search."""
+    logger.info(f"Searching insights via RAG: {request.query[:50]}")
     try:
         async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
             resp = await client.post(
-                f"{_rag_url()}/facts/search",
+                f"{_rag_url()}/insights/search",
                 json={
                     "query": request.query,
                     "limit": request.limit,
@@ -75,21 +75,21 @@ async def search_facts(request: SearchRequest) -> dict:
                 },
             )
             resp.raise_for_status()
-            facts = resp.json()
-        return {"query": request.query, "results": facts, "total": len(facts)}
+            insights = resp.json()
+        return {"query": request.query, "results": insights, "total": len(insights)}
     except httpx.HTTPError as exc:
         logger.warning(f"RAG search failed: {exc}")
         raise HTTPException(status_code=502, detail=f"RAG service unavailable: {exc}")
 
 
-@router.get("/facts/{fact_id}")
-async def get_fact(fact_id: str) -> dict:
-    """Get a specific fact by ID from the RAG Service."""
+@router.get("/insights/{insight_id}")
+async def get_insight(insight_id: str) -> dict:
+    """Get a specific insight by ID from the RAG Service."""
     try:
         async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
-            resp = await client.get(f"{_rag_url()}/facts/{fact_id}")
+            resp = await client.get(f"{_rag_url()}/insights/{insight_id}")
         if resp.status_code == 404:
-            raise HTTPException(status_code=404, detail="Fact not found")
+            raise HTTPException(status_code=404, detail="Insight not found")
         resp.raise_for_status()
         return resp.json()
     except HTTPException:
@@ -129,7 +129,7 @@ async def get_provenance_graph(
 
 @router.get("/sessions")
 async def list_sessions() -> dict:
-    """List research sessions from research_jobs table."""
+    """List system sessions from system_jobs table."""
     try:
         from shared.database.connection import get_database_pool
 
@@ -137,7 +137,7 @@ async def list_sessions() -> dict:
         rows = await pool.fetch(
             """
             SELECT job_id, query, status, created_at, completed_at
-            FROM research_jobs
+            FROM system_jobs
             ORDER BY created_at DESC
             LIMIT 100
             """
@@ -160,12 +160,12 @@ async def list_sessions() -> dict:
 
 @router.get("/sessions/{session_id}")
 async def get_session(session_id: str) -> dict:
-    """Get session details from research_jobs table."""
+    """Get session details from system_jobs table."""
     try:
         from shared.database.connection import get_database_pool
 
         pool = await get_database_pool()
-        row = await pool.fetchrow("SELECT * FROM research_jobs WHERE job_id = $1", session_id)
+        row = await pool.fetchrow("SELECT * FROM system_jobs WHERE job_id = $1", session_id)
         if row is None:
             raise HTTPException(status_code=404, detail="Session not found")
         r = dict(row)

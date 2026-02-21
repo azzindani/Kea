@@ -1,7 +1,7 @@
 """
 Artifact Store.
 
-Storage for research artifacts (reports, data files, etc).
+Storage for system artifacts (reports, data files, etc).
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ logger = get_logger(__name__)
 # ============================================================================
 
 class Artifact(BaseModel):
-    """Research artifact metadata."""
+    """Artifact metadata."""
     artifact_id: str = Field(default_factory=lambda: f"art-{uuid.uuid4().hex[:12]}")
     name: str
     content_type: str = "application/octet-stream"

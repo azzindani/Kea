@@ -1,4 +1,4 @@
-# Project Research Engine - Services Package
+# Project Autonomous Engine - Services Package
 """
 Services package containing the core microservices.
 Auto-discovered with actual export detection.

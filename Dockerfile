@@ -1,5 +1,5 @@
 # ============================================================================
-# Multi-stage Dockerfile for Project Research Engine
+# Multi-stage Dockerfile for Project System Engine
 # ============================================================================
 
 # Base image with Python dependencies

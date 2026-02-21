@@ -31,7 +31,7 @@ class ConversationManager:
         await manager.initialize()
         
         # Create conversation
-        conv = await manager.create_conversation(user_id, "Research Topic")
+        conv = await manager.create_conversation(user_id, "System Topic")
         
         # Add messages
         await manager.add_message(conv.conversation_id, "user", "Tell me about AI")
@@ -196,12 +196,12 @@ class ConversationManager:
             await conn.execute("""
                 INSERT INTO messages 
                 (message_id, conversation_id, role, content, created_at,
-                    intent, attachments, tool_calls, sources, confidence, is_complete)
+                    intent, attachments, tool_calls, origins, confidence, is_complete)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             """, msg.message_id, msg.conversation_id, msg.role.value,
                 msg.content, msg.created_at, msg.intent,
                 json.dumps(msg.attachments), json.dumps(msg.tool_calls),
-                json.dumps(msg.sources), msg.confidence, msg.is_complete)
+                json.dumps(msg.origins), msg.confidence, msg.is_complete)
             
             # Update conversation
             await conn.execute("""
@@ -295,7 +295,7 @@ class ConversationManager:
             intent=row.get("intent", ""),
             attachments=self._parse_json(row.get("attachments", "[]")),
             tool_calls=self._parse_json(row.get("tool_calls", "[]")),
-            sources=self._parse_json(row.get("sources", "[]")),
+            origins=self._parse_json(row.get("origins", "[]")),
             confidence=row.get("confidence"),
             is_complete=bool(row.get("is_complete", True)),
         )

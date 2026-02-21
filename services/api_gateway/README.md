@@ -1,6 +1,6 @@
 # 🚪 API Gateway Service ("The Front Door")
 
-The **API Gateway** is the centralized nerve center of the Kea v0.4.0 system. It manages the security perimeter, orchestrates asynchronous research jobs, and serves as the primary interface for human interaction with the "Fractal Corp" hive mind.
+The **API Gateway** is the centralized nerve center of the System v0.4.0 architecture. It manages the security perimeter, orchestrates asynchronous system jobs, and serves as the primary interface for human interaction with the "Fractal Corp" hive mind.
 
 ## 📐 Architecture
 
@@ -46,7 +46,7 @@ graph TD
 Supports both programmatic access (via JWT tokens in Header) and browser-based sessions (via HttpOnly cookies). The Gateway is the **Source of Truth for Identity**; downstream services trust the injected `X-User-ID` header.
 
 ### 2. High-Fidelity Job Lifecycle
-The `/jobs` endpoint handles the asynchronous nature of research. It creates persistent job records in PostgreSQL and delegates the cognitive workflow to the **Orchestrator**, allowing users to monitor progress via SSE (Server-Sent Events) or WebSockets.
+The `/jobs` endpoint handles the asynchronous nature of system operations. It creates persistent job records in PostgreSQL and delegates the cognitive workflow to the **Orchestrator**, allowing users to monitor progress via SSE (Server-Sent Events) or WebSockets.
 
 ### 3. Human-in-the-Loop (HITL) Protocol
 When a `KernelCell` encounters a high-risk action or an information gap, it sends an **Escalation**. The Gateway's `interventions` route exposes these as actionable notifications, allowing humans to "Approve," "Reject," or "Provide Clarification" without stopping the entire thread.
@@ -82,7 +82,7 @@ When a user submits a job, the Gateway doesn't wait for results. It:
 4.  Wires the job to an background worker that triggers the Orchestrator.
 
 ### 2. Contextual Continuity
-The Gateway supports "Contextual Seeding." A user can provide `seed_facts` or `existing_artifacts` in a request, which the Gateway injects into the Orchestrator's **Inference Context**, allowing new research to build upon previous work seamlessly.
+The Gateway supports "Contextual Seeding." A user can provide `seed_facts` or `existing_artifacts` in a request, which the Gateway injects into the Orchestrator's **Inference Context**, allowing new autonomous operations to build upon previous work seamlessly.
 
 ---
 *The API Gateway is the interface through which human intent is translated into autonomous corporate action.*

@@ -1,12 +1,14 @@
 """
-Vault Service — Research Persistence & Context Engine.
+Vault Service — Persistence & Context Engine.
 
 Routes:
   GET    /health
   POST   /audit/logs
   GET    /audit/logs
-  POST   /research/sessions
-  GET    /research/query
+  POST   /audit/logs
+  GET    /audit/logs
+  POST   /persistence/sessions
+  GET    /persistence/query
 """
 
 from __future__ import annotations
@@ -42,7 +44,7 @@ setup_logging(LogConfig(
 
 app = FastAPI(
     title=f"{settings.app.name} - Vault",
-    description="Research Persistence & Context Engine",
+    description="System Persistence & Context Engine",
     version=settings.app.version,
 )
 app.add_middleware(RequestLoggingMiddleware)
@@ -115,7 +117,7 @@ async def search_logs(
 
 
 # ============================================================================
-# Research Routes — Semantic search over findings
+# Persistence Routes — Semantic search over insights
 # ============================================================================
 
 
@@ -127,13 +129,13 @@ class SaveSessionRequest(BaseModel):
     facts: list[dict[str, Any]] = []
 
 
-@app.post("/research/sessions", status_code=201)
-async def save_research_session(request: SaveSessionRequest) -> dict:
-    """Persist research results to the vector store for later retrieval."""
+@app.post("/persistence/sessions", status_code=201)
+async def save_execution_session(request: SaveSessionRequest) -> dict:
+    """Persist execution results to the vector store for later retrieval."""
     store = await get_vector_store()
 
     # Create a document for the main content
-    doc_id = f"research_{request.job_id or str(uuid.uuid4())[:8]}"
+    doc_id = f"session_{request.job_id or str(uuid.uuid4())[:8]}"
     doc = Document(
         id=doc_id,
         content=request.content,
@@ -141,37 +143,38 @@ async def save_research_session(request: SaveSessionRequest) -> dict:
             "query": request.query,
             "job_id": request.job_id,
             "confidence": request.confidence,
-            "type": "research_report",
+            "type": "execution_summary",
         },
     )
 
-    # Also extract individual facts as documents for more granular retrieval
+    # Also extract individual insights as documents for more granular retrieval
     documents = [doc]
-    for i, fact in enumerate(request.facts):
+    for i, insight in enumerate(request.facts):
         documents.append(
             Document(
-                id=f"{doc_id}_fact_{i}",
-                content=fact.get("text", ""),
+                id=f"{doc_id}_insight_{i}",
+                content=insight.get("text", ""),
                 metadata={
                     "query": request.query,
                     "job_id": request.job_id,
-                    "confidence": fact.get("confidence", 0.0),
-                    "type": "atomic_fact",
+                    "confidence": insight.get("confidence", 0.0),
+                    "type": "atomic_insight",
                 },
             )
         )
 
     await store.add(documents)
-    return {"status": "saved", "document_id": doc_id, "facts_count": len(request.facts)}
+    return {"status": "saved", "document_id": doc_id, "insights_count": len(request.facts)}
 
 
-@app.get("/research/query")
-async def query_research(
+@app.get("/persistence/query")
+async def query_persistence(
     q: str,
-    limit: int = 5,
+    limit: int | None = None,
     domain: str | None = None,
 ) -> dict:
-    """Semantic search over stored research findings."""
+    """Semantic search over stored insights."""
+    limit = limit or settings.vault_settings.default_limit
     store = await get_vector_store()
 
     filters = {}
@@ -185,7 +188,7 @@ async def query_research(
         filter=filters if filters else None,
     )
 
-    # Format for generic research response
+    # Format for generic system response
     facts = []
     for res in results:
         facts.append(

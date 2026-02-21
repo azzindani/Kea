@@ -167,7 +167,7 @@ class InitializeRequest(BaseModel):
     """Initialize request parameters."""
     protocolVersion: str = "2024-11-05"
     capabilities: ClientCapabilities = Field(default_factory=ClientCapabilities)
-    clientInfo: dict[str, str] = Field(default_factory=lambda: {"name": "research-engine", "version": "0.1.0"})
+    clientInfo: dict[str, str] = Field(default_factory=lambda: {"name": "system-engine", "version": "0.1.0"})
 
 
 class InitializeResult(BaseModel):

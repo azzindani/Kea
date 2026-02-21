@@ -68,7 +68,7 @@ class MessageResponse(BaseModel):
     created_at: str
     intent: Optional[str] = None
     attachments: List[str] = []
-    sources: List[dict] = []
+    origins: List[dict] = []
 
 
 class ConversationListResponse(BaseModel):
@@ -222,7 +222,7 @@ async def get_conversation(
                 created_at=m.created_at.isoformat(),
                 intent=m.intent,
                 attachments=m.attachments,
-                sources=m.sources,
+                origins=m.origins,
             )
             for m in messages
         ],
@@ -321,7 +321,7 @@ async def get_messages(
                 created_at=m.created_at.isoformat(),
                 intent=m.intent,
                 attachments=m.attachments,
-                sources=m.sources,
+                origins=m.origins,
             )
             for m in messages
         ],
@@ -338,11 +338,11 @@ async def send_message(
     """
     Send message in conversation.
     
-    This triggers the research pipeline with:
-    - Query classification (casual/utility/research)
+    This triggers the system pipeline with:
+    - Query classification (casual/utility/system)
     - Context caching
-    - Research graph execution
-    - Sources storage
+    - System graph execution
+    - Origins storage
     """
     manager = await get_conversation_manager()
     
@@ -367,10 +367,10 @@ async def send_message(
         title = request.content[:50] + ("..." if len(request.content) > 50 else "")
         await manager.update_conversation(conversation_id, title=title)
     
-    # Run research pipeline
+    # Run system pipeline
     from shared.config import get_settings
     settings = get_settings()
-    # Run research pipeline
+    # Run system pipeline
     try:
         # Call Orchestrator Service
         async with httpx.AsyncClient(timeout=settings.timeouts.llm_streaming) as client:
@@ -389,25 +389,24 @@ async def send_message(
                 
             data = response.json()
             
-            # Simple wrapper to match expected 'result' interface
-            class ResearchResult:
+            class AutonomousResult:
                 def __init__(self, d):
                     self.content = d.get("content", "")
-                    self.sources = d.get("sources", [])
+                    self.origins = d.get("origins", [])
                     self.tool_calls = d.get("tool_calls", [])
                     self.confidence = d.get("confidence", 0.0)
-                    self.query_type = d.get("query_type", "research")
+                    self.query_type = d.get("query_type", "autonomous")
                     self.duration_ms = d.get("duration_ms", 0)
                     self.was_cached = d.get("was_cached", False)
             
-            result = ResearchResult(data)
+            result = AutonomousResult(data)
         
-        # Store assistant response with sources
+        # Store assistant response with origins
         assistant_msg = await manager.add_message(
             conversation_id=conversation_id,
             role=MessageRole.ASSISTANT,
             content=result.content,
-            sources=result.sources,
+            origins=result.origins,
             tool_calls=result.tool_calls,
             confidence=result.confidence,
         )
@@ -426,12 +425,12 @@ async def send_message(
                 role=assistant_msg.role.value if hasattr(assistant_msg.role, 'value') else str(assistant_msg.role),
                 content=assistant_msg.content,
                 created_at=assistant_msg.created_at.isoformat(),
-                sources=assistant_msg.sources,
+                origins=assistant_msg.origins,
             ),
             "meta": {
                 "query_type": result.query_type,
                 "confidence": result.confidence,
-                "sources_count": len(result.sources),
+                "origin_count": len(result.origins),
                 "duration_ms": result.duration_ms,
                 "was_cached": result.was_cached,
             },
@@ -439,7 +438,7 @@ async def send_message(
         
     except Exception as e:
         import traceback
-        logger.error(f"Research pipeline error: {e}")
+        logger.error(f"System pipeline error: {e}")
         logger.error(f"Traceback: {traceback.format_exc()}")
         
         # Fallback to simple response

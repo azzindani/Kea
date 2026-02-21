@@ -4,9 +4,9 @@ The `shared/embedding` module provides the neural foundation for Project's retri
 
 ## ✨ Features
 
-- **Qwen3 Integration**: Primary support for Qwen3-based embedding and reranking models, optimized for technical and corporate research.
+- **Qwen3 Integration**: Primary support for Qwen3-based embedding and reranking models, optimized for technical and corporate tasks.
 - **Vision-Language Support**: Specialized `Qwen3VL` models for embedding and reranking visual data (images, document snapshots).
-- **Cross-Encoder Reranking**: Implementation of neural reranking to improve precision by evaluating the direct relevance of facts to the research query.
+- **Cross-Encoder Reranking**: Implementation of neural reranking to improve precision by evaluating the direct relevance of facts to the task query.
 - **Model Lifecycle Management**: Automated loading, caching, and execution of local or remote models via a unified `ModelManager`.
 
 ## 📐 Architecture
@@ -15,7 +15,7 @@ The component acts as a high-performance utility layer consumed primarily by the
 
 ```mermaid
 graph TD
-    Query[Researcher Query] --> RAG[RAG Service]
+    Query[System Query] --> RAG[RAG Service]
     RAG --> Embed[Embedding Model]
     Embed --> Vector[Vector Search]
     
@@ -29,7 +29,7 @@ graph TD
 - **`model_manager.py`**: Handles initialization and resource management for transformer-based models.
 - **`qwen3_embedding.py`**: Implementation of text-to-vector transformation using Qwen3.
 - **`qwen3_reranker.py`**: Logic for scoring query-fact pairs using cross-attention.
-- **`qwen3_vl_...`**: Multi-modal variants for visual research tasks.
+- **`qwen3_vl_...`**: Multi-modal variants for visual tasks.
 
 ## 🧠 Deep Dive
 

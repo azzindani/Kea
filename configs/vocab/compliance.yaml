@@ -19,17 +19,17 @@ security:
 
 # Procedures
 procedures:
-  standard_research:
-    name: "Standard Research Procedure"
+  standard_execution:
+    name: "Standard Execution Procedure"
     steps:
       - id: "1"
-        name: "Query Classification"
+        name: "Task Classification"
       - id: "2"
         name: "Input Validation"
       - id: "3"
         name: "Security Check"
       - id: "4"
-        name: "Execute Research"
+        name: "Execute Workflow"
       - id: "5"
         name: "Quality Review"
       - id: "6"

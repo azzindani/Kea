@@ -543,16 +543,19 @@ class SessionRegistry:
         """Get the server name that provides a tool."""
         return self.tool_to_server.get(tool_name)
 
-    async def search_tools(self, query: str, limit: int = 1000, min_similarity: float = 0.0) -> List[dict]:
+    async def search_tools(self, query: str, limit: int | None = None, min_similarity: float | None = None) -> List[dict]:
         """
         Semantic search for tools using Postgres Vector DB.
         Enables scaling to 10k+ tools.
         
         Args:
             query: Search query for tool discovery
-            limit: Max results (default 1000 for large tool registries)
+            limit: Max results
             min_similarity: Minimum cosine similarity (0.0 to 1.0)
         """
+        settings = get_settings()
+        limit = limit or settings.mcp.search_limit
+        min_similarity = min_similarity if min_similarity is not None else settings.mcp.min_similarity
         if not self.pg_registry:
             logger.warning("Search unavailable: Postgres Registry not initialized.")
             return []

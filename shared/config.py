@@ -28,7 +28,7 @@ class Environment(str, Enum):
 
 class AppSettings(BaseModel):
     """Core application metadata."""
-    name: str = "Project Research Engine"
+    name: str = "Autonomous OS"
     version: str = "0.4.0"
     environment: str = "development"
 
@@ -59,7 +59,7 @@ class LoggingSettings(BaseModel):
     """Logging configuration."""
     level: str = "INFO"
     format: str = "json"
-    service_name: str = "research-engine"
+    service_name: str = "system-core"
 
 
 class DatabaseSettings(BaseModel):
@@ -69,6 +69,8 @@ class DatabaseSettings(BaseModel):
     max_connections: int = 20
     connection_timeout: float = 30.0
     idle_timeout: float = 600.0
+    max_retries: int = 3
+    retry_delay: float = 2.0
 
 
 class JITSettings(BaseModel):
@@ -89,6 +91,9 @@ class MCPSettings(BaseModel):
     retry_backoff: float = 2.0
     max_concurrent_tools: int = 5
     tool_timeout_seconds: float = 60.0
+    discovery_timeout: float = 10.0
+    search_limit: int = 1000
+    min_similarity: float = 0.0
     jit: JITSettings = JITSettings()
 
 
@@ -133,17 +138,59 @@ class GovernanceSettings(BaseModel):
 class AuthSettings(BaseModel):
     """Auth & Session configuration."""
     jwt_secret: str = ""
+    jwt_algorithm: str = "HS256"
     access_token_minutes: int = 60
     refresh_token_days: int = 7
     session_hours: int = 24
+    allow_anonymous: bool = True
+    api_key_header_name: str = "X-API-Key"
 
 
-class ResearchSettings(BaseModel):
-    """Research default parameters."""
+class RateLimitSettings(BaseModel):
+    """Global rate limiting settings."""
+    enabled: bool = True
+    requests_per_minute: int = 60
+    requests_per_hour: int = 1000
+    burst_size: int = 10
+    default_window_seconds: int = 60
+    exempt_paths: list[str] = [
+        "/health",
+        "/docs",
+        "/redoc",
+        "/openapi.json",
+        "/metrics",
+    ]
+
+
+class KernelSettings(BaseModel):
+    """Kernel operational parameters."""
     default_depth: int = 2
-    default_max_sources: int = 10
+    default_max_steps: int = 20
     max_depth: int = 5
-    max_sources: int = 50
+    max_steps: int = 100
+
+
+class RAGSettings(BaseModel):
+    """RAG Service settings."""
+    default_min_score: float = 0.5
+    default_limit: int = 20
+    max_limit: int = 100
+    ingest_max_rows: int = 1000
+    knowledge_limit: int = 5
+    knowledge_candidate_multiplier: int = 5
+
+
+class VaultSettings(BaseModel):
+    """Vault Service settings."""
+    default_limit: int = 5
+    max_limit: int = 100
+
+
+class ChronosSettings(BaseModel):
+    """Chronos scheduler settings."""
+    poll_interval: float = 60.0
+    due_tolerance: float = 30.0
+    max_history_days: int = 30
 
 
 class ApiSettings(BaseModel):
@@ -169,9 +216,15 @@ class FeatureFlags(BaseModel):
     enable_mock_responses: bool = False
 
 
+class CircuitBreakerSettings(BaseModel):
+    """Circuit breaker configuration."""
+    failure_threshold: int = 5
+    reset_timeout: float = 30.0
+
+
 class S3Settings(BaseModel):
     """S3 Storage settings."""
-    bucket: str = "research-artifacts"
+    bucket: str = "system-artifacts"
     endpoint: str = ""
     access_key: str = ""
     secret_key: str = ""
@@ -180,6 +233,12 @@ class S3Settings(BaseModel):
 class SecuritySettings(BaseModel):
     """Security and CORS settings."""
     cors_origins: list[str] = ["*"]
+    cors_methods: list[str] = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    cors_headers: list[str] = ["*"]
+    hsts_max_age: int = 31536000
+    hsts_include_subdomains: bool = True
+    csp_policy: str = "default-src 'self'"
+    max_body_size_mb: int = 10
 
 
 class Settings(BaseSettings):
@@ -204,11 +263,16 @@ class Settings(BaseSettings):
     timeouts: TimeoutSettings = TimeoutSettings()
     governance: GovernanceSettings = GovernanceSettings()
     auth: AuthSettings = AuthSettings()
-    research: ResearchSettings = ResearchSettings()
+    kernel: KernelSettings = KernelSettings()
     api: ApiSettings = ApiSettings()
     feature_flags: FeatureFlags = FeatureFlags()
     s3: S3Settings = S3Settings()
     security: SecuritySettings = SecuritySettings()
+    chronos: ChronosSettings = ChronosSettings()
+    circuit_breaker: CircuitBreakerSettings = CircuitBreakerSettings()
+    rate_limit: RateLimitSettings = RateLimitSettings()
+    rag: RAGSettings = RAGSettings()
+    vault_settings: VaultSettings = VaultSettings()
 
     class Config:
         env_file = ".env"
@@ -277,11 +341,16 @@ class Settings(BaseSettings):
                 "timeouts": TimeoutSettings,
                 "governance": GovernanceSettings,
                 "auth": AuthSettings,
-                "research": ResearchSettings,
+                "kernel": KernelSettings,
                 "api": ApiSettings,
                 "feature_flags": FeatureFlags,
                 "s3": S3Settings,
                 "security": SecuritySettings,
+                "chronos": ChronosSettings,
+                "circuit_breaker": CircuitBreakerSettings,
+                "rate_limit": RateLimitSettings,
+                "rag": RAGSettings,
+                "vault": VaultSettings,
             }
             
             for field_name, model_cls in models_to_update.items():

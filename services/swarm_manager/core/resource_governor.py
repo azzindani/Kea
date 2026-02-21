@@ -78,10 +78,10 @@ class ResourceGovernor:
         
         try:
             async with pool.acquire() as conn:
-                # Approximate active agents by counting running research jobs
+                # Approximate active agents by counting running system jobs
                 try:
                     active_agents = await conn.fetchval("""
-                        SELECT COUNT(*) FROM research_jobs 
+                        SELECT COUNT(*) FROM system_jobs 
                         WHERE status = 'running'
                     """) or 0
                 except Exception:

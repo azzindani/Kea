@@ -1,9 +1,6 @@
 """
 Jobs API Routes.
 
-Endpoints for research job management with persistent storage.
-
-Changes:
 - Uses PostgreSQL for persistent job storage
 - Implements background task execution via Orchestrator API
 - Requires authentication for job operations
@@ -11,20 +8,18 @@ Changes:
 
 from __future__ import annotations
 
-import asyncio
 import uuid
 from datetime import datetime
-from typing import Any, Optional
+from typing import Optional
 
-import httpx
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pydantic import BaseModel, Field
 
-from shared.schemas import JobRequest, JobResponse, JobType, ResearchStatus
-from shared.logging import get_logger
+from shared.schemas import JobType, JobStatus
+from shared.logging.main import get_logger
 from shared.database.connection import get_database_pool
-from shared.users import User
-from services.api_gateway.middleware.auth import get_current_user, get_current_user_required
+from shared.users.models import User
+from services.api_gateway.middleware.auth import get_current_user_required
 
 
 logger = get_logger(__name__)
@@ -41,22 +36,21 @@ ORCHESTRATOR_URL = ServiceRegistry.get_url(ServiceName.ORCHESTRATOR)
 # ============================================================================
 
 CREATE_JOBS_TABLE = """
-CREATE TABLE IF NOT EXISTS research_jobs (
+CREATE TABLE IF NOT EXISTS system_jobs (
     job_id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
     query TEXT NOT NULL,
     job_type TEXT NOT NULL,
     depth INTEGER DEFAULT 2,
-    max_sources INTEGER DEFAULT 10,
+    max_steps INTEGER DEFAULT 20,
     status TEXT NOT NULL,
     progress REAL DEFAULT 0.0,
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ,
     error TEXT,
-    report TEXT,
+    output TEXT,
     confidence REAL DEFAULT 0.0,
-    facts_count INTEGER DEFAULT 0,
-    sources_count INTEGER DEFAULT 0,
+    steps_count INTEGER DEFAULT 0,
     artifact_ids TEXT
 )
 """
@@ -100,7 +94,7 @@ class JobStore:
         query: str,
         job_type: JobType,
         depth: int,
-        max_sources: int,
+        max_steps: int,
     ) -> dict:
         """Create new job in database."""
         await self.initialize()
@@ -110,12 +104,12 @@ class JobStore:
         
         await pool.execute(
             """
-            INSERT INTO research_jobs 
-            (job_id, user_id, query, job_type, depth, max_sources, status, progress, created_at)
+            INSERT INTO system_jobs 
+            (job_id, user_id, query, job_type, depth, max_steps, status, progress, created_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             """,
-            job_id, user_id, query, job_type.value, depth, max_sources,
-            ResearchStatus.PENDING.value, 0.0, now,
+            job_id, user_id, query, job_type.value, depth, max_steps,
+            JobStatus.PENDING.value, 0.0, now,
         )
         
         return {
@@ -124,8 +118,8 @@ class JobStore:
             "query": query,
             "job_type": job_type,
             "depth": depth,
-            "max_sources": max_sources,
-            "status": ResearchStatus.PENDING,
+            "max_steps": max_steps,
+            "status": JobStatus.PENDING,
             "progress": 0.0,
             "created_at": now,
             "updated_at": None,
@@ -138,7 +132,7 @@ class JobStore:
         pool = await get_database_pool()
         
         row = await pool.fetchrow(
-            "SELECT * FROM research_jobs WHERE job_id = $1",
+            "SELECT * FROM system_jobs WHERE job_id = $1",
             job_id,
         )
         
@@ -161,21 +155,21 @@ class JobStore:
         for key, value in kwargs.items():
             set_parts.append(f"{key} = ${param_index}")
             param_index += 1
-            if isinstance(value, ResearchStatus):
+            if isinstance(value, JobStatus):
                 value = value.value
             values.append(value)
         
         values.append(job_id)
         
         await pool.execute(
-            f"UPDATE research_jobs SET {', '.join(set_parts)} WHERE job_id = ${param_index}",
+            f"UPDATE system_jobs SET {', '.join(set_parts)} WHERE job_id = ${param_index}",
             *values,
         )
     
     async def list_for_user(
         self,
         user_id: str,
-        status: Optional[ResearchStatus] = None,
+        status: Optional[JobStatus] = None,
         limit: int = 20,
         offset: int = 0,
     ) -> list[dict]:
@@ -186,7 +180,7 @@ class JobStore:
         if status:
             rows = await pool.fetch(
                 """
-                SELECT * FROM research_jobs 
+                SELECT * FROM system_jobs 
                 WHERE user_id = $1 AND status = $2
                 ORDER BY created_at DESC
                 LIMIT $3 OFFSET $4
@@ -196,7 +190,7 @@ class JobStore:
         else:
             rows = await pool.fetch(
                 """
-                SELECT * FROM research_jobs 
+                SELECT * FROM system_jobs 
                 WHERE user_id = $1
                 ORDER BY created_at DESC
                 LIMIT $2 OFFSET $3
@@ -206,19 +200,19 @@ class JobStore:
         
         return [self._row_to_dict(row) for row in rows]
     
-    async def count_for_user(self, user_id: str, status: Optional[ResearchStatus] = None) -> int:
+    async def count_for_user(self, user_id: str, status: Optional[JobStatus] = None) -> int:
         """Count jobs for user."""
         await self.initialize()
         pool = await get_database_pool()
         
         if status:
             result = await pool.fetchrow(
-                "SELECT COUNT(*) as cnt FROM research_jobs WHERE user_id = $1 AND status = $2",
+                "SELECT COUNT(*) as cnt FROM system_jobs WHERE user_id = $1 AND status = $2",
                 user_id, status.value,
             )
         else:
             result = await pool.fetchrow(
-                "SELECT COUNT(*) as cnt FROM research_jobs WHERE user_id = $1",
+                "SELECT COUNT(*) as cnt FROM system_jobs WHERE user_id = $1",
                 user_id,
             )
         
@@ -232,16 +226,15 @@ class JobStore:
             "query": row["query"],
             "job_type": JobType(row["job_type"]),
             "depth": row["depth"],
-            "max_sources": row["max_sources"],
-            "status": ResearchStatus(row["status"]),
+            "max_steps": row["max_steps"],
+            "status": JobStatus(row["status"]),
             "progress": row["progress"],
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
             "error": row["error"],
-            "report": row["report"],
+            "output": row["output"],
             "confidence": row["confidence"] if row["confidence"] is not None else 0.0,
-            "facts_count": row["facts_count"] if row["facts_count"] is not None else 0,
-            "sources_count": row["sources_count"] if row["sources_count"] is not None else 0,
+            "steps_count": row["steps_count"] if row["steps_count"] is not None else 0,
             "artifact_ids": row["artifact_ids"].split(",") if row["artifact_ids"] else [],
         }
 
@@ -259,16 +252,14 @@ async def get_job_store() -> JobStore:
 
 
 # ============================================================================
-# Background Task: Run Research Job
+# Background Task: Run System Job
 # ============================================================================
 
-async def run_research_job(
+async def run_system_job(
     job_id: str,
 ):
     """
-    Execute research job via Orchestrator API.
-    
-    This is the background task that actually runs the research.
+    Execute job via Orchestrator API.
     """
     store = await get_job_store()
     job = await store.get(job_id)
@@ -278,43 +269,42 @@ async def run_research_job(
         return
     
     # Update status to running
-    await store.update(job_id, status=ResearchStatus.RUNNING, progress=0.1)
+    await store.update(job_id, status=JobStatus.RUNNING, progress=0.1)
     
-    logger.info(f"Starting research job {job_id}", 
+    logger.info(f"Starting system job {job_id}", 
                 extra={"query": job["query"][:100]})
     
     try:
         from services.api_gateway.clients.orchestrator import get_orchestrator_client
         client = await get_orchestrator_client()
         
-        # Start research via client (which handles retries and circuit breaking)
-        result = await client.start_research(
+        # Start execution via client
+        result = await client.start_execution(
             query=job["query"],
             depth=job["depth"],
-            max_sources=job["max_sources"],
+            max_steps=job["max_steps"],
         )
         
         # Update job with results
         await store.update(
             job_id,
-            status=ResearchStatus.COMPLETED,
+            status=JobStatus.COMPLETED,
             progress=1.0,
-            report=result.get("report", ""),
+            output=result.get("output", ""),
             confidence=result.get("confidence", 0.0),
-            facts_count=result.get("facts_count", 0),
-            sources_count=result.get("sources_count", 0),
+            steps_count=result.get("steps_count", 0),
         )
         
-        logger.info(f"Research job {job_id} completed", extra={
+        logger.info(f"System job {job_id} completed", extra={
             "confidence": result.get("confidence", 0.0),
-            "sources_count": result.get("sources_count", 0),
+            "steps_count": result.get("steps_count", 0),
         })
         
     except Exception as e:
-        logger.error(f"Research job {job_id} failed: {e}")
+        logger.error(f"System job {job_id} failed: {e}")
         await store.update(
             job_id,
-            status=ResearchStatus.FAILED,
+            status=JobStatus.FAILED,
             error=str(e),
         )
 
@@ -329,23 +319,23 @@ class CreateJobRequest(BaseModel):
     _settings = get_settings()
     
     query: str = Field(..., min_length=1)
-    job_type: JobType = JobType.DEEP_RESEARCH
+    job_type: JobType = JobType.AUTONOMOUS
     depth: int = Field(
-        default=_settings.research.default_depth, 
+        default=_settings.kernel.default_depth, 
         ge=1, 
-        le=_settings.research.max_depth
+        le=_settings.kernel.max_depth
     )
-    max_sources: int = Field(
-        default=_settings.research.default_max_sources, 
+    max_steps: int = Field(
+        default=_settings.kernel.default_max_steps, 
         ge=1, 
-        le=_settings.research.max_sources
+        le=_settings.kernel.max_steps
     )
 
 
-class JobStatus(BaseModel):
+class JobStatusResponse(BaseModel):
     """Job status response."""
     job_id: str
-    status: ResearchStatus
+    status: JobStatus
     progress: float
     created_at: datetime
     updated_at: datetime | None
@@ -355,11 +345,10 @@ class JobStatus(BaseModel):
 class JobResult(BaseModel):
     """Job result response."""
     job_id: str
-    status: ResearchStatus
-    report: str | None
+    status: JobStatus
+    output: str | None
     confidence: float
-    facts_count: int
-    sources_count: int
+    steps_count: int
     artifact_ids: list[str]
 
 
@@ -367,14 +356,14 @@ class JobResult(BaseModel):
 # Routes
 # ============================================================================
 
-@router.post("/", response_model=JobStatus)
+@router.post("/", response_model=JobStatusResponse)
 async def create_job(
     request: CreateJobRequest,
     background_tasks: BackgroundTasks,
     user: User = Depends(get_current_user_required),
 ):
     """
-    Create a new research job.
+    Create a new system job.
     
     Returns job_id for tracking. Job runs in background.
     Requires authentication.
@@ -388,7 +377,7 @@ async def create_job(
         query=request.query,
         job_type=request.job_type,
         depth=request.depth,
-        max_sources=request.max_sources,
+        max_steps=request.max_steps,
     )
     
     logger.info(f"Created job {job_id}", extra={
@@ -398,20 +387,20 @@ async def create_job(
     
     # Queue background task to execute job
     background_tasks.add_task(
-        run_research_job, 
+        run_system_job, 
         job_id, 
     )
     
-    return JobStatus(
+    return JobStatusResponse(
         job_id=job_id,
-        status=ResearchStatus.PENDING,
+        status=JobStatus.PENDING,
         progress=0.0,
         created_at=job["created_at"],
         updated_at=None,
     )
 
 
-@router.get("/{job_id}", response_model=JobStatus)
+@router.get("/{job_id}", response_model=JobStatusResponse)
 async def get_job_status(
     job_id: str,
     user: User = Depends(get_current_user_required),
@@ -427,7 +416,7 @@ async def get_job_status(
     if job["user_id"] != user.user_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
-    return JobStatus(
+    return JobStatusResponse(
         job_id=job["job_id"],
         status=job["status"],
         progress=job["progress"],
@@ -452,7 +441,7 @@ async def get_job_result(
     if job["user_id"] != user.user_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
-    if job["status"] != ResearchStatus.COMPLETED:
+    if job["status"] != JobStatus.COMPLETED:
         raise HTTPException(
             status_code=400,
             detail=f"Job not completed. Current status: {job['status'].value}"
@@ -461,10 +450,9 @@ async def get_job_result(
     return JobResult(
         job_id=job_id,
         status=job["status"],
-        report=job.get("report"),
+        output=job.get("output"),
         confidence=job.get("confidence", 0.0),
-        facts_count=job.get("facts_count", 0),
-        sources_count=job.get("sources_count", 0),
+        steps_count=job.get("steps_count", 0),
         artifact_ids=job.get("artifact_ids", []),
     )
 
@@ -484,10 +472,10 @@ async def cancel_job(
     if job["user_id"] != user.user_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
-    if job["status"] in [ResearchStatus.COMPLETED, ResearchStatus.FAILED]:
+    if job["status"] in [JobStatus.COMPLETED, JobStatus.FAILED]:
         raise HTTPException(status_code=400, detail="Cannot cancel completed/failed job")
     
-    await store.update(job_id, status=ResearchStatus.CANCELLED)
+    await store.update(job_id, status=JobStatus.CANCELLED)
     
     logger.info(f"Cancelled job {job_id}", extra={"user_id": user.user_id})
     
@@ -496,7 +484,7 @@ async def cancel_job(
 
 @router.get("/")
 async def list_jobs(
-    status: ResearchStatus | None = None,
+    status: JobStatus | None = None,
     limit: int = 20,
     offset: int = 0,
     user: User = Depends(get_current_user_required),
@@ -514,7 +502,7 @@ async def list_jobs(
     
     return {
         "jobs": [
-            JobStatus(
+            JobStatusResponse(
                 job_id=j["job_id"],
                 status=j["status"],
                 progress=j["progress"],

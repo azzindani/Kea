@@ -1,16 +1,15 @@
 """
 Chronos — Scheduling Service.
 
-Manages recurring and one-shot research jobs via cron expressions.
+Manages recurring and one-shot system jobs via cron expressions.
 Persists scheduled tasks in PostgreSQL and fires them by POSTing to
-the Orchestrator's /research endpoint.
+the Orchestrator's /execute endpoint.
 """
 
 from __future__ import annotations
 
 import asyncio
 import uuid
-import os
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Any
@@ -35,13 +34,13 @@ logger = get_logger(__name__)
 
 
 class ScheduleRequest(BaseModel):
-    """Create a new scheduled research job."""
+    """Create a new scheduled system job."""
     _settings = get_settings()
 
-    query: str = Field(..., description="Research query to run on schedule")
+    query: str = Field(..., description="System query to run on schedule")
     cron_expr: str = Field(..., description="Cron expression e.g. '0 8 * * *' for 08:00 daily")
-    depth: int = Field(default=_settings.research.default_depth, ge=1, le=_settings.research.max_depth)
-    max_sources: int = Field(default=_settings.research.default_max_sources, ge=1, le=_settings.research.max_sources)
+    depth: int = Field(default=_settings.kernel.default_depth, ge=1, le=_settings.kernel.max_depth)
+    max_steps: int = Field(default=_settings.kernel.default_max_steps, ge=1, le=_settings.kernel.max_steps)
     enabled: bool = Field(default=True)
 
 
@@ -162,8 +161,10 @@ def _next_run(cron_expr: str) -> datetime | None:
         return None
 
 
-def _is_due(next_run_at: Any, tolerance_s: int = 30) -> bool:
+def _is_due(next_run_at: Any, tolerance_s: float | None = None) -> bool:
     """Return True if the task is due to fire (within tolerance seconds)."""
+    if tolerance_s is None:
+        tolerance_s = settings.chronos.due_tolerance
     if next_run_at is None:
         return False
     if isinstance(next_run_at, str):
@@ -180,7 +181,7 @@ def _is_due(next_run_at: Any, tolerance_s: int = 30) -> bool:
 
 
 async def _fire_task(task: dict) -> None:
-    """POST to Orchestrator /research for a scheduled task."""
+    """POST to Orchestrator /execute for a scheduled task."""
     orch_url = ServiceRegistry.get_url(ServiceName.ORCHESTRATOR)
     payload = {
         "query": task["query"],
@@ -189,7 +190,7 @@ async def _fire_task(task: dict) -> None:
     }
     try:
         async with httpx.AsyncClient(timeout=settings.timeouts.long) as client:
-            resp = await client.post(f"{orch_url}/research", json=payload)
+            resp = await client.post(f"{orch_url}/execute", json=payload)
             if resp.status_code == 200:
                 logger.info(
                     f"Chronos: fired task {task['task_id']} \u2192 job_id={resp.json().get('job_id')}"
@@ -212,7 +213,7 @@ async def _scheduler_loop() -> None:
                     await _update_last_run(task["task_id"], next_run)
         except Exception as e:
             logger.error(f"Chronos scheduler loop error: {e}")
-        await asyncio.sleep(60)
+        await asyncio.sleep(settings.chronos.poll_interval)
 
 
 # ---------------------------------------------------------------------------
@@ -240,7 +241,7 @@ setup_logging(LogConfig(
 
 app = FastAPI(
     title=f"{settings.app.name} - Chronos",
-    description="Recurring and one-shot research job management",
+    description="Recurring and one-shot system job management",
     version=settings.app.version,
     lifespan=lifespan,
 )
@@ -260,7 +261,7 @@ async def health() -> dict:
 
 @app.post("/schedule", response_model=ScheduledTask, status_code=201)
 async def create_schedule(req: ScheduleRequest) -> ScheduledTask:
-    """Create a new scheduled research job."""
+    """Create a new scheduled system job."""
     next_run = _next_run(req.cron_expr)
     if next_run is None:
         raise HTTPException(status_code=400, detail=f"Invalid cron expression: {req.cron_expr}")

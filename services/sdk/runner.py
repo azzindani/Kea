@@ -1,55 +1,47 @@
-"""
-Research Job Runner.
-
-Handles job submission, polling, and result management.
-"""
-
 import asyncio
-import json
 import uuid
-from typing import Optional
 
 from shared.logging import get_logger
-from services.client.api import ResearchClient
-from services.client.metrics import MetricsCollector, JobMetrics
+from services.sdk.api import AutonomousClient
+from services.sdk.metrics import MetricsCollector, JobMetrics
 
 logger = get_logger(__name__)
 
 
-class ResearchRunner:
+class JobRunner:
     """
-    Executes research jobs and tracks their progress.
+    Executes system jobs and tracks their progress.
     """
     
-    def __init__(self, api_client: ResearchClient, metrics: MetricsCollector):
+    def __init__(self, api_client: AutonomousClient, metrics: MetricsCollector):
         self.client = api_client
         self.metrics = metrics
         self.poll_interval = 2.0  # Seconds
     
-    async def run_query(
+    async def execute_task(
         self, 
-        query: str,
+        task: str,
     ) -> JobMetrics:
         """
-        Run a single research query and return metrics.
+        Run a single system task and return metrics.
         
         Args:
-            query: The research query to run
+            task: The system task to run
         """
         job_id = str(uuid.uuid4())
-        logger.info(f"🚀 Starting Research Job {job_id}: '{query}'")
+        logger.info(f"🚀 Starting System Job {job_id}: '{task}'")
         
-        self.metrics.start_job(job_id, query)
+        self.metrics.start_job(job_id, task)
         
         try:
             # 1. Submit Job
             # Note: We must adhere to the exact API expected by the orchestrator
             # API Gateway routes jobs to /api/v1/jobs
             payload = {
-                "query": query,
-                "job_type": "deep_research", # Required by API Gateway
+                "query": task,
+                "job_type": "autonomous", # Generalized
                 "depth": 2,
-                "max_sources": 50,
+                "max_steps": 50, # Generalized from max_sources
             }
             
             response = await self.client.post("/api/v1/jobs/", json=payload)
@@ -111,11 +103,11 @@ class ResearchRunner:
                     
                     # API returns these at top level (not nested in metrics)
                     self.metrics._current_job.confidence = result_data.get("confidence", 0.0)
-                    self.metrics._current_job.facts_count = result_data.get("facts_count", 0)
-                    self.metrics._current_job.sources_count = result_data.get("sources_count", 0)
+                    self.metrics._current_job.insight_count = result_data.get("insight_count", 0)
+                    self.metrics._current_job.origin_count = result_data.get("origin_count", 0)
                     
                     
-                    logger.info(f"Result received: confidence={result_data.get('confidence')}, facts={result_data.get('facts_count')}, sources={result_data.get('sources_count')}")
+                    logger.info(f"Result received: confidence={result_data.get('confidence')}, insights={result_data.get('insight_count')}, origins={result_data.get('origin_count')}")
                 
                 self.metrics.end_job(success=True)
                 logger.info(f"✅ Job {job_id} Completed Successfully")

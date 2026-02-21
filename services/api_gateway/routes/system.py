@@ -37,7 +37,7 @@ class SystemCapabilities(BaseModel):
     """System capabilities response."""
 
     mcp_servers: list[str]
-    research_paths: list[str]
+    available_job_types: list[str]
     llm_providers: list[str]
     max_parallel_tools: int
 
@@ -70,7 +70,7 @@ async def system_capabilities():
 
     return SystemCapabilities(
         mcp_servers=[s.name for s in settings.mcp.servers if s.enabled],
-        research_paths=["deep_research"],
+        available_job_types=["autonomous"],
         llm_providers=["openrouter"],
         max_parallel_tools=settings.mcp.max_concurrent_tools,
     )
@@ -102,12 +102,12 @@ async def metrics_summary() -> dict:
         from shared.database.connection import get_database_pool
 
         pool = await get_database_pool()
-        total_jobs = await pool.fetchval("SELECT COUNT(*) FROM research_jobs") or 0
+        total_jobs = await pool.fetchval("SELECT COUNT(*) FROM system_jobs") or 0
         total_tool_calls = 0  # To be implemented with new telemetry standard
         avg_duration = await pool.fetchval(
             """
             SELECT AVG(EXTRACT(EPOCH FROM (updated_at - created_at)))
-            FROM research_jobs
+            FROM system_jobs
             WHERE status = 'completed' AND updated_at IS NOT NULL
             """
         )

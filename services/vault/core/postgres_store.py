@@ -32,7 +32,7 @@ class PostgresVectorStore(VectorStore):
     
     def __init__(
         self,
-        table_name: str = "research_facts",
+        table_name: str = "system_insights",
         embedding_dim: int = 1024,  # Qwen3 default
         use_local_embedding: bool = False,
         use_vl_model: bool = False,

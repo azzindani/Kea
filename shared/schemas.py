@@ -59,31 +59,31 @@ from shared.mcp.protocol import (
 )
 
 # ============================================================================
-# Research State
+# Execution State
 # ============================================================================
 
 
-class AtomicFact(BaseModel):
+class AtomicInsight(BaseModel):
     """
-    Atomic fact (Entity-Attribute-Value).
+    Atomic Insight (Entity-Attribute-Value).
     
-    The foundational granular finding for Project.
+    The foundational granular finding for the system.
     """
 
-    fact_id: str = Field(default="", description="Unique identifier")
-    entity: str = Field(..., description="Subject of the fact")
+    insight_id: str = Field(default="", description="Unique identifier")
+    entity: str = Field(..., description="Subject of the insight")
     attribute: str = Field(..., description="Property described")
     value: str = Field(..., description="Measured or stated value")
     unit: str | None = Field(default=None, description="Units of measurement")
     period: str | None = Field(default=None, description="Time period applicable")
-    source_url: str = Field(..., description="Originating URL")
-    source_title: str = Field(default="", description="Originating document title")
+    origin_url: str = Field(..., description="Originating URL")
+    origin_title: str = Field(default="", description="Originating document title")
     confidence_score: float = Field(default=0.8, ge=0.0, le=1.0)
-    extracted_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
-class ResearchStatus(str, Enum):
-    """Research job status."""
+class JobStatus(str, Enum):
+    """System job status."""
 
     PENDING = "pending"
     RUNNING = "running"
@@ -97,8 +97,8 @@ class ResearchStatus(str, Enum):
 # ============================================================================
 
 
-class Source(BaseModel):
-    """Research source."""
+class Origin(BaseModel):
+    """Information origin."""
 
     url: str
     title: str
@@ -116,33 +116,33 @@ class Source(BaseModel):
 class JobType(str, Enum):
     """Job types."""
 
-    DEEP_RESEARCH = "deep_research"
-    QUICK_ANSWER = "quick_answer"
+    AUTONOMOUS = "autonomous"
+    TASK = "task"
+    INTERACTIVE = "interactive"
 
 
 class JobRequest(BaseModel):
-    """Research job request."""
+    """General task/job request."""
 
     query: str
-    job_type: JobType = JobType.DEEP_RESEARCH
+    job_type: JobType = JobType.AUTONOMOUS
     depth: int = 2
-    max_sources: int = 10
-    domain_hints: list[str] = Field(default_factory=list)
+    max_steps: int = 20
+    context_hints: list[str] = Field(default_factory=list)
 
 
 class JobResponse(BaseModel):
-    """Research job response."""
+    """General task response."""
 
     job_id: str
-    status: ResearchStatus
+    status: JobStatus
     created_at: datetime
     updated_at: datetime | None = None
     progress: float = 0.0
 
     # Results (when completed)
-    report: str | None = None
-    facts_count: int = 0
-    sources_count: int = 0
+    output: str | None = None
+    steps_count: int = 0
     artifact_ids: list[str] = Field(default_factory=list)
     confidence: float = 0.0
 

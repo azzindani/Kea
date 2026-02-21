@@ -14,7 +14,6 @@ import httpx
 
 from shared.logging import get_logger
 from shared.config import get_settings
-from shared.environment import get_environment_config
 from shared.service_registry import ServiceRegistry, ServiceName
 
 
@@ -32,7 +31,6 @@ class MCPClient:
     """
     
     def __init__(self, base_url: str | None = None) -> None:
-        from shared.config import get_settings
         settings = get_settings()
         self.base_url = base_url or ServiceRegistry.get_url(ServiceName.MCP_HOST)
         self.timeout = httpx.Timeout(
@@ -70,9 +68,8 @@ class MCPClient:
     
     async def search_tools(self, query: str, limit: int | None = None) -> list[dict[str, Any]]:
         """Search for tools using RAG."""
-        from shared.config import get_settings
-        _settings = get_settings()
-        limit = limit or _settings.api.default_limit
+        settings = get_settings()
+        limit = limit or settings.api.default_limit
         
         client = await self._get_client()
         response = await client.post(

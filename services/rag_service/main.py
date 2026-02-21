@@ -13,7 +13,7 @@ from prometheus_client import make_asgi_app
 from pydantic import BaseModel, Field
 
 from services.rag_service.core import (
-    FactStore,
+    InsightStore,
     create_artifact_store,
     create_vector_store,
 )
@@ -21,12 +21,12 @@ from services.rag_service.core.dataset_loader import DatasetLoader
 from services.rag_service.core.knowledge_store import KnowledgeStore, create_knowledge_store
 from shared.config import get_settings
 from shared.logging import LogConfig, get_logger, setup_logging, RequestLoggingMiddleware
-from shared.schemas import AtomicFact
+from shared.schemas import AtomicInsight
 
 logger = get_logger(__name__)
 
 # Global stores
-fact_store: FactStore | None = None
+insight_store: InsightStore | None = None
 dataset_loader: DatasetLoader | None = None
 artifact_store = None
 knowledge_store: KnowledgeStore | None = None
@@ -51,7 +51,7 @@ async def lifespan(_app: FastAPI):
 
     # Initialize stores
     vector_store = create_vector_store()
-    fact_store = FactStore(vector_store)
+    insight_store = InsightStore(vector_store)
     dataset_loader = DatasetLoader()
     artifact_store = create_artifact_store()
 
@@ -96,16 +96,16 @@ app.mount("/metrics", make_asgi_app())
 # ============================================================================
 
 
-class AddFactRequest(BaseModel):
-    """Add fact request."""
+class AddInsightRequest(BaseModel):
+    """Add insight request."""
 
     entity: str
     attribute: str
     value: str
     unit: str | None = None
     period: str | None = None
-    source_url: str
-    source_title: str = ""
+    origin_url: str
+    origin_title: str = ""
     confidence_score: float = Field(default=0.8, ge=0.0, le=1.0)
     dataset_id: str | None = None
 
@@ -115,7 +115,10 @@ class SearchRequest(BaseModel):
 
     query: str
     limit: int = Field(
-        default=10, ge=1, le=10000, description="Max results (up to 10000 for large-scale searches)"
+        default=settings.rag.default_limit, 
+        ge=1, 
+        le=settings.rag.max_limit, 
+        description="Max results"
     )
     entity: str | None = None
     dataset_id: str | None = None
@@ -127,20 +130,20 @@ class IngestRequest(BaseModel):
 
     dataset_name: str
     split: str = "train"
-    max_rows: int = 1000
+    max_rows: int = settings.rag.ingest_max_rows
     mapping: dict[str, str] | None = None
 
 
-class FactResponse(BaseModel):
-    """Fact response."""
+class InsightResponse(BaseModel):
+    """Insight response."""
 
-    fact_id: str
+    insight_id: str
     entity: str
     attribute: str
     value: str
     unit: str | None
     period: str | None
-    source_url: str
+    origin_url: str
     confidence_score: float
 
 
@@ -154,35 +157,35 @@ async def health_check():
     return {"status": "healthy", "service": "rag_service"}
 
 
-@app.post("/facts", response_model=dict)
-async def add_fact(request: AddFactRequest):
-    """Add a new atomic fact."""
-    if not fact_store:
-        raise HTTPException(status_code=503, detail="Fact store not initialized")
+@app.post("/insights", response_model=dict)
+async def add_insight(request: AddInsightRequest):
+    """Add a new atomic insight."""
+    if not insight_store:
+        raise HTTPException(status_code=503, detail="Insight store not initialized")
 
-    fact = AtomicFact(
-        fact_id="",
+    insight = AtomicInsight(
+        insight_id="",
         entity=request.entity,
         attribute=request.attribute,
         value=request.value,
         unit=request.unit,
         period=request.period,
-        source_url=request.source_url,
-        source_title=request.source_title,
+        origin_url=request.origin_url,
+        origin_title=request.origin_title,
         confidence_score=request.confidence_score,
     )
 
-    fact_id = await fact_store.add_fact(fact, dataset_id=request.dataset_id)
-    return {"fact_id": fact_id}
+    insight_id = await insight_store.add_insight(insight, dataset_id=request.dataset_id)
+    return {"insight_id": insight_id}
 
 
-@app.post("/facts/search", response_model=list[FactResponse])
-async def search_facts(request: SearchRequest):
-    """Search for facts."""
-    if not fact_store:
-        raise HTTPException(status_code=503, detail="Fact store not initialized")
+@app.post("/insights/search", response_model=list[InsightResponse])
+async def search_insights(request: SearchRequest):
+    """Search for insights."""
+    if not insight_store:
+        raise HTTPException(status_code=503, detail="Insight store not initialized")
 
-    facts = await fact_store.search(
+    insights = await insight_store.search(
         query=request.query,
         limit=request.limit,
         entity=request.entity,
@@ -191,59 +194,59 @@ async def search_facts(request: SearchRequest):
     )
 
     return [
-        FactResponse(
-            fact_id=f.fact_id,
-            entity=f.entity,
-            attribute=f.attribute,
-            value=f.value,
-            unit=f.unit,
-            period=f.period,
-            source_url=f.source_url,
-            confidence_score=f.confidence_score,
+        InsightResponse(
+            insight_id=i.insight_id,
+            entity=i.entity,
+            attribute=i.attribute,
+            value=i.value,
+            unit=i.unit,
+            period=i.period,
+            origin_url=i.origin_url,
+            confidence_score=i.confidence_score,
         )
-        for f in facts
+        for i in insights
     ]
 
 
-@app.get("/facts/{fact_id}", response_model=FactResponse)
-async def get_fact(fact_id: str):
-    """Get a specific fact."""
-    if not fact_store:
-        raise HTTPException(status_code=503, detail="Fact store not initialized")
+@app.get("/insights/{insight_id}", response_model=InsightResponse)
+async def get_insight(insight_id: str):
+    """Get a specific insight."""
+    if not insight_store:
+        raise HTTPException(status_code=503, detail="Insight store not initialized")
 
-    fact = await fact_store.get_fact(fact_id)
-    if not fact:
-        raise HTTPException(status_code=404, detail="Fact not found")
+    insight = await insight_store.get_insight(insight_id)
+    if not insight:
+        raise HTTPException(status_code=404, detail="Insight not found")
 
-    return FactResponse(
-        fact_id=fact.fact_id,
-        entity=fact.entity,
-        attribute=fact.attribute,
-        value=fact.value,
-        unit=fact.unit,
-        period=fact.period,
-        source_url=fact.source_url,
-        confidence_score=fact.confidence_score,
+    return InsightResponse(
+        insight_id=insight.insight_id,
+        entity=insight.entity,
+        attribute=insight.attribute,
+        value=insight.value,
+        unit=insight.unit,
+        period=insight.period,
+        origin_url=insight.origin_url,
+        confidence_score=insight.confidence_score,
     )
 
 
-@app.delete("/facts/{fact_id}")
-async def delete_fact(fact_id: str):
-    """Delete a fact."""
-    if not fact_store:
-        raise HTTPException(status_code=503, detail="Fact store not initialized")
+@app.delete("/insights/{insight_id}")
+async def delete_insight(insight_id: str):
+    """Delete an insight."""
+    if not insight_store:
+        raise HTTPException(status_code=503, detail="Insight store not initialized")
 
-    await fact_store.delete_fact(fact_id)
-    return {"message": "Fact deleted"}
+    await insight_store.delete_insight(insight_id)
+    return {"message": "Insight deleted"}
 
 
 @app.get("/entities")
 async def list_entities():
     """List all unique entities."""
-    if not fact_store:
-        raise HTTPException(status_code=503, detail="Fact store not initialized")
+    if not insight_store:
+        raise HTTPException(status_code=503, detail="Insight store not initialized")
 
-    entities = await fact_store.get_entities()
+    entities = await insight_store.get_entities()
     return {"entities": entities}
 
 
@@ -254,7 +257,7 @@ async def list_entities():
 
 async def _ingest_job(request: IngestRequest):
     """Background task for ingestion."""
-    if not dataset_loader or not fact_store:
+    if not dataset_loader or not insight_store:
         logger.error("Stores not initialized for background job")
         return
 
@@ -273,16 +276,16 @@ async def _ingest_job(request: IngestRequest):
 
             # Batch insert every 50
             if len(facts_buffer) >= 50:
-                await fact_store.add_facts(facts_buffer, dataset_id=request.dataset_name)
+                await insight_store.add_insights(facts_buffer, dataset_id=request.dataset_name)
                 count += len(facts_buffer)
                 facts_buffer.clear()
 
         # Insert remaining
         if facts_buffer:
-            await fact_store.add_facts(facts_buffer, dataset_id=request.dataset_name)
+            await insight_store.add_insights(facts_buffer, dataset_id=request.dataset_name)
             count += len(facts_buffer)
 
-        logger.info(f"Ingestion complete: {request.dataset_name} ({count} facts)")
+        logger.info(f"Ingestion complete: {request.dataset_name} ({count} insights)")
 
     except Exception as e:
         logger.error(f"Ingestion failed for {request.dataset_name}: {e}")
@@ -301,10 +304,10 @@ async def ingest_dataset(request: IngestRequest, background_tasks: BackgroundTas
 @app.delete("/datasets/{dataset_id}")
 async def delete_dataset(dataset_id: str):
     """Unload/Delete a dataset."""
-    if not fact_store:
-        raise HTTPException(status_code=503, detail="Fact store not initialized")
+    if not insight_store:
+        raise HTTPException(status_code=503, detail="Insight store not initialized")
 
-    count = await fact_store.delete_by_dataset(dataset_id)
+    count = await insight_store.delete_by_dataset(dataset_id)
     return {"message": "Dataset deleted", "count": count}
 
 

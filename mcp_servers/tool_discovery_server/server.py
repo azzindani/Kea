@@ -133,14 +133,14 @@ async def check_compatibility(package_name: str, check_deps: bool = True) -> str
     return await run_op(analysis.check_compatibility, package_name=package_name, check_deps=check_deps)
 
 @mcp.tool()
-async def suggest_tools(research_domain: str, task_type: str = "") -> str:
+async def suggest_tools(task_domain: str, task_type: str = "") -> str:
     """SUGGESTS tools. [ACTION]
     
     [RAG Context]
-    Suggest tools based on research needs (finance, medical, legal, social).
+    Suggest tools based on system needs (finance, medical, legal, social).
     Returns tool suggestions.
     """
-    return await run_op(analysis.suggest_tools, research_domain=research_domain, task_type=task_type)
+    return await run_op(analysis.suggest_tools, task_domain=task_domain, task_type=task_type)
 
 # --- REGISTRY TOOLS ---
 @mcp.tool()

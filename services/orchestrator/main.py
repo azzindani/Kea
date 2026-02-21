@@ -1,20 +1,19 @@
 ﻿"""
 Orchestrator Main Service.
 
-FastAPI entrypoint for the research orchestrator.
+FastAPI entrypoint for the kernel orchestrator.
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
-import os
 import sys
 from contextlib import asynccontextmanager
 from typing import Any
 
 import httpx
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from prometheus_client import make_asgi_app
@@ -36,10 +35,7 @@ setup_logging(LogConfig(
 logger = get_logger(__name__)
 
 # Global state
-research_graph = None
-
-orchestrator_vocab = load_vocab("orchestrator")
-vocab_settings = orchestrator_vocab.get("settings", {})
+workflow_graph = None
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -56,7 +52,7 @@ async def lifespan(_app: FastAPI):
 # Create FastAPI app
 app = FastAPI(
     title=settings.app.name,
-    description="Research orchestration service (Redesign in progress)",
+    description="Kernel orchestration service (Redesign in progress)",
     version=settings.app.version,
     lifespan=lifespan,
 )
@@ -71,31 +67,30 @@ app.mount("/metrics", make_asgi_app())
 # ============================================================================
 
 
-class ResearchRequest(BaseModel):
-    """Research job request."""
-    query: str = Field(..., min_length=1, description="Research query")
+class ExecutionRequest(BaseModel):
+    """General execution request."""
+    query: str = Field(..., min_length=1, description="Task query")
     depth: int = Field(
-        default=settings.research.default_depth, 
+        default=settings.kernel.default_depth, 
         ge=1, 
-        le=settings.research.max_depth, 
-        description="Research depth"
+        le=settings.kernel.max_depth, 
+        description="Execution depth"
     )
-    max_sources: int = Field(
-        default=settings.research.default_max_sources, 
+    max_steps: int = Field(
+        default=settings.kernel.default_max_steps, 
         ge=1, 
-        le=settings.research.max_sources, 
-        description="Max sources"
+        le=settings.kernel.max_steps, 
+        description="Max steps"
     )
 
 
-class ResearchResponse(BaseModel):
-    """Research job response."""
+class ExecutionResponse(BaseModel):
+    """General execution response."""
     job_id: str
     status: str
-    report: str | None = None
+    output: str | None = None
     confidence: float = 0.0
-    sources_count: int = 0
-    facts_count: int = 0
+    steps_count: int = 0
 
 
 # ============================================================================
@@ -118,7 +113,7 @@ async def list_tools():
     """List all available MCP tools via MCP Host service."""
     try:
         mcp_url = ServiceRegistry.get_url(ServiceName.MCP_HOST)
-        async with httpx.AsyncClient(timeout=vocab_settings.get("mcp_tool_list_timeout", 10.0)) as client:
+        async with httpx.AsyncClient(timeout=settings.mcp.discovery_timeout) as client:
             resp = await client.get(f"{mcp_url}/tools")
             if resp.status_code == 200:
                 return resp.json()
@@ -127,14 +122,14 @@ async def list_tools():
     return {"tools": []}
 
 
-@app.post("/research", response_model=ResearchResponse)
-async def start_research(request: ResearchRequest):
+@app.post("/execute", response_model=ExecutionResponse)
+async def start_execution(request: ExecutionRequest):
     """
-    Start research job (Redesign in progress).
+    Start execution job (Redesign in progress).
     """
     raise HTTPException(
         status_code=501, 
-        detail="Research engine is currently under redesign. Kernel and Workers have been removed."
+        detail="Kernel engine is currently under redesign."
     )
 
 
@@ -159,20 +154,20 @@ async def call_tool(tool_name: str, arguments: dict[str, Any]):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/research/stream")
-async def stream_research(
+@app.get("/execute/stream")
+async def stream_execution(
     query: str, 
     depth: int | None = None, 
-    max_sources: int | None = None
+    max_steps: int | None = None
 ):
     """
-    Stream research results (Redesign in progress).
+    Stream execution results (Redesign in progress).
     """
-    settings = get_settings()
-    depth = depth or settings.research.default_depth
-    max_sources = max_sources or settings.research.default_max_sources
+    global settings
+    depth = depth or settings.kernel.default_depth
+    max_steps = max_steps or settings.kernel.default_max_steps
     async def event_generator():
-        yield f"data: {json.dumps({'event': 'error', 'message': 'Research engine is under redesign.'})}\n\n"
+        yield f"data: {json.dumps({'event': 'error', 'message': 'Kernel engine is under redesign.'})}\n\n"
 
     return StreamingResponse(
         event_generator(),
@@ -196,7 +191,7 @@ if sys.platform == "win32":
 def main():
     """Run the orchestrator service."""
     import uvicorn
-    settings = get_settings()
+    global settings
     uvicorn.run(
         "services.orchestrator.main:app",
         host=settings.api.host,

@@ -11,7 +11,6 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-import os
 from typing import Any
 
 import asyncpg
@@ -40,6 +39,7 @@ class PostgresKnowledgeRegistry:
         self.table_name = table_name
         self.embedder = create_embedding_provider(use_local=True)
         self._reranker = None
+        self._rerank_lock = asyncio.Lock()
         self._pool: asyncpg.Pool | None = None
         self._initialized = False
 
@@ -51,7 +51,8 @@ class PostgresKnowledgeRegistry:
         if PostgresKnowledgeRegistry._init_lock is None:
             PostgresKnowledgeRegistry._init_lock = asyncio.Lock()
 
-        async with PostgresKnowledgeRegistry._init_lock:
+        lock = PostgresKnowledgeRegistry._init_lock
+        async with lock:
             if self._pool is not None and self._initialized:
                 return self._pool
 
@@ -198,8 +199,10 @@ class PostgresKnowledgeRegistry:
             )
             texts.append(embed_text)
 
-        max_retries = 3
-        retry_delay = 2.0
+        from shared.config import get_settings
+        settings = get_settings()
+        max_retries = settings.database.max_retries
+        retry_delay = settings.database.retry_delay
 
         for attempt in range(max_retries):
             try:
@@ -268,13 +271,12 @@ class PostgresKnowledgeRegistry:
             from shared.embedding.qwen3_reranker import create_reranker_provider
 
             self._reranker = create_reranker_provider()
-            self._rerank_lock = asyncio.Lock()
         return self._reranker
 
     async def search(
         self,
         query: str,
-        limit: int = 5,
+        limit: int | None = None,
         domain: str | None = None,
         category: str | None = None,
         tags: list[str] | None = None,
@@ -298,11 +300,15 @@ class PostgresKnowledgeRegistry:
             List of matching knowledge items with similarity scores
         """
         try:
+            from shared.config import get_settings
+            settings = get_settings()
+            limit = limit or settings.rag.knowledge_limit
+            
             pool = await self._get_pool()
             query_emb = await self.embedder.embed_query(query)
-
-            # Fetch 5x candidates when reranking (matches Vault pattern)
-            candidate_limit = limit * 5 if enable_reranking else limit
+            
+            # Fetch candidates when reranking
+            candidate_limit = limit * settings.rag.knowledge_candidate_multiplier if enable_reranking else limit
 
             conditions = []
             params: list[Any] = [query_emb]

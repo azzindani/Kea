@@ -31,11 +31,11 @@ class Message:
     
     created_at: datetime = field(default_factory=datetime.utcnow)
     
-    # Research-specific metadata
+    # System-specific metadata
     intent: str = ""                # follow_up, deeper, revise, new_topic
     attachments: list[str] = field(default_factory=list)  # URLs, file refs
     tool_calls: list[dict] = field(default_factory=list)  # MCP tools used
-    sources: list[dict] = field(default_factory=list)     # Referenced sources
+    origins: list[dict] = field(default_factory=list)     # Referenced origins
     confidence: float | None = None
     
     # For streaming
@@ -61,7 +61,7 @@ class Message:
             intent=metadata.get("intent", ""),
             attachments=metadata.get("attachments", []),
             tool_calls=metadata.get("tool_calls", []),
-            sources=metadata.get("sources", []),
+            origins=metadata.get("origins", []),
             confidence=metadata.get("confidence"),
         )
     
@@ -75,7 +75,7 @@ class Message:
             "intent": self.intent,
             "attachments": self.attachments,
             "tool_calls": self.tool_calls,
-            "sources": self.sources,
+            "origins": self.origins,
             "confidence": self.confidence,
             "is_complete": self.is_complete,
         }
@@ -91,7 +91,7 @@ class Message:
             intent=data.get("intent", ""),
             attachments=data.get("attachments", []),
             tool_calls=data.get("tool_calls", []),
-            sources=data.get("sources", []),
+            origins=data.get("origins", []),
             confidence=data.get("confidence"),
             is_complete=data.get("is_complete", True),
         )
@@ -203,7 +203,7 @@ CREATE TABLE IF NOT EXISTS messages (
     intent VARCHAR(50),
     attachments JSONB DEFAULT '[]',
     tool_calls JSONB DEFAULT '[]',
-    sources JSONB DEFAULT '[]',
+    origins JSONB DEFAULT '[]',
     confidence FLOAT,
     is_complete BOOLEAN DEFAULT TRUE
 );

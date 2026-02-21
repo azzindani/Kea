@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Research CLI Tool.
+Autonomous CLI Tool.
 
-Command-line interface for running research jobs.
+Command-line interface for running system jobs.
 Usage:
-    python scripts/cli.py --query "Analyze BCA Bank" --env dev
+    python services/sdk/cli.py --query "Analyze BCA Bank" --env dev
 """
 
 import argparse
@@ -17,9 +17,9 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from shared.logging import setup_logging, LogConfig, LogLevel, get_logger
-from services.client.api import ResearchClient
-from services.client.runner import ResearchRunner
-from services.client.metrics import MetricsCollector
+from services.sdk.api import AutonomousClient
+from services.sdk.runner import JobRunner
+from services.sdk.metrics import MetricsCollector
 
 logger = get_logger(__name__)
 
@@ -30,7 +30,7 @@ def parse_args():
         "--query",
         type=str,
         required=True,
-        help="Query to research (e.g., 'Analyze Apple')"
+        help="Task to execute (e.g., 'Analyze Apple')"
     )
     
     parser.add_argument(
@@ -75,21 +75,21 @@ async def main():
     
     base_url = get_base_url(args.env, args.url)
     
-    logger.info(f"Starting research job against {base_url}")
-    logger.info(f"Query: {args.query}")
+    logger.info(f"Starting system job against {base_url}")
+    logger.info(f"Task: {args.query}")
     
     # Initialize components
     # In a real CLI, we might load credentials from a config file or env vars
-    # For now, we use the defaults in ResearchClient which match dev/local
-    client = ResearchClient(base_url=base_url)
+    # For now, we use the defaults in AutonomousClient which match dev/local
+    client = AutonomousClient(base_url=base_url)
     metrics = MetricsCollector()
-    runner = ResearchRunner(client, metrics)
+    runner = JobRunner(client, metrics)
     
     try:
         await client.initialize()
         
         # Run the job
-        job_metrics = await runner.run_query(args.query)
+        job_metrics = await runner.execute_task(args.query)
         
         if job_metrics.success:
             logger.info("✅ Job Completed Successfully")

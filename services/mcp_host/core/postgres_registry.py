@@ -158,9 +158,10 @@ class PostgresToolRegistry:
                 texts.append(desc)
             
             # Retry loop to handle race conditions during startup
-            # (e.g., transformers not fully loaded when embedding is first called)
-            max_retries = 3
-            retry_delay = 2.0
+            from shared.config import get_settings
+            settings = get_settings()
+            max_retries = settings.database.max_retries
+            retry_delay = settings.database.retry_delay
             
             for attempt in range(max_retries):
                 try:
@@ -191,14 +192,18 @@ class PostgresToolRegistry:
                     else:
                         logger.error(f"Registry embedding failed after {max_retries} attempts: {e}")
 
-    async def search_tools(self, query: str, limit: int = 1000, min_similarity: float = 0.0) -> List[Dict[str, Any]]:
+    async def search_tools(self, query: str, limit: int | None = None, min_similarity: float | None = None) -> List[Dict[str, Any]]:
         """Semantic search for tools.
         
         Args:
             query: Search query for tool discovery
-            limit: Max results (default 1000 for large tool registries)
+            limit: Max results
             min_similarity: Minimum cosine similarity (0.0 to 1.0)
         """
+        from shared.config import get_settings
+        settings = get_settings()
+        limit = limit or settings.mcp.search_limit
+        min_similarity = min_similarity if min_similarity is not None else settings.mcp.min_similarity
         try:
             pool = await get_db_pool()
             await self._ensure_schema(pool)

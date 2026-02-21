@@ -29,13 +29,17 @@ class KnowledgeStore:
     async def search(
         self,
         query: str,
-        limit: int = 5,
+        limit: int | None = None,
         domain: str | None = None,
         category: str | None = None,
         tags: list[str] | None = None,
         enable_reranking: bool = True,
     ) -> list[dict[str, Any]]:
         """Semantic search for knowledge items with optional reranking."""
+        from shared.config import get_settings
+        settings = get_settings()
+        limit = limit or settings.rag.knowledge_limit
+        
         return await self._registry.search(
             query=query,
             limit=limit,

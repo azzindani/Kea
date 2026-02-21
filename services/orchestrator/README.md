@@ -7,13 +7,13 @@ The **Orchestrator Service** is the cognitive core of the Kea system. It acts as
 
 ## 📐 Architecture
 
-The Orchestrator manages the lifecycle of research jobs, coordinating between the **Gateway**, **Vault**, and **MCP Host**.
+The Orchestrator manages the lifecycle of system jobs, coordinating between the **Gateway**, **Vault**, and **MCP Host**.
 
 ```mermaid
 graph TD
     subgraph Orchestrator [Orchestrator Service]
         direction TB
-        Main[FastAPI: /research] --> JobMgr[Job Lifecycle Manager]
+        Main[FastAPI: /execute] --> JobMgr[Job Lifecycle Manager]
         JobMgr --> Kernel[Kea Kernel]
     end
 

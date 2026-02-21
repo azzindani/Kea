@@ -1,14 +1,14 @@
 [project]
-name = "research-engine"
+name = "system-engine"
 version = "0.1.0"
-description = "Project: Distributed Autonomous Research Engine - A microservices-based AI system for deep research"
+description = "Project: Distributed Autonomous Engine - A microservices-based AI system for autonomous tasks"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
     {name = "Project Team"}
 ]
-keywords = ["ai", "research", "mcp", "langgraph", "rag"]
+keywords = ["ai", "autonomous", "mcp", "langgraph", "rag"]
 
 dependencies = [
     # Core Framework

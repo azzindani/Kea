@@ -58,7 +58,7 @@
             "pluginVersion": "10.0.0",
             "targets": [
                 {
-                    "expr": "sum(research_jobs_total)",
+                    "expr": "sum(system_jobs_total)",
                     "legendFormat": "Total Jobs"
                 }
             ],

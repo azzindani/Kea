@@ -1,5 +1,5 @@
 """
-Research API Client.
+System API Client.
 
 Handles authentication and communication with the API Gateway.
 """
@@ -12,7 +12,7 @@ from shared.logging import get_logger
 
 logger = get_logger(__name__)
 
-class ResearchClient:
+class AutonomousClient:
     """
     HTTP client with automatic authentication.
     
@@ -22,9 +22,9 @@ class ResearchClient:
     def __init__(
         self, 
         base_url: str | None = None,
-        email: str = "researcher@example.com",
-        password: str = "research_password_123",
-        name: str = "Research User"
+        email: str = "user@example.com",
+        password: str = "system_password_123",
+        name: str = "System User"
     ):
         from shared.service_registry import ServiceRegistry, ServiceName
         self.base_url = base_url or ServiceRegistry.get_url(ServiceName.GATEWAY)
