@@ -1,3 +1,4 @@
+
 """
 Chronos — Scheduling Service (Port 8006).
 
@@ -10,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+import os
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Any
@@ -18,8 +20,14 @@ import httpx
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from shared.logging import get_logger
+from shared.logging import get_logger, setup_logging, LogConfig, RequestLoggingMiddleware
 from shared.service_registry import ServiceName, ServiceRegistry
+
+# Initialize standardized logging
+setup_logging(LogConfig(
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    service_name="chronos",
+))
 
 logger = get_logger(__name__)
 
@@ -39,8 +47,7 @@ class ScheduleRequest(BaseModel):
 
 
 class ScheduledTask(BaseModel):
-    """A persisted scheduled task."""
-
+    """A scheduled task as stored in DB."""
     task_id: str
     query: str
     cron_expr: str
@@ -186,7 +193,7 @@ async def _fire_task(task: dict) -> None:
             resp = await client.post(f"{orch_url}/research", json=payload)
             if resp.status_code == 200:
                 logger.info(
-                    f"Chronos: fired task {task['task_id']} → job_id={resp.json().get('job_id')}"
+                    f"Chronos: fired task {task['task_id']} \u2192 job_id={resp.json().get('job_id')}"
                 )
             else:
                 logger.warning(f"Chronos: task {task['task_id']} fire returned {resp.status_code}")
@@ -224,7 +231,8 @@ async def lifespan(app: FastAPI):
     logger.info("Chronos scheduler stopped")
 
 
-app = FastAPI(title="Chronos — Scheduling Service", lifespan=lifespan)
+app = FastAPI(title="Chronos \u2014 Scheduling Service", lifespan=lifespan)
+app.add_middleware(RequestLoggingMiddleware)
 
 
 # ---------------------------------------------------------------------------
@@ -256,7 +264,7 @@ async def create_schedule(req: ScheduleRequest) -> ScheduledTask:
         "next_run_at": next_run,
     }
     await _save_task(task)
-    logger.info(f"Chronos: scheduled task {task['task_id']} — next run {next_run}")
+    logger.info(f"Chronos: scheduled task {task['task_id']} \u2014 next run {next_run}")
     return ScheduledTask(**{**task, "next_run_at": next_run.isoformat()})
 
 

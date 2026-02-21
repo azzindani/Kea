@@ -20,8 +20,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from shared.config import get_settings
-from shared.logging import get_logger, setup_logging, LogConfig
-from shared.logging.middleware import RequestLoggingMiddleware
+from shared.logging import get_logger, setup_logging, LogConfig, RequestLoggingMiddleware
 from shared.service_registry import ServiceName, ServiceRegistry
 from shared.vocab import load_vocab
 

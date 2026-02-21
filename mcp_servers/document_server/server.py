@@ -23,14 +23,13 @@ from shared.mcp.fastmcp import FastMCP
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
+from typing import List, Dict, Any, Optional
 from mcp_servers.document_server.tools import pdf, word, excel, html, json_tool
-import structlog
-
-logger = structlog.get_logger()
+from shared.logging import setup_logging, get_logger
+setup_logging()
+logger = get_logger(__name__)
 
 # Create the FastMCP server
-from shared.logging.structured import setup_logging
-setup_logging()
 
 mcp = FastMCP("document_server", dependencies=["httpx", "pymupdf", "python-docx", "pandas", "bs4"])
 

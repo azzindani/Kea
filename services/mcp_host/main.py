@@ -6,7 +6,7 @@ import fastapi
 import uvicorn
 from contextlib import asynccontextmanager
 
-from shared.logging import get_logger, setup_logging, LogConfig
+from shared.logging import get_logger, setup_logging, LogConfig, RequestLoggingMiddleware
 import os
 
 import asyncio
@@ -39,6 +39,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="MCP Host", lifespan=lifespan)
+app.add_middleware(RequestLoggingMiddleware)
 
 
 @app.get("/health")

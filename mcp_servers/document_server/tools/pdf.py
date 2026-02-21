@@ -7,7 +7,7 @@ except ImportError:
     except ImportError:
         fitz = None
 import json
-from shared.logging.structured import get_logger
+from shared.logging import get_logger
 
 logger = get_logger(__name__)
 

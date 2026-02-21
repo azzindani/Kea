@@ -14,18 +14,12 @@ if root_path not in sys.path:
 # ///
 
 from shared.mcp.fastmcp import FastMCP
-import sys
-from pathlib import Path
-sys.path.append(str(Path(__file__).parent))
-from mcp_servers.analysis_server.tools import stats_ops
-import structlog
-from typing import List, Dict, Any, Union
-
-logger = structlog.get_logger()
-
-# Create the FastMCP server
-from shared.logging.structured import setup_logging
+from typing import List, Dict, Any, Union, Optional
+from shared.logging import setup_logging, get_logger
 setup_logging()
+logger = get_logger(__name__)
+
+from mcp_servers.analysis_server.tools import stats_ops
 
 
 

@@ -2,7 +2,7 @@
 import ccxt.async_support as ccxt
 import asyncio
 from typing import Optional
-from shared.logging.structured import get_logger
+from shared.logging import get_logger
 
 logger = get_logger(__name__)
 

@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field
 from services.vault.core.audit_trail import AuditEventType, get_audit_trail
 from services.vault.core.postgres_store import PostgresVectorStore
 from services.vault.core.vector_store import Document
-from shared.logging import get_logger, setup_logging, LogConfig
+from shared.logging import get_logger, setup_logging, LogConfig, RequestLoggingMiddleware
 import os
 
 # Initialize structured logging globally
@@ -33,6 +33,7 @@ setup_logging(LogConfig(
 logger = get_logger(__name__)
 
 app = FastAPI(title="The Vault")
+app.add_middleware(RequestLoggingMiddleware)
 
 # Global Vector Store
 _vector_store: PostgresVectorStore | None = None

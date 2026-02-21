@@ -28,7 +28,7 @@ logger = get_logger(__name__)
 # Audit Event Types
 # ============================================================================
 
-from shared.audit import AuditEventType
+from shared.schemas import AuditEventType
 
 
 @dataclass

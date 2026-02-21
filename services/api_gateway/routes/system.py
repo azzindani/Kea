@@ -70,7 +70,7 @@ async def system_capabilities():
 
     return SystemCapabilities(
         mcp_servers=[s.name for s in settings.mcp.servers if s.enabled],
-        research_paths=["memory_fork", "shadow_lab", "grand_synthesis", "deep_research"],
+        research_paths=["deep_research"],
         llm_providers=["openrouter"],
         max_parallel_tools=settings.research.parallel_tools,
     )
@@ -108,7 +108,7 @@ async def metrics_summary() -> dict:
 
         pool = await get_database_pool()
         total_jobs = await pool.fetchval("SELECT COUNT(*) FROM research_jobs") or 0
-        total_tool_calls = await pool.fetchval("SELECT COUNT(*) FROM micro_tasks") or 0
+        total_tool_calls = 0  # Re-implement once new kernel metrics are available
         avg_duration = await pool.fetchval(
             """
             SELECT AVG(EXTRACT(EPOCH FROM (completed_at - created_at)))

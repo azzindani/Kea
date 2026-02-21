@@ -12,6 +12,47 @@ from typing import Any, TypedDict
 
 from pydantic import BaseModel, Field
 
+
+class AuditEventType(str, Enum):
+    """Types of auditable events."""
+
+    # Query lifecycle
+    QUERY_RECEIVED = "query_received"
+    QUERY_CLASSIFIED = "query_classified"
+    QUERY_COMPLETED = "query_completed"
+
+    # Tool operations
+    TOOL_CALLED = "tool_called"
+    TOOL_RESULT = "tool_result"
+    TOOL_ERROR = "tool_error"
+
+    # Data operations
+    DATA_ACCESSED = "data_accessed"
+    DATA_MODIFIED = "data_modified"
+    DATA_DELETED = "data_deleted"
+
+    # Decisions
+    DECISION_MADE = "decision_made"
+    DECISION_OVERRIDDEN = "decision_overridden"
+
+    # Human in the loop
+    ESCALATION_CREATED = "escalation_created"
+    ESCALATION_RESOLVED = "escalation_resolved"
+    APPROVAL_REQUESTED = "approval_requested"
+    APPROVAL_GRANTED = "approval_granted"
+    APPROVAL_DENIED = "approval_denied"
+
+    # Security
+    SECURITY_CHECK = "security_check"
+    SECURITY_VIOLATION = "security_violation"
+    ACCESS_DENIED = "access_denied"
+
+    # System
+    SYSTEM_START = "system_start"
+    SYSTEM_STOP = "system_stop"
+    CONFIG_CHANGED = "config_changed"
+    ERROR = "error"
+
 from shared.mcp.protocol import (
     ToolResult, TextContent, ImageContent, 
     JSONContent, FileContent

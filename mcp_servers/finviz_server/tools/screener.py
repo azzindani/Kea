@@ -6,7 +6,7 @@ except ImportError:
     
 
 
-from shared.logging.structured import get_logger
+from shared.logging import get_logger
 from shared.mcp.protocol import ToolResult, JSONContent, TextContent
 import pandas as pd
 import json
@@ -45,7 +45,7 @@ async def get_screener_signal(limit: int = 100000, signal: str = None) -> ToolRe
             # IMPORTANT: Pass limit to screener_view to avoid scraping 9000 stocks!
             return foverview.screener_view(limit=limit)
 
-        from shared.stdout_suppression import suppress_stdout
+        from shared.logging import suppress_stdout
         with suppress_stdout():
              df = await asyncio.to_thread(fetch_overview)
         

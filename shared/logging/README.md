@@ -1,10 +1,10 @@
 # 📊 Shared Logging & Observability
 
-The `shared/logging` module provides a unified observability framework for the Kea system. it supports structured JSON logging, colored console output, request tracing, and business metrics tracking.
+The `shared/logging` package provides a unified observability framework. It supports structured JSON logging, high-end vibrant console output, and Prometheus metrics tracking. All components are fully compliant with MCP JSON-RPC 2.0 and RFC 5424 severity standards.
 
 ## 🏗️ Architecture
 
-The logging system is built for distributed environments, ensuring that logs from multiple microservices can be correlated via trace IDs.
+The logging system is built for distributed environments, ensuring that logs from multiple microservices can be correlated via trace and request IDs.
 
 ```mermaid
 graph TD
@@ -13,26 +13,23 @@ graph TD
     Logger --> Console[Console Formatter]
     Logger --> Metrics[Prometheus Metrics]
     
-    JSON --> File[File/Log Collector]
+    JSON --> Collector[Log Collector]
     Console --> StdErr[Developer Console]
 ```
 
 ## ✨ Features
 
-- **Structured JSON Logging**: Produces machine-readable logs with automatic ingestion of context, trace IDs, and exception details.
-- **Request Tracing**: Lightweight implementation of traces and spans (similar to OpenTelemetry) for end-to-end request tracking.
-- **Middleware**: Integrated FastAPI middleware for automatic request logging and trace propagation.
-- **Business Metrics**: Specialized tracking for research-specific events (tool calls, token counts, cost).
-- **Hardened Error Handling**: Sanitizes log records to prevent "DDoS by Logging" and ensures reserved keys (like `args`) are handled correctly.
-- **Colorized Output**: High-readability console output for development environments.
+- **Standardized Severity (RFC 5424)**: Supports levels from `DEBUG` up to `EMERGENCY` with consistent symbols and styling.
+- **MCP Compliance**: Standardized JSON-RPC log notifications (`notifications/message`) for interoperability with MCP tools and hosts.
+- **FastAPI Middleware**: Integrated `RequestLoggingMiddleware` for automatic request lifecycle logging, trace correlation, and latency metrics.
+- **Prometheus Integration**: Automatic recording of API request counts, durations, and system metadata.
+- **Standardized I/O Envelope**: Common models for logging inputs, outputs, RPC calls, and errors across the system.
+- **Console Renderer**: A rich, vibrant console renderer for development, highlighting important metadata and I/O status.
 
-## 📁 Component Structure
+## 📁 Package Structure
 
-- `structured.py`: Core logic for JSON and Console formatters and setup.
-- `tracing.py`: Implementation of `Trace` and `Span` classes and tracing middleware.
-- `metrics.py`: Integration with Prometheus for system and business metrics.
-- `context.py`: Thread-safe context storage for trace and request IDs.
-- `mcp_middleware.py`: Specialized tracing for MCP tool calls.
+- `main.py`: The single source of truth containing core logic, renderers, middleware, and I/O models.
+- `__init__.py`: Dynamic gateway with auto-discovery for all logging utilities.
 
 ## 🔌 API Reference
 
@@ -40,7 +37,8 @@ graph TD
 ```python
 from shared.logging import setup_logging, LogConfig
 
-setup_logging(LogConfig(service_name="orchestrator", level="INFO"))
+# Initialize globally at service startup
+setup_logging(LogConfig(service_name="orchestrator", level="info"))
 ```
 
 ### Basic Logging
@@ -48,15 +46,26 @@ setup_logging(LogConfig(service_name="orchestrator", level="INFO"))
 from shared.logging import get_logger
 
 logger = get_logger(__name__)
-logger.info("Task completed", extra={"job_id": "123", "duration": 0.45})
+logger.info("Operation completed", extra={"status": "success", "delay_ms": 120})
+logger.success("Critical milestone reached")
 ```
 
-### Function Tracing
+### Protocol & I/O Logging
 ```python
-from shared.logging.tracing import trace_function
+from shared.logging import log_input, log_output, log_rpc_call
 
-@trace_function("search_database")
-async def search():
-    # Automatically creates a span for this function
-    pass
+# Log standardized I/O envelopes
+log_input(source="gateway", data=user_request)
+log_rpc_call(source="orchestrator", target="vault", method="save_fact", params={"id": 1})
 ```
+
+### MCP Notifications
+```python
+from shared.logging import log_mcp_message, LogLevel
+
+# Send standardized MCP log notifications
+log_mcp_message(source="analysis_server", level=LogLevel.INFO, data="Processing dataset...")
+```
+
+---
+*This module ensures consistency and deep observability across all system components.*

@@ -8,7 +8,7 @@ import trafilatura
 import feedparser
 import nltk
 from typing import Optional, List, Dict, Any
-from shared.logging.structured import get_logger
+from shared.logging import get_logger
 
 logger = get_logger(__name__)
 

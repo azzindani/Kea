@@ -17,13 +17,11 @@ from mcp_servers.finviz_server.tools import (
     strategy, charts, financials, bulk_ta
 )
 from typing import List, Dict, Any, Optional
-import structlog
-
-logger = structlog.get_logger()
+from shared.logging import setup_logging, get_logger
+setup_logging()
+logger = get_logger(__name__)
 
 # Create the FastMCP server
-from shared.logging.structured import setup_logging
-setup_logging()
 
 mcp = FastMCP("finviz_server", dependencies=["finvizfinance", "pandas"])
 

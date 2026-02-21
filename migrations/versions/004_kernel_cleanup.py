@@ -18,6 +18,7 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     # Drop kernel-specific tables
+    op.execute("DROP TABLE IF EXISTS data_pool CASCADE")
     op.drop_table("micro_tasks")
     op.drop_table("execution_batches")
     op.drop_table("graph_checkpoints")
