@@ -122,10 +122,10 @@ class InsightStore:
     async def search(
         self,
         query: str,
-        limit: int = 100000,
+        limit: int | None = None,
         entity: str | None = None,
         dataset_id: str | None = None,
-        min_confidence: float = 0.0,
+        min_confidence: float | None = None,
     ) -> list[AtomicInsight]:
         """
         Semantic search for insights.
@@ -140,6 +140,10 @@ class InsightStore:
         Returns:
             List of matching insights
         """
+        from shared.config import get_settings
+        settings = get_settings()
+        limit = limit or settings.rag.default_limit
+        min_confidence = min_confidence if min_confidence is not None else settings.rag.min_confidence
         # Build filter
         filter_dict = {}
         if entity:
@@ -243,8 +247,8 @@ class InsightStore:
             period=metadata.get("period"),
             origin_url=metadata.get("origin_url", ""),
             origin_title=metadata.get("origin_title", ""),
-            confidence_score=metadata.get("confidence_score", 0.5),
-            created_at=datetime.fromisoformat(metadata.get("created_at", datetime.utcnow().isoformat())),
+            confidence_score=metadata.get("confidence_score", get_settings().rag.default_confidence),
+            created_at=datetime.fromisoformat(metadata.get("created_at", datetime.now(__import__("datetime").UTC).isoformat())),
         )
     
     def _result_to_insight(self, result) -> AtomicInsight:
@@ -259,5 +263,5 @@ class InsightStore:
             period=metadata.get("period"),
             origin_url=metadata.get("origin_url", ""),
             origin_title=metadata.get("origin_title", ""),
-            confidence_score=metadata.get("confidence_score", 0.5),
+            confidence_score=metadata.get("confidence_score", get_settings().rag.default_confidence),
         )

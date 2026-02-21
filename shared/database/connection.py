@@ -78,12 +78,13 @@ class DatabasePool:
         try:
             import asyncpg
             
+            settings = get_settings()
             self._pool = await asyncpg.create_pool(
                 self.config.url,
                 min_size=self.config.min_connections,
                 max_size=self.config.max_connections,
                 timeout=self.config.connection_timeout,
-                command_timeout=60.0,
+                command_timeout=settings.database.command_timeout,
             )
             
             logger.info(f"PostgreSQL pool initialized: {self.config.min_connections}-{self.config.max_connections} connections")

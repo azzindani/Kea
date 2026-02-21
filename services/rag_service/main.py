@@ -106,7 +106,7 @@ class AddInsightRequest(BaseModel):
     period: str | None = None
     origin_url: str
     origin_title: str = ""
-    confidence_score: float = Field(default=0.8, ge=0.0, le=1.0)
+    confidence_score: float = Field(default_factory=lambda: get_settings().rag.default_confidence, ge=0.0, le=1.0)
     dataset_id: str | None = None
 
 
@@ -122,7 +122,7 @@ class SearchRequest(BaseModel):
     )
     entity: str | None = None
     dataset_id: str | None = None
-    min_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    min_confidence: float = Field(default_factory=lambda: get_settings().rag.min_confidence, ge=0.0, le=1.0)
 
 
 class IngestRequest(BaseModel):
@@ -154,7 +154,8 @@ class InsightResponse(BaseModel):
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "rag_service"}
+    from datetime import UTC, datetime
+    return {"status": "healthy", "service": "rag_service", "timestamp": datetime.now(UTC).isoformat()}
 
 
 @app.post("/insights", response_model=dict)
@@ -274,8 +275,8 @@ async def _ingest_job(request: IngestRequest):
         ):
             facts_buffer.append(fact)
 
-            # Batch insert every 50
-            if len(facts_buffer) >= 50:
+            # Batch insert
+            if len(facts_buffer) >= get_settings().rag.batch_size:
                 await insight_store.add_insights(facts_buffer, dataset_id=request.dataset_name)
                 count += len(facts_buffer)
                 facts_buffer.clear()
@@ -320,7 +321,7 @@ class KnowledgeSearchRequest(BaseModel):
     """Knowledge search request."""
 
     query: str
-    limit: int = Field(default=settings.api.default_limit, ge=1, le=20)
+    limit: int = Field(default=get_settings().api.default_limit, ge=1, le=get_settings().rag.max_limit)
     domain: str | None = None
     category: str | None = None
     tags: list[str] | None = None
@@ -420,8 +421,11 @@ async def _sync_knowledge_job(
         from pathlib import Path
 
         from knowledge.index_knowledge import scan_knowledge_files
-
-        knowledge_dir = Path(__file__).resolve().parents[2] / "knowledge"
+        
+        settings = get_settings()
+        root_dir = Path(__file__).resolve().parents[2]
+        knowledge_dir = root_dir / settings.app.knowledge_dir
+        
         items = scan_knowledge_files(knowledge_dir, domain_filter=domain, category_filter=category)
 
         if items and knowledge_store:

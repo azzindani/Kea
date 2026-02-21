@@ -14,13 +14,12 @@ from pydantic import BaseModel, Field
 from shared.logging.main import get_logger
 from shared.service_registry import ServiceName, ServiceRegistry
 
+from shared.config import get_settings
 logger = get_logger(__name__)
 
 router = APIRouter()
 
-from shared.config import get_settings
-settings = get_settings()
-_HTTP_TIMEOUT = settings.timeouts.default
+_HTTP_TIMEOUT = get_settings().timeouts.default
 
 
 def _rag_url() -> str:
@@ -36,8 +35,8 @@ class SearchRequest(BaseModel):
     """Semantic search request."""
 
     query: str
-    limit: int = Field(default=10, ge=1, le=100)
-    min_confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+    limit: int = Field(default_factory=lambda: get_settings().memory.search_limit, ge=1, le=get_settings().memory.search_max_limit)
+    min_confidence: float = Field(default_factory=lambda: get_settings().memory.min_confidence, ge=0.0, le=1.0)
     domain: str | None = None
 
 
@@ -101,14 +100,14 @@ async def get_insight(insight_id: str) -> dict:
 @router.get("/graph")
 async def get_provenance_graph(
     entity: str | None = None,
-    depth: int = Query(default=2, ge=1, le=5),
+    depth: int = Query(default=get_settings().memory.graph_depth, ge=1, le=get_settings().memory.graph_max_depth),
 ) -> dict:
     """Get provenance graph — delegates to RAG Service /knowledge/search."""
     try:
         async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
             resp = await client.post(
                 f"{_rag_url()}/knowledge/search",
-                json={"query": entity or "", "limit": 50},
+                json={"query": entity or "", "limit": get_settings().memory.graph_limit},
             )
             resp.raise_for_status()
             items = resp.json()
@@ -135,11 +134,11 @@ async def list_sessions() -> dict:
 
         pool = await get_database_pool()
         rows = await pool.fetch(
-            """
+            f"""
             SELECT job_id, query, status, created_at, completed_at
             FROM system_jobs
             ORDER BY created_at DESC
-            LIMIT 100
+            LIMIT {get_settings().memory.session_limit}
             """
         )
         sessions = [

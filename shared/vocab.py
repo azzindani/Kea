@@ -15,8 +15,10 @@ from shared.logging.main import get_logger
 
 logger = get_logger(__name__)
 
-# Base directory for vocabulary files
-VOCAB_DIR = Path("configs/vocab")
+# Base directory for vocabulary files (dynamically loaded from config)
+def _get_vocab_dir() -> Path:
+    from shared.config import get_settings
+    return Path(get_settings().app.vocab_dir)
 
 
 @lru_cache()
@@ -31,7 +33,7 @@ def load_vocab(name: str) -> dict[str, Any]:
         Dictionary containing the vocabulary data.
         Returns empty dict if file not found or invalid.
     """
-    file_path = VOCAB_DIR / f"{name}.yaml"
+    file_path = _get_vocab_dir() / f"{name}.yaml"
     
     if not file_path.exists():
         logger.warning(f"Vocab file not found: {file_path}")

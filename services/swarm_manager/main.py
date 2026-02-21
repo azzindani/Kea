@@ -30,20 +30,17 @@ from services.swarm_manager.core.guards import get_resource_guard
 from services.swarm_manager.core.kill_switch import get_kill_switch
 from services.swarm_manager.core.supervisor import get_supervisor
 from shared.logging.main import get_logger, setup_logging, LogConfig, RequestLoggingMiddleware
-import os
+# Load settings
+from shared.config import get_settings
+settings = get_settings()
 
 # Initialize standardized logging
 setup_logging(LogConfig(
-    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    level=settings.logging.level,
     service_name="swarm_manager",
 ))
 
 logger = get_logger(__name__)
-
-from shared.config import get_settings, Settings
-
-# Load settings
-settings: Settings = get_settings()
 
 app = FastAPI(
     title=f"{settings.app.name} - Swarm Manager",
@@ -56,7 +53,8 @@ app.mount("/metrics", make_asgi_app())
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok", "service": "swarm_manager"}
+    from datetime import UTC, datetime
+    return {"status": "ok", "service": "swarm_manager", "timestamp": datetime.now(UTC).isoformat()}
 
 
 # ============================================================================
@@ -110,7 +108,7 @@ class EmergencyStopRequest(BaseModel):
 
 class BlacklistRequest(BaseModel):
     reason: str = "Manual blacklist"
-    duration_minutes: int = 30
+    duration_minutes: int = settings.swarm.default_blacklist_duration_minutes
 
 
 @app.post("/kill-switch/activate", status_code=200)
@@ -166,7 +164,7 @@ async def unblacklist_tool(tool_name: str) -> dict:
 
 
 class EscalateRequest(BaseModel):
-    escalation_type: str = "error"
+    escalation_type: str = settings.swarm.default_escalation_type
     context: dict[str, Any] = {}
 
 
@@ -240,6 +238,6 @@ if __name__ == "__main__":
     from shared.service_registry import ServiceRegistry, ServiceName
     uvicorn.run(
         app, 
-        host="0.0.0.0", 
+        host=settings.api.host, 
         port=ServiceRegistry.get_port(ServiceName.SWARM_MANAGER)
     )

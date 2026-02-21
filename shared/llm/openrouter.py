@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Any, AsyncIterator
 
 import httpx
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from shared.llm.provider import (
     LLMProvider,
@@ -21,6 +22,7 @@ from shared.llm.provider import (
 
 
 from shared.config import get_settings
+from shared.logging.main import record_llm_request, record_llm_tokens
 
 # Default model fallback (if config fails, though get_settings handles defaults)
 DEFAULT_MODEL = "nvidia/nemotron-3-nano-30b-a3b:free" 
@@ -110,21 +112,46 @@ class OpenRouterProvider(LLMProvider):
         messages: list[LLMMessage],
         config: LLMConfig,
     ) -> LLMResponse:
-        """Generate a completion."""
-        
-        body = self._build_request_body(messages, config, stream=False)
-        
+        """Generate a completion with retry logic."""
         settings = get_settings()
-        timeout = settings.timeouts.llm_completion
         
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.post(
-                f"{self.base_url}/chat/completions",
-                headers=self._get_headers(),
-                json=body,
+        @retry(
+            stop=stop_after_attempt(settings.llm.max_retries),
+            wait=wait_exponential(multiplier=settings.llm.retry_delay_base, min=1, max=10),
+            retry=retry_if_exception_type((httpx.HTTPStatusError, httpx.NetworkError, httpx.TimeoutException)),
+            reraise=True
+        )
+        async def _execute():
+            body = self._build_request_body(messages, config, stream=False)
+            timeout = settings.timeouts.llm_completion
+            
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.post(
+                    f"{self.base_url}/chat/completions",
+                    headers=self._get_headers(),
+                    json=body,
+                )
+                # Only retry on transient errors
+                if response.status_code in (429, 500, 502, 503, 504):
+                    response.raise_for_status()
+                
+                response.raise_for_status()
+                return response.json()
+
+        try:
+            data = await _execute()
+            record_llm_request(provider="openrouter", model=data.get("model", config.model), status="success")
+            
+            usage_data = data.get("usage", {})
+            record_llm_tokens(
+                provider="openrouter", 
+                model=data.get("model", config.model),
+                prompt_tokens=usage_data.get("prompt_tokens", 0),
+                completion_tokens=usage_data.get("completion_tokens", 0)
             )
-            response.raise_for_status()
-            data = response.json()
+        except Exception as e:
+            record_llm_request(provider="openrouter", model=config.model, status="failed")
+            raise
         
         # Extract response
         choice = data.get("choices", [{}])[0]

@@ -47,7 +47,7 @@ class Escalation:
     work_id: str | None
     context: dict[str, Any]
     message: str
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(__import__("datetime").UTC))
     resolved: bool = False
     resolution: str | None = None
 

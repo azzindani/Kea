@@ -16,6 +16,7 @@ from shared.users import User
 from shared.users.manager import get_user_manager
 from shared.sessions import get_session_manager, get_jwt_manager
 from services.api_gateway.middleware.auth import get_current_user_required
+from shared.config import get_settings
 
 
 logger = get_logger(__name__)
@@ -36,7 +37,7 @@ class RegisterRequest(BaseModel):
     """Registration request."""
     email: EmailStr
     name: str = Field(..., min_length=1, max_length=255)
-    password: str = Field(..., min_length=6)
+    password: str = Field(..., min_length=get_settings().auth.password_min_length)
 
 
 class TokenResponse(BaseModel):
@@ -145,7 +146,6 @@ async def login(request: LoginRequest, response: Response):
     )
     
     # Set session cookie
-    from shared.config import get_settings
     settings = get_settings()
     
     response.set_cookie(

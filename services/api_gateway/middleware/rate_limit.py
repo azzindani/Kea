@@ -206,17 +206,18 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         key = self._get_key(request)
         
         # Check rate limit
+        window = settings.rate_limit.default_window_seconds
         if self._postgres_limiter:
             allowed, remaining = await self._postgres_limiter.is_allowed(
                 key,
                 self.config.requests_per_minute,
-                60,
+                window,
             )
         else:
             allowed, remaining = self._memory_limiter.is_allowed(
                 key,
                 self.config.requests_per_minute,
-                60,
+                window,
             )
         
         if not allowed:
@@ -225,7 +226,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 status_code=429,
                 detail="Rate limit exceeded. Please try again later.",
                 headers={
-                    "Retry-After": "60",
+                    "Retry-After": str(window),
                     "X-RateLimit-Limit": str(self.config.requests_per_minute),
                     "X-RateLimit-Remaining": "0",
                 },

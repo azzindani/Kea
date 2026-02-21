@@ -11,7 +11,7 @@ from shared.logging.main import get_logger, setup_logging, LogConfig, RequestLog
 import os
 
 import asyncio
-from services.mcp_host.core.models import (
+from shared.schemas import (
     ToolRequest, BatchToolRequest, ToolResponse, ToolSearchRequest, ToolOutput
 )
 

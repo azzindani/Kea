@@ -15,6 +15,7 @@ from shared.logging.main import get_logger
 from shared.users import User
 from shared.conversations import get_conversation_manager, MessageRole
 from services.api_gateway.middleware.auth import get_current_user, get_current_user_required
+from shared.config import get_settings
 
 
 logger = get_logger(__name__)
@@ -90,13 +91,11 @@ class MessageListResponse(BaseModel):
 @router.get("", response_model=ConversationListResponse)
 async def list_conversations(
     include_archived: bool = Query(False),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(get_settings().conversations.default_limit, ge=1, le=get_settings().conversations.max_limit),
     offset: int = Query(0, ge=0),
     user: User = Depends(get_current_user_required),
 ):
     """List user's conversations."""
-    from shared.config import get_settings
-    settings = get_settings()
     manager = await get_conversation_manager()
     
     conversations = await manager.list_conversations(
@@ -127,7 +126,7 @@ async def list_conversations(
 @router.get("/search")
 async def search_conversations(
     q: str = Query(..., min_length=1),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(get_settings().conversations.search_limit, ge=1, le=get_settings().conversations.max_limit),
     user: User = Depends(get_current_user_required),
 ):
     """Search conversations by title or content."""
@@ -195,10 +194,16 @@ async def get_conversation(
     conv = await manager.get_conversation(conversation_id)
     
     if not conv:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+        raise HTTPException(
+            status_code=get_settings().status_codes.not_found, 
+            detail="Conversation not found"
+        )
     
     if conv.user_id != user.user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise HTTPException(
+            status_code=get_settings().status_codes.forbidden, 
+            detail="Access denied"
+        )
     
     messages = await manager.get_messages(conversation_id)
     
@@ -241,10 +246,16 @@ async def update_conversation(
     conv = await manager.get_conversation(conversation_id)
     
     if not conv:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+        raise HTTPException(
+            status_code=get_settings().status_codes.not_found, 
+            detail="Conversation not found"
+        )
     
     if conv.user_id != user.user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise HTTPException(
+            status_code=get_settings().status_codes.forbidden, 
+            detail="Access denied"
+        )
     
     updates = {}
     if request.title is not None:
@@ -282,10 +293,16 @@ async def delete_conversation(
     conv = await manager.get_conversation(conversation_id)
     
     if not conv:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+        raise HTTPException(
+            status_code=get_settings().status_codes.not_found, 
+            detail="Conversation not found"
+        )
     
     if conv.user_id != user.user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise HTTPException(
+            status_code=get_settings().status_codes.forbidden, 
+            detail="Access denied"
+        )
     
     await manager.delete_conversation(conversation_id, user_id=user.user_id)
     
@@ -295,7 +312,7 @@ async def delete_conversation(
 @router.get("/{conversation_id}/messages", response_model=MessageListResponse)
 async def get_messages(
     conversation_id: str,
-    limit: int = Query(100, ge=1, le=500),
+    limit: int = Query(get_settings().conversations.message_limit, ge=1, le=get_settings().conversations.message_max_limit),
     user: User = Depends(get_current_user_required),
 ):
     """Get messages from conversation."""
@@ -304,10 +321,16 @@ async def get_messages(
     conv = await manager.get_conversation(conversation_id)
     
     if not conv:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+        raise HTTPException(
+            status_code=get_settings().status_codes.not_found, 
+            detail="Conversation not found"
+        )
     
     if conv.user_id != user.user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise HTTPException(
+            status_code=get_settings().status_codes.forbidden, 
+            detail="Access denied"
+        )
     
     messages = await manager.get_messages(conversation_id, limit=limit)
     
@@ -349,10 +372,16 @@ async def send_message(
     conv = await manager.get_conversation(conversation_id)
     
     if not conv:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+        raise HTTPException(
+            status_code=get_settings().status_codes.not_found, 
+            detail="Conversation not found"
+        )
     
     if conv.user_id != user.user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise HTTPException(
+            status_code=get_settings().status_codes.forbidden, 
+            detail="Access denied"
+        )
     
     # Add user message
     user_msg = await manager.add_message(
@@ -364,14 +393,13 @@ async def send_message(
     
     # Auto-update title for first message
     if conv.message_count == 0:
-        title = request.content[:50] + ("..." if len(request.content) > 50 else "")
+        max_title = get_settings().conversations.title_max_length
+        title = request.content[:max_title] + ("..." if len(request.content) > max_title else "")
         await manager.update_conversation(conversation_id, title=title)
     
     # Run system pipeline
-    from shared.config import get_settings
-    settings = get_settings()
-    # Run system pipeline
     try:
+        settings = get_settings()
         # Call Orchestrator Service
         async with httpx.AsyncClient(timeout=settings.timeouts.llm_streaming) as client:
             response = await client.post(
@@ -384,7 +412,7 @@ async def send_message(
                 },
             )
             
-            if response.status_code != 200:
+            if response.status_code != get_settings().status_codes.ok:
                 raise Exception(f"Orchestrator returned {response.status_code}: {response.text}")
                 
             data = response.json()

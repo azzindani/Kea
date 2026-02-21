@@ -265,8 +265,8 @@ def main():
         "services.api_gateway.main:app",
         host=settings.api.host,
         port=ServiceRegistry.get_port(ServiceName.GATEWAY),
-        reload=settings.app.environment == "development",
-        workers=settings.api.workers_dev if settings.app.environment == "development" else settings.api.workers_prod,
+        reload=settings.is_development,
+        workers=settings.api.workers_dev if settings.is_development else settings.api.workers_prod,
     )
 
 

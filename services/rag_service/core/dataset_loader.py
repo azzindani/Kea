@@ -4,7 +4,7 @@ Hugging Face Dataset Loader.
 Streams datasets from Hugging Face Hub and ingests them into the InsightStore.
 """
 import asyncio
-from typing import AsyncGenerator, Any
+from typing import AsyncGenerator
 
 from shared.schemas import AtomicInsight
 from shared.logging.main import get_logger
@@ -26,7 +26,7 @@ class DatasetLoader:
         self, 
         dataset_name: str, 
         split: str = "train", 
-        max_rows: int = 1000,
+        max_rows: int | None = None,
         mapping: dict[str, str] = None
     ) -> AsyncGenerator[AtomicInsight, None]:
         """
@@ -39,6 +39,9 @@ class DatasetLoader:
             mapping: Map dataset columns to AtomicInsight fields
                      {"text_col": "value", "title_col": "entity", ...}
         """
+        from shared.config import get_settings
+        settings = get_settings()
+        max_rows = max_rows or settings.rag.ingest_max_rows
         # Default mapping if none provided - tries to be smart
         if not mapping:
             mapping = {

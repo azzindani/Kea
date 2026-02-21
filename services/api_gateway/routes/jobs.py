@@ -20,6 +20,7 @@ from shared.logging.main import get_logger
 from shared.database.connection import get_database_pool
 from shared.users.models import User
 from services.api_gateway.middleware.auth import get_current_user_required
+from shared.config import get_settings
 
 
 logger = get_logger(__name__)
@@ -170,10 +171,11 @@ class JobStore:
         self,
         user_id: str,
         status: Optional[JobStatus] = None,
-        limit: int = 20,
+        limit: int = None,
         offset: int = 0,
     ) -> list[dict]:
         """List jobs for a user."""
+        limit = limit or get_settings().jobs.default_limit
         await self.initialize()
         pool = await get_database_pool()
         
@@ -315,20 +317,17 @@ async def run_system_job(
 
 class CreateJobRequest(BaseModel):
     """Create job request."""
-    from shared.config import get_settings
-    _settings = get_settings()
-    
     query: str = Field(..., min_length=1)
     job_type: JobType = JobType.AUTONOMOUS
     depth: int = Field(
-        default=_settings.kernel.default_depth, 
+        default_factory=lambda: get_settings().kernel.default_depth, 
         ge=1, 
-        le=_settings.kernel.max_depth
+        le=get_settings().kernel.max_depth
     )
     max_steps: int = Field(
-        default=_settings.kernel.default_max_steps, 
+        default_factory=lambda: get_settings().kernel.default_max_steps, 
         ge=1, 
-        le=_settings.kernel.max_steps
+        le=get_settings().kernel.max_steps
     )
 
 
@@ -368,7 +367,7 @@ async def create_job(
     Returns job_id for tracking. Job runs in background.
     Requires authentication.
     """
-    job_id = f"job-{uuid.uuid4().hex[:12]}"
+    job_id = f"{get_settings().jobs.id_prefix}{uuid.uuid4().hex[:12]}"
     store = await get_job_store()
     
     job = await store.create(
@@ -410,11 +409,17 @@ async def get_job_status(
     job = await store.get(job_id)
     
     if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
+        raise HTTPException(
+            status_code=get_settings().status_codes.not_found, 
+            detail="Job not found"
+        )
     
     # Check ownership
     if job["user_id"] != user.user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise HTTPException(
+            status_code=get_settings().status_codes.forbidden, 
+            detail="Access denied"
+        )
     
     return JobStatusResponse(
         job_id=job["job_id"],
@@ -436,14 +441,20 @@ async def get_job_result(
     job = await store.get(job_id)
     
     if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
+        raise HTTPException(
+            status_code=get_settings().status_codes.not_found, 
+            detail="Job not found"
+        )
     
     if job["user_id"] != user.user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise HTTPException(
+            status_code=get_settings().status_codes.forbidden, 
+            detail="Access denied"
+        )
     
     if job["status"] != JobStatus.COMPLETED:
         raise HTTPException(
-            status_code=400,
+            status_code=get_settings().status_codes.bad_request,
             detail=f"Job not completed. Current status: {job['status'].value}"
         )
     
@@ -467,13 +478,22 @@ async def cancel_job(
     job = await store.get(job_id)
     
     if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
+        raise HTTPException(
+            status_code=get_settings().status_codes.not_found, 
+            detail="Job not found"
+        )
     
     if job["user_id"] != user.user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise HTTPException(
+            status_code=get_settings().status_codes.forbidden, 
+            detail="Access denied"
+        )
     
     if job["status"] in [JobStatus.COMPLETED, JobStatus.FAILED]:
-        raise HTTPException(status_code=400, detail="Cannot cancel completed/failed job")
+        raise HTTPException(
+            status_code=get_settings().status_codes.bad_request, 
+            detail="Cannot cancel completed/failed job"
+        )
     
     await store.update(job_id, status=JobStatus.CANCELLED)
     
@@ -485,8 +505,8 @@ async def cancel_job(
 @router.get("/")
 async def list_jobs(
     status: JobStatus | None = None,
-    limit: int = 20,
-    offset: int = 0,
+    limit: int = Query(get_settings().jobs.default_limit, ge=1, le=get_settings().jobs.max_limit),
+    offset: int = Query(0, ge=0),
     user: User = Depends(get_current_user_required),
 ):
     """List jobs for current user. Requires authentication."""

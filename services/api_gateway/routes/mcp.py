@@ -14,6 +14,7 @@ from pydantic import BaseModel
 
 from shared.logging.main import get_logger
 from services.api_gateway.clients.mcp_client import MCPClient, get_mcp_client
+from shared.config import get_settings
 
 
 logger = get_logger(__name__)
@@ -59,7 +60,11 @@ async def list_tools(client: MCPClient = Depends(get_mcp_client)):
 
 
 @router.get("/search")
-async def search_tools(query: str, limit: int = 5, client: MCPClient = Depends(get_mcp_client)):
+async def search_tools(
+    query: str, 
+    limit: int = Query(default=5, ge=1, le=get_settings().mcp.search_limit), 
+    client: MCPClient = Depends(get_mcp_client)
+):
     """Search for tools via RAG on MCP Host."""
     try:
         tools = await client.search_tools(query, limit)

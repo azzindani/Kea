@@ -98,10 +98,13 @@ class ConversationManager:
         user_id: str,
         tenant_id: str = None,
         include_archived: bool = False,
-        limit: int = 50,
+        limit: int = None,
         offset: int = 0,
     ) -> list[Conversation]:
         """List user's conversations."""
+        from shared.config import get_settings
+        settings = get_settings()
+        limit = limit or settings.conversations.default_limit
         conversations = []
         
         async with self._pool.acquire() as conn:
@@ -215,10 +218,13 @@ class ConversationManager:
     async def get_messages(
         self,
         conversation_id: str,
-        limit: int = 100,
+        limit: int = None,
         before: datetime = None,
     ) -> list[Message]:
         """Get messages from conversation."""
+        from shared.config import get_settings
+        settings = get_settings()
+        limit = limit or settings.conversations.message_limit
         messages = []
         
         async with self._pool.acquire() as conn:
@@ -241,9 +247,12 @@ class ConversationManager:
         self,
         user_id: str,
         query: str,
-        limit: int = 20,
+        limit: int = None,
     ) -> list[Conversation]:
         """Search conversations by title or content."""
+        from shared.config import get_settings
+        settings = get_settings()
+        limit = limit or settings.conversations.search_limit
         conversations = []
         search_pattern = f"%{query}%"
         

@@ -46,19 +46,19 @@ class SystemCapabilities(BaseModel):
 # Routes
 # ============================================================================
 
-_start_time = datetime.utcnow()
+_start_time = datetime.now(__import__("datetime").UTC)
 
 
 @router.get("/health", response_model=SystemHealth)
 async def system_health():
     """Get system health status."""
     settings = get_settings()
-    uptime = (datetime.utcnow() - _start_time).total_seconds()
+    uptime = (datetime.now(__import__("datetime").UTC) - _start_time).total_seconds()
 
     return SystemHealth(
         status="healthy",
         version=settings.app.version,
-        environment=settings.environment.value,
+        environment=settings.app.environment.value,
         uptime_seconds=uptime,
     )
 
@@ -69,9 +69,9 @@ async def system_capabilities():
     settings = get_settings()
 
     return SystemCapabilities(
-        mcp_servers=[s.name for s in settings.mcp.servers if s.enabled],
+        mcp_servers=[],  # Dynamic list via MCP Host tools/search
         available_job_types=["autonomous"],
-        llm_providers=["openrouter"],
+        llm_providers=[p.name for p in settings.llm.providers if p.enabled],
         max_parallel_tools=settings.mcp.max_concurrent_tools,
     )
 
@@ -82,7 +82,7 @@ async def get_config():
     settings = get_settings()
 
     return {
-        "environment": settings.environment.value,
+        "environment": settings.app.environment.value,
         "llm": {
             "provider": settings.llm.default_provider,
             "model": settings.llm.default_model,

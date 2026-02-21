@@ -11,6 +11,25 @@ from enum import Enum
 from typing import Any, TypedDict
 
 from pydantic import BaseModel, Field
+from shared.config import get_settings
+
+
+class ProblemDetails(BaseModel):
+    """RFC 7807 compliant error envelope."""
+    type: str = Field(default="about:blank", description="URI reference identifying the problem type")
+    title: str = Field(..., description="Short, human-readable summary of the problem")
+    status: int = Field(..., description="HTTP status code for this occurrence")
+    detail: str = Field(..., description="Human-readable explanation specific to this occurrence")
+    instance: str | None = Field(default=None, description="URI reference identifying the specific occurrence")
+    extensions: dict[str, Any] = Field(default_factory=dict, description="Extension members for additional info")
+
+
+class SuccessResponse(BaseModel):
+    """Standardized success response envelope."""
+    status: str = "success"
+    message: str | None = None
+    data: Any | None = None
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(__import__("datetime").UTC))
 
 
 class AuditEventType(str, Enum):
@@ -78,8 +97,8 @@ class AtomicInsight(BaseModel):
     period: str | None = Field(default=None, description="Time period applicable")
     origin_url: str = Field(..., description="Originating URL")
     origin_title: str = Field(default="", description="Originating document title")
-    confidence_score: float = Field(default=0.8, ge=0.0, le=1.0)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    confidence_score: float = Field(default_factory=lambda: get_settings().memory.min_confidence, ge=0.0, le=1.0)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(__import__("datetime").UTC))
 
 
 class JobStatus(str, Enum):
@@ -103,7 +122,7 @@ class Origin(BaseModel):
     url: str
     title: str
     domain: str
-    accessed_at: datetime = Field(default_factory=datetime.utcnow)
+    accessed_at: datetime = Field(default_factory=lambda: datetime.now(__import__("datetime").UTC))
     content_hash: str = ""
     reliability_score: float = 0.5
 
@@ -126,8 +145,8 @@ class JobRequest(BaseModel):
 
     query: str
     job_type: JobType = JobType.AUTONOMOUS
-    depth: int = 2
-    max_steps: int = 20
+    depth: int = Field(default_factory=lambda: get_settings().kernel.default_depth)
+    max_steps: int = Field(default_factory=lambda: get_settings().kernel.default_max_steps)
     context_hints: list[str] = Field(default_factory=list)
 
 
@@ -164,7 +183,7 @@ class ToolInvocation(BaseModel):
     result: Any | None = None
     is_error: bool = False
     duration_ms: float = 0.0
-    invoked_at: datetime = Field(default_factory=datetime.utcnow)
+    invoked_at: datetime = Field(default_factory=lambda: datetime.now(__import__("datetime").UTC))
 
 
 # ============================================================================
@@ -311,13 +330,13 @@ class ToolSearchRequest(BaseModel):
         description="Natural-language task description for semantic matching",
     )
     limit: int = Field(
-        default=10,
+        default_factory=lambda: get_settings().mcp.max_concurrent_tools,
         ge=1,
         le=50,
         description="Max number of tools to return",
     )
     min_similarity: float = Field(
-        default=0.0,
+        default_factory=lambda: get_settings().mcp.min_similarity,
         ge=0.0,
         le=1.0,
         description="Minimum cosine similarity score (0.0-1.0)",

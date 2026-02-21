@@ -29,7 +29,9 @@ class AppSettings(BaseModel):
     """Core application metadata."""
     name: str = "Autonomous OS"
     version: str = "0.4.0"
-    environment: str = "development"
+    environment: Environment = Environment.DEVELOPMENT
+    vocab_dir: str = "configs/vocab"
+    knowledge_dir: str = "knowledge"
 
 
 class ServiceSettings(BaseModel):
@@ -43,6 +45,25 @@ class ServiceSettings(BaseModel):
     chronos: str = "http://localhost:8006"
 
 
+class LLMModelInfo(BaseModel):
+    """Deep metadata for an LLM model."""
+    id: str
+    name: str
+    provider: str
+    context_length: int
+    supports_vision: bool = False
+    supports_tools: bool = False
+    pricing_input: float = 0.0  # per 1M tokens
+    pricing_output: float = 0.0
+
+
+class LLMProviderInfo(BaseModel):
+    """Metadata for an LLM provider."""
+    name: str
+    enabled: bool = True
+    base_url: str | None = None
+
+
 class LLMSettings(BaseModel):
     """LLM configuration."""
     default_provider: str = "openrouter"
@@ -52,6 +73,56 @@ class LLMSettings(BaseModel):
     max_tokens: int = 32768
     enable_reasoning: bool = True
     openrouter_api_key: str = ""
+    max_retries: int = 3
+    retry_delay_base: float = 2.0
+    
+    # Provider Registry
+    providers: list[LLMProviderInfo] = [
+        LLMProviderInfo(
+            name="openrouter", 
+            enabled=True, 
+            base_url="https://openrouter.ai/api/v1"
+        )
+    ]
+    models: list[LLMModelInfo] = [
+        LLMModelInfo(
+            id="nvidia/nemotron-3-nano-30b-a3b:free",
+            name="Nemotron 3 Nano",
+            provider="openrouter",
+            context_length=32768,
+            supports_tools=True,
+        ),
+        LLMModelInfo(
+            id="google/gemini-2.0-flash-exp:free",
+            name="Gemini Flash 2.0",
+            provider="openrouter",
+            context_length=1000000,
+            supports_vision=True,
+            supports_tools=True,
+            pricing_input=0.075,
+            pricing_output=0.30,
+        ),
+        LLMModelInfo(
+            id="anthropic/claude-3.5-sonnet",
+            name="Claude 3.5 Sonnet",
+            provider="openrouter",
+            context_length=200000,
+            supports_vision=True,
+            supports_tools=True,
+            pricing_input=3.0,
+            pricing_output=15.0,
+        ),
+        LLMModelInfo(
+            id="openai/gpt-4o",
+            name="GPT-4o",
+            provider="openrouter",
+            context_length=128000,
+            supports_vision=True,
+            supports_tools=True,
+            pricing_input=2.50,
+            pricing_output=10.0,
+        ),
+    ]
 
 
 class LoggingSettings(BaseModel):
@@ -70,6 +141,7 @@ class DatabaseSettings(BaseModel):
     idle_timeout: float = 600.0
     max_retries: int = 3
     retry_delay: float = 2.0
+    command_timeout: float = 60.0
 
 
 class JITSettings(BaseModel):
@@ -143,6 +215,43 @@ class AuthSettings(BaseModel):
     session_hours: int = 24
     allow_anonymous: bool = True
     api_key_header_name: str = "X-API-Key"
+    password_min_length: int = 6
+    api_key_default_rate_limit: int = 1000
+    api_key_max_rate_limit: int = 10000
+
+
+class UserSettings(BaseModel):
+    """User management settings."""
+    default_list_limit: int = 100
+    max_list_limit: int = 500
+
+
+class ConversationSettings(BaseModel):
+    """Conversation management settings."""
+    default_limit: int = 50
+    max_limit: int = 200
+    search_limit: int = 20
+    message_limit: int = 100
+    message_max_limit: int = 500
+    title_max_length: int = 50
+
+
+class JobSettings(BaseModel):
+    """Job management settings."""
+    default_limit: int = 20
+    max_limit: int = 100
+    id_prefix: str = "job-"
+
+
+class MemorySettings(BaseModel):
+    """Memory (Insight/Graph) management settings."""
+    search_limit: int = 10
+    search_max_limit: int = 100
+    min_confidence: float = 0.5
+    graph_depth: int = 2
+    graph_max_depth: int = 5
+    graph_limit: int = 50
+    session_limit: int = 100
 
 
 class RateLimitSettings(BaseModel):
@@ -175,8 +284,12 @@ class RAGSettings(BaseModel):
     default_limit: int = 20
     max_limit: int = 100
     ingest_max_rows: int = 1000
+    batch_size: int = 50
     knowledge_limit: int = 5
     knowledge_candidate_multiplier: int = 5
+    artifact_path: str = "./artifacts"
+    default_confidence: float = 0.8
+    min_confidence: float = 0.0
 
 
 class VaultSettings(BaseModel):
@@ -190,6 +303,17 @@ class ChronosSettings(BaseModel):
     poll_interval: float = 60.0
     due_tolerance: float = 30.0
     max_history_days: int = 30
+    default_max_sources: int = 10
+
+
+class SwarmSettings(BaseModel):
+    """Swarm Manager (Governance) settings."""
+    default_blacklist_duration_minutes: int = 30
+    default_escalation_type: str = "error"
+    poll_interval: float = 5.0
+    max_agents_per_minute: int = 100
+    max_tool_calls_per_minute: int = 100
+    rate_limit_window_seconds: float = 60.0
 
 
 class ApiSettings(BaseModel):
@@ -229,6 +353,19 @@ class S3Settings(BaseModel):
     secret_key: str = ""
 
 
+class EnterpriseSettings(BaseModel):
+    """Enterprise-scale limits (from constants.py)."""
+    tool_limit: int = 100_000
+    search_limit: int = 100_000
+    fact_limit: int = 100_000
+    batch_size: int = 10_000
+    registry_limit: int = 100_000
+    crawl_depth: int = 1_000
+    max_tool_results: int = 1_000_000
+    max_concurrent_tools: int = 1_000
+    max_parallel_servers: int = 100
+
+
 class SecuritySettings(BaseModel):
     """Security and CORS settings."""
     cors_origins: list[str] = ["*"]
@@ -238,6 +375,25 @@ class SecuritySettings(BaseModel):
     hsts_include_subdomains: bool = True
     csp_policy: str = "default-src 'self'"
     max_body_size_mb: int = 10
+
+
+class HttpStatusSettings(BaseModel):
+    """Standardized HTTP Status Codes."""
+    ok: int = 200
+    created: int = 201
+    accepted: int = 202
+    no_content: int = 204
+    bad_request: int = 400
+    unauthorized: int = 401
+    forbidden: int = 403
+    not_found: int = 404
+    method_not_allowed: int = 405
+    conflict: int = 409
+    payload_too_large: int = 413
+    unprocessable_entity: int = 422
+    too_many_requests: int = 429
+    internal_error: int = 500
+    service_unavailable: int = 503
 
 
 class Settings(BaseSettings):
@@ -273,6 +429,13 @@ class Settings(BaseSettings):
     rate_limit: RateLimitSettings = RateLimitSettings()
     rag: RAGSettings = RAGSettings()
     vault_settings: VaultSettings = VaultSettings()
+    conversations: ConversationSettings = ConversationSettings()
+    jobs: JobSettings = JobSettings()
+    memory: MemorySettings = MemorySettings()
+    users: UserSettings = UserSettings()
+    swarm: SwarmSettings = SwarmSettings()
+    enterprise: EnterpriseSettings = EnterpriseSettings()
+    status_codes: HttpStatusSettings = HttpStatusSettings()
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -290,6 +453,11 @@ class Settings(BaseSettings):
             self.database.url = self.database_url
         if self.jwt_secret:
             self.auth.jwt_secret = self.jwt_secret
+
+    @property
+    def is_development(self) -> bool:
+        return self.app.environment == Environment.DEVELOPMENT
+
 
 @lru_cache()
 def get_settings() -> Settings:

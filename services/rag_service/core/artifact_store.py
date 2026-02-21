@@ -40,7 +40,7 @@ class Artifact(BaseModel):
     tags: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(__import__("datetime").UTC))
 
 
 # ============================================================================
@@ -53,22 +53,18 @@ class ArtifactStore(ABC):
     @abstractmethod
     async def put(self, artifact: Artifact, content: bytes) -> str:
         """Store artifact content. Returns artifact ID."""
-        pass
     
     @abstractmethod
     async def get(self, artifact_id: str) -> tuple[Artifact, bytes] | None:
         """Get artifact and its content."""
-        pass
     
     @abstractmethod
     async def get_metadata(self, artifact_id: str) -> Artifact | None:
         """Get artifact metadata only."""
-        pass
     
     @abstractmethod
     async def delete(self, artifact_id: str) -> None:
         """Delete artifact."""
-        pass
     
     @abstractmethod
     async def list(
@@ -78,7 +74,6 @@ class ArtifactStore(ABC):
         limit: int = 100,
     ) -> list[Artifact]:
         """List artifacts with optional filtering."""
-        pass
 
 
 # ============================================================================
@@ -96,8 +91,10 @@ class LocalArtifactStore(ArtifactStore):
             content
     """
     
-    def __init__(self, base_path: str = "./artifacts") -> None:
-        self.base_path = Path(base_path)
+    def __init__(self, base_path: str | None = None) -> None:
+        from shared.config import get_settings
+        settings = get_settings()
+        self.base_path = Path(base_path or settings.rag.artifact_path)
         self.base_path.mkdir(parents=True, exist_ok=True)
     
     def _artifact_dir(self, artifact_id: str) -> Path:
@@ -117,7 +114,7 @@ class LocalArtifactStore(ArtifactStore):
         
         # Write metadata
         metadata_path = artifact_dir / "metadata.json"
-        with open(metadata_path, "w") as f:
+        with open(metadata_path, "w", encoding="utf-8") as f:
             json.dump(artifact.model_dump(mode="json"), f, indent=2, default=str)
         
         # Write content
@@ -139,7 +136,7 @@ class LocalArtifactStore(ArtifactStore):
         
         # Read metadata
         metadata_path = artifact_dir / "metadata.json"
-        with open(metadata_path) as f:
+        with open(metadata_path, "r", encoding="utf-8") as f:
             metadata = json.load(f)
         
         artifact = Artifact(**metadata)
@@ -160,7 +157,7 @@ class LocalArtifactStore(ArtifactStore):
         if not metadata_path.exists():
             return None
         
-        with open(metadata_path) as f:
+        with open(metadata_path, "r", encoding="utf-8") as f:
             metadata = json.load(f)
         
         return Artifact(**metadata)
@@ -194,7 +191,7 @@ class LocalArtifactStore(ArtifactStore):
             if not metadata_path.exists():
                 continue
             
-            with open(metadata_path) as f:
+            with open(metadata_path, "r", encoding="utf-8") as f:
                 metadata = json.load(f)
             
             artifact = Artifact(**metadata)
@@ -257,7 +254,6 @@ class S3ArtifactStore(ArtifactStore):
     
     async def put(self, artifact: Artifact, content: bytes) -> str:
         """Store artifact in S3."""
-        import json
         
         client = self._get_client()
         

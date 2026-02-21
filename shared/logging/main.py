@@ -39,9 +39,11 @@ class LogLevel(str, Enum):
 
 class LogConfig:
     """Compatibility container for logging configuration."""
-    def __init__(self, level: str = "info", format: str = "console", service_name: str = "app"):
-        self.level = level.lower()
-        self.format = format
+    def __init__(self, level: str | None = None, format: str | None = None, service_name: str = "app"):
+        from shared.config import get_settings
+        settings = get_settings()
+        self.level = (level or settings.logging.level).lower()
+        self.format = format or settings.logging.format
         self.service_name = service_name
 
 LEVEL_SYMBOLS = {
@@ -61,10 +63,10 @@ LOG_THEME = Theme({
     "logging.level.debug": "cyan",
 })
 
-# Defaults (can be updated by setup_logging)
+# Defaults (updated by setup_logging)
 DEFAULT_FLAGS = {
-    "env": "dev",
-    "version": "0.4.0",
+    "env": "unknown",
+    "version": "unknown",
 }
 
 # ============================================================================
@@ -98,6 +100,15 @@ def record_api_request(method: str, endpoint: str, status_code: int, duration: f
     if METRICS_ENABLED:
         API_REQUESTS.labels(method=method, endpoint=endpoint, status_code=str(status_code)).inc()
         API_DURATION.labels(method=method, endpoint=endpoint).observe(duration)
+
+def record_llm_request(provider: str, model: str, status: str):
+    if METRICS_ENABLED:
+        LLM_REQUESTS.labels(provider=provider, model=model, status=status).inc()
+
+def record_llm_tokens(provider: str, model: str, prompt_tokens: int, completion_tokens: int):
+    if METRICS_ENABLED:
+        LLM_TOKENS.labels(provider=provider, model=model, token_type="prompt").inc(prompt_tokens)
+        LLM_TOKENS.labels(provider=provider, model=model, token_type="completion").inc(completion_tokens)
 
 # ============================================================================
 # 📥 Standardized I/O Models
