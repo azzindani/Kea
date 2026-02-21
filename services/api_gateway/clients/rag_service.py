@@ -32,8 +32,10 @@ class RAGServiceClient:
     """
     
     def __init__(self, base_url: str | None = None) -> None:
+        from shared.config import get_settings
+        settings = get_settings()
         self.base_url = base_url or ServiceRegistry.get_url(ServiceName.RAG_SERVICE)
-        self.timeout = httpx.Timeout(60.0, connect=10.0)
+        self.timeout = httpx.Timeout(settings.timeouts.default, connect=10.0)
     
     async def health_check(self) -> dict[str, Any]:
         """Check RAG service health."""

@@ -95,6 +95,8 @@ async def list_conversations(
     user: User = Depends(get_current_user_required),
 ):
     """List user's conversations."""
+    from shared.config import get_settings
+    settings = get_settings()
     manager = await get_conversation_manager()
     
     conversations = await manager.list_conversations(
@@ -366,10 +368,12 @@ async def send_message(
         await manager.update_conversation(conversation_id, title=title)
     
     # Run research pipeline
+    from shared.config import get_settings
+    settings = get_settings()
     # Run research pipeline
     try:
         # Call Orchestrator Service
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=settings.timeouts.llm_streaming) as client:
             response = await client.post(
                 f"{ORCHESTRATOR_URL}/chat/message",
                 json={

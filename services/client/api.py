@@ -21,12 +21,13 @@ class ResearchClient:
     
     def __init__(
         self, 
-        base_url: str = "http://localhost:8000",
+        base_url: str | None = None,
         email: str = "researcher@example.com",
         password: str = "research_password_123",
         name: str = "Research User"
     ):
-        self.base_url = base_url
+        from shared.service_registry import ServiceRegistry, ServiceName
+        self.base_url = base_url or ServiceRegistry.get_url(ServiceName.GATEWAY)
         self.email = email
         self.password = password
         self.name = name

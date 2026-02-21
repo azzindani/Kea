@@ -61,8 +61,9 @@ LOG_THEME = Theme({
     "logging.level.debug": "cyan",
 })
 
+# Defaults (can be updated by setup_logging)
 DEFAULT_FLAGS = {
-    "env": os.getenv("APP_ENV", "dev"),
+    "env": "dev",
     "version": "0.4.0",
 }
 
@@ -178,8 +179,15 @@ class ConsoleRenderer:
 
 def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optional[str] = None):
     """Standardized logging setup for all codebases."""
-    raw_level = (config.level if isinstance(config, LogConfig) else (config if isinstance(config, str) else "info")).lower()
-    log_format = os.getenv("LOG_FORMAT", "console").lower()
+    from shared.config import get_settings
+    settings = get_settings()
+    
+    # Update global flags
+    DEFAULT_FLAGS["env"] = settings.app.environment
+    DEFAULT_FLAGS["version"] = settings.app.version
+    
+    raw_level = (config.level if isinstance(config, LogConfig) else (config if isinstance(config, str) else settings.logging.level)).lower()
+    log_format = settings.logging.format.lower()
 
     root_logger = logging.getLogger()
     for h in root_logger.handlers[:]:

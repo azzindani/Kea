@@ -235,8 +235,11 @@ class AuditTrail:
             backend: Storage backend (defaults to Postgres -> Memory)
         """
         if backend is None:
+            from shared.config import get_settings
+            settings = get_settings()
+            
             # 1. Try Postgres (Primary)
-            if os.getenv("DATABASE_URL"):
+            if settings.database.url:
                 try:
                     from services.vault.core.postgres_audit import PostgresBackend
                     backend = PostgresBackend()

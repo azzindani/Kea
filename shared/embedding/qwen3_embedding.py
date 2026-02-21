@@ -13,6 +13,7 @@ from __future__ import annotations
 import os
 from abc import ABC, abstractmethod
 from typing import Any
+from shared.config import get_settings
 
 from shared.logging import get_logger
 
@@ -66,11 +67,12 @@ class OpenRouterEmbedding(EmbeddingProvider):
     def __init__(
         self,
         api_key: str | None = None,
-        dimension: int = 4096,
+        dimension: int | None = None,
     ) -> None:
-        self.api_key = api_key or os.getenv("OPENROUTER_API_KEY", "")
-        self._dimension = dimension
-        self.model = "qwen/qwen3-embedding-8b"
+        settings = get_settings()
+        self.api_key = api_key or settings.llm.openrouter_api_key
+        self._dimension = dimension or settings.embedding.dimension
+        self.model = settings.embedding.api_model
         self.base_url = "https://openrouter.ai/api/v1/embeddings"
     
     @property
@@ -316,7 +318,7 @@ class LocalEmbedding(EmbeddingProvider):
 
 # Factory function
 def create_embedding_provider(
-    use_local: bool = False,
+    use_local: bool | None = None,
     **kwargs
 ) -> EmbeddingProvider:
     """
@@ -329,7 +331,15 @@ def create_embedding_provider(
     Returns:
         EmbeddingProvider instance
     """
+    settings = get_settings()
+    if use_local is None:
+        use_local = settings.embedding.use_local
+        
     if use_local:
+        if "model_name" not in kwargs:
+            kwargs["model_name"] = settings.embedding.model_name
+        if "dimension" not in kwargs:
+            kwargs["dimension"] = settings.embedding.dimension
         return LocalEmbedding(**kwargs)
     else:
         return OpenRouterEmbedding(**kwargs)

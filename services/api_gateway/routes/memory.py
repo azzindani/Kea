@@ -2,7 +2,7 @@
 Memory API Routes.
 
 Endpoints for fact storage and semantic search.
-Delegates to RAG Service (port 8003) for fact queries and knowledge graph.
+Delegates to RAG Service for fact queries and knowledge graph.
 """
 
 from __future__ import annotations
@@ -18,7 +18,9 @@ logger = get_logger(__name__)
 
 router = APIRouter()
 
-_HTTP_TIMEOUT = 30.0
+from shared.config import get_settings
+settings = get_settings()
+_HTTP_TIMEOUT = settings.timeouts.default
 
 
 def _rag_url() -> str:

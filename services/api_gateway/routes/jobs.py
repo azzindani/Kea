@@ -50,8 +50,8 @@ CREATE TABLE IF NOT EXISTS research_jobs (
     max_sources INTEGER DEFAULT 10,
     status TEXT NOT NULL,
     progress REAL DEFAULT 0.0,
-    created_at TIMESTAMP NOT NULL,
-    updated_at TIMESTAMP,
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ,
     error TEXT,
     report TEXT,
     confidence REAL DEFAULT 0.0,
@@ -284,23 +284,15 @@ async def run_research_job(
                 extra={"query": job["query"][:100]})
     
     try:
-        # Call Orchestrator's research endpoint via API
-        payload = {
-            "query": job["query"],
-            "depth": job["depth"],
-            "max_sources": job["max_sources"],
-        }
-            
-        async with httpx.AsyncClient(timeout=600.0) as client:
-            response = await client.post(
-                f"{ORCHESTRATOR_URL}/research",
-                json=payload,
-            )
-            
-            if response.status_code != 200:
-                raise Exception(f"Orchestrator returned {response.status_code}: {response.text}")
-            
-            result = response.json()
+        from services.api_gateway.clients.orchestrator import get_orchestrator_client
+        client = await get_orchestrator_client()
+        
+        # Start research via client (which handles retries and circuit breaking)
+        result = await client.start_research(
+            query=job["query"],
+            depth=job["depth"],
+            max_sources=job["max_sources"],
+        )
         
         # Update job with results
         await store.update(
@@ -333,10 +325,21 @@ async def run_research_job(
 
 class CreateJobRequest(BaseModel):
     """Create job request."""
+    from shared.config import get_settings
+    _settings = get_settings()
+    
     query: str = Field(..., min_length=1)
     job_type: JobType = JobType.DEEP_RESEARCH
-    depth: int = Field(default=2, ge=1, le=5)
-    max_sources: int = Field(default=10, ge=1, le=50)
+    depth: int = Field(
+        default=_settings.research.default_depth, 
+        ge=1, 
+        le=_settings.research.max_depth
+    )
+    max_sources: int = Field(
+        default=_settings.research.default_max_sources, 
+        ge=1, 
+        le=_settings.research.max_sources
+    )
 
 
 class JobStatus(BaseModel):

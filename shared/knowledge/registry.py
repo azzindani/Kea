@@ -17,6 +17,8 @@ from typing import Any
 import asyncpg
 from pgvector.asyncpg import register_vector
 
+from shared.database.connection import get_database_pool
+
 from shared.embedding.qwen3_embedding import create_embedding_provider
 from shared.logging import get_logger
 
@@ -29,17 +31,17 @@ class PostgresKnowledgeRegistry:
     _init_lock: asyncio.Lock | None = None
 
     def __init__(self, table_name: str = "knowledge_registry") -> None:
+        """
+        Initializes the PostgresKnowledgeRegistry.
+
+        Args:
+            table_name: The name of the PostgreSQL table to use for knowledge storage.
+        """
         self.table_name = table_name
         self.embedder = create_embedding_provider(use_local=True)
         self._reranker = None
         self._pool: asyncpg.Pool | None = None
-        self._db_url = os.getenv("DATABASE_URL")
         self._initialized = False
-
-        if not self._db_url:
-            raise ValueError(
-                "DATABASE_URL environment variable is required for PostgresKnowledgeRegistry"
-            )
 
     async def _get_pool(self) -> asyncpg.Pool:
         """Get or create connection pool with thread-safe initialization."""
@@ -53,11 +55,7 @@ class PostgresKnowledgeRegistry:
             if self._pool is not None and self._initialized:
                 return self._pool
 
-            self._pool = await asyncpg.create_pool(
-                self._db_url,
-                min_size=1,
-                max_size=10,
-            )
+            self._pool = await get_database_pool()
 
             async with self._pool.acquire() as conn:
                 await conn.execute("SELECT pg_advisory_lock(12346)")

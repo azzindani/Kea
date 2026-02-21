@@ -63,6 +63,25 @@ from shared.mcp.protocol import (
 # ============================================================================
 
 
+class AtomicFact(BaseModel):
+    """
+    Atomic fact (Entity-Attribute-Value).
+    
+    The foundational granular finding for Project.
+    """
+
+    fact_id: str = Field(default="", description="Unique identifier")
+    entity: str = Field(..., description="Subject of the fact")
+    attribute: str = Field(..., description="Property described")
+    value: str = Field(..., description="Measured or stated value")
+    unit: str | None = Field(default=None, description="Units of measurement")
+    period: str | None = Field(default=None, description="Time period applicable")
+    source_url: str = Field(..., description="Originating URL")
+    source_title: str = Field(default="", description="Originating document title")
+    confidence_score: float = Field(default=0.8, ge=0.0, le=1.0)
+    extracted_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class ResearchStatus(str, Enum):
     """Research job status."""
 

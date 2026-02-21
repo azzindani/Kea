@@ -9,6 +9,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
+from prometheus_client import make_asgi_app
 from pydantic import BaseModel, Field
 
 from services.rag_service.core import (
@@ -32,7 +33,7 @@ knowledge_store: KnowledgeStore | None = None
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
     """Application lifespan manager."""
     global fact_store, artifact_store, dataset_loader, knowledge_store
 
@@ -40,8 +41,8 @@ async def lifespan(app: FastAPI):
 
     setup_logging(
         LogConfig(
-            level=settings.log_level,
-            format=settings.log_format,
+            level=settings.logging.level,
+            format=settings.logging.format,
             service_name="rag_service",
         )
     )
@@ -77,14 +78,17 @@ async def lifespan(app: FastAPI):
     logger.info("RAG Service stopped")
 
 
+settings = get_settings()
+
 app = FastAPI(
-    title="Project RAG Service",
+    title=f"{settings.app.name} - RAG Service",
     description="External Knowledge Engine (Hugging Face Integration)",
-    version="0.2.0",
+    version=settings.app.version,
     lifespan=lifespan,
 )
 
 app.add_middleware(RequestLoggingMiddleware)
+app.mount("/metrics", make_asgi_app())
 
 
 # ============================================================================
@@ -313,7 +317,7 @@ class KnowledgeSearchRequest(BaseModel):
     """Knowledge search request."""
 
     query: str
-    limit: int = Field(default=5, ge=1, le=20)
+    limit: int = Field(default=settings.api.default_limit, ge=1, le=20)
     domain: str | None = None
     category: str | None = None
     tags: list[str] | None = None
@@ -444,10 +448,11 @@ def main():
 
     settings = get_settings()
 
+    from shared.service_registry import ServiceRegistry, ServiceName
     uvicorn.run(
         "services.rag_service.main:app",
-        host="0.0.0.0",
-        port=8003,
+        host=settings.api.host,
+        port=ServiceRegistry.get_port(ServiceName.RAG_SERVICE),
         reload=settings.is_development,
     )
 

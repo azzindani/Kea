@@ -204,8 +204,10 @@ async def create_intervention(request: CreateInterventionRequest) -> Any:
 @router.get("/pending")
 async def list_pending_interventions() -> dict:
     """List all pending interventions requiring human action."""
+    from shared.config import get_settings
+    settings = get_settings()
     try:
-        rows = await _db_list(job_id=None, status="pending", limit=200)
+        rows = await _db_list(job_id=None, status="pending", limit=settings.api.default_limit * 2)
         pending = [
             InterventionRequest(
                 intervention_id=r["intervention_id"],

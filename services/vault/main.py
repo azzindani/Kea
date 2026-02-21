@@ -1,5 +1,5 @@
 """
-Vault Service — Research Persistence & Context Engine (Port 8004).
+Vault Service — Research Persistence & Context Engine.
 
 Routes:
   GET    /health
@@ -16,6 +16,7 @@ from typing import Any
 import uuid
 import uvicorn
 from fastapi import FastAPI, HTTPException
+from prometheus_client import make_asgi_app
 from pydantic import BaseModel, Field
 
 from services.vault.core.audit_trail import AuditEventType, get_audit_trail
@@ -25,15 +26,27 @@ from shared.logging import get_logger, setup_logging, LogConfig, RequestLoggingM
 import os
 
 # Initialize structured logging globally
-setup_logging(LogConfig(
-    level=os.getenv("LOG_LEVEL", "INFO").upper(),
-    service_name="vault",
-))
+# (Moved below settings loading)
 
 logger = get_logger(__name__)
 
-app = FastAPI(title="The Vault")
+from shared.config import get_settings
+
+# Load settings
+settings = get_settings()
+
+setup_logging(LogConfig(
+    level=settings.logging.level,
+    service_name="vault",
+))
+
+app = FastAPI(
+    title=f"{settings.app.name} - Vault",
+    description="Research Persistence & Context Engine",
+    version=settings.app.version,
+)
 app.add_middleware(RequestLoggingMiddleware)
+app.mount("/metrics", make_asgi_app())
 
 # Global Vector Store
 _vector_store: PostgresVectorStore | None = None
@@ -91,7 +104,7 @@ async def log_event(request: LogEventRequest) -> dict:
 
 @app.get("/audit/logs")
 async def search_logs(
-    limit: int = 100,
+    limit: int = settings.api.default_limit,
     actor: str | None = None,
     session_id: str | None = None,
 ) -> dict:
@@ -187,4 +200,9 @@ async def query_research(
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8004)
+    from shared.service_registry import ServiceRegistry, ServiceName
+    uvicorn.run(
+        app, 
+        host=settings.api.host, 
+        port=ServiceRegistry.get_port(ServiceName.VAULT)
+    )

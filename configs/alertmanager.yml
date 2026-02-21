@@ -1,0 +1,14 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'web.browser'
+
+receivers:
+- name: 'web.browser'
+  # For development, we just keep alerts in the Alertmanager UI.
+  # In production, you would add slack_configs or email_configs here.

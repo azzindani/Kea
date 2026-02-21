@@ -12,6 +12,7 @@ import asyncio
 import os
 
 from shared.logging import get_logger
+from shared.database.connection import get_database_pool
 from shared.users.models import User, UserRole, APIKey, USERS_TABLE_SQL, API_KEYS_TABLE_SQL
 
 
@@ -33,51 +34,21 @@ class UserManager:
         user = await manager.authenticate_email("user@example.com", "password")
     """
     
-    def __init__(self, database_url: str = None):
-        """
-        Initialize manager.
-        
-        Args:
-            database_url: PostgreSQL URL
-        """
-        self.database_url = database_url or os.getenv("DATABASE_URL")
-        
-        if not self.database_url:
-            raise ValueError("DATABASE_URL environment variable is required for UserManager")
-            
+    def __init__(self):
+        """Initialize manager."""
         self._pool = None
-        
-        logger.debug(f"UserManager initialized (Postgres)")
+        logger.debug("UserManager initialized")
     
     async def initialize(self):
         """Initialize database connection and tables."""
-        await self._init_postgres()
-    
-    async def _init_postgres(self):
-        """Initialize PostgreSQL."""
-        try:
-            import asyncpg
-            
-            # Get pool configuration from environment or use defaults
-            min_connections = int(os.getenv("DATABASE_MIN_CONNECTIONS", "5"))
-            max_connections = int(os.getenv("DATABASE_MAX_CONNECTIONS", "20"))
-            
-            self._pool = await asyncpg.create_pool(
-                self.database_url,
-                min_size=min_connections,
-                max_size=max_connections,
-                command_timeout=60.0,
-            )
-            
+        if self._pool is None:
+            self._pool = await get_database_pool()
+        
+        if self._pool:
             async with self._pool.acquire() as conn:
                 await conn.execute(USERS_TABLE_SQL)
                 await conn.execute(API_KEYS_TABLE_SQL)
-            
-            logger.info(f"PostgreSQL initialized for users (pool: {min_connections}-{max_connections})")
-            
-        except Exception as e:
-            logger.error(f"PostgreSQL init failed: {e}")
-            raise
+            logger.info("PostgreSQL tables initialized for users")
     
     # =========================================================================
     # User CRUD
@@ -228,22 +199,13 @@ class UserManager:
 class APIKeyManager:
     """Manages API keys."""
     
-    def __init__(self, database_url: str = None):
-        self.database_url = database_url or os.getenv("DATABASE_URL")
-        
-        if not self.database_url:
-            raise ValueError("DATABASE_URL environment variable is required for APIKeyManager")
-            
+    def __init__(self):
         self._pool = None
     
     async def initialize(self):
-        """Initialize (uses same DB as UserManager)."""
-        import asyncpg
-        try:
-            self._pool = await asyncpg.create_pool(self.database_url)
-        except Exception as e:
-            logger.error(f"APIKeyManager PostgreSQL init failed: {e}")
-            raise
+        """Initialize (uses same shared pool)."""
+        if self._pool is None:
+            self._pool = await get_database_pool()
     
     async def create_key(
         self,

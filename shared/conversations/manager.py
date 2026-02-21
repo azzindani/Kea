@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Any
 
 from shared.logging import get_logger
+from shared.database.connection import get_database_pool
 from shared.conversations.models import (
     Conversation, Message, MessageRole,
     CONVERSATIONS_TABLE_SQL, MESSAGES_TABLE_SQL,
@@ -40,43 +41,19 @@ class ConversationManager:
         conversations = await manager.list_conversations(user_id)
     """
     
-    def __init__(self, database_url: str = None):
-        self.database_url = database_url or os.getenv("DATABASE_URL")
-        
-        if not self.database_url:
-            raise ValueError("DATABASE_URL environment variable is required for ConversationManager")
-            
+    def __init__(self):
         self._pool = None
     
     async def initialize(self):
         """Initialize database tables."""
-        await self._init_postgres()
-    
-    async def _init_postgres(self):
-        """Initialize PostgreSQL."""
-        try:
-            import asyncpg
+        if self._pool is None:
+            self._pool = await get_database_pool()
             
-            # Get pool configuration from environment or use defaults
-            min_connections = int(os.getenv("DATABASE_MIN_CONNECTIONS", "5"))
-            max_connections = int(os.getenv("DATABASE_MAX_CONNECTIONS", "20"))
-            
-            self._pool = await asyncpg.create_pool(
-                self.database_url,
-                min_size=min_connections,
-                max_size=max_connections,
-                command_timeout=60.0,
-            )
-            
+        if self._pool:
             async with self._pool.acquire() as conn:
                 await conn.execute(CONVERSATIONS_TABLE_SQL)
                 await conn.execute(MESSAGES_TABLE_SQL)
-            
-            logger.info(f"PostgreSQL initialized for conversations (pool: {min_connections}-{max_connections})")
-            
-        except Exception as e:
-            logger.error(f"PostgreSQL init failed: {e}")
-            raise
+            logger.info("PostgreSQL tables initialized for conversations")
     
     # =========================================================================
     # Conversation CRUD

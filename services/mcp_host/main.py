@@ -4,6 +4,7 @@ load_dotenv()
 from fastapi import FastAPI, HTTPException
 import fastapi
 import uvicorn
+from prometheus_client import make_asgi_app
 from contextlib import asynccontextmanager
 
 from shared.logging import get_logger, setup_logging, LogConfig, RequestLoggingMiddleware
@@ -15,16 +16,13 @@ from services.mcp_host.core.models import (
 )
 
 # Initialize structured logging globally
-setup_logging(LogConfig(
-    level=os.getenv("LOG_LEVEL", "INFO").upper(),
-    service_name="mcp_host",
-))
+# (Moved below settings loading)
 
 logger = get_logger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
     # Startup: Initialize Registry
     from services.mcp_host.core.session_registry import get_session_registry
     registry = get_session_registry()
@@ -38,8 +36,24 @@ async def lifespan(app: FastAPI):
     await registry.shutdown()
 
 
-app = FastAPI(title="MCP Host", lifespan=lifespan)
+from shared.config import get_settings
+from shared.service_registry import ServiceRegistry, ServiceName
+
+# Load settings
+settings = get_settings()
+
+setup_logging(LogConfig(
+    level=settings.logging.level,
+    service_name="mcp_host",
+))
+
+app = FastAPI(
+    title=f"{settings.app.name} - MCP Host",
+    version=settings.app.version,
+    lifespan=lifespan,
+)
 app.add_middleware(RequestLoggingMiddleware)
+app.mount("/metrics", make_asgi_app())
 
 
 @app.get("/health")
@@ -198,4 +212,8 @@ async def execute_batch(request: BatchToolRequest):
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8002) # Port 8002 (MCP Host)
+    uvicorn.run(
+        app, 
+        host=settings.api.host, 
+        port=ServiceRegistry.get_port(ServiceName.MCP_HOST)
+    )

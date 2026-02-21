@@ -10,23 +10,26 @@ import asyncio
 import json
 import os
 import sys
-import uuid
 from contextlib import asynccontextmanager
 from typing import Any
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from prometheus_client import make_asgi_app
 
 from shared.config import get_settings
 from shared.logging import get_logger, setup_logging, LogConfig, RequestLoggingMiddleware
 from shared.service_registry import ServiceName, ServiceRegistry
 from shared.vocab import load_vocab
 
+# Load settings
+settings = get_settings()
+
 # Initialize structured logging globally
 setup_logging(LogConfig(
-    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    level=settings.logging.level,
     service_name="orchestrator",
 ))
 
@@ -39,7 +42,7 @@ orchestrator_vocab = load_vocab("orchestrator")
 vocab_settings = orchestrator_vocab.get("settings", {})
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
     """Lifecycle manager for the FastAPI app."""
     logger.info("Starting Orchestrator service")
     logger.info("Service is in REDESIGN mode - Kernel logic removed.")
@@ -48,16 +51,19 @@ async def lifespan(app: FastAPI):
     logger.info("Orchestrator service stopped")
 
 
+# (Settings already loaded above)
+
 # Create FastAPI app
 app = FastAPI(
-    title="Project Orchestrator",
+    title=settings.app.name,
     description="Research orchestration service (Redesign in progress)",
-    version="0.5.0",
+    version=settings.app.version,
     lifespan=lifespan,
 )
 
 # Add middleware
 app.add_middleware(RequestLoggingMiddleware)
+app.mount("/metrics", make_asgi_app())
 
 
 # ============================================================================
@@ -68,8 +74,18 @@ app.add_middleware(RequestLoggingMiddleware)
 class ResearchRequest(BaseModel):
     """Research job request."""
     query: str = Field(..., min_length=1, description="Research query")
-    depth: int = Field(default=2, ge=1, le=5, description="Research depth")
-    max_sources: int = Field(default=10, ge=1, le=50, description="Max sources")
+    depth: int = Field(
+        default=settings.research.default_depth, 
+        ge=1, 
+        le=settings.research.max_depth, 
+        description="Research depth"
+    )
+    max_sources: int = Field(
+        default=settings.research.default_max_sources, 
+        ge=1, 
+        le=settings.research.max_sources, 
+        description="Max sources"
+    )
 
 
 class ResearchResponse(BaseModel):
@@ -127,7 +143,7 @@ async def call_tool(tool_name: str, arguments: dict[str, Any]):
     """Call a specific MCP tool via MCP Host service."""
     try:
         mcp_url = ServiceRegistry.get_url(ServiceName.MCP_HOST)
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=settings.timeouts.default) as client:
             resp = await client.post(
                 f"{mcp_url}/tools/execute",
                 json={"tool_name": tool_name, "arguments": arguments},
@@ -144,10 +160,17 @@ async def call_tool(tool_name: str, arguments: dict[str, Any]):
 
 
 @app.get("/research/stream")
-async def stream_research(query: str, depth: int = 2, max_sources: int = 10):
+async def stream_research(
+    query: str, 
+    depth: int | None = None, 
+    max_sources: int | None = None
+):
     """
     Stream research results (Redesign in progress).
     """
+    settings = get_settings()
+    depth = depth or settings.research.default_depth
+    max_sources = max_sources or settings.research.default_max_sources
     async def event_generator():
         yield f"data: {json.dumps({'event': 'error', 'message': 'Research engine is under redesign.'})}\n\n"
 
@@ -176,7 +199,7 @@ def main():
     settings = get_settings()
     uvicorn.run(
         "services.orchestrator.main:app",
-        host=settings.api_host,
+        host=settings.api.host,
         port=ServiceRegistry.get_port(ServiceName.ORCHESTRATOR),
         reload=False,
         loop="asyncio",

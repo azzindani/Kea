@@ -1,290 +1,51 @@
-# Application Settings
+# Kea Configuration
+# Values here override the defaults in shared/config.py
+
+# Application Identity
 app:
   name: "Project Research Engine"
   version: "0.4.0"
   environment: "${ENVIRONMENT:development}"
 
-# Logging Configuration
+# Logging
 logging:
   level: "${LOG_LEVEL:INFO}"
   format: "${LOG_FORMAT:json}"
   service_name: "research-engine"
 
-# LLM Configuration
+# LLM Selection
 llm:
   default_provider: "openrouter"
   default_model: "${OPENROUTER_MODEL:nvidia/nemotron-3-nano-30b-a3b:free}"
+  fallback_model: "${FALLBACK_MODEL:stepfun/step-3.5-flash:free}"
   temperature: 0.7
   max_tokens: 32768
-  enable_reasoning: true
 
-# Embedding Configuration (Priority: Local -> API Fallback)
-embedding:
-  use_local: true
-  model_name: "Qwen/Qwen3-Embedding-0.6B"
-  api_model: "qwen/qwen3-embedding-8b"
-  dimension: 1024
-  batch_size: 32
+# Microservice Registry
+# Controls how services discover each other
+services:
+  gateway: "http://localhost:8000"
+  orchestrator: "http://localhost:8001"
+  mcp_host: "http://localhost:8002"
+  rag_service: "http://localhost:8003"
+  vault: "http://localhost:8004"
+  swarm_manager: "http://localhost:8005"
+  chronos: "http://localhost:8006"
 
-# Reranker Configuration
-reranker:
-  model_name: "Qwen/Qwen3-Reranker-0.6B"
-  per_task_top_k: 32768
-  final_batch_top_k: 32768
-  max_length: 32768
+# Infrastructure
+database:
+  url: "${DATABASE_URL:postgresql://localhost/research_engine}"
 
-# MCP Servers Configuration
-mcp:
-  # Just-In-Time Spawning Config
-  jit:
-    enabled: true
-    uv_enabled: true
-    idle_timeout: 300  # 5 minutes
-    max_servers: 20
-    connect_timeout: 300
-  
-  servers:
-    - name: "scraper_server"
-      enabled: true
-      transport: "stdio"
-    - name: "python_server"
-      enabled: true
-      transport: "stdio"
-    - name: "search_server"
-      enabled: true
-      transport: "stdio"
-    - name: "academic_server"
-      enabled: true
-      transport: "stdio"
-    - name: "analytics_server"
-      enabled: true
-      transport: "stdio"
-    - name: "browser_agent_server"
-      enabled: true
-      transport: "stdio"
-    - name: "crawler_server"
-      enabled: true
-      transport: "stdio"
-    - name: "data_sources_server"
-      enabled: true
-      transport: "stdio"
-    - name: "document_server"
-      enabled: true
-      transport: "stdio"
-    - name: "ml_server"
-      enabled: true
-      transport: "stdio"
-    - name: "qualitative_server"
-      enabled: true
-      transport: "stdio"
-    - name: "regulatory_server"
-      enabled: true
-      transport: "stdio"
-    - name: "security_server"
-      enabled: true
-      transport: "stdio"
-    - name: "tool_discovery_server"
-      enabled: true
-      transport: "stdio"
-    - name: "visualization_server"
-      enabled: true
-      transport: "stdio"
-    - name: "vision_server"
-      enabled: true
-      transport: "stdio"
-    
-    # === Financial Data Servers ===
-    - name: "yfinance_server"
-      enabled: true
-      transport: "stdio"
-    - name: "yahooquery_server"
-      enabled: true
-      transport: "stdio"
-    - name: "ccxt_server"
-      enabled: true
-      transport: "stdio"
-    - name: "tradingview_server"
-      enabled: true
-      transport: "stdio"
-    
-    # === Technical Analysis Servers ===
-    - name: "pandas_ta_server"
-      enabled: true
-      transport: "stdio"
-    - name: "finta_server"
-      enabled: true
-      transport: "stdio"
-    - name: "mibian_server"
-      enabled: true
-      transport: "stdio"
-    
-    # === Market Data Servers ===
-    - name: "finviz_server"
-      enabled: true
-      transport: "stdio"
-    - name: "pdr_server"
-      enabled: true
-      transport: "stdio"
-    - name: "wbgapi_server"
-      enabled: true
-      transport: "stdio"
-    
-    # === SEC/EDGAR Servers ===
-    - name: "sec_edgar_server"
-      enabled: true
-      transport: "stdio"
-    - name: "python_edgar_server"
-      enabled: true
-      transport: "stdio"
-    - name: "pdfplumber_server"
-      enabled: true
-      transport: "stdio"
-    - name: "docx_server"
-      enabled: true
-      transport: "stdio"
-    
-    # === Specialized Servers ===
-    - name: "newspaper_server"
-      enabled: true
-      transport: "stdio"
-    - name: "web3_server"
-      enabled: true
-      transport: "stdio"
-    - name: "analysis_server"
-      enabled: true
-      transport: "stdio"
-    - name: "openpyxl_server"
-      enabled: true
-      transport: "stdio"
-    - name: "pandas_server"
-      enabled: true
-      transport: "stdio"
-    - name: "playwright_server"
-      enabled: true
-      transport: "stdio"
-    - name: "bs4_server"
-      enabled: true
-      transport: "stdio"
-    - name: "google_search_server"
-      enabled: true
-      transport: "stdio"
-    - name: "ddg_search_server"
-      enabled: true
-      transport: "stdio"
-    - name: "scipy_server"
-      enabled: true
-      transport: "stdio"
-    - name: "numpy_server"
-      enabled: true
-      transport: "stdio"
-    - name: "statsmodels_server"
-      enabled: true
-      transport: "stdio"
-    - name: "networkx_server"
-      enabled: true
-      transport: "stdio"
-    - name: "sklearn_server"
-      enabled: true
-      transport: "stdio"
-    - name: "xgboost_server"
-      enabled: true
-      transport: "stdio"
-    - name: "matplotlib_server"
-      enabled: true
-      transport: "stdio"
-    - name: "seaborn_server"
-      enabled: true
-      transport: "stdio"
-    - name: "plotly_server"
-      enabled: true
-      transport: "stdio"
-    - name: "filesystem_server"
-      enabled: true
-      transport: "stdio"
-    - name: "portfolio_server"
-      enabled: true
-      transport: "stdio"
-    - name: "quantstats_server"
-      enabled: true
-      transport: "stdio"
-    - name: "spacy_server"
-      enabled: true
-      transport: "stdio"
-    - name: "rapidfuzz_server"
-      enabled: true
-      transport: "stdio"
-    - name: "textblob_server"
-      enabled: true
-      transport: "stdio"
-    - name: "xmltodict_server"
-      enabled: true
-      transport: "stdio"
-    - name: "lxml_server"
-      enabled: true
-      transport: "stdio"
-    - name: "html5lib_server"
-      enabled: true
-      transport: "stdio"
-    - name: "hashlib_server"
-      enabled: true
-      transport: "stdio"
-    - name: "shutil_server"
-      enabled: true
-      transport: "stdio"
-    - name: "zipfile_server"
-      enabled: true
-      transport: "stdio"
-    - name: "ytdlp_server"
-      enabled: true
-      transport: "stdio"
-    - name: "ffmpeg_server"
-      enabled: true
-      transport: "stdio"
-    - name: "geopy_server"
-      enabled: true
-      transport: "stdio"
-    - name: "duckdb_server"
-      enabled: true
-      transport: "stdio"
+# Security
+auth:
+  jwt_secret: "${JWT_SECRET}"
 
-# Research Configuration
-research:
-  max_depth: 5
-  max_sources: 50
-  timeout_seconds: 300
-  parallel_tools: 10
+security:
+  cors_origins: ["${CORS_ORIGINS:*}"]
 
-# Rate Limiting
-rate_limits:
-  default:
-    requests_per_minute: 60
-    requests_per_hour: 1000
-  domains:
-    "*.gov.id":
-      requests_per_minute: 10
-      delay_seconds: 2
-
-# ============================================================================
-# Deep Audit Configs (Added during Refactoring)
-# ============================================================================
-
-# Model Identity Configuration
-models:
-  # The default model for most tasks
-  default_model: "${MODELS_DEFAULT_MODEL:nvidia/nemotron-3-nano-30b-a3b:free}"
-  app_name: "Project Research Engine"
-
-# Governance & Safety
-governance:
-  max_concurrent_cost: 100  # "Points" for rate limiting
-  max_ram_percent: 85.0     # Pause dispatch if RAM > 85%
-  max_cpu_percent: 90.0     # Pause dispatch if CPU > 90%
-  poll_interval: 1.0        # Supervisor check interval in seconds
-
-# Standardized Timeouts
-timeouts:
-  default: 30.0
-  llm_completion: 60.0
-  llm_streaming: 120.0
-  tool_execution: 300.0
-  long: 1200.0
+# Storage
+s3:
+  bucket: "${S3_BUCKET:research-artifacts}"
+  endpoint: "${S3_ENDPOINT}"
+  access_key: "${S3_ACCESS_KEY}"
+  secret_key: "${S3_SECRET_KEY}"

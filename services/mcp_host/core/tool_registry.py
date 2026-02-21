@@ -21,7 +21,11 @@ async def get_tool_registry() -> PostgresToolRegistry:
     global _registry_instance
     
     if _registry_instance is None:
-        if not os.getenv("DATABASE_URL"):
+        from shared.config import get_settings
+        settings = get_settings()
+        
+        if not settings.database.url:
+            logger.warning("DATABASE_URL not set in centralized settings. Tool Registry will be unavailable.")
             raise ValueError("DATABASE_URL is required for Tool Registry")
             
         try:

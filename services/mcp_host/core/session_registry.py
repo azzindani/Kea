@@ -318,15 +318,15 @@ class SessionRegistry:
             
             # Fallback for Windows Conda environment if not found in PATH
             if not uv_path and os.name == 'nt':
-                 user_home = os.path.expanduser("~")
-                 common_paths = [
-                     os.path.join(user_home, "miniconda3", "Scripts", "uv.exe"),
-                     os.path.join(user_home, "anaconda3", "Scripts", "uv.exe"),
-                 ]
-                 for potential_path in common_paths:
-                     if os.path.exists(potential_path):
-                         uv_path = potential_path
-                         break
+                user_home = os.path.expanduser("~")
+                common_paths = [
+                    os.path.join(user_home, "miniconda3", "Scripts", "uv.exe"),
+                    os.path.join(user_home, "anaconda3", "Scripts", "uv.exe"),
+                ]
+                for potential_path in common_paths:
+                    if os.path.exists(potential_path):
+                        uv_path = potential_path
+                        break
 
             # Check for explicit disable
             # Check config for UV settings
@@ -336,8 +336,8 @@ class SessionRegistry:
             if not jit_config.uv_enabled:
                 uv_path = None
             elif jit_config.uv_path:
-                 # Use explicit path if configured
-                 uv_path = jit_config.uv_path
+                # Use explicit path if configured
+                uv_path = jit_config.uv_path
             
             # Determine CWD and if we are isolated
             server_dir = config.script_path.parent
@@ -385,11 +385,11 @@ class SessionRegistry:
             
             # Create Transport
             transport = SubprocessTransport(process)
-            client = MCPClient(timeout=300.0)
+            client = MCPClient(timeout=settings.timeouts.tool_execution)
             
             # Connect with timeout to prevent indefinite hangs
             # FastMCP servers with dependencies may take time to start (UV install)
-            connect_timeout = getattr(jit_config, 'connect_timeout', 120)  # 120s default for dep install
+            connect_timeout = jit_config.connect_timeout
             try:
                 await asyncio.wait_for(client.connect(transport), timeout=connect_timeout)
             except asyncio.TimeoutError:

@@ -65,7 +65,6 @@ FUZZY_MATCH_LIMIT = 100_000
 ENTITY_EXTRACT_LIMIT = 100_000
 
 
-# ============================================================================
 # Service Limits
 # ============================================================================
 
@@ -76,11 +75,6 @@ FACT_STORE_LIMIT = 100_000
 # RAG Service
 RAG_SEARCH_LIMIT = 100_000
 EMBEDDING_BATCH_SIZE = 1_000
-
-# Orchestrator
-MAX_PARALLEL_TOOLS = 100
-MAX_ITERATIONS = 50
-MAX_SUB_QUERIES = 100
 
 
 # ============================================================================

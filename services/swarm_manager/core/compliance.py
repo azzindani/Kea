@@ -22,14 +22,8 @@ logger = get_logger(__name__)
 # Compliance Standards
 # ============================================================================
 
-class ComplianceStandard(Enum):
-    """Supported compliance standards."""
-    ISO_9001 = "iso_9001"       # Quality Management
-    ISO_27001 = "iso_27001"     # Information Security
-    ISO_22301 = "iso_22301"     # Business Continuity
-    SOC2 = "soc2"               # Service Organization Control
-    GDPR = "gdpr"               # General Data Protection
-    HIPAA = "hipaa"             # Health Insurance Portability
+# Standards are loaded from configs/vocab/compliance.yaml
+ComplianceStandard = str
 
 
 class CheckResult(Enum):
@@ -206,9 +200,7 @@ class ComplianceEngine:
     """
     
     def __init__(self):
-        self.rules: dict[ComplianceStandard, list[ComplianceRule]] = {
-            std: [] for std in ComplianceStandard
-        }
+        self.rules: dict[str, list[ComplianceRule]] = {}
         
         # Register default rules
         self._register_default_rules()
@@ -217,136 +209,143 @@ class ComplianceEngine:
     
     def _register_default_rules(self):
         """Register default compliance rules."""
+        from shared.vocab import load_vocab
+        
+        v_compliance = load_vocab("compliance")
+        v_standards = {s["id"]: s["name"] for s in v_compliance.get("standards", [])}
         
         # ============================================================
         # ISO 27001 - Information Security
         # ============================================================
         
-        security_rule = ComplianceRule(
-            "iso27001_data_security",
-            "Data Security Controls",
-            ComplianceStandard.ISO_27001,
-            "Ensure data is protected in transit and at rest",
-        )
-        
-        async def check_https(ctx: dict) -> CheckResult:
-            """Check URLs use HTTPS."""
-            url = ctx.get("url", "")
-            if url and url.startswith("http://"):
-                return CheckResult.FAIL
-            return CheckResult.PASS
-        
-        security_rule.add_check(
-            "27001_https", "HTTPS Required",
-            "External URLs must use HTTPS",
-            Severity.MAJOR, check_https,
-        )
-        
-        async def check_sensitive_data(ctx: dict) -> CheckResult:
-            """Check for sensitive data exposure."""
-            from shared.vocab import load_vocab
-            v_compliance = load_vocab("compliance")
-            sensitive_patterns = v_compliance.get("security", {}).get("sensitive_patterns", ["password", "secret", "api_key", "token"])
+        if "iso_27001" in v_standards:
+            security_rule = ComplianceRule(
+                "iso27001_data_security",
+                "Data Security Controls",
+                "iso_27001",
+                "Ensure data is protected in transit and at rest",
+            )
             
-            data = str(ctx)
-            for pattern in sensitive_patterns:
-                if pattern in data.lower():
-                    return CheckResult.WARN
-            return CheckResult.PASS
-        
-        security_rule.add_check(
-            "27001_sensitive", "Sensitive Data Check",
-            "Check for sensitive data in context",
-            Severity.MAJOR, check_sensitive_data,
-        )
-        
-        self.register_rule(security_rule)
+            async def check_https(ctx: dict) -> CheckResult:
+                """Check URLs use HTTPS."""
+                url = ctx.get("url", "")
+                if url and url.startswith("http://"):
+                    return CheckResult.FAIL
+                return CheckResult.PASS
+            
+            security_rule.add_check(
+                "27001_https", "HTTPS Required",
+                "External URLs must use HTTPS",
+                Severity.MAJOR, check_https,
+            )
+            
+            async def check_sensitive_data(ctx: dict) -> CheckResult:
+                """Check for sensitive data exposure."""
+                sensitive_patterns = v_compliance.get("security", {}).get("sensitive_patterns", ["password", "secret", "api_key", "token"])
+                
+                data = str(ctx)
+                for pattern in sensitive_patterns:
+                    if pattern in data.lower():
+                        return CheckResult.WARN
+                return CheckResult.PASS
+            
+            security_rule.add_check(
+                "27001_sensitive", "Sensitive Data Check",
+                "Check for sensitive data in context",
+                Severity.MAJOR, check_sensitive_data,
+            )
+            
+            self.register_rule(security_rule)
         
         # ============================================================
         # ISO 9001 - Quality Management
         # ============================================================
         
-        quality_rule = ComplianceRule(
-            "iso9001_quality",
-            "Quality Management",
-            ComplianceStandard.ISO_9001,
-            "Ensure quality standards are met",
-        )
-        
-        async def check_documentation(ctx: dict) -> CheckResult:
-            """Check operation is documented."""
-            if ctx.get("documented", True):
-                return CheckResult.PASS
-            return CheckResult.WARN
-        
-        quality_rule.add_check(
-            "9001_doc", "Documentation Required",
-            "Operations should be documented",
-            Severity.MINOR, check_documentation,
-        )
-        
-        async def check_traceability(ctx: dict) -> CheckResult:
-            """Check operation has trace ID."""
-            if ctx.get("trace_id") or ctx.get("session_id"):
-                return CheckResult.PASS
-            return CheckResult.WARN
-        
-        quality_rule.add_check(
-            "9001_trace", "Traceability",
-            "Operations should have trace ID",
-            Severity.MINOR, check_traceability,
-        )
-        
-        self.register_rule(quality_rule)
+        if "iso_9001" in v_standards:
+            quality_rule = ComplianceRule(
+                "iso9001_quality",
+                "Quality Management",
+                "iso_9001",
+                "Ensure quality standards are met",
+            )
+            
+            async def check_documentation(ctx: dict) -> CheckResult:
+                """Check operation is documented."""
+                if ctx.get("documented", True):
+                    return CheckResult.PASS
+                return CheckResult.WARN
+            
+            quality_rule.add_check(
+                "9001_doc", "Documentation Required",
+                "Operations should be documented",
+                Severity.MINOR, check_documentation,
+            )
+            
+            async def check_traceability(ctx: dict) -> CheckResult:
+                """Check operation has trace ID."""
+                if ctx.get("trace_id") or ctx.get("session_id"):
+                    return CheckResult.PASS
+                return CheckResult.WARN
+            
+            quality_rule.add_check(
+                "9001_trace", "Traceability",
+                "Operations should have trace ID",
+                Severity.MINOR, check_traceability,
+            )
+            
+            self.register_rule(quality_rule)
         
         # ============================================================
         # GDPR - Data Protection
         # ============================================================
         
-        gdpr_rule = ComplianceRule(
-            "gdpr_data_protection",
-            "GDPR Data Protection",
-            ComplianceStandard.GDPR,
-            "Ensure GDPR compliance for personal data",
-        )
-        
-        async def check_data_minimization(ctx: dict) -> CheckResult:
-            """Check data minimization principle."""
-            # Check if we're collecting more than needed
-            data_fields = ctx.get("collected_fields", [])
-            required_fields = ctx.get("required_fields", [])
+        if "gdpr" in v_standards:
+            gdpr_rule = ComplianceRule(
+                "gdpr_data_protection",
+                "GDPR Data Protection",
+                "gdpr",
+                "Ensure GDPR compliance for personal data",
+            )
             
-            if data_fields and required_fields:
-                excess = set(data_fields) - set(required_fields)
-                if excess:
-                    return CheckResult.WARN
-            return CheckResult.PASS
-        
-        gdpr_rule.add_check(
-            "gdpr_min", "Data Minimization",
-            "Only collect necessary data",
-            Severity.MAJOR, check_data_minimization,
-        )
-        
-        async def check_consent(ctx: dict) -> CheckResult:
-            """Check consent for data processing."""
-            if ctx.get("requires_consent", False):
-                if not ctx.get("consent_given", False):
-                    return CheckResult.FAIL
-            return CheckResult.PASS
-        
-        gdpr_rule.add_check(
-            "gdpr_consent", "Consent Check",
-            "Verify consent for data processing",
-            Severity.CRITICAL, check_consent,
-        )
-        
-        self.register_rule(gdpr_rule)
+            async def check_data_minimization(ctx: dict) -> CheckResult:
+                """Check data minimization principle."""
+                # Check if we're collecting more than needed
+                data_fields = ctx.get("collected_fields", [])
+                required_fields = ctx.get("required_fields", [])
+                
+                if data_fields and required_fields:
+                    excess = set(data_fields) - set(required_fields)
+                    if excess:
+                        return CheckResult.WARN
+                return CheckResult.PASS
+            
+            gdpr_rule.add_check(
+                "gdpr_min", "Data Minimization",
+                "Only collect necessary data",
+                Severity.MAJOR, check_data_minimization,
+            )
+            
+            async def check_consent(ctx: dict) -> CheckResult:
+                """Check consent for data processing."""
+                if ctx.get("requires_consent", False):
+                    if not ctx.get("consent_given", False):
+                        return CheckResult.FAIL
+                return CheckResult.PASS
+            
+            gdpr_rule.add_check(
+                "gdpr_consent", "Consent Check",
+                "Verify consent for data processing",
+                Severity.CRITICAL, check_consent,
+            )
+            
+            self.register_rule(gdpr_rule)
     
     def register_rule(self, rule: ComplianceRule):
         """Register a compliance rule."""
+        if rule.standard not in self.rules:
+            self.rules[rule.standard] = []
         self.rules[rule.standard].append(rule)
-        logger.debug(f"Registered rule: {rule.rule_id}")
+        logger.debug(f"Registered rule: {rule.rule_id} for {rule.standard}")
     
     async def check_operation(
         self,
@@ -366,7 +365,7 @@ class ComplianceEngine:
             ComplianceReport with results
         """
         if standards is None:
-            standards = list(ComplianceStandard)
+            standards = list(self.rules.keys())
         
         all_issues = []
         checks_passed = 0

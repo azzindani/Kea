@@ -1,6 +1,5 @@
-
 """
-Chronos — Scheduling Service (Port 8006).
+Chronos — Scheduling Service.
 
 Manages recurring and one-shot research jobs via cron expressions.
 Persists scheduled tasks in PostgreSQL and fires them by POSTing to
@@ -18,16 +17,15 @@ from typing import Any
 
 import httpx
 from fastapi import FastAPI, HTTPException
+from prometheus_client import make_asgi_app
 from pydantic import BaseModel, Field
 
 from shared.logging import get_logger, setup_logging, LogConfig, RequestLoggingMiddleware
 from shared.service_registry import ServiceName, ServiceRegistry
+from shared.config import get_settings
 
 # Initialize standardized logging
-setup_logging(LogConfig(
-    level=os.getenv("LOG_LEVEL", "INFO").upper(),
-    service_name="chronos",
-))
+# (Moved below settings loading)
 
 logger = get_logger(__name__)
 
@@ -38,11 +36,12 @@ logger = get_logger(__name__)
 
 class ScheduleRequest(BaseModel):
     """Create a new scheduled research job."""
+    _settings = get_settings()
 
     query: str = Field(..., description="Research query to run on schedule")
     cron_expr: str = Field(..., description="Cron expression e.g. '0 8 * * *' for 08:00 daily")
-    depth: int = Field(default=2, ge=1, le=5)
-    max_sources: int = Field(default=10, ge=1, le=50)
+    depth: int = Field(default=_settings.research.default_depth, ge=1, le=_settings.research.max_depth)
+    max_sources: int = Field(default=_settings.research.default_max_sources, ge=1, le=_settings.research.max_sources)
     enabled: bool = Field(default=True)
 
 
@@ -189,7 +188,7 @@ async def _fire_task(task: dict) -> None:
         "max_sources": task.get("max_sources", 10),
     }
     try:
-        async with httpx.AsyncClient(timeout=600.0) as client:
+        async with httpx.AsyncClient(timeout=settings.timeouts.long) as client:
             resp = await client.post(f"{orch_url}/research", json=payload)
             if resp.status_code == 200:
                 logger.info(
@@ -222,7 +221,7 @@ async def _scheduler_loop() -> None:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
     await _ensure_schema()
     loop_task = asyncio.create_task(_scheduler_loop())
     logger.info("Chronos scheduler started")
@@ -231,8 +230,22 @@ async def lifespan(app: FastAPI):
     logger.info("Chronos scheduler stopped")
 
 
-app = FastAPI(title="Chronos \u2014 Scheduling Service", lifespan=lifespan)
+# Load settings
+settings = get_settings()
+
+setup_logging(LogConfig(
+    level=settings.logging.level,
+    service_name="chronos",
+))
+
+app = FastAPI(
+    title=f"{settings.app.name} - Chronos",
+    description="Recurring and one-shot research job management",
+    version=settings.app.version,
+    lifespan=lifespan,
+)
 app.add_middleware(RequestLoggingMiddleware)
+app.mount("/metrics", make_asgi_app())
 
 
 # ---------------------------------------------------------------------------
@@ -302,5 +315,10 @@ async def delete_schedule(task_id: str) -> None:
 
 if __name__ == "__main__":
     import uvicorn
+    from shared.service_registry import ServiceRegistry, ServiceName
 
-    uvicorn.run(app, host="0.0.0.0", port=8006)
+    uvicorn.run(
+        app,
+        host=settings.api.host,
+        port=ServiceRegistry.get_port(ServiceName.CHRONOS)
+    )

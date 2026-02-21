@@ -2,18 +2,47 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
+rule_files:
+  - "/etc/prometheus/alerting/*.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
 scrape_configs:
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['api-gateway:8000']
+    metrics_path: '/metrics'
+
   - job_name: 'orchestrator'
     static_configs:
-      - targets: ['orchestrator:8000']
+      - targets: ['orchestrator:8001']
+    metrics_path: '/metrics'
+
+  - job_name: 'mcp-host'
+    static_configs:
+      - targets: ['mcp-host:8002']
     metrics_path: '/metrics'
 
   - job_name: 'rag-service'
     static_configs:
-      - targets: ['rag-service:8001']
+      - targets: ['rag-service:8003']
     metrics_path: '/metrics'
 
-  - job_name: 'api-gateway'
+  - job_name: 'vault'
     static_configs:
-      - targets: ['api-gateway:8000']
+      - targets: ['vault:8004']
+    metrics_path: '/metrics'
+
+  - job_name: 'swarm-manager'
+    static_configs:
+      - targets: ['swarm-manager:8005']
+    metrics_path: '/metrics'
+
+  - job_name: 'chronos'
+    static_configs:
+      - targets: ['chronos:8006']
     metrics_path: '/metrics'

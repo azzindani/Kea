@@ -145,11 +145,14 @@ async def login(request: LoginRequest, response: Response):
     )
     
     # Set session cookie
+    from shared.config import get_settings
+    settings = get_settings()
+    
     response.set_cookie(
         key="session_id",
         value=session.session_id,
         httponly=True,
-        max_age=86400,  # 24 hours
+        max_age=settings.auth.session_hours * 3600,
         samesite="lax",
     )
     

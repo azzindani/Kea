@@ -27,9 +27,13 @@ kubectl apply -f deployments.yaml
     - `orchestrator-service`: Exposes port 8001.
     - etc.
 - **`deployments.yaml`**: Defines the `Deployment` objects (replicas, containers, images).
-    - `project-gateway`: running `services.api_gateway.main:app`
-    - `project-orchestrator`: running `services.orchestrator.main:app`
-    - `project-worker`: running `workers.research_worker` (background scalers)
+    - `api-gateway`: Security and routing.
+    - `orchestrator`: LangGraph reasoning engine.
+    - `mcp-host`: JIT tool execution and server management.
+    - `rag-service`: Semantic context retrieval.
+    - `vault`: Research persistence.
+    - `swarm-manager`: Governance and compliance.
+    - `chronos`: Task scheduling.
 
 ## 🏗️ Architecture
 

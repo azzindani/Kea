@@ -8,12 +8,15 @@ metadata:
     app: project
 data:
   ENVIRONMENT: "production"
-  LOG_LEVEL: "WARNING"
+  LOG_LEVEL: "INFO"
   LOG_FORMAT: "json"
-  REDIS_URL: "redis://redis:6379"
-  QDRANT_URL: "http://qdrant:6333"
-  RAG_SERVICE_URL: "http://rag-service:8001"
-  ORCHESTRATOR_URL: "http://orchestrator:8000"
+  SERVICE_URL_RAG_SERVICE: "http://rag-service:8003"
+  SERVICE_URL_ORCHESTRATOR: "http://orchestrator:8001"
+  SERVICE_URL_MCP_HOST: "http://mcp-host:8002"
+  SERVICE_URL_VAULT: "http://vault:8004"
+  SERVICE_URL_SWARM_MANAGER: "http://swarm-manager:8005"
+  SERVICE_URL_CHRONOS: "http://chronos:8006"
+  SERVICE_URL_GATEWAY: "http://api-gateway:8000"
 
 ---
 # Create secrets with:

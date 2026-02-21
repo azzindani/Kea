@@ -1,5 +1,5 @@
 # 📚 Project 'Liquid Intelligence' Library Manifest
-> **Total Skills Available**: 202
+> **Total Intelligence Modules Available**: 215
 
 This document is an automatically generated index of all available 'Pure Context' skills.
 
@@ -33,6 +33,7 @@ This document is an automatically generated index of all available 'Pure Context
 - [Tech (13)](#tech)
 - [Trades (4)](#trades)
 - [Web_Research (13)](#web_research)
+- [Silicon Corporate Infrastructure](#infrastructure)
 
 ---
 ## Ai <a name='ai'></a>
@@ -363,3 +364,39 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Social Media Strategist](skills/web_research/social_media_manager.md)** | Expertise in viral loops, community management, and brand voice. | `social, marketing, community, viral` |
 | **[Technical Product Manager](skills/web_research/product_manager.md)** | Expertise in user stories, prioritization frameworks, and stakeholder management. | `product, management, agile, strategy` |
 | **[UX Researcher](skills/web_research/ux_researcher.md)** | Expertise in user interviews, usability testing, and persona creation. | `ux, user-research, design, testing` |
+
+---
+## Silicon Corporate Infrastructure <a name='infrastructure'></a>
+
+### 🎭 Hierarchy Personas
+| Persona Name | Description | Tags |
+|---|---|---|
+| **[CEO](personas/hierarchy/ceo.md)** | Ultimate visionary and goal-setter. Focused on mission alignment and value creation. | `hierarchy, executive, ceo` |
+| **[Principal Solutions Architect](personas/hierarchy/principal.md)** | System designer focused on multi-step orchestration and DAG integrity. | `hierarchy, architecture, principal` |
+| **[Senior Research Analyst](personas/hierarchy/senior.md)** | Independent optimizer focused on pattern recognition and triangulation. | `hierarchy, optimization, senior` |
+| **[Junior Research Associate](personas/hierarchy/intern.md)** | High-execution persona focused on reliable data collection and primary research. | `hierarchy, execution, intern` |
+
+### 🛠️ Functional Personas
+| Persona Name | Description | Tags |
+|---|---|---|
+| **[Head of Research](personas/functional/head_of_research.md)** | Guardian of information integrity and methodological purity. | `research, integrity, head` |
+| **[Chief Operations Officer (COO)](personas/functional/coo.md)** | Architect of efficiency, task throughput, and resource management. | `operations, efficiency, coo` |
+| **[Compliance & Governance Officer](personas/functional/compliance_officer.md)** | Enforcer of ethical boundaries and Swarm Governance Policy. | `compliance, legal, ethics` |
+| **[Product & Mission Manager](personas/functional/product_manager.md)** | Advocate for the human user and actionable strategic output. | `product, alignment, user` |
+| **[Chief Intelligence Officer (CIO)](personas/functional/cio.md)** | Librarian of the swarm; optimizes RAG and knowledge flow. | `knowledge, rag, cio` |
+
+### ⚖️ Governance Rules
+| Rule Name | Description | Tags |
+|---|---|---|
+| **[Corporate Mission](rules/corporate/mission_statement.md)** | The philosophical anchor and core values of the Silicon Swarm. | `mission, vision, values` |
+| **[Swarm Governance Policy](rules/corporate/governance_policy.md)** | Hard boundaries for evidence-based reasoning and tool safety. | `compliance, governance, swarm` |
+| **[Enterprise Risk Management](rules/corporate/risk_management.md)** | Framework for handling operational and reputational risks. | `risk, mitigation, safety` |
+| **[Ethics & Safety Guidelines](rules/general/ethics_and_safety.md)** | Global constraints on privacy, bias, and harm prevention. | `ethics, safety, privacy` |
+
+### 📋 Operating Procedures (SOPs)
+| Procedure Name | Description | Tags |
+|---|---|---|
+| **[Strategic Planning](procedures/general/strategic_planning.md)** | Framework for translating objectives into executable DAGs. | `strategy, planning, dag` |
+| **[Swarm Communication](procedures/general/communication_protocol.md)** | Standards for inter-agent handoffs and status reporting. | `communication, handoff, soap` |
+| **[Agent Onboarding](procedures/general/agent_onboarding.md)** | The initialization sequence for new agent instances. | `onboarding, initialization, boot` |
+| **[Research Methodology](procedures/general/research_methodology.md)** | Universal framework for structured, multi-source investigation. | `research, methodology, synthesis` |

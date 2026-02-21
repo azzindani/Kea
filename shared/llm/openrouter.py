@@ -6,7 +6,6 @@ Implements LLM provider for OpenRouter API with NVIDIA Nemotron support.
 
 from __future__ import annotations
 
-import os
 from typing import Any, AsyncIterator
 
 import httpx
@@ -50,16 +49,17 @@ class OpenRouterProvider(LLMProvider):
         self,
         api_key: str | None = None,
         base_url: str = OPENROUTER_BASE_URL,
-        app_name: str = "research-engine",
+        app_name: str | None = None,
         site_url: str = "",
     ) -> None:
-        self.api_key = api_key or os.getenv("OPENROUTER_API_KEY", "")
+        settings = get_settings()
+        self.api_key = api_key or settings.llm.openrouter_api_key
         self.base_url = base_url
-        self.app_name = app_name
+        self.app_name = app_name or settings.app.name
         self.site_url = site_url
         
         if not self.api_key:
-            raise ValueError("OpenRouter API key is required. Set OPENROUTER_API_KEY env var.")
+            raise ValueError("OpenRouter API key is required in settings.yaml or via Environment mapping.")
     
     def _get_headers(self) -> dict[str, str]:
         """Get request headers."""

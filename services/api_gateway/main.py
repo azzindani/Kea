@@ -39,24 +39,25 @@ logger = get_logger(__name__)
 
 def validate_config():
     """Validate required configuration at startup."""
-    env_config = get_environment_config()
+    settings = get_settings()
     
-    if env_config.is_production:
-        required = ["DATABASE_URL", "JWT_SECRET"]
-        missing = [k for k in required if not os.getenv(k)]
+    if settings.app.environment == "production":
+        # Check database
+        if not settings.database.url:
+            raise RuntimeError("Missing database.url in settings for production")
+            
+        # Check JWT Secret
+        if not settings.auth.jwt_secret:
+            raise RuntimeError("Missing auth.jwt_secret in settings for production")
         
-        if missing:
-            raise RuntimeError(f"Missing required env vars for production: {missing}")
-        
-        jwt_secret = os.getenv("JWT_SECRET", "")
-        if len(jwt_secret) < 32:
-            raise RuntimeError("JWT_SECRET must be at least 32 characters")
+        if len(settings.auth.jwt_secret) < 32:
+            raise RuntimeError("JWT_SECRET must be at least 32 characters for production security")
     
-    logger.info(f"Configuration validated for {env_config.mode.value}")
+    logger.info(f"Configuration validated for {settings.app.environment}")
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
     """Application lifespan manager."""
     settings = get_settings()
     env_config = get_environment_config()
@@ -72,7 +73,7 @@ async def lifespan(app: FastAPI):
     ))
     
     # Set system info metrics
-    set_system_info(version="0.3.0", environment=env_config.mode.value)
+    set_system_info(version=settings.app.version, environment=env_config.mode.value)
     
     # Initialize database
     from shared.database import get_database_pool
@@ -86,7 +87,7 @@ async def lifespan(app: FastAPI):
     await get_api_key_manager()
     await get_conversation_manager()
     
-    logger.info(f"API Gateway v0.4.0 started [{env_config.mode.value}]")
+    logger.info(f"API Gateway {settings.app.version} started [{env_config.mode.value}]")
     
     yield
     
@@ -97,11 +98,15 @@ async def lifespan(app: FastAPI):
     logger.info("API Gateway stopped")
 
 
+# Load settings
+settings = get_settings()
+
+
 # Create FastAPI app
 app = FastAPI(
-    title="Project Research Engine API",
+    title=settings.app.name,
     description="API Gateway for the Project Distributed Autonomous Research Engine",
-    version="0.3.0",
+    version=settings.app.version,
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -206,10 +211,12 @@ app.include_router(llm.router, prefix="/api/v1/llm", tags=["LLM"])
 @app.get("/")
 async def root():
     """API root."""
+    from shared.config import get_settings
+    settings = get_settings()
     env_config = get_environment_config()
     return {
-        "name": "Project Research Engine",
-        "version": "0.3.0",
+        "name": settings.app.name,
+        "version": settings.app.version,
         "environment": env_config.mode.value,
         "docs": "/docs",
     }
@@ -229,7 +236,7 @@ async def full_health_check():
     """
     Comprehensive health check.
     
-    Checks: database, redis, qdrant, memory.
+    Checks: database, Vault, RAG Service.
     """
     from shared.database.health import get_health_checker
     
@@ -253,14 +260,14 @@ def main():
     import uvicorn
     
     settings = get_settings()
-    env_config = get_environment_config()
     
+    from shared.service_registry import ServiceRegistry, ServiceName
     uvicorn.run(
         "services.api_gateway.main:app",
-        host=settings.api_host,
-        port=settings.api_port,
-        reload=env_config.is_development,
-        workers=1 if env_config.is_development else 4,
+        host=settings.api.host,
+        port=ServiceRegistry.get_port(ServiceName.GATEWAY),
+        reload=settings.app.environment == "development",
+        workers=settings.api.workers_dev if settings.app.environment == "development" else settings.api.workers_prod,
     )
 
 

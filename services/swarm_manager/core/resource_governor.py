@@ -37,9 +37,13 @@ class ResourceGovernor:
     
     def __init__(self):
         # Limits
-        self.MAX_CPU = float(os.getenv("MAX_CPU_PERCENT", "80.0"))
-        self.MAX_RAM = float(os.getenv("MAX_RAM_PERCENT", "80.0"))
-        self.MAX_AGENTS = int(os.getenv("MAX_CONCURRENT_AGENTS", "50"))
+        from shared.config import get_settings
+        settings = get_settings()
+        gov = settings.governance
+        
+        self.MAX_CPU = gov.max_cpu_percent
+        self.MAX_RAM = gov.max_ram_percent
+        self.MAX_AGENTS = gov.max_agents
         
         # State
         self._last_state: SystemState | None = None

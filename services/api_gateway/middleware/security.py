@@ -197,19 +197,11 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
 # CORS configuration for production
 def get_cors_origins() -> list[str]:
     """Get allowed CORS origins based on environment."""
-    import os
+    from shared.config import get_settings
+    settings = get_settings()
     
-    env_config = get_environment_config()
-    
-    if env_config.is_development:
-        return ["*"]  # Allow all in dev
-    
-    # Production: whitelist only
-    origins = os.getenv("CORS_ORIGINS", "").split(",")
-    origins = [o.strip() for o in origins if o.strip()]
-    
-    if not origins:
-        logger.warning("No CORS_ORIGINS configured, defaulting to none")
-        return []
-    
-    return origins
+    # Development: Allow all (unless specific origins provided)
+    if settings.app.environment == "development" and settings.security.cors_origins == ["*"]:
+        return ["*"]
+        
+    return settings.security.cors_origins

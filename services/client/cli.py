@@ -59,12 +59,12 @@ def get_base_url(env: str, custom_url: str = None) -> str:
     if custom_url:
         return custom_url
         
-    urls = {
-        "local": "http://localhost:8000",
-        "dev": "http://localhost:8000",  # Update when dev env exists
-        "prod": "https://api.example.com" # Update when prod env exists
-    }
-    return urls.get(env, "http://localhost:8000")
+    from shared.service_registry import ServiceRegistry, ServiceName
+    
+    if env == "prod":
+        return "https://api.example.com" # Update when prod env exists
+        
+    return ServiceRegistry.get_url(ServiceName.GATEWAY)
 
 async def main():
     args = parse_args()

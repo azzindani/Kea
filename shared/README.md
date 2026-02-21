@@ -44,8 +44,6 @@ graph TD
 | **Hardware** | Real-time system profiling and adaptive scaling. | `hardware/` |
 | **LLM Interface** | Standardized multi-provider LLM connector. | `llm/` |
 | **MCP** | Model Context Protocol implementation and utilities. | `mcp/` |
-| **Messaging** | Intra-service Message Bus (Upward/Downward/Lateral). | `messaging.py` |
-| **Dispatcher** | Persistent PostgreSQL-backed task queue. | `dispatcher.py` |
 | **Database** | Asynchronous PostgreSQL connection pooling (`asyncpg`). | `database/` |
 | **Logging** | Structured JSON logging with trace correlation. | `logging/` |
 | **Tenants** | Multi-tenancy isolation and compliance context. | `tenants/` |

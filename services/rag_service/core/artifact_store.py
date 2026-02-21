@@ -233,10 +233,12 @@ class S3ArtifactStore(ArtifactStore):
         access_key: str | None = None,
         secret_key: str | None = None,
     ) -> None:
-        self.bucket = bucket or os.getenv("S3_BUCKET", "research-artifacts")
-        self.endpoint = endpoint or os.getenv("S3_ENDPOINT")
-        self.access_key = access_key or os.getenv("S3_ACCESS_KEY")
-        self.secret_key = secret_key or os.getenv("S3_SECRET_KEY")
+        from shared.config import get_settings
+        settings = get_settings()
+        self.bucket = bucket or settings.s3.bucket
+        self.endpoint = endpoint or settings.s3.endpoint
+        self.access_key = access_key or settings.s3.access_key
+        self.secret_key = secret_key or settings.s3.secret_key
         self._client = None
     
     def _get_client(self):
@@ -376,15 +378,22 @@ class S3ArtifactStore(ArtifactStore):
 # Factory
 # ============================================================================
 
-def create_artifact_store(use_local: bool = True) -> ArtifactStore:
+def create_artifact_store(use_local: bool | None = None) -> ArtifactStore:
     """
     Create artifact store based on configuration.
     
     Args:
         use_local: Use local storage instead of S3
     """
+    from shared.config import get_settings
+    settings = get_settings()
+    
+    if use_local is None:
+        # Default to local if S3 not configured or explicitly disabled
+        use_local = not bool(settings.s3.bucket and settings.s3.access_key)
+        
     # 1. Create Blob Layer (Physical Storage)
-    if use_local or not os.getenv("S3_BUCKET"):
+    if use_local:
         logger.info("Using local artifact blob store")
         blob_store = LocalArtifactStore()
     else:
@@ -392,7 +401,7 @@ def create_artifact_store(use_local: bool = True) -> ArtifactStore:
         blob_store = S3ArtifactStore()
 
     # 2. Add Metadata Layer (Postgres Index)
-    if os.getenv("DATABASE_URL"):
+    if settings.database.url or os.getenv("DATABASE_URL"):
         try:
             from services.rag_service.core.postgres_artifacts import PostgresArtifactStore
             logger.info("Using Postgres artifact metadata index")

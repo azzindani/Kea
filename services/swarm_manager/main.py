@@ -1,5 +1,5 @@
 """
-Swarm Manager Service — Governance, Compliance & Resource Gating (Port 8005).
+Swarm Manager Service — Governance, Compliance & Resource Gating.
 
 Routes:
   GET  /health
@@ -22,6 +22,7 @@ from typing import Any
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
+from prometheus_client import make_asgi_app
 from pydantic import BaseModel
 
 from services.swarm_manager.core.compliance import ComplianceStandard, get_compliance_engine
@@ -39,8 +40,18 @@ setup_logging(LogConfig(
 
 logger = get_logger(__name__)
 
-app = FastAPI(title="Swarm Manager")
+from shared.config import get_settings, Settings
+
+# Load settings
+settings: Settings = get_settings()
+
+app = FastAPI(
+    title=f"{settings.app.name} - Swarm Manager",
+    description="Governance, Compliance & Resource Gating Service",
+    version=settings.app.version,
+)
 app.add_middleware(RequestLoggingMiddleware)
+app.mount("/metrics", make_asgi_app())
 
 
 @app.get("/health")
@@ -63,22 +74,12 @@ class ComplianceCheckRequest(BaseModel):
 async def check_compliance(request: ComplianceCheckRequest) -> dict:
     """Check operation against compliance standards."""
     engine = get_compliance_engine()
-    standards = None
-    if request.standards:
-        standards = []
-        for s in request.standards:
-            try:
-                standards.append(ComplianceStandard(s))
-            except ValueError:
-                try:
-                    standards.append(ComplianceStandard(s.lower()))
-                except ValueError:
-                    continue
-
+    
+    # Standards are now dynamic strings, no Enum validation needed here
     report = await engine.check_operation(
         operation=request.operation,
         context=request.context,
-        standards=standards,
+        standards=request.standards,
     )
     return {
         "passed": report.passed,
@@ -236,4 +237,9 @@ async def resource_status() -> dict:
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8005)
+    from shared.service_registry import ServiceRegistry, ServiceName
+    uvicorn.run(
+        app, 
+        host="0.0.0.0", 
+        port=ServiceRegistry.get_port(ServiceName.SWARM_MANAGER)
+    )

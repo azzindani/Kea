@@ -57,7 +57,7 @@ async def system_health():
 
     return SystemHealth(
         status="healthy",
-        version="0.1.0",
+        version=settings.app.version,
         environment=settings.environment.value,
         uptime_seconds=uptime,
     )
@@ -72,7 +72,7 @@ async def system_capabilities():
         mcp_servers=[s.name for s in settings.mcp.servers if s.enabled],
         research_paths=["deep_research"],
         llm_providers=["openrouter"],
-        max_parallel_tools=settings.research.parallel_tools,
+        max_parallel_tools=settings.mcp.max_concurrent_tools,
     )
 
 
@@ -87,11 +87,6 @@ async def get_config():
             "provider": settings.llm.default_provider,
             "model": settings.llm.default_model,
             "temperature": settings.llm.temperature,
-        },
-        "research": {
-            "max_depth": settings.research.max_depth,
-            "max_sources": settings.research.max_sources,
-            "parallel_tools": settings.research.parallel_tools,
         },
         "logging": {
             "level": settings.logging.level,
@@ -108,12 +103,12 @@ async def metrics_summary() -> dict:
 
         pool = await get_database_pool()
         total_jobs = await pool.fetchval("SELECT COUNT(*) FROM research_jobs") or 0
-        total_tool_calls = 0  # Re-implement once new kernel metrics are available
+        total_tool_calls = 0  # To be implemented with new telemetry standard
         avg_duration = await pool.fetchval(
             """
-            SELECT AVG(EXTRACT(EPOCH FROM (completed_at - created_at)))
+            SELECT AVG(EXTRACT(EPOCH FROM (updated_at - created_at)))
             FROM research_jobs
-            WHERE status = 'completed' AND completed_at IS NOT NULL
+            WHERE status = 'completed' AND updated_at IS NOT NULL
             """
         )
         return {

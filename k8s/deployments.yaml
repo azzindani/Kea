@@ -27,7 +27,10 @@ spec:
             - containerPort: 8000
           env:
             - name: ENVIRONMENT
-              value: "production"
+              valueFrom:
+                configMapKeyRef:
+                  name: project-config
+                  key: ENVIRONMENT
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
@@ -38,10 +41,16 @@ spec:
                 secretKeyRef:
                   name: project-secrets
                   key: jwt-secret
-            - name: ORCHESTRATOR_URL
-              value: "http://orchestrator:8001"
-            - name: RAG_SERVICE_URL
-              value: "http://rag-service:8003"
+            - name: SERVICE_URL_ORCHESTRATOR
+              valueFrom:
+                configMapKeyRef:
+                  name: project-config
+                  key: SERVICE_URL_ORCHESTRATOR
+            - name: SERVICE_URL_RAG_SERVICE
+              valueFrom:
+                configMapKeyRef:
+                  name: project-config
+                  key: SERVICE_URL_RAG_SERVICE
           resources:
             requests:
               memory: "256Mi"
@@ -83,7 +92,10 @@ spec:
             - containerPort: 8001
           env:
             - name: ENVIRONMENT
-              value: "production"
+              valueFrom:
+                configMapKeyRef:
+                  name: project-config
+                  key: ENVIRONMENT
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
@@ -94,6 +106,31 @@ spec:
                 secretKeyRef:
                   name: project-secrets
                   key: openrouter-api-key
+            - name: SERVICE_URL_MCP_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: project-config
+                  key: SERVICE_URL_MCP_HOST
+            - name: SERVICE_URL_RAG_SERVICE
+              valueFrom:
+                configMapKeyRef:
+                  name: project-config
+                  key: SERVICE_URL_RAG_SERVICE
+            - name: SERVICE_URL_VAULT
+              valueFrom:
+                configMapKeyRef:
+                  name: project-config
+                  key: SERVICE_URL_VAULT
+            - name: SERVICE_URL_SWARM_MANAGER
+              valueFrom:
+                configMapKeyRef:
+                  name: project-config
+                  key: SERVICE_URL_SWARM_MANAGER
+            - name: SERVICE_URL_CHRONOS
+              valueFrom:
+                configMapKeyRef:
+                  name: project-config
+                  key: SERVICE_URL_CHRONOS
           resources:
             requests:
               memory: "512Mi"
@@ -128,6 +165,11 @@ spec:
           ports:
             - containerPort: 8002
           env:
+            - name: ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: project-config
+                  key: ENVIRONMENT
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
@@ -136,15 +178,10 @@ spec:
           volumeMounts:
             - name: artifacts
               mountPath: /app/artifacts
-            - name: mcp-servers
-              mountPath: /app/mcp_servers
       volumes:
         - name: artifacts
           persistentVolumeClaim:
             claimName: project-artifacts-pvc
-        - name: mcp-servers
-          configMap:
-            name: project-mcp-servers
 
 ---
 apiVersion: apps/v1
@@ -172,6 +209,11 @@ spec:
           ports:
             - containerPort: 8003
           env:
+            - name: ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: project-config
+                  key: ENVIRONMENT
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
@@ -182,6 +224,18 @@ spec:
                 secretKeyRef:
                   name: project-secrets
                   key: openrouter-api-key
+            - name: SERVICE_URL_VAULT
+              valueFrom:
+                configMapKeyRef:
+                  name: project-config
+                  key: SERVICE_URL_VAULT
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "200m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
 
 ---
 apiVersion: apps/v1
@@ -209,11 +263,23 @@ spec:
           ports:
             - containerPort: 8004
           env:
+            - name: ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: project-config
+                  key: ENVIRONMENT
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
                   name: project-secrets
                   key: database-url
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
 
 ---
 apiVersion: apps/v1
@@ -241,11 +307,28 @@ spec:
           ports:
             - containerPort: 8005
           env:
+            - name: ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: project-config
+                  key: ENVIRONMENT
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
                   name: project-secrets
                   key: database-url
+            - name: SERVICE_URL_ORCHESTRATOR
+              valueFrom:
+                configMapKeyRef:
+                  name: project-config
+                  key: SERVICE_URL_ORCHESTRATOR
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
 
 ---
 apiVersion: apps/v1
@@ -273,44 +356,25 @@ spec:
           ports:
             - containerPort: 8006
           env:
+            - name: ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: project-config
+                  key: ENVIRONMENT
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
                   name: project-secrets
                   key: database-url
-
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: research-worker
-  labels:
-    app: project
-    component: worker
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: project
-      component: worker
-  template:
-    metadata:
-      labels:
-        app: project
-        component: worker
-    spec:
-      containers:
-        - name: worker
-          image: project/worker:latest
-          command: ["python", "-m", "workers.research_worker"]
-          env:
-            - name: DATABASE_URL
+            - name: SERVICE_URL_ORCHESTRATOR
               valueFrom:
-                secretKeyRef:
-                  name: project-secrets
-                  key: database-url
-            - name: OPENROUTER_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: project-secrets
-                  key: openrouter-api-key
+                configMapKeyRef:
+                  name: project-config
+                  key: SERVICE_URL_ORCHESTRATOR
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"

@@ -195,9 +195,12 @@ async def _call_openrouter(
     import httpx
 
     last_exc: Exception | None = None
+    from shared.config import get_settings
+
+    settings = get_settings()
     for attempt in range(3):
         try:
-            async with httpx.AsyncClient(timeout=60) as client:
+            async with httpx.AsyncClient(timeout=settings.timeouts.llm_completion) as client:
                 resp = await client.post(
                     "https://openrouter.ai/api/v1/chat/completions",
                     headers={"Authorization": f"Bearer {api_key}"},
@@ -231,7 +234,9 @@ async def generate(request: GenerateRequest) -> dict:
     if not api_key:
         raise HTTPException(status_code=500, detail="OPENROUTER_API_KEY not set")
 
-    fallback_model = os.getenv("FALLBACK_MODEL", "deepseek/deepseek-r1-0528:free")
+    from shared.config import get_settings
+    settings = get_settings()
+    fallback_model = settings.llm.fallback_model
     input_tokens = _count_tokens_approx(request.messages)
 
     for model in [request.model, fallback_model]:

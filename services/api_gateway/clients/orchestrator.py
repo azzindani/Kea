@@ -13,7 +13,10 @@ import asyncio
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from shared.config import Settings
 
 import httpx
 
@@ -40,6 +43,12 @@ class CircuitBreaker:
     state: CircuitState = CircuitState.CLOSED
     failure_count: int = 0
     last_failure: float = 0.0
+    
+    def __post_init__(self):
+        from shared.config import get_settings
+        settings = get_settings()
+        self.failure_threshold = settings.circuit_breaker.failure_threshold
+        self.reset_timeout = settings.circuit_breaker.reset_timeout
     
     def record_success(self):
         self.failure_count = 0
@@ -75,18 +84,23 @@ class OrchestratorClient:
     """
     
     def __init__(self, base_url: str | None = None) -> None:
-        settings = get_settings()
-        env_config = get_environment_config()
+        from shared.service_registry import ServiceRegistry, ServiceName
         
-        self.base_url = base_url or f"http://localhost:{settings.api_port}"
+        self.base_url = base_url or ServiceRegistry.get_url(ServiceName.ORCHESTRATOR)
+        
+        settings = get_settings()
         self.timeout = httpx.Timeout(
-            env_config.request_timeout_seconds,
-            connect=10.0,
+            settings.timeouts.default,
+            connect=settings.timeouts.auth_token,
         )
-        self.max_retries = env_config.max_retries
-        self.retry_delay = env_config.retry_delay_seconds
+        # Using long timeout for research jobs if needed, but default for health/tools
+        self.research_timeout = settings.timeouts.long
+        
+        self.max_retries = settings.mcp.max_retries
+        self.retry_delay = settings.mcp.retry_delay
         
         self._circuit = CircuitBreaker()
+        self.settings = settings
         self._client: httpx.AsyncClient | None = None
     
     async def _get_client(self) -> httpx.AsyncClient:
@@ -95,7 +109,7 @@ class OrchestratorClient:
             self._client = httpx.AsyncClient(
                 base_url=self.base_url,
                 timeout=self.timeout,
-                limits=httpx.Limits(max_connections=20),
+                limits=httpx.Limits(max_connections=self.settings.api.max_connections),
             )
         return self._client
     
@@ -155,10 +169,13 @@ class OrchestratorClient:
     async def start_research(
         self,
         query: str,
-        depth: int = 2,
-        max_sources: int = 10,
+        depth: int | None = None,
+        max_sources: int | None = None,
     ) -> dict[str, Any]:
-        """Start a synchronous research job."""
+        settings = get_settings()
+        depth = depth or settings.research.default_depth
+        max_sources = max_sources or settings.research.default_max_sources
+        
         response = await self._request(
             "POST",
             "/research",
@@ -169,9 +186,12 @@ class OrchestratorClient:
     async def stream_research(
         self,
         query: str,
-        depth: int = 2,
+        depth: int | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         """Stream research results via SSE."""
+        settings = get_settings()
+        depth = depth or settings.research.default_depth
+        
         client = await self._get_client()
         
         async with client.stream(
