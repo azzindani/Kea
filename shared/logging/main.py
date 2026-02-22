@@ -177,7 +177,7 @@ class ConsoleRenderer:
             if key not in ("level", "timestamp", "logger", "exception", "io", "env", "version"):
                 flags.append(f"[log.key]{key}[/]=[log.value]{value}[/]")
         
-        flag_str = f" [dim]→[/] {' '.join(flags)}" if flags else ""
+        flag_str = f" [bold blue]→[/] {' '.join(flags)}" if flags else ""
         
         io_hint = ""
         if "io" in event_dict:
@@ -188,9 +188,9 @@ class ConsoleRenderer:
             "debug": "cyan", "info": "bright_blue", "success": "bright_green", "notice": "bright_cyan italic",
             "warning": "bright_yellow", "error": "bright_red", "critical": "bright_magenta bold",
             "alert": "white on bright_red bold", "emergency": "white on bright_red bold blink",
-        }.get(level, "white")
+        }.get(level, "bright_blue")
         
-        return f"[log.timestamp]{timestamp}[/] [bold {level_style}]{symbol} {level.upper():<8}[/] [log.logger]{logger_name:<12}[/]{io_hint} [white]{message}[/]{flag_str}"
+        return f"[log.timestamp]{timestamp}[/] [bold {level_style}]{symbol} {level.upper():<8}[/] [log.logger]{logger_name:<12}[/]{io_hint} {message}{flag_str}"
 
 def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optional[str] = None):
     """Standardized logging setup for all codebases."""
