@@ -14,7 +14,7 @@ import pytest
 import httpx
 
 
-API_URL = "http://localhost:8080"
+API_URL = "http://localhost:8000"
 
 
 class TestMCPServers:

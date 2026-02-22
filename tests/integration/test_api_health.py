@@ -11,9 +11,9 @@ import httpx
 
 
 # Base URLs for services
-API_GATEWAY_URL = "http://localhost:8080"
-ORCHESTRATOR_URL = "http://localhost:8000"
-RAG_SERVICE_URL = "http://localhost:8001"
+API_GATEWAY_URL = "http://localhost:8000"
+ORCHESTRATOR_URL = "http://localhost:8001"
+RAG_SERVICE_URL = "http://localhost:8003"
 
 
 async def check_service_available(url: str) -> bool:
