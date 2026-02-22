@@ -12,6 +12,7 @@ import asyncio
 import os
 
 from shared.logging.main import get_logger
+from shared.config import get_settings
 from shared.database.connection import get_database_pool
 from shared.users.models import User, UserRole, APIKey, USERS_TABLE_SQL, API_KEYS_TABLE_SQL
 
@@ -63,7 +64,7 @@ class UserManager:
         tenant_id: str | None = None,
     ) -> User:
         """Create new user."""
-        from shared.config import get_settings
+
         tenant_id = tenant_id or get_settings().app.default_tenant
         user = User.create(email, name, password, role, tenant_id)
         
@@ -147,7 +148,7 @@ class UserManager:
         offset: int = 0,
     ) -> list[User]:
         """List users."""
-        from shared.config import get_settings
+
         settings = get_settings()
         limit = limit or settings.users.default_list_limit
         users = []
@@ -221,7 +222,7 @@ class APIKeyManager:
         expires_at: datetime = None,
     ) -> tuple[APIKey, str]:
         """Create new API key, returns (key, raw_key)."""
-        from shared.config import get_settings
+
         settings = get_settings()
         rate_limit = rate_limit or settings.auth.api_key_default_rate_limit
         
@@ -242,7 +243,7 @@ class APIKeyManager:
     
     async def validate_key(self, raw_key: str) -> APIKey | None:
         """Validate API key and return if valid."""
-        from shared.config import get_settings
+
         if not raw_key or not raw_key.startswith(get_settings().auth.api_key_prefix):
             return None
         
@@ -296,7 +297,7 @@ class APIKeyManager:
     
     def _row_to_key(self, row: dict) -> APIKey:
         """Convert row to APIKey."""
-        from shared.config import get_settings
+
         settings = get_settings()
         scopes = row.get("scopes", settings.auth.default_scopes)
         if isinstance(scopes, str):

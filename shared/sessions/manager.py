@@ -14,6 +14,7 @@ from typing import Any
 from uuid import uuid4
 
 from shared.logging.main import get_logger
+from shared.config import get_settings
 
 
 logger = get_logger(__name__)
@@ -32,7 +33,7 @@ class Session:
     
     def __post_init__(self):
         """Initialize expiration from settings."""
-        from shared.config import get_settings
+
         settings = get_settings()
         self.expires_at = self.created_at + timedelta(hours=settings.auth.session_hours)
     
@@ -71,7 +72,7 @@ class SessionManager:
     """
     
     def __init__(self, session_hours: int | None = None):
-        from shared.config import get_settings
+
         settings = get_settings()
         self.session_hours = session_hours or settings.auth.session_hours
         self._sessions: dict[str, Session] = {}
@@ -166,7 +167,7 @@ class JWTManager:
         access_token_minutes: int | None = None,
         refresh_token_days: int | None = None,
     ):
-        from shared.config import get_settings
+
         settings = get_settings()
         
         self.secret_key = secret_key or settings.auth.jwt_secret or secrets.token_hex(32)

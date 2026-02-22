@@ -14,6 +14,8 @@ from datetime import datetime
 from enum import Enum
 from uuid import uuid4
 
+from shared.config import get_settings
+
 
 class UserRole(Enum):
     """User roles for access control."""
@@ -61,7 +63,7 @@ class User:
         tenant_id: str | None = None,
     ) -> User:
         """Create new user with hashed password."""
-        from shared.config import get_settings
+
         settings = get_settings()
         tenant_id = tenant_id or settings.app.default_tenant
         
@@ -79,7 +81,7 @@ class User:
     @classmethod
     def anonymous(cls) -> User:
         """Create anonymous user for backward compatibility."""
-        from shared.config import get_settings
+
         settings = get_settings()
         return cls(
             user_id=settings.users.anonymous_user_id,
@@ -198,11 +200,11 @@ class APIKey:
         Returns:
             (APIKey, raw_key) - raw_key is only available at creation
         """
-        from shared.config import get_settings
+
         settings = get_settings()
         raw_key = f"{settings.auth.api_key_prefix}{secrets.token_urlsafe(32)}"
         key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
-        settings = get_settings()
+
         rate_limit = rate_limit or settings.auth.api_key_default_rate_limit
 
         api_key = cls(
@@ -221,7 +223,7 @@ class APIKey:
     @classmethod
     def verify(cls, raw_key: str, stored_hash: str) -> bool:
         """Verify raw key against stored hash."""
-        from shared.config import get_settings
+
         if not raw_key.startswith(get_settings().auth.api_key_prefix):
             return False
         check_hash = hashlib.sha256(raw_key.encode()).hexdigest()
