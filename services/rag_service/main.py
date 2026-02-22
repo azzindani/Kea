@@ -35,7 +35,7 @@ knowledge_store: KnowledgeStore | None = None
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     """Application lifespan manager."""
-    global fact_store, artifact_store, dataset_loader, knowledge_store
+    global insight_store, artifact_store, dataset_loader, knowledge_store
 
     settings = get_settings()
 
@@ -281,6 +281,7 @@ async def _ingest_job(request: IngestRequest):
         return
 
     try:
+        from shared.config import get_settings
         logger.info(f"Starting ingestion: {request.dataset_name}")
         facts_buffer = []
         count = 0
@@ -457,6 +458,7 @@ async def _sync_knowledge_job(
         from pathlib import Path
 
         from knowledge.index_knowledge import scan_knowledge_files
+        from shared.config import get_settings
         
         settings = get_settings()
         root_dir = Path(__file__).resolve().parents[2]
