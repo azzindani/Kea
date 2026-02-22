@@ -17,7 +17,7 @@ import asyncpg
 from pgvector.asyncpg import register_vector
 
 from shared.database.connection import get_database_pool
-
+from shared.config import get_settings
 from shared.embedding.qwen3_embedding import create_embedding_provider
 from shared.logging.main import get_logger
 
@@ -36,7 +36,6 @@ class PostgresKnowledgeRegistry:
         Args:
             table_name: The name of the PostgreSQL table to use for knowledge storage (defaults to config).
         """
-        from shared.config import get_settings
         settings = get_settings()
         self.table_name = table_name or settings.knowledge.registry_table
         self.embedder = create_embedding_provider(use_local=settings.embedding.use_local)
@@ -60,7 +59,6 @@ class PostgresKnowledgeRegistry:
 
             self._pool = await get_database_pool()
 
-            from shared.config import get_settings
             settings = get_settings()
             async with self._pool.acquire() as conn:
                 await conn.execute(f"SELECT pg_advisory_lock({settings.knowledge.advisory_lock_id})")
@@ -203,7 +201,6 @@ class PostgresKnowledgeRegistry:
             )
             texts.append(embed_text)
 
-        from shared.config import get_settings
         settings = get_settings()
         max_retries = settings.database.max_retries
         retry_delay = settings.database.retry_delay
@@ -304,7 +301,6 @@ class PostgresKnowledgeRegistry:
             List of matching knowledge items with similarity scores
         """
         try:
-            from shared.config import get_settings
             settings = get_settings()
             limit = limit or settings.rag.knowledge_limit
             

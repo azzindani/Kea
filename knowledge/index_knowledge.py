@@ -26,6 +26,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from shared.config import get_settings
+
 # Optional YAML support for frontmatter
 try:
     import yaml as _yaml
@@ -47,7 +49,7 @@ def _parse_frontmatter(text: str) -> tuple[dict[str, Any], str]:
     Returns (metadata_dict, body_text).  If no frontmatter is found,
     metadata is empty and body is the full text.
     """
-    from shared.config import get_settings
+
     delimiter = get_settings().knowledge.frontmatter_delimiter
 
     if not text.startswith(delimiter):
@@ -95,7 +97,7 @@ def _infer_category(path: Path, meta: dict[str, Any]) -> str:
     if "procedures" in parts:
         return "procedure"
 
-    from shared.config import get_settings
+
     return get_settings().knowledge.default_category
 
 
@@ -119,7 +121,7 @@ def _scan_markdown_files(
     """Scan knowledge/ Markdown files with YAML frontmatter."""
     items: list[dict[str, Any]] = []
 
-    from shared.config import get_settings
+
     settings = get_settings().knowledge
 
     for md_file in knowledge_dir.rglob("*.md"):
