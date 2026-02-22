@@ -31,7 +31,8 @@ class TestSystemCapabilities:
         assert response.status_code == 200
         data = response.json()
         assert "mcp_servers" in data
-        assert "research_paths" in data
+        assert "available_job_types" in data
+        assert "llm_providers" in data
 
 
 class TestSystemConfig:

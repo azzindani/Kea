@@ -88,7 +88,6 @@ class SessionManager:
             session_id=f"sess_{uuid4().hex[:16]}",
             user_id=user_id,
             tenant_id=tenant_id,
-            expires_at=datetime.utcnow() + timedelta(hours=self.session_hours),
             device_info=device_info,
             ip_address=ip_address,
         )
