@@ -60,11 +60,11 @@ LOG_THEME = Theme({
     "logging.level.critical": "bright_magenta bold",
     "logging.level.alert": "white on bright_red bold",
     "logging.level.emergency": "white on bright_red bold blink",
-    "logging.level.debug": "grey50",
-    "log.timestamp": "grey42",
-    "log.logger": "deep_sky_blue4",
+    "logging.level.debug": "cyan",
+    "log.timestamp": "blue",
+    "log.logger": "magenta",
     "log.key": "cyan",
-    "log.value": "grey70",
+    "log.value": "green",
 })
 
 # Defaults (updated by setup_logging)
@@ -185,7 +185,7 @@ class ConsoleRenderer:
             io_hint = f" [bold yellow][[IO:{io_type.upper()}]][/]"
 
         level_style = {
-            "debug": "grey50", "info": "bright_blue", "success": "bright_green", "notice": "bright_cyan italic",
+            "debug": "cyan", "info": "bright_blue", "success": "bright_green", "notice": "bright_cyan italic",
             "warning": "bright_yellow", "error": "bright_red", "critical": "bright_magenta bold",
             "alert": "white on bright_red bold", "emergency": "white on bright_red bold blink",
         }.get(level, "white")
