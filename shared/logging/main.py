@@ -52,15 +52,19 @@ LEVEL_SYMBOLS = {
 }
 
 LOG_THEME = Theme({
-    "logging.level.success": "green bold",
-    "logging.level.info": "blue bold",
-    "logging.level.notice": "blue bold italic",
-    "logging.level.warning": "yellow bold",
-    "logging.level.error": "red bold",
-    "logging.level.critical": "magenta bold",
-    "logging.level.alert": "white on red bold",
-    "logging.level.emergency": "white on red bold blink",
-    "logging.level.debug": "cyan",
+    "logging.level.success": "bright_green bold",
+    "logging.level.info": "bright_blue bold",
+    "logging.level.notice": "bright_cyan bold italic",
+    "logging.level.warning": "bright_yellow bold",
+    "logging.level.error": "bright_red bold",
+    "logging.level.critical": "bright_magenta bold",
+    "logging.level.alert": "white on bright_red bold",
+    "logging.level.emergency": "white on bright_red bold blink",
+    "logging.level.debug": "grey50",
+    "log.timestamp": "grey42",
+    "log.logger": "deep_sky_blue4",
+    "log.key": "cyan",
+    "log.value": "grey70",
 })
 
 # Defaults (updated by setup_logging)
@@ -170,23 +174,23 @@ class ConsoleRenderer:
         
         flags = []
         for key, value in event_dict.items():
-            if key not in ("level", "timestamp", "logger", "exception", "io"):
-                flags.append(f"[bold cyan]{key}[/]=[white]{value}[/]")
+            if key not in ("level", "timestamp", "logger", "exception", "io", "env", "version"):
+                flags.append(f"[log.key]{key}[/]=[log.value]{value}[/]")
         
-        flag_str = f" [dim]|[/] {' '.join(flags)}" if flags else ""
+        flag_str = f" [dim]→[/] {' '.join(flags)}" if flags else ""
         
         io_hint = ""
         if "io" in event_dict:
             io_type = event_dict["io"].get("type", "unknown")
             io_hint = f" [bold yellow][[IO:{io_type.upper()}]][/]"
 
-        level_color = {
-            "debug": "cyan", "info": "blue", "success": "green", "notice": "blue italic",
-            "warning": "yellow", "error": "red", "critical": "magenta bold",
-            "alert": "white on red bold", "emergency": "white on red bold blink",
+        level_style = {
+            "debug": "grey50", "info": "bright_blue", "success": "bright_green", "notice": "bright_cyan italic",
+            "warning": "bright_yellow", "error": "bright_red", "critical": "bright_magenta bold",
+            "alert": "white on bright_red bold", "emergency": "white on bright_red bold blink",
         }.get(level, "white")
         
-        return f"[dim][{timestamp}][/] [bold {level_color}]{symbol} {level.upper():8}[/] [bold white][{logger_name}][/]{io_hint} {message}{flag_str}"
+        return f"[log.timestamp]{timestamp}[/] [bold {level_style}]{symbol} {level.upper():<8}[/] [log.logger]{logger_name:<12}[/]{io_hint} [white]{message}[/]{flag_str}"
 
 def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optional[str] = None):
     """Standardized logging setup for all codebases."""
