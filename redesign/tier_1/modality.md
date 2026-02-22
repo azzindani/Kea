@@ -1,98 +1,102 @@
+# Modality Ingestion & Demuxing
+
+## Overview
+A heavy-duty **Tier 1** component that acts as the agent's absolute sensory gateway. Kea supports Omni-modal inputs: Video, Audio, Complex Documents (PDF/Excel), and Images. 
+
+Because advanced LLMs (the "Brain") are extremely slow and expensive when processing dense raw files (like a 3-hour video), Tier 1 physically decomposes and parses the structures into computationally efficient chunks or purely text formats *before* a higher cognitive tier even looks at it.
+
+## Architecture & Flow
+
 ```mermaid
 ---
 config:
   layout: dagre
 ---
 flowchart TB
- subgraph sInput["1. Sensory Input"]
+    %% SCHEMA IMPORTS
+    subgraph sTier0["Tier 0: Universal Schemas"]
+        direction LR
+        nSchemaText["CognitiveContext (Text)"]
+        nSchemaFile["FileHandle (Path Pointer)"]
+        nSchemaVec["AssociativeMemory (Vector Object)"]
+    end
+
+    %% INPUT
+    subgraph sInput["1. Sensory Input"]
         nInputText["Text Prompt"]
         nInputAudio["Audio / Voice"]
-        nInputImage["Image"]
-        nInputVideo["Video Stream"]
-        nInputDoc["Documents (PDF/Docx/PPT/CSV/Excel/etc)"]
-  end
+        nInputImg["Image Array"]
+        nInputVid["Video Stream"]
+        nInputDoc["Docs (PDF/XLSX)"]
+    end
 
- subgraph sDecompose["2. Structural Decomposition"]
+    %% TIER 1 Engine
+    subgraph sTier1["Tier 1: High-Speed Demuxer"]
         direction TB
-        nDocling["Docling (Layout Parser)"]
-        nVideoSplit["Video Demuxer (FFmpeg)"]
- end
+        
+        %% Decomposition
+        subgraph sDecompose["2. Structural Decomposition"]
+            nDocling["Docling (Layout Extraction)"]
+            nVideoSplit["Video Demuxer (FFMPEG KeyFrames)"]
+        end
 
- subgraph sProcess["3. Cognitive Processing (The Brain)"]
-        direction TB
-        nSTT["STT (Qwen-Audio / Whisper V3)"]
-        nBrain["VLM: Qwen 3-VL (Thinking/Instruct)"]
-        nTTS["TTS: Qwen 3 TTS (Voice Clone)"]
-  end
+        %% STT / Translators
+        subgraph sProcess["3. Translators"]
+            nSTT["Speech-To-Text (Whisper/Qwen A)"]
+            nOCR["Vision Parsing (Qwen VL)"]
+        end
 
- subgraph sMemory["4. The Embedding Engine (Unified Space)"]
-        direction TB
-        nUnifiedEmbed["Qwen 3-VL-Embedding"]
-  end
+        %% Vectorizer
+        subgraph sMemory["4. The Embedding Engine"]
+            nEmbed["General Vector Extraction Model"]
+        end
+    end
 
- subgraph sOutput["5. Kernel State"]
-        nFinalText["Cognitive Context (Text)"]
-        nFinalVector["Associative Memory (Vector)"]
-        nAudioOut["Speech Synthesis (Audio)"]
-        nFileOut["File Handle (Path/Raw)"]
-  end
+    %% Outputs
+    subgraph sOutput["5. Output (Kernel State Ready)"]
+        nFinalText["Cognitive Context (Semantic Meaning)"]
+        nFinalVector["Associative Memory (Embedding Vector)"]
+        nFileOut["File Handle (Raw Path for MCP)"]
+    end
 
-    %% ==========================================
-    %% 1. DIRECT PASSTHROUGH (The New Fix)
-    %% Skips the brain, preserves the file path/pointer
-    %% ==========================================
-    nInputDoc -- "Raw File Path" --> nFileOut
-    nInputVideo -- "Raw File Path" --> nFileOut
-    nInputImage -- "Raw File Path" --> nFileOut
-    nInputAudio -- "Raw File Path" --> nFileOut
+    %% PASSTHROUGH (Efficiency Rule)
+    nInputDoc & nInputVid & nInputImg & nInputAudio -.->|Direct Pointer Bypasses Engine| nFileOut
 
-    %% ==========================================
-    %% 2. COGNITIVE PATHWAYS
-    %% ==========================================
-    
-    %% Flow: Documents
+    %% Process Routing
     nInputDoc --> nDocling
-    nDocling -- "Layout & Text" --> nBrain
-    nDocling -- "Extracted Charts/Images" --> nBrain
-    nDocling -- "Clean Logic" --> nFinalText
+    nDocling -->|Metadata| nFinalText
+    nDocling -->|Embedded Images| nOCR
 
-    %% Flow: Video
-    nInputVideo --> nVideoSplit
-    nVideoSplit -- "Audio Track" --> nSTT
-    nVideoSplit -- "Key Frames" --> nBrain
-    nVideoSplit -- "Key Frames" --> nUnifiedEmbed
+    nInputVid --> nVideoSplit
+    nVideoSplit -->|Keyframes| nOCR
+    nVideoSplit -->|Stems| nSTT
 
-    %% Flow: Audio/Voice
     nInputAudio --> nSTT
-    nSTT -- "Transcript" --> nBrain
-    nBrain -- "Response Text" --> nTTS
-    nTTS --> nAudioOut
+    nInputImg --> nOCR
 
-    %% Flow: Image
-    nInputImage --> nBrain
-    nInputImage --> nUnifiedEmbed
+    nInputText --> nEmbed & nFinalText
 
-    %% Flow: Text
-    nInputText --> nBrain
-    nInputText --> nUnifiedEmbed
+    nSTT --> nEmbed & nFinalText
+    nOCR --> nEmbed & nFinalText
 
-    %% The Unification
-    nBrain -- "Description/Reasoning" --> nFinalText
-    nBrain -- "Semantic Concept" --> nUnifiedEmbed
-    nUnifiedEmbed -- "Shared Vector Space" --> nFinalVector
-
-    %% Styling
-    classDef input fill:#f9f,stroke:#333,stroke-width:2px;
-    classDef tools fill:#ff9,stroke:#333,stroke-width:1px;
-    classDef qwen fill:#bbf,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5;
-    classDef output fill:#bfb,stroke:#333,stroke-width:2px;
-    classDef passthrough stroke:#ff0000,stroke-width:2px,stroke-dasharray: 2 2;
-
-    class nInputText,nInputAudio,nInputImage,nInputVideo,nInputDoc input;
-    class nDocling,nVideoSplit tools;
-    class nBrain,nTTS,nUnifiedEmbed,nSTT qwen;
-    class nFinalText,nFinalVector,nAudioOut,nFileOut output;
+    %% Schema Routing
+    nSchemaText -.->|Formats| nFinalText
+    nSchemaFile -.->|Formats| nFileOut
+    nSchemaVec -.->|Formats| nFinalVector
     
-    %% Apply specific style to the passthrough lines links
-    linkStyle 0,1,2,3 stroke:#ff9900,stroke-width:2px;
+    %% Styling
+    classDef t0 fill:#451A03,stroke:#F59E0B,stroke-width:1px,color:#fff
+    classDef t1 fill:#14532D,stroke:#22C55E,stroke-width:2px,color:#fff
+    classDef in fill:#1e293b,stroke:#475569,stroke-width:1px,color:#fff
+    classDef out fill:#1E3A8A,stroke:#3B82F6,stroke-width:2px,color:#fff
+    
+    class sTier0,nSchemaText,nSchemaFile,nSchemaVec t0
+    class sInput,nInputText,nInputAudio,nInputImg,nInputVid,nInputDoc in
+    class sTier1,sDecompose,sProcess,sMemory,nDocling,nVideoSplit,nSTT,nOCR,nEmbed t1
+    class sOutput,nFinalText,nFinalVector,nFileOut out
 ```
+
+## Key Mechanisms
+1. **Direct Passthrough**: The dotted lines show that raw files (like a 4K `.mp4`) bypass the cognitive engine and are immediately assigned a `FileHandle`. Kea refuses to keep 4K video data in RAM. Tier 4 MCP tools will grab the `FileHandle` pointer on disk.
+2. **Structural Demuxing (FFMPEG / Docling)**: Cuts the file apart. It scrapes images out of PDFs for `OCR`, extracts audio out of `Video` for transcriptions, and returns a flat dictionary of extracted properties.
+3. **Embedding Vectorization**: Anything translated to text or image slices is run through the `Embedding Engine` at Tier 1, creating a shared Associative Vector Space that Tier 2 can use to "remember" concepts instantly.

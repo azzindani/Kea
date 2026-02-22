@@ -13,27 +13,34 @@ config:
   layout: dagre
 ---
 flowchart TB
+    %% DOWNSTREAM TIER 0 IMPORTS (SCHEMAS)
+    subgraph sTier0["Tier 0: Universal Schemas"]
+        direction LR
+        nSchemaDAG["CompiledDAG Schema (Execution Graph)"]
+        nSchemaNode["ExecutableNode Schema"]
+    end
+
     %% Inputs from T4
     subgraph sInput["Incoming Context (Triggered by T4)"]
         nGoal["High-Level Objective"]
         nState["Current Agent State & Constraints"]
     end
 
-    %% Abstraction: Calling T2 Engines
-    subgraph sT2["Cognitive Engines (Tier 2 Call)"]
+    %% DOWNSTREAM TIER 2 IMPORTS (COGNITIVE ENGINES)
+    subgraph sT2["Tier 2 Dependencies"]
         direction TB
-        nT2Decomp["Call > Task Decomposition Engine"]
-        nT2Curiosity["Call > Curiosity Engine"]
-        nT2WhatIf["Call > What-If Engine (Validation)"]
+        nT2Decomp["TaskDecomposer.decompose_goal()<br>(task_decomposition.md)"]
+        nT2Curiosity["CuriosityEngine.detect_gaps()<br>(curiosity_engine.md)"]
+        nT2WhatIf["SimulationEngine.simulate_outcomes()<br>(what_if_scenario.md)"]
     end
 
     %% T3 Engine: Graph Assembly
     subgraph sT3["Tier 3: Graph Synthesizer"]
         direction TB
         
-        nMapNodes["Map T2 sub-tasks to Executable Nodes"]
-        nRouteDeps["Calculate Dependency Edges (Sequential vs Parallel)"]
-        nCompile["Compile LangGraph State DAG"]
+        nMapNodes["1. Map T2 sub-tasks to Executable Nodes"]
+        nRouteDeps["2. Calculate Dependency Edges (Sequential vs Parallel)"]
+        nCompile["3. Compile Prototype LangGraph State DAG"]
         
         nMapNodes --> nRouteDeps --> nCompile
     end
@@ -52,12 +59,17 @@ flowchart TB
     nCompile -- "Review Prototype Graph" --> nT2WhatIf
     nT2WhatIf -- "Graph Approved" --> nExecDAG & nStateSchema
     nT2WhatIf -- "Graph Rejected" --> nRouteDeps
+    
+    nSchemaNode -.->|Formats| nMapNodes
+    nSchemaDAG -.->|Formats| nCompile
 
     %% Styling
-    classDef t2 fill:#064E3B,stroke:#10B981,stroke-width:1px,color:#fff
-    classDef t3 fill:#1E3A8A,stroke:#3B82F6,stroke-width:2px,color:#fff
+    classDef t0 fill:#451A03,stroke:#F59E0B,stroke-width:1px,color:#fff
+    classDef t2 fill:#064E3B,stroke:#10B981,stroke-width:2px,color:#fff
+    classDef t3 fill:#1E3A8A,stroke:#3B82F6,stroke-width:3px,color:#fff
     classDef t4 fill:#312E81,stroke:#6366F1,stroke-width:1px,color:#fff
     
+    class sTier0,nSchemaDAG,nSchemaNode t0
     class sT2,nT2Decomp,nT2Curiosity,nT2WhatIf t2
     class sT3,nMapNodes,nRouteDeps,nCompile t3
     class sOutput,nExecDAG,nStateSchema t4

@@ -1,62 +1,85 @@
+# Universal Classification Kernel
+
+## Overview
+Operating at **Tier 1 (Core Processing)**, the Universal Classification Kernel takes completely raw text and labels it according to distinct buckets (e.g., topic, intent, spam, urgency). It relies strictly on mathematical and syntactic structures rather than full logical deduction, allowing it to run at blazing fast speeds. Higher tiers use this primitive to rapidly determine the state of the world before attempting complex planning.
+
+## Architecture & Flow
+
 ```mermaid
 ---
 config:
   layout: dagre
 ---
 flowchart TB
- subgraph sUniversal["Universal Classification Kernel"]
+    %% DOWNSTREAM IMPORTS
+    subgraph sTier0["Tier 0: Universal Schemas"]
+        direction LR
+        nSchemaRaw["RawString Input"]
+        nSchemaClass["ClassificationResult Object"]
+    end
+
+    %% INPUTS
+    subgraph sInputs["Execution Signals"]
+        nInput["Input Text String"]
+        nProfile["Dynamic Class Profile Rules"]
+    end
+
+    %% TIER 1 CORE
+    subgraph sTier1["Tier 1: Classification Engine"]
         direction TB
         
-        %% INPUTS
-        nInput["Input Text"]
-        nProfile["Class Profile (Intent/Urgency/etc)"]
-        
-        %% LAYER 1: SpaCy (Fast/Syntax)
-        subgraph sSpacy["Layer A: Linguistic (SpaCy)"]
-            nPattern["Pattern Matcher (Regex)"]
-            nPOS["Part-of-Speech (Verbs/Nouns)"]
-            nDep["Dependency Parse (Subject/Object)"]
-            nScoreA["Symbolic Score"]
+        %% LAYER 1: Fast Regex/Syntax
+        subgraph sSpacy["Layer A: Linguistic Analysis"]
+            nPattern["Regex Pattern Filters"]
+            nPOS["Part-of-Speech Checks"]
         end
 
-        %% LAYER 2: Embedding (Slow/Semantic)
-        subgraph sEmbed["Layer B: Semantic (Qwen 3 Embedding)"]
-            nVecInput["Input Vector"]
-            nVecLabels["Label Vectors (Cached)"]
-            nCosine["Cosine Similarity"]
-            nScoreB["Semantic Score"]
+        %% LAYER 2: Vector Search
+        subgraph sEmbed["Layer B: Semantic Proximity"]
+            nVecInput["Generate Vector String"]
+            nCosine["Cosine Similarity Match"]
         end
 
-        %% LAYER 3: Hybrid Fusion
-        nFusion["Weighted Fusion Logic"]
-        nThreshold["Confidence Threshold Check"]
-        
-        %% OUTPUTS
-        nLabel["Final Label"]
-        nConf["Confidence Score"]
-  end
+        %% LAYER 3: Merge
+        subgraph sFusion["Layer C: Hybrid Merge"]
+            nFusion["Weighted Output Fusion"]
+            nThreshold["Confidence Threshold Filter"]
+        end
+    end
 
-    %% Flow
-    nInput --> nPattern & nPOS & nDep
+    %% OUTPUTS
+    subgraph sOutput["Output to Tier 2 Engines"]
+        nLabel["Deterministic Label Output"]
+        nFallback["Human/LLM Fallback Trigger"]
+    end
+
+    %% T0 Mappings
+    nSchemaRaw -.->|Formats| nInput
+    nSchemaClass -.->|Formats| nLabel
+
+    %% Routing
+    nInput --> nPattern & nPOS
     nInput --> nVecInput
-    nProfile --> nPattern
-    nProfile --> nVecLabels
+    nProfile --> nPattern & nCosine
 
-    %% Spacy Logic
-    nPattern & nPOS & nDep --> nScoreA
-
-    %% Embedding Logic
-    nVecInput & nVecLabels --> nCosine
-    nCosine --> nScoreB
-
-    %% Fusion
-    nScoreA --> nFusion
-    nScoreB --> nFusion
-    nFusion --> nThreshold
+    sSpacy & sEmbed --> nFusion --> nThreshold
     
-    nThreshold -- "High Confidence" --> nLabel & nConf
-    nThreshold -- "Low Confidence" --> nFallback["Fallback / Ask Human"]
+    nThreshold -- "Passes > 80%" --> nLabel
+    nThreshold -- "Fails Threshold" --> nFallback
 
-    classDef proc fill:#bbf,stroke:#333,stroke-width:1px;
-    class nPattern,nPOS,nDep,nVecInput,nCosine,nFusion,nThreshold proc;
+    %% Styling
+    classDef t0 fill:#451A03,stroke:#F59E0B,stroke-width:1px,color:#fff
+    classDef t1 fill:#14532D,stroke:#22C55E,stroke-width:2px,color:#fff
+    classDef signal fill:#1e293b,stroke:#475569,stroke-width:1px,color:#fff
+    classDef out fill:#1E3A8A,stroke:#3B82F6,stroke-width:2px,color:#fff
+    
+    class sTier0,nSchemaRaw,nSchemaClass t0
+    class sTier1,sSpacy,sEmbed,sFusion,nPattern,nPOS,nVecInput,nCosine,nFusion,nThreshold t1
+    class sInputs,nInput,nProfile signal
+    class sOutput,nLabel,nFallback out
 ```
+
+## Key Mechanisms
+1. **Linguistic Analysis (Layer A)**: Runs extremely fast SpaCy models to check for literal text patterns. If the user says "Delete my account," the regex and part-of-speech taggers instantly recognize the imperative verb "Delete" and the noun "account."
+2. **Semantic Proximity (Layer B)**: Runs in parallel. It converts the text into vector embeddings and checks against known intent vectors (e.g., matching "Get rid of my profile" to the label `DELETE_ACCOUNT_INTENT`).
+3. **Hybrid Merge (Layer C)**: Combines the fast literal check (Layer A) with the flexible meaning check (Layer B). If the confidence is high, it returns a strict Tier 0 label schema. If the confidence is too low, it aborts the deterministic primitive and flags Tier 2 to handle the ambiguity.

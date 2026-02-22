@@ -13,6 +13,20 @@ config:
   layout: dagre
 ---
 flowchart TB
+    %% DOWNSTREAM TIER 0 IMPORTS (SCHEMAS)
+    subgraph sTier0["Tier 0: Universal Schemas"]
+        direction LR
+        nSchemaEvent["ObservationEvent Schema"]
+        nSchemaContext["RAGContext Schema"]
+        nSchemaDAG["CompiledDAG Execution Object"]
+    end
+
+    %% DOWNSTREAM TIER 3 IMPORTS (ORCHESTRATION)
+    subgraph sT3["Tier 3 Dependencies"]
+        direction TB
+        nT3Plan["GraphSynthesizer.synthesize_plan()<br>(graph_synthesizer.md)"]
+    end
+
     %% External Interfaces (The World)
     subgraph sWorld["Environment"]
         direction TB
@@ -26,11 +40,6 @@ flowchart TB
         direction TB
         nContext["Working Context Buffer"]
         nHistory["Recent Loop History"]
-    end
-
-    %% T3 Abstraction (Black Box Planner)
-    subgraph sT3["Tier 3 Planner"]
-        nT3Plan["Graph Synthesizer / JIT Assembly"]
     end
 
     %% T4 Core Engine - The OODA Loop
@@ -55,17 +64,24 @@ flowchart TB
     nOrient <--> nContext
     
     nDecide -- "Request Plan" --> nT3Plan
+    nDecide -.->|Generates| nSchemaDAG
     nDecide -- "Evaluate Plan" --> nContext
     nT3Plan -- "Return Executable DAG" --> nDecide
     
     nAct -- "Execute Graph Nodes" --> nMCP
+    
+    %% Schema mappings
+    nObserve -.->|Formats to| nSchemaEvent
+    nOrient -.->|Formats to| nSchemaContext
 
     %% Styling
-    classDef t3 fill:#1E3A8A,stroke:#3B82F6,stroke-width:1px,color:#fff
-    classDef t4 fill:#312E81,stroke:#6366F1,stroke-width:2px,color:#fff
+    classDef t0 fill:#451A03,stroke:#F59E0B,stroke-width:1px,color:#fff
+    classDef t3 fill:#1E3A8A,stroke:#3B82F6,stroke-width:2px,color:#fff
+    classDef t4 fill:#312E81,stroke:#6366F1,stroke-width:3px,color:#fff
     classDef mem fill:#0f172a,stroke:#475569,stroke-width:2px,color:#fff
     classDef ext fill:#525252,stroke:#A3A3A3,stroke-width:1px,color:#fff
     
+    class sTier0,nSchemaEvent,nSchemaContext,nSchemaDAG t0
     class sWorld,nMCP,nRAG,nUser,nWorldEvents ext
     class sMem,nContext,nHistory mem
     class sT3,nT3Plan t3

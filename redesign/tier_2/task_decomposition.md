@@ -11,51 +11,59 @@ config:
   layout: dagre
 ---
 flowchart TB
-    %% Inputs
-    subgraph sInputs["Inputs (From OODA/Tier 4)"]
-        nGoal["High-Level Goal / Objective"]
-        nContext["Current Agent Context"]
+    %% DOWNSTREAM TIER 0 IMPORTS (SCHEMAS)
+    subgraph sTier0["Tier 0: Universal Schemas (shared/schemas.py)"]
+        direction LR
+        nSchemaGoal["Base Model: Goal"]
+        nSchemaTask["Base Model: SubTaskItem"]
     end
 
-    %% T1 Primitives
-    subgraph sTier1["Tier 1 Dependencies"]
-        nIntent["Intent Extraction"]
-        nEntity["Entity Extraction (Constraints)"]
+    %% DOWNSTREAM TIER 1 IMPORTS (PRIMITIVES)
+    subgraph sTier1["Tier 1: Cognitive Primitives"]
+        direction LR
+        nIntent["PrimitiveScorers.detect_intent()<br>(intent_sentiment_urgency.md)"]
+        nEntity["EntityRecognizer.extract_entities()<br>(entity_recognition.md)"]
+    end
+
+    %% Inputs
+    subgraph sInputs["Current Agent Context"]
+        nContext["Working World State"]
     end
 
     %% T2 Processing Engine
-    subgraph sEngine["Task Decomposition Engine"]
+    subgraph sEngine["Tier 2: Task Decomposition Layer"]
         direction TB
         
-        nAnalyze["Analyze Goal Complexity"]
-        nSplit["Split into Logical Sub-Goals"]
-        nDepCheck["Identify Cross-Task Dependencies"]
-        nResourceCheck["Identify Required Skills/Tools"]
+        nAnalyze["1. Analyze Goal Complexity"]
+        nSplit["2. Split into Logical Sub-Goals"]
+        nDepCheck["3. Build Task Dependency Array"]
+        nResourceCheck["4. Map Required Agent Skills"]
         
-        nAnalyze --> nSplit
-        nSplit --> nDepCheck
-        nDepCheck --> nResourceCheck
+        nAnalyze --> nSplit --> nDepCheck --> nResourceCheck
     end
 
     %% Outputs
-    subgraph sOutputs["Output to Tier 3 (Orchestrator)"]
-        nTaskList["Structured Sub-Task List"]
-        nGraphProto["Prototypical Task Graph"]
+    subgraph sOutputs["Output to Orchestrator (Tier 3)"]
+        nTaskList["Structured Array<br>[SubTaskItem, SubTaskItem]"]
     end
 
-    %% Routing
-    nGoal --> nIntent & nEntity
+    %% Execution & Routing
+    nSchemaGoal -.->|Parsed By| nIntent & nEntity
+    nSchemaTask -.->|Formats| nTaskList
+
     nContext --> nAnalyze
-    nIntent & nEntity --> nAnalyze
+    nIntent & nEntity -->|Signal Output| nAnalyze
     
-    nResourceCheck --> nTaskList --> nGraphProto
+    nResourceCheck --> nTaskList
 
     %% Styling
-    classDef t1 fill:#14532D,stroke:#22C55E,stroke-width:1px,color:#fff
-    classDef t2 fill:#064E3B,stroke:#10B981,stroke-width:2px,color:#fff
+    classDef t0 fill:#451A03,stroke:#F59E0B,stroke-width:1px,color:#fff
+    classDef t1 fill:#14532D,stroke:#22C55E,stroke-width:2px,color:#fff
+    classDef t2 fill:#064E3B,stroke:#10B981,stroke-width:3px,color:#fff
     classDef out fill:#1E3A8A,stroke:#3B82F6,stroke-width:2px,color:#fff
     
+    class sTier0,nSchemaGoal,nSchemaTask t0
     class sTier1,nIntent,nEntity t1
-    class nAnalyze,nSplit,nDepCheck,nResourceCheck t2
-    class nTaskList,nGraphProto out
+    class sEngine,nAnalyze,nSplit,nDepCheck,nResourceCheck t2
+    class sOutputs,nTaskList out
 ```

@@ -1,76 +1,82 @@
+# Confidence & Precision Scoring 
+
+## Overview
+As a **Tier 1** module, the Scoring/Evaluation engine does not think; it measures. Following the mandate of evaluating safety and exactness computationally before relying on an LLM, this engine runs pure algorithms (Vector similarity, Cross-encoding, Contextual Weighting) to assess the quality of a specific action relative to an initial goal.
+
+Tier 3 Guardrails and Tier 2 Plausibility checks use this tool precisely to decide if they should reject a DAG or trust an execution result.
+
+## Architecture & Flow
+
 ```mermaid
 ---
 config:
   layout: dagre
 ---
 flowchart TB
- subgraph sInput["Input Context"]
+    %% DOWNSTREAM IMPORTS
+    subgraph sTier0["Tier 0: Universal Schemas"]
+        direction LR
+        nScoreObj["NumericScore Schema"]
+    end
+
+    %% Inputs
+    subgraph sInput["Incoming Context Container"]
         nInput["Content / Agent Output"]
         nQuery["Original Query / Goal"]
-        nMeta["Metadata (User Role, Time, Source, Location)"]
-  end
+        nMeta["Metadata (Context)"]
+    end
 
- subgraph s2["Scoring Mechanism"]
+    %% TIER 1 CORE
+    subgraph sTier1["Tier 1: Hybrid Evaluation Framework"]
         direction TB
         
-        %% 1. Semantic Path
-        n15["Embedding Engine"]
-        nScoreVector["Cosine Similarity Score"]
+        %% Track 1: Semantic
+        nEmbed["Embedding Engine"]
+        nScoreVector["Cosine Similarity Metric"]
 
-        %% 2. Precision Path
-        n16["Reranker (Cross-Encoder)"]
-        nScoreRelevance["Relevance/Precision Score"]
+        %% Track 2: Precision
+        nRerank["Reranker (Cross-Encoder)"]
+        nScorePrecise["Relevance / Precision Metric"]
 
-        %% 3. Context Path (Perspective)
-        n18["Perspective Matrix"]
-        nPerspFactors["Factors: Hierarchy, Authority, Recency, Incentive, Context"]
-        nScorePersp["Contextual Weight Score"]
-
-        %% 4. Objective Path (Reward)
-        n17["Reward Function"]
-        nConstraints["Check: Constraints & Logic"]
-        nScoreReward["Compliance/Utility Score"]
+        %% Track 3: Objective Reward
+        nReward["Reward Function"]
+        nScoreReward["Constraints & Logic Compliance"]
 
         %% Aggregation
-        nAggregator["Weighted Aggregator"]
-  end
+        nAggregator["Factor-Weighted Fusion Matrix"]
+    end
 
- subgraph sOutput["Output / Kernel Decision"]
-        nFinalScore["FINAL SCORE (0.0 - 1.0)"]
-  end
+    %% Output
+    subgraph sOutput["Output Routing"]
+        nFinal["FINAL EXACT SCORE (0.00-1.00)"]
+    end
 
-    %% Wiring Inputs to Scorers
-    nInput & nQuery --> n15
-    n15 --> nScoreVector
+    %% Pathing
+    nInput & nQuery --> nEmbed & nRerank & nReward
+    
+    nEmbed --> nScoreVector --> nAggregator
+    nRerank --> nScorePrecise --> nAggregator
+    nReward --> nScoreReward --> nAggregator
+    
+    nMeta --> nAggregator
 
-    nInput & nQuery --> n16
-    n16 --> nScoreRelevance
-
-    nMeta --> n18
-    n18 --> nPerspFactors
-    nPerspFactors --> nScorePersp
-
-    nInput & nQuery --> n17
-    n17 --> nConstraints
-    nConstraints --> nScoreReward
-
-    %% Aggregation Wiring
-    nScoreVector -- "Semantic (? %)" --> nAggregator
-    nScoreRelevance -- "Precision (? %)" --> nAggregator
-    nScorePersp -- "Context (? %)" --> nAggregator
-    nScoreReward -- "Utility (? %)" --> nAggregator
-
-    %% Final Output
-    nAggregator --> nFinalScore
+    nAggregator --> nFinal
+    nScoreObj -.->|Formats| nFinal
 
     %% Styling
-    classDef input fill:#f9f,stroke:#333,stroke-width:2px;
-    classDef calc fill:#bbf,stroke:#333,stroke-width:1px;
-    classDef score fill:#ff9,stroke:#333,stroke-width:1px;
-    classDef final fill:#bfb,stroke:#333,stroke-width:2px;
-
-    class nInput,nQuery,nMeta input;
-    class n15,n16,n17,n18,nPerspFactors,nConstraints,nAggregator calc;
-    class nScoreVector,nScoreRelevance,nScorePersp,nScoreReward score;
-    class nFinalScore final;
+    classDef t0 fill:#451A03,stroke:#F59E0B,stroke-width:1px,color:#fff
+    classDef t1 fill:#14532D,stroke:#22C55E,stroke-width:2px,color:#fff
+    classDef in fill:#1e293b,stroke:#475569,stroke-width:1px,color:#fff
+    classDef out fill:#1E3A8A,stroke:#3B82F6,stroke-width:2px,color:#fff
+    
+    class sTier0,nScoreObj t0
+    class sInput,nInput,nQuery,nMeta in
+    class sTier1,nEmbed,nScoreVector,nRerank,nScorePrecise,nReward,nScoreReward,nAggregator t1
+    class sOutput,nFinal out
 ```
+
+## Key Mechanisms
+1. **Semantic Evaluation (Cosine)**: Computes the basic underlying meaning gap between what the user asked and what the agent produced. If the user asked for a "Dog image" and got a "Cat image," the semantic score drops correctly.
+2. **Precision Cross-Encoding**: Embedding algorithms are bad at precise negations. A Cross-Encoder reranks the results to catch exact matches. If a user says "I do NOT want a dog," ordinary embeddings fail the test, but the Reranker catches the strict semantic rejection.
+3. **Reward Compliance Check**: Mechanically validates boolean logic requests ("Must be under 400 lines", "Must end in .py"). This is an instant pass/fail layer on the numeric score.
+4. **Context Factor Aggregation**: Weights the above three scores based on metadata. E.g., if the user role is "Admin," the threshold for passing the reward function is higher.

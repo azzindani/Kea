@@ -11,46 +11,57 @@ config:
   layout: dagre
 ---
 flowchart TB
-    %% Inputs
-    subgraph sInputs["Current State"]
-        nTask["Active Sub-Task"]
-        nKnowledge["Current Local Knowledge"]
+    %% DOWNSTREAM TIER 0 IMPORTS (SCHEMAS)
+    subgraph sTier0["Tier 0: Universal Schemas"]
+        direction LR
+        nSchemaState["WorldState (Buffer Context)"]
+        nSchemaExplore["ExplorationTask (Query format)"]
+    end
+
+    %% DOWNSTREAM TIER 1 IMPORTS (PRIMITIVES)
+    subgraph sTier1["Tier 1: Validation Engine"]
+        direction LR
+        nValidate["PrimitiveValidator.validate_bounds()<br>(validation.md)"]
+    end
+
+    %% External Hook (Provided by T3/T4)
+    subgraph sTask["Active Context"]
+        nTask["Active Sub-Task Execution"]
     end
 
     %% T2 Processing Engine
-    subgraph sEngine["Curiosity Engine"]
+    subgraph sEngine["Tier 2: Curiosity Cognitive Engine"]
         direction TB
         
-        nGapDetect["Detect Information Gaps"]
-        nFormulate["Formulate Exploration Questions"]
-        nStrategy["Select Exploration Strategy<br>(RAG, Web Search, FS Scan)"]
+        nGapDetect["1. Detect Missing Variable Vector"]
+        nFormulate["2. Formulate Question Strings"]
+        nStrategy["3. Route Exploration Strategy<br>(RAG, Web, Scan)"]
         
         nGapDetect --> nFormulate --> nStrategy
     end
 
-    %% T1 Dependencies
-    subgraph sTier1["Tier 1 Check"]
-        nValidate["Validate Required vs Available Data"]
+    %% Output to Higher Tiers
+    subgraph sOut["Output Actions"]
+        nActionTask["Generated Exploration Nodes"]
     end
 
-    %% External Hook (Handled by T3/T4)
-    subgraph sAction["Exploration Output"]
-        nActionTask["Generate Actionable Information-Gathering Tasks"]
-    end
-
-    %% Routing
-    nTask & nKnowledge --> nValidate
-    nValidate -- "Data Missing" --> nGapDetect
-    nValidate -- "Data Sufficient" --> nBypass["Bypass Curiosity (Proceed)"]
+    %% Execution & Routing
+    nSchemaState -.->|Formats| nTask
+    nTask --> nValidate
+    nValidate -- "Constraint Failed (Missing Target Data)" --> nGapDetect
+    nValidate -- "Constraint Passed (Data Exists)" --> nBypass["Skip Curiosity Matrix"]
     
-    nStrategy --> nActionTask
+    nStrategy -.->|Formats to| nSchemaExplore
+    nSchemaExplore --> nActionTask
 
     %% Styling
-    classDef t1 fill:#14532D,stroke:#22C55E,stroke-width:1px,color:#fff
-    classDef t2 fill:#064E3B,stroke:#10B981,stroke-width:2px,color:#fff
-    classDef out fill:#1E3A8A,stroke:#3B82F6,stroke-width:2px,color:#fff
+    classDef t0 fill:#451A03,stroke:#F59E0B,stroke-width:1px,color:#fff
+    classDef t1 fill:#14532D,stroke:#22C55E,stroke-width:2px,color:#fff
+    classDef t2 fill:#064E3B,stroke:#10B981,stroke-width:3px,color:#fff
+    classDef action fill:#1E3A8A,stroke:#3B82F6,stroke-width:2px,color:#fff
     
+    class sTier0,nSchemaState,nSchemaExplore t0
     class sTier1,nValidate t1
-    class nGapDetect,nFormulate,nStrategy t2
-    class nActionTask out
+    class sEngine,nGapDetect,nFormulate,nStrategy t2
+    class sOut,nActionTask action
 ```
