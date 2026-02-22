@@ -128,7 +128,7 @@ class LLMSettings(BaseModel):
 class LoggingSettings(BaseModel):
     """Logging configuration."""
     level: str = "INFO"
-    format: str = "json"
+    format: str = "console"
     service_name: str = "system-core"
 
 
