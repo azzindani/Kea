@@ -29,15 +29,17 @@ class PostgresKnowledgeRegistry:
 
     _init_lock: asyncio.Lock | None = None
 
-    def __init__(self, table_name: str = "knowledge_registry") -> None:
+    def __init__(self, table_name: str | None = None) -> None:
         """
         Initializes the PostgresKnowledgeRegistry.
 
         Args:
-            table_name: The name of the PostgreSQL table to use for knowledge storage.
+            table_name: The name of the PostgreSQL table to use for knowledge storage (defaults to config).
         """
-        self.table_name = table_name
-        self.embedder = create_embedding_provider(use_local=True)
+        from shared.config import get_settings
+        settings = get_settings()
+        self.table_name = table_name or settings.knowledge.registry_table
+        self.embedder = create_embedding_provider(use_local=settings.embedding.use_local)
         self._reranker = None
         self._rerank_lock = asyncio.Lock()
         self._pool: asyncpg.Pool | None = None
@@ -58,8 +60,10 @@ class PostgresKnowledgeRegistry:
 
             self._pool = await get_database_pool()
 
+            from shared.config import get_settings
+            settings = get_settings()
             async with self._pool.acquire() as conn:
-                await conn.execute("SELECT pg_advisory_lock(12346)")
+                await conn.execute(f"SELECT pg_advisory_lock({settings.knowledge.advisory_lock_id})")
                 try:
                     await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
                     await register_vector(conn)
@@ -69,14 +73,14 @@ class PostgresKnowledgeRegistry:
                             knowledge_id TEXT PRIMARY KEY,
                             name TEXT NOT NULL,
                             description TEXT NOT NULL,
-                            domain TEXT NOT NULL DEFAULT 'general',
-                            category TEXT NOT NULL DEFAULT 'skill',
+                            domain TEXT NOT NULL DEFAULT '{settings.knowledge.default_domain}',
+                            category TEXT NOT NULL DEFAULT '{settings.knowledge.default_category}',
                             tags TEXT[] DEFAULT ARRAY[]::TEXT[],
                             content TEXT NOT NULL,
                             content_hash TEXT NOT NULL,
                             metadata JSONB DEFAULT '{{}}'::jsonb,
-                            embedding vector(1024),
-                            version TEXT DEFAULT '1.0',
+                            embedding vector({settings.embedding.dimension}),
+                            version TEXT DEFAULT '{settings.knowledge.default_version}',
                             parent_id TEXT,
                             last_seen TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
                         )
@@ -85,7 +89,7 @@ class PostgresKnowledgeRegistry:
                     # Idempotent schema migration for existing tables
                     # Add version column
                     try:
-                        await conn.execute(f"ALTER TABLE {self.table_name} ADD COLUMN IF NOT EXISTS version TEXT DEFAULT '1.0'")
+                        await conn.execute(f"ALTER TABLE {self.table_name} ADD COLUMN IF NOT EXISTS version TEXT DEFAULT '{settings.knowledge.default_version}'")
                     except Exception:
                         pass # Column exists or other issue
 
@@ -125,7 +129,7 @@ class PostgresKnowledgeRegistry:
                     except Exception:
                         pass
                 finally:
-                    await conn.execute("SELECT pg_advisory_unlock(12346)")
+                    await conn.execute(f"SELECT pg_advisory_unlock({get_settings().knowledge.advisory_lock_id})")
 
             self._initialized = True
 
@@ -195,7 +199,7 @@ class PostgresKnowledgeRegistry:
                 f"Description: {item['description']}\n"
                 f"Domain: {item['domain']}\n"
                 f"Tags: {', '.join(item.get('tags', []))}\n"
-                f"Content:\n{item['content'][:4000]}"
+                f"Content:\n{item['content'][:get_settings().knowledge.embedding_content_limit]}"
             )
             texts.append(embed_text)
 
@@ -239,13 +243,13 @@ class PostgresKnowledgeRegistry:
                             item["name"],
                             item["description"],
                             item["domain"],
-                            item.get("category", "skill"),
+                            item.get("category", settings.knowledge.default_category),
                             tags,
                             item["content"],
                             content_hash,
                             metadata,
                             embeddings[i],
-                            item.get("version", "1.0"),
+                            item.get("version", settings.knowledge.default_version),
                             item.get("parent_id"),
                         )
 
@@ -365,7 +369,7 @@ class PostgresKnowledgeRegistry:
                             if isinstance(row["metadata"], str)
                             else row["metadata"]
                         ),
-                        "version": row.get("version", "1.0"),
+                        "version": row.get("version", settings.knowledge.default_version),
                         "parent_id": row.get("parent_id"),
                         "similarity": float(row["similarity"]),
                     }
@@ -377,7 +381,8 @@ class PostgresKnowledgeRegistry:
                 try:
                     reranker = await self._get_reranker()
                     # Use content (truncated) for reranking — same field used for embedding
-                    docs = [r["content"][:4000] for r in initial_results]
+                    limit_chars = get_settings().knowledge.embedding_content_limit
+                    docs = [r["content"][:limit_chars] for r in initial_results]
                     async with self._rerank_lock:
                         reranked = await reranker.rerank(query, docs, top_k=limit)
 
@@ -430,7 +435,7 @@ class PostgresKnowledgeRegistry:
                         if isinstance(row["metadata"], str)
                         else row["metadata"]
                     ),
-                    "version": row.get("version", "1.0"),
+                    "version": row.get("version", get_settings().knowledge.default_version),
                     "parent_id": row.get("parent_id"),
                 }
         except Exception as e:

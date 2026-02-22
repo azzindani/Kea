@@ -24,9 +24,18 @@ from shared.llm.provider import (
 from shared.config import get_settings
 from shared.logging.main import record_llm_request, record_llm_tokens
 
-# Default model fallback (if config fails, though get_settings handles defaults)
-DEFAULT_MODEL = "nvidia/nemotron-3-nano-30b-a3b:free" 
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+# Defaults (Used as fallback if config is missing, but get_settings handles them)
+def _get_default_model() -> str:
+    from shared.config import get_settings
+    return get_settings().llm.default_model
+
+def _get_openrouter_url() -> str:
+    from shared.config import get_settings
+    # Find openrouter provider base_url
+    for p in get_settings().llm.providers:
+        if p.name == "openrouter":
+            return p.base_url or "https://openrouter.ai/api/v1"
+    return "https://openrouter.ai/api/v1"
 
 
 class OpenRouterProvider(LLMProvider):
@@ -43,20 +52,20 @@ class OpenRouterProvider(LLMProvider):
         provider = OpenRouterProvider(api_key="sk-or-...")
         response = await provider.complete(
             messages=[LLMMessage(role="user", content="Hello!")],
-            config=LLMConfig(model=DEFAULT_MODEL)
+            config=LLMConfig(model=_get_default_model())
         )
     """
     
     def __init__(
         self,
         api_key: str | None = None,
-        base_url: str = OPENROUTER_BASE_URL,
+        base_url: str | None = None,
         app_name: str | None = None,
         site_url: str = "",
     ) -> None:
         settings = get_settings()
         self.api_key = api_key or settings.llm.openrouter_api_key
-        self.base_url = base_url
+        self.base_url = base_url or _get_openrouter_url()
         self.app_name = app_name or settings.app.name
         self.site_url = site_url
         
@@ -81,7 +90,7 @@ class OpenRouterProvider(LLMProvider):
     ) -> dict[str, Any]:
         """Build the request body."""
         settings = get_settings()
-        default_model = settings.llm.default_model or DEFAULT_MODEL
+        default_model = settings.llm.default_model or _get_default_model()
         
         body: dict[str, Any] = {
             "model": config.model or default_model,
@@ -117,7 +126,11 @@ class OpenRouterProvider(LLMProvider):
         
         @retry(
             stop=stop_after_attempt(settings.llm.max_retries),
-            wait=wait_exponential(multiplier=settings.llm.retry_delay_base, min=1, max=10),
+            wait=wait_exponential(
+                multiplier=settings.llm.retry_delay_base, 
+                min=settings.llm.retry_min_seconds, 
+                max=settings.llm.retry_max_seconds
+            ),
             retry=retry_if_exception_type((httpx.HTTPStatusError, httpx.NetworkError, httpx.TimeoutException)),
             reraise=True
         )
@@ -234,5 +247,6 @@ class OpenRouterProvider(LLMProvider):
         Note: This is an approximation. OpenRouter doesn't provide
         a tokenization endpoint, so we use a simple heuristic.
         """
-        # Rough estimation: ~4 characters per token for English
-        return len(text) // 4
+        # Rough estimation based on characters per token heuristic
+        from shared.config import get_settings
+        return int(len(text) // get_settings().llm.token_limit_multiplier)

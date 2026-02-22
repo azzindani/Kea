@@ -105,9 +105,9 @@ class Conversation:
     """
     conversation_id: str
     user_id: str
-    tenant_id: str = "default"
+    tenant_id: str = ""
     
-    title: str = "New Conversation"
+    title: str = ""
     summary: str = ""               # Auto-generated summary
     
     created_at: datetime = field(default_factory=datetime.utcnow)
@@ -125,14 +125,19 @@ class Conversation:
         cls,
         user_id: str,
         title: str = None,
-        tenant_id: str = "default",
+        tenant_id: str = None,
     ) -> "Conversation":
         """Create new conversation."""
+        from shared.config import get_settings
+        settings = get_settings()
+        tenant_id = tenant_id or settings.app.default_tenant
+        title = title or settings.app.default_conversation_title
+        
         return cls(
             conversation_id=f"conv_{uuid4().hex[:16]}",
             user_id=user_id,
             tenant_id=tenant_id,
-            title=title or "New Conversation",
+            title=title,
         )
     
     def to_dict(self, _include_messages: bool = False) -> dict:
@@ -153,11 +158,13 @@ class Conversation:
     
     @classmethod
     def from_dict(cls, data: dict) -> "Conversation":
+        from shared.config import get_settings
+        settings = get_settings()
         return cls(
             conversation_id=data["conversation_id"],
             user_id=data["user_id"],
-            tenant_id=data.get("tenant_id", "default"),
-            title=data.get("title", "New Conversation"),
+            tenant_id=data.get("tenant_id", settings.app.default_tenant),
+            title=data.get("title", settings.app.default_conversation_title),
             summary=data.get("summary", ""),
             created_at=datetime.fromisoformat(data["created_at"]) if "created_at" in data else datetime.utcnow(),
             updated_at=datetime.fromisoformat(data["updated_at"]) if "updated_at" in data else datetime.utcnow(),
@@ -176,8 +183,8 @@ CONVERSATIONS_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS conversations (
     conversation_id VARCHAR(50) PRIMARY KEY,
     user_id VARCHAR(50) NOT NULL,
-    tenant_id VARCHAR(50) DEFAULT 'default',
-    title VARCHAR(500) DEFAULT 'New Conversation',
+    tenant_id VARCHAR(50),
+    title VARCHAR(500),
     summary TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

@@ -11,6 +11,7 @@ from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field
+from shared.config import get_settings
 
 
 class JSONRPCVersion(str, Enum):
@@ -165,14 +166,17 @@ class ServerCapabilities(BaseModel):
 
 class InitializeRequest(BaseModel):
     """Initialize request parameters."""
-    protocolVersion: str = "2024-11-05"
+    protocolVersion: str = Field(default_factory=lambda: get_settings().mcp.protocol_version)
     capabilities: ClientCapabilities = Field(default_factory=ClientCapabilities)
-    clientInfo: dict[str, str] = Field(default_factory=lambda: {"name": "system-engine", "version": "0.1.0"})
+    clientInfo: dict[str, str] = Field(default_factory=lambda: {
+        "name": get_settings().mcp.client_name, 
+        "version": get_settings().mcp.client_version
+    })
 
 
 class InitializeResult(BaseModel):
     """Initialize response result."""
-    protocolVersion: str = "2024-11-05"
+    protocolVersion: str = Field(default_factory=lambda: get_settings().mcp.protocol_version)
     capabilities: ServerCapabilities = Field(default_factory=ServerCapabilities)
     serverInfo: dict[str, str] = Field(default_factory=dict)
 

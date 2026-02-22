@@ -24,10 +24,10 @@ logger = get_logger(__name__)
 class DatabaseConfig:
     """Database configuration."""
     url: str
-    min_connections: int = 5
-    max_connections: int = 20
-    connection_timeout: float = 30.0
-    idle_timeout: float = 300.0
+    min_connections: int = 0
+    max_connections: int = 0
+    connection_timeout: float = 0.0
+    idle_timeout: float = 0.0
     
     @classmethod
     def from_environment(cls) -> "DatabaseConfig":

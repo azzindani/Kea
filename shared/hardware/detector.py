@@ -48,25 +48,30 @@ class HardwareProfile:
     
     def optimal_workers(self) -> int:
         """Calculate optimal number of worker threads."""
+        from shared.config import get_settings
+        settings = get_settings().hardware
         # Base on CPU threads, but limit by RAM
         cpu_based = max(1, self.cpu_threads - 1)  # Leave 1 for main
-        ram_based = max(1, int(self.ram_available_gb / 2))  # 2GB per worker
-        return min(cpu_based, ram_based, 8)  # Cap at 8
+        ram_based = max(1, int(self.ram_available_gb / settings.ram_per_worker_gb))
+        return min(cpu_based, ram_based, settings.worker_cap)
     
     def optimal_batch_size(self) -> int:
         """Calculate optimal batch size for data processing."""
-        if self.ram_available_gb >= 16:
-            return 10000
-        elif self.ram_available_gb >= 8:
-            return 5000
-        elif self.ram_available_gb >= 4:
-            return 1000
+        from shared.config import get_settings
+        settings = get_settings().hardware
+        if self.ram_available_gb >= settings.batch_size_high_threshold:
+            return settings.batch_size_high_val
+        elif self.ram_available_gb >= settings.batch_size_med_threshold:
+            return settings.batch_size_med_val
+        elif self.ram_available_gb >= settings.batch_size_low_threshold:
+            return settings.batch_size_low_val
         else:
-            return 500
+            return settings.batch_size_min_val
     
     def can_use_gpu_embedding(self) -> bool:
         """Check if GPU can be used for embeddings."""
-        return self.cuda_available and self.vram_available_gb >= 2.0
+        from shared.config import get_settings
+        return self.cuda_available and self.vram_available_gb >= get_settings().hardware.vram_min_embedding_gb
     
     def memory_pressure(self) -> float:
         """Calculate memory pressure (0.0 = free, 1.0 = full)."""
@@ -77,77 +82,73 @@ class HardwareProfile:
     def should_queue_tasks(self) -> bool:
         """Check if tasks should be queued due to high memory pressure.
 
-        Returns True if RAM usage > 80%, preventing OOM crashes.
-        Process queue should wait until memory pressure drops before spawning new tasks.
+        Returns True if RAM usage > High Pressure Threshold, preventing OOM crashes.
         """
+        from shared.config import get_settings
+        threshold = get_settings().hardware.high_pressure_threshold
         pressure = self.memory_pressure()
-        return pressure > 0.80  # Queue if >80% RAM used
+        return pressure > threshold
 
     def safe_parallel_limit(self) -> int:
-        """Calculate safe parallel task limit based on current RAM pressure.
-
-        Reduces parallelism when memory is tight to prevent OOM.
-        """
+        """Calculate safe parallel task limit based on current RAM pressure."""
+        from shared.config import get_settings
+        settings = get_settings().hardware
+        
         pressure = self.memory_pressure()
         base_limit = self.optimal_workers()
 
-        if pressure > 0.90:  # Critical: 90%+ RAM used
-            return max(1, base_limit // 4)  # Reduce to 25%
-        elif pressure > 0.80:  # High: 80-90% RAM used
-            return max(1, base_limit // 2)  # Reduce to 50%
-        elif pressure > 0.70:  # Moderate: 70-80% RAM used
-            return max(2, int(base_limit * 0.75))  # Reduce to 75%
-        else:  # Normal: <70% RAM used
-            return base_limit  # Full parallelism
+        if pressure > settings.critical_pressure_threshold:
+            return max(1, base_limit // settings.critical_pressure_divisor)
+        elif pressure > settings.high_pressure_threshold:
+            return max(1, base_limit // settings.high_pressure_divisor)
+        elif pressure > settings.moderate_pressure_threshold:
+            return max(2, int(base_limit * settings.moderate_pressure_multiplier))
+        else:
+            return base_limit
 
     def is_constrained(self) -> bool:
         """Check if running in constrained environment."""
-        return self.environment in ("colab", "kaggle") or self.ram_total_gb < 8
+        from shared.config import get_settings
+        threshold = get_settings().hardware.constrained_ram_threshold
+        return self.environment in ("colab", "kaggle") or self.ram_total_gb < threshold
     
     def optimal_max_results(self) -> int:
-        """Calculate optimal max_results based on RAM.
-        
-        Returns hardware-aware limit for search/discovery operations.
-        10K results per GB of RAM, capped at 100K.
-        """
-        return min(int(self.ram_available_gb * 10000), 100000)
+        """Calculate optimal max_results based on RAM."""
+        from shared.config import get_settings
+        settings = get_settings().knowledge
+        return min(
+            int(self.ram_available_gb * settings.results_per_gb_ram),
+            settings.max_results_cap
+        )
     
     def optimal_top_k(self) -> int:
-        """Calculate optimal top_k for tool routing.
-        
-        Returns hardware-aware limit for tool discovery.
-        Based on workers * 10, minimum 20.
-        """
-        return max(20, self.optimal_workers() * 10)
+        """Calculate optimal top_k for tool routing."""
+        from shared.config import get_settings
+        settings = get_settings().hardware
+        return max(settings.top_k_min, self.optimal_workers() * settings.top_k_multiplier)
     
     def optimal_search_limit(self) -> int:
-        """Calculate optimal limit for web/API searches.
-        
-        Uses logarithmic scaling: 10 * log2(RAM + 1)
-        Range: ~10 (1GB) to ~100 (128GB)
-        """
+        """Calculate optimal limit for web/API searches."""
         import math
-        base = 10 * math.log2(max(1, self.ram_available_gb) + 1)
-        return max(10, min(100, int(base)))
+        from shared.config import get_settings
+        settings = get_settings().hardware
+        base = settings.search_limit_multiplier * math.log2(max(1, self.ram_available_gb) + 1)
+        return max(settings.search_limit_min, min(settings.search_limit_max, int(base)))
     
     def optimal_tool_registry_limit(self) -> int:
-        """Calculate optimal limit for tool registry searches.
-        
-        Uses linear scaling: 300 * RAM (capped)
-        Range: 100 (minimal) to 10000 (32GB+)
-        """
-        limit = int(300 * self.ram_available_gb)
-        return max(100, min(10000, limit))
+        """Calculate optimal limit for tool registry searches."""
+        from shared.config import get_settings
+        settings = get_settings().knowledge
+        limit = int(settings.tool_registry_multiplier * self.ram_available_gb)
+        return max(settings.tool_registry_min, min(settings.tool_registry_max, limit))
     
     def optimal_fact_limit(self) -> int:
-        """Calculate optimal limit for semantic fact search.
-        
-        Uses square root scaling: 40 * sqrt(RAM)
-        Range: ~20 (1GB) to ~500 (150GB)
-        """
+        """Calculate optimal limit for semantic fact search."""
         import math
-        limit = int(40 * math.sqrt(max(1, self.ram_available_gb)))
-        return max(20, min(500, limit))
+        from shared.config import get_settings
+        settings = get_settings().knowledge
+        limit = int(settings.fact_limit_sqrt_multiplier * math.sqrt(max(1, self.ram_available_gb)))
+        return max(settings.fact_limit_min, min(settings.fact_limit_max, limit))
 
     
     def vram_pressure(self) -> float:
@@ -159,18 +160,22 @@ class HardwareProfile:
             return 0.0
         return 1.0 - (self.vram_available_gb / self.vram_total_gb)
     
-    def is_gpu_oom_risk(self, required_gb: float = 1.0) -> bool:
+    def is_gpu_oom_risk(self, required_gb: float | None = None) -> bool:
         """Check if GPU is at risk of OOM.
         
         Args:
-            required_gb: Estimated VRAM needed for upcoming operation
+            required_gb: Estimated VRAM needed for upcoming operation (defaults to config)
             
         Returns:
-            True if available VRAM < required_gb or VRAM pressure > 90%
+            True if available VRAM < required_gb or VRAM pressure > critical threshold
         """
+        from shared.config import get_settings
+        settings = get_settings().hardware
+        req = required_gb if required_gb is not None else settings.vram_oom_limit_gb
+        
         if not self.cuda_available:
             return True  # No GPU = always risky
-        return self.vram_available_gb < required_gb or self.vram_pressure() > 0.9
+        return self.vram_available_gb < req or self.vram_pressure() > settings.critical_pressure_threshold
     
     def refresh_vram(self) -> None:
         """Refresh VRAM stats (call before GPU operations)."""
@@ -195,16 +200,20 @@ class HardwareProfile:
         except Exception:
             pass
     
-    def is_ram_oom_risk(self, required_gb: float = 2.0) -> bool:
+    def is_ram_oom_risk(self, required_gb: float | None = None) -> bool:
         """Check if RAM is at risk of OOM.
         
         Args:
-            required_gb: Estimated RAM needed for upcoming operation
+            required_gb: Estimated RAM needed for upcoming operation (defaults to config)
             
         Returns:
-            True if available RAM < required_gb or RAM pressure > 90%
+            True if available RAM < required_gb or RAM pressure > critical threshold
         """
-        return self.ram_available_gb < required_gb or self.memory_pressure() > 0.9
+        from shared.config import get_settings
+        settings = get_settings().hardware
+        req = required_gb if required_gb is not None else settings.ram_oom_limit_gb
+
+        return self.ram_available_gb < req or self.memory_pressure() > settings.critical_pressure_threshold
 
 
 def detect_hardware() -> HardwareProfile:

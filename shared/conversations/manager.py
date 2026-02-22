@@ -63,10 +63,19 @@ class ConversationManager:
         self,
         user_id: str,
         title: str = None,
-        tenant_id: str = "default",
+        tenant_id: str = None,
         metadata: dict = None,
     ) -> Conversation:
         """Create new conversation."""
+        from shared.config import get_settings
+        settings = get_settings()
+        tenant_id = tenant_id or settings.app.default_tenant
+        title = title or settings.app.default_conversation_title
+        
+        # Enforce max length
+        if title:
+            title = title[:settings.conversations.title_max_length]
+        
         conv = Conversation.create(user_id, title, tenant_id)
         if metadata:
             conv.metadata = metadata
@@ -104,7 +113,7 @@ class ConversationManager:
         """List user's conversations."""
         from shared.config import get_settings
         settings = get_settings()
-        limit = limit or settings.conversations.default_limit
+        limit = min(limit or settings.conversations.default_limit, settings.conversations.max_limit)
         conversations = []
         
         async with self._pool.acquire() as conn:
@@ -224,7 +233,7 @@ class ConversationManager:
         """Get messages from conversation."""
         from shared.config import get_settings
         settings = get_settings()
-        limit = limit or settings.conversations.message_limit
+        limit = min(limit or settings.conversations.message_limit, settings.conversations.message_max_limit)
         messages = []
         
         async with self._pool.acquire() as conn:
@@ -252,7 +261,7 @@ class ConversationManager:
         """Search conversations by title or content."""
         from shared.config import get_settings
         settings = get_settings()
-        limit = limit or settings.conversations.search_limit
+        limit = min(limit or settings.conversations.search_limit, settings.conversations.max_limit)
         conversations = []
         search_pattern = f"%{query}%"
         
@@ -275,6 +284,9 @@ class ConversationManager:
     
     def _row_to_conversation(self, row: dict) -> Conversation:
         """Convert row to Conversation."""
+        from shared.config import get_settings
+        settings = get_settings()
+        
         metadata = row.get("metadata", "{}")
         if isinstance(metadata, str):
             metadata = json.loads(metadata) if metadata else {}
@@ -282,8 +294,8 @@ class ConversationManager:
         return Conversation(
             conversation_id=row["conversation_id"],
             user_id=row["user_id"],
-            tenant_id=row.get("tenant_id", "default"),
-            title=row.get("title", "New Conversation"),
+            tenant_id=row.get("tenant_id", settings.app.default_tenant),
+            title=row.get("title", settings.app.default_conversation_title),
             summary=row.get("summary", ""),
             created_at=self._parse_dt(row.get("created_at")),
             updated_at=self._parse_dt(row.get("updated_at")),

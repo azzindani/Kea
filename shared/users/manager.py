@@ -60,9 +60,11 @@ class UserManager:
         name: str,
         password: str = "",
         role: UserRole = UserRole.USER,
-        tenant_id: str = "default",
+        tenant_id: str | None = None,
     ) -> User:
         """Create new user."""
+        from shared.config import get_settings
+        tenant_id = tenant_id or get_settings().app.default_tenant
         user = User.create(email, name, password, role, tenant_id)
         
         async with self._pool.acquire() as conn:
@@ -141,10 +143,13 @@ class UserManager:
     async def list_users(
         self,
         tenant_id: str = None,
-        limit: int = 100,
+        limit: int | None = None,
         offset: int = 0,
     ) -> list[User]:
         """List users."""
+        from shared.config import get_settings
+        settings = get_settings()
+        limit = limit or settings.users.default_list_limit
         users = []
         
         async with self._pool.acquire() as conn:
@@ -174,8 +179,8 @@ class UserManager:
             user_id=row["user_id"],
             email=row["email"],
             name=row["name"],
-            role=UserRole(row.get("role", "user")),
-            tenant_id=row.get("tenant_id", "default"),
+            role=UserRole(row.get("role", get_settings().users.default_role)),
+            tenant_id=row.get("tenant_id", get_settings().app.default_tenant),
             password_hash=row.get("password_hash", ""),
             email_verified=bool(row.get("email_verified", False)),
             is_active=bool(row.get("is_active", True)),
@@ -212,10 +217,14 @@ class APIKeyManager:
         user_id: str,
         name: str,
         scopes: list[str] = None,
-        rate_limit: int = 1000,
+        rate_limit: int | None = None,
         expires_at: datetime = None,
     ) -> tuple[APIKey, str]:
         """Create new API key, returns (key, raw_key)."""
+        from shared.config import get_settings
+        settings = get_settings()
+        rate_limit = rate_limit or settings.auth.api_key_default_rate_limit
+        
         api_key, raw_key = APIKey.create(user_id, name, scopes, rate_limit, expires_at)
         
         async with self._pool.acquire() as conn:
@@ -233,7 +242,8 @@ class APIKeyManager:
     
     async def validate_key(self, raw_key: str) -> APIKey | None:
         """Validate API key and return if valid."""
-        if not raw_key or not raw_key.startswith("project_"):
+        from shared.config import get_settings
+        if not raw_key or not raw_key.startswith(get_settings().auth.api_key_prefix):
             return None
         
         key_prefix = raw_key[:12]
@@ -286,9 +296,11 @@ class APIKeyManager:
     
     def _row_to_key(self, row: dict) -> APIKey:
         """Convert row to APIKey."""
-        scopes = row.get("scopes", ["read", "write"])
+        from shared.config import get_settings
+        settings = get_settings()
+        scopes = row.get("scopes", settings.auth.default_scopes)
         if isinstance(scopes, str):
-            scopes = scopes.split(",") if scopes else ["read", "write"]
+            scopes = scopes.split(",") if scopes else settings.auth.default_scopes
         
         return APIKey(
             key_id=row["key_id"],
@@ -297,7 +309,7 @@ class APIKeyManager:
             key_hash=row["key_hash"],
             key_prefix=row["key_prefix"],
             scopes=scopes,
-            rate_limit=row.get("rate_limit", 1000),
+            rate_limit=row.get("rate_limit", settings.auth.api_key_default_rate_limit),
             is_active=bool(row.get("is_active", True)),
             created_at=self._parse_datetime(row.get("created_at")) or datetime.utcnow(),
             expires_at=self._parse_datetime(row.get("expires_at")),

@@ -47,15 +47,18 @@ def _parse_frontmatter(text: str) -> tuple[dict[str, Any], str]:
     Returns (metadata_dict, body_text).  If no frontmatter is found,
     metadata is empty and body is the full text.
     """
-    if not text.startswith("---"):
+    from shared.config import get_settings
+    delimiter = get_settings().knowledge.frontmatter_delimiter
+
+    if not text.startswith(delimiter):
         return {}, text
 
-    end = text.find("\n---", 3)
+    end = text.find(f"\n{delimiter}", 3)
     if end == -1:
         return {}, text
 
     fm_block = text[3:end].strip()
-    body = text[end + 4 :].lstrip("\n")
+    body = text[end + len(delimiter) + 1 :].lstrip("\n")
 
     if not _HAS_YAML:
         # Simple fallback: parse key: value pairs
@@ -92,7 +95,8 @@ def _infer_category(path: Path, meta: dict[str, Any]) -> str:
     if "procedures" in parts:
         return "procedure"
 
-    return "skill"  # default
+    from shared.config import get_settings
+    return get_settings().knowledge.default_category
 
 
 def _path_to_id(knowledge_dir: Path, filepath: Path) -> str:
@@ -115,9 +119,12 @@ def _scan_markdown_files(
     """Scan knowledge/ Markdown files with YAML frontmatter."""
     items: list[dict[str, Any]] = []
 
+    from shared.config import get_settings
+    settings = get_settings().knowledge
+
     for md_file in knowledge_dir.rglob("*.md"):
         # Skip README / documentation files
-        if md_file.name.upper() in ("README.MD", "LIBRARY_MANIFEST.MD"):
+        if md_file.name.upper() in [f.upper() for f in settings.excluded_filenames]:
             continue
 
         try:
@@ -133,7 +140,7 @@ def _scan_markdown_files(
 
         name: str = meta.get("name", md_file.stem.replace("_", " ").title())
         description: str = meta.get("description", name)
-        domain: str = str(meta.get("domain", "general")).lower()
+        domain: str = str(meta.get("domain", settings.default_domain)).lower()
         category: str = _infer_category(md_file, meta)
 
         raw_tags = meta.get("tags", [])
@@ -163,7 +170,7 @@ def _scan_markdown_files(
                 "content": body.strip() or text.strip(),
                 "metadata": {
                     "source_file": str(md_file.relative_to(knowledge_dir)),
-                    "version": str(meta.get("version", "1.0")),
+                    "version": str(meta.get("version", settings.default_version)),
                 },
             }
         )

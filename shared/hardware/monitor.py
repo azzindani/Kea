@@ -65,21 +65,24 @@ class ResourceMonitor:
     
     def __init__(
         self,
-        ram_warning_percent: float = 75.0,
-        ram_critical_percent: float = 90.0,
-        cpu_warning_percent: float = 80.0,
-        check_interval_seconds: float = 5.0,
+        ram_warning_percent: float | None = None,
+        ram_critical_percent: float | None = None,
+        cpu_warning_percent: float | None = None,
+        check_interval_seconds: float | None = None,
     ):
-        self.ram_warning = ram_warning_percent
-        self.ram_critical = ram_critical_percent
-        self.cpu_warning = cpu_warning_percent
-        self.check_interval = check_interval_seconds
+        from shared.config import get_settings
+        settings = get_settings()
+        
+        self.ram_warning = ram_warning_percent or settings.hardware.ram_warning_percent
+        self.ram_critical = ram_critical_percent or settings.hardware.ram_critical_percent
+        self.cpu_warning = cpu_warning_percent or settings.hardware.cpu_warning_percent
+        self.check_interval = check_interval_seconds or settings.hardware.check_interval_seconds
         
         self._running = False
         self._task: asyncio.Task | None = None
         self._callbacks: list[Callable[[ResourceAlert], None]] = []
         self._history: list[ResourceSnapshot] = []
-        self._max_history = 100
+        self._max_history = settings.hardware.max_history
         
         # Current state
         self._last_snapshot: ResourceSnapshot | None = None
@@ -129,11 +132,14 @@ class ResourceMonitor:
         """Get recommended parallelism based on current resources."""
         if not self._last_snapshot:
             return base_parallelism
+            
+        from shared.config import get_settings
+        settings = get_settings().hardware
         
         if self.is_memory_critical():
-            return max(1, base_parallelism // 4)
+            return max(1, base_parallelism // settings.critical_pressure_divisor)
         elif self.is_memory_warning():
-            return max(1, base_parallelism // 2)
+            return max(1, base_parallelism // settings.high_pressure_divisor)
         else:
             return base_parallelism
     
@@ -169,7 +175,8 @@ class ResourceMonitor:
             mem = psutil.virtual_memory()
             ram_percent = mem.percent
             ram_available = mem.available / (1024**3)
-            cpu_percent = psutil.cpu_percent(interval=0.1)
+            from shared.config import get_settings
+            cpu_percent = psutil.cpu_percent(interval=get_settings().hardware.cpu_sample_interval)
             
             disk = psutil.disk_usage("/")
             disk_free = disk.free / (1024**3)

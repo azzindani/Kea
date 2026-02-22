@@ -36,7 +36,7 @@ class User:
     email: str
     name: str
     role: UserRole = UserRole.USER
-    tenant_id: str = "default"      # For future multi-tenant
+    tenant_id: str = "default"      # For logic fallback, default is from config
     
     # Security
     password_hash: str = ""         # bcrypt hash
@@ -58,9 +58,13 @@ class User:
         name: str,
         password: str = "",
         role: UserRole = UserRole.USER,
-        tenant_id: str = "default",
+        tenant_id: str | None = None,
     ) -> User:
         """Create new user with hashed password."""
+        from shared.config import get_settings
+        settings = get_settings()
+        tenant_id = tenant_id or settings.app.default_tenant
+        
         user = cls(
             user_id=f"user_{uuid4().hex[:12]}",
             email=email.lower().strip(),
@@ -75,12 +79,14 @@ class User:
     @classmethod
     def anonymous(cls) -> User:
         """Create anonymous user for backward compatibility."""
+        from shared.config import get_settings
+        settings = get_settings()
         return cls(
-            user_id="anonymous",
+            user_id=settings.users.anonymous_user_id,
             email="",
-            name="Anonymous",
+            name=settings.users.anonymous_user_name,
             role=UserRole.ANONYMOUS,
-            tenant_id="default",
+            tenant_id=settings.app.default_tenant,
         )
     
     def set_password(self, password: str):
@@ -143,8 +149,8 @@ class User:
             user_id=data["user_id"],
             email=data["email"],
             name=data["name"],
-            role=UserRole(data.get("role", "user")),
-            tenant_id=data.get("tenant_id", "default"),
+            role=UserRole(data.get("role", get_settings().users.default_role)),
+            tenant_id=data.get("tenant_id", get_settings().app.default_tenant),
             password_hash=data.get("password_hash", ""),
             email_verified=data.get("email_verified", False),
             is_active=data.get("is_active", True),
@@ -169,8 +175,8 @@ class APIKey:
     key_hash: str               # SHA-256 hash of the raw key
     key_prefix: str             # First 8 chars for identification
     
-    scopes: list[str] = field(default_factory=lambda: ["read", "write"])
-    rate_limit: int = 1000      # Requests per hour
+    scopes: list[str] = field(default_factory=list) # Default from config at runtime
+    rate_limit: int = 0                            # Default from config at runtime
     
     is_active: bool = True
     created_at: datetime = field(default_factory=datetime.utcnow)
@@ -183,7 +189,7 @@ class APIKey:
         user_id: str,
         name: str,
         scopes: list[str] = None,
-        rate_limit: int = 1000,
+        rate_limit: int | None = None,
         expires_at: datetime = None,
     ) -> tuple["APIKey", str]:
         """
@@ -192,16 +198,20 @@ class APIKey:
         Returns:
             (APIKey, raw_key) - raw_key is only available at creation
         """
-        raw_key = f"project_{secrets.token_urlsafe(32)}"
+        from shared.config import get_settings
+        settings = get_settings()
+        raw_key = f"{settings.auth.api_key_prefix}{secrets.token_urlsafe(32)}"
         key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
-        
+        settings = get_settings()
+        rate_limit = rate_limit or settings.auth.api_key_default_rate_limit
+
         api_key = cls(
             key_id=f"key_{uuid4().hex[:12]}",
             user_id=user_id,
             name=name,
             key_hash=key_hash,
             key_prefix=raw_key[:12],
-            scopes=scopes or ["read", "write"],
+            scopes=scopes or settings.auth.default_scopes,
             rate_limit=rate_limit,
             expires_at=expires_at,
         )
@@ -211,7 +221,8 @@ class APIKey:
     @classmethod
     def verify(cls, raw_key: str, stored_hash: str) -> bool:
         """Verify raw key against stored hash."""
-        if not raw_key.startswith("project_"):
+        from shared.config import get_settings
+        if not raw_key.startswith(get_settings().auth.api_key_prefix):
             return False
         check_hash = hashlib.sha256(raw_key.encode()).hexdigest()
         return secrets.compare_digest(check_hash, stored_hash)

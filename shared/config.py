@@ -32,6 +32,8 @@ class AppSettings(BaseModel):
     environment: Environment = Environment.DEVELOPMENT
     vocab_dir: str = "configs/vocab"
     knowledge_dir: str = "knowledge"
+    default_tenant: str = "default"
+    default_conversation_title: str = "New Conversation"
 
 
 class ServiceSettings(BaseModel):
@@ -71,10 +73,16 @@ class LLMSettings(BaseModel):
     fallback_model: str = Field(default="stepfun/step-3.5-flash:free")
     temperature: float = 0.7
     max_tokens: int = 32768
+    top_p: float = 1.0
+    frequency_penalty: float = 0.0
+    presence_penalty: float = 0.0
     enable_reasoning: bool = True
     openrouter_api_key: str = ""
     max_retries: int = 3
     retry_delay_base: float = 2.0
+    retry_min_seconds: float = 1.0
+    retry_max_seconds: float = 10.0
+    token_limit_multiplier: float = 4.0  # Heuristic for token estimation
     
     # Provider Registry
     providers: list[LLMProviderInfo] = [
@@ -159,13 +167,19 @@ class MCPSettings(BaseModel):
     """MCP configuration."""
     max_retries: int = 3
     retry_delay: float = 1.0
-    retry_backoff: float = 2.0
+    retry_backoff_factor: float = 0.5
     max_concurrent_tools: int = 5
     tool_timeout_seconds: float = 60.0
+    connect_timeout: float = 120.0
     discovery_timeout: float = 10.0
     search_limit: int = 1000
     min_similarity: float = 0.0
     jit: JITSettings = JITSettings()
+    
+    # Protocol & Metadata
+    protocol_version: str = "2024-11-05"
+    client_name: str = "system-engine"
+    client_version: str = "0.4.0"
 
 
 class EmbeddingSettings(BaseModel):
@@ -175,6 +189,13 @@ class EmbeddingSettings(BaseModel):
     api_model: str = "qwen/qwen3-embedding-8b"
     dimension: int = 1024
     batch_size: int = 32
+    max_length: int = 32768
+    instruction: str = "Given a web search query, retrieve relevant passages that answer the query"
+    api_url: str = "https://openrouter.ai/api/v1/embeddings"
+    
+    # Adaptive settings
+    high_pressure_batch_size: int = 8
+    med_pressure_batch_size: int = 16
 
 
 class RerankerSettings(BaseModel):
@@ -183,6 +204,26 @@ class RerankerSettings(BaseModel):
     per_task_top_k: int = 32768
     final_batch_top_k: int = 32768
     max_length: int = 32768
+    batch_size: int = 16
+    instruction: str = "Given a web search query, retrieve relevant passages that answer the query"
+
+    # Adaptive settings
+    high_pressure_batch_size: int = 2
+    med_pressure_batch_size: int = 4
+    low_pressure_batch_size: int = 8
+
+
+class VLSettings(BaseModel):
+    """Vision-Language embedding configuration."""
+    model_name: str = "Qwen/Qwen3-VL-Embedding-2B"
+    dimension: int = 1024
+    instruction: str = "Given a web search query, retrieve relevant passages that answer the query"
+
+
+class VLRerankerSettings(BaseModel):
+    """Vision-Language reranker configuration."""
+    model_name: str = "Qwen/Qwen3-VL-Reranker-2B"
+    instruction: str = "Given a web search query, retrieve relevant passages that answer the query"
 
 
 class TimeoutSettings(BaseModel):
@@ -191,10 +232,140 @@ class TimeoutSettings(BaseModel):
     audit_log: float = 2.0
     llm_completion: float = 60.0
     llm_streaming: float = 120.0
+    embedding_api: float = 60.0
     tool_execution: float = 300.0
     auth_token: float = 5.0
     short: float = 5.0
     long: float = 600.0
+
+
+class HardwareSettings(BaseModel):
+    """Hardware monitoring and resource settings."""
+    ram_warning_percent: float = 75.0
+    ram_critical_percent: float = 90.0
+    cpu_warning_percent: float = 80.0
+    check_interval_seconds: float = 5.0
+    max_history: int = 100
+    
+    # Executor limits
+    max_parallel_scrapers: int = 3
+    max_parallel_llm_calls: int = 2
+    max_parallel_db_writers: int = 2
+    max_parallel_embedders: int = 1
+    batch_size: int = 1000
+    chunk_size_mb: int = 10
+    scraper_timeout_seconds: int = 30
+    llm_timeout_seconds: int = 60
+    checkpoint_every_items: int = 100
+    max_memory_percent: float = 80.0
+
+    # Adative Heuristics
+    worker_cap: int = 8
+    ram_per_worker_gb: float = 2.0
+    vram_min_embedding_gb: float = 2.0
+    cpu_sample_interval: float = 0.1
+    
+    # Adaptive Divisors/Multipliers
+    scraper_worker_multiplier: int = 2
+    db_writer_worker_divisor: int = 2
+    critical_pressure_divisor: int = 4
+    high_pressure_divisor: int = 2
+    moderate_pressure_multiplier: float = 0.75
+    
+    # Pressure Thresholds
+    high_pressure_threshold: float = 0.80
+    critical_pressure_threshold: float = 0.90
+    moderate_pressure_threshold: float = 0.70
+
+    # Environment Heuristics
+    kaggle_scraper_limit: int = 10
+    default_scraper_limit: int = 5
+    colab_llm_limit: int = 2
+    kaggle_llm_limit: int = 3
+    max_llm_limit: int = 4
+    high_ram_chunk_mb: int = 50
+    med_ram_chunk_mb: int = 20
+    low_ram_chunk_mb: int = 10
+    constrained_scraper_timeout: int = 60
+    constrained_llm_timeout: int = 120
+    notebook_max_memory_percent: float = 75.0
+    notebook_checkpoint_items: int = 50
+    default_max_memory_percent: float = 85.0
+    default_checkpoint_items: int = 100
+
+    # Batch Size Heuristics
+    batch_size_high_threshold: float = 16.0
+    batch_size_med_threshold: float = 8.0
+    batch_size_low_threshold: float = 4.0
+    batch_size_high_val: int = 10000
+    batch_size_med_val: int = 5000
+    batch_size_low_val: int = 1000
+    batch_size_min_val: int = 500
+
+    # Search & Tool Discovery
+    top_k_min: int = 20
+    top_k_multiplier: int = 10
+    search_limit_min: int = 10
+    search_limit_max: int = 100
+    search_limit_multiplier: float = 10.0
+    constrained_ram_threshold: float = 8.0
+
+    # Embedder Limits
+    gpu_embedder_limit: int = 2
+    cpu_embedder_limit: int = 1
+
+    # RAM Thresholds
+    high_ram_threshold_gb: float = 8.0
+    med_ram_threshold_gb: float = 4.0
+    
+    # OOM Risk Limits
+    vram_oom_limit_gb: float = 1.0
+    ram_oom_limit_gb: float = 2.0
+
+
+class KnowledgeSettings(BaseModel):
+    """Knowledge retrieval settings for KnowledgeRetriever."""
+    cache_ttl: float = 60.0
+    min_similarity: float = 0.3
+    default_limit: int = 3
+    raw_search_limit: int = 5
+    skill_limit: int = 3
+    rule_limit: int = 2
+    procedure_limit: int = 3
+    timeout_search: float = 30.0
+    timeout_raw: float = 10.0
+    timeout_health: float = 3.0
+    
+    # Registry & Backend
+    embedding_content_limit: int = 4000
+    advisory_lock_id: int = 12346
+    
+    # Heuristics
+    results_per_gb_ram: int = 10000
+    max_results_cap: int = 100000
+    tool_registry_multiplier: int = 300
+    tool_registry_min: int = 100
+    tool_registry_max: int = 10000
+    fact_limit_sqrt_multiplier: int = 40
+    fact_limit_min: int = 20
+    fact_limit_max: int = 500
+    
+    # Scanner Defaults
+    default_domain: str = "general"
+    default_category: str = "skill"
+    default_version: str = "1.0"
+    frontmatter_delimiter: str = "---"
+    excluded_filenames: list[str] = ["README.MD", "LIBRARY_MANIFEST.MD"]
+
+    # Categories
+    category_skill: str = "skill"
+    category_rule: str = "rule"
+    category_procedure: str = "procedure"
+    category_persona: str = "persona"
+
+    # Registry
+    registry_table: str = "knowledge_registry"
+    context_header: str = "DOMAIN EXPERTISE"
 
 
 class GovernanceSettings(BaseModel):
@@ -218,12 +389,17 @@ class AuthSettings(BaseModel):
     password_min_length: int = 6
     api_key_default_rate_limit: int = 1000
     api_key_max_rate_limit: int = 10000
+    api_key_prefix: str = "project_"
+    default_scopes: list[str] = ["read", "write"]
 
 
 class UserSettings(BaseModel):
     """User management settings."""
     default_list_limit: int = 100
     max_list_limit: int = 500
+    default_role: str = "user"
+    anonymous_user_id: str = "anonymous"
+    anonymous_user_name: str = "Anonymous"
 
 
 class ConversationSettings(BaseModel):
@@ -416,6 +592,8 @@ class Settings(BaseSettings):
     mcp: MCPSettings = MCPSettings()
     embedding: EmbeddingSettings = EmbeddingSettings()
     reranker: RerankerSettings = RerankerSettings()
+    vl_embedding: VLSettings = VLSettings()
+    vl_reranker: VLRerankerSettings = VLRerankerSettings()
     timeouts: TimeoutSettings = TimeoutSettings()
     governance: GovernanceSettings = GovernanceSettings()
     auth: AuthSettings = AuthSettings()
@@ -434,6 +612,8 @@ class Settings(BaseSettings):
     users: UserSettings = UserSettings()
     swarm: SwarmSettings = SwarmSettings()
     enterprise: EnterpriseSettings = EnterpriseSettings()
+    hardware: HardwareSettings = HardwareSettings()
+    knowledge: KnowledgeSettings = KnowledgeSettings()
     status_codes: HttpStatusSettings = HttpStatusSettings()
 
     model_config = SettingsConfigDict(

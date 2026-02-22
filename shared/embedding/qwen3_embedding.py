@@ -73,7 +73,7 @@ class OpenRouterEmbedding(EmbeddingProvider):
         self.api_key = api_key or settings.llm.openrouter_api_key
         self._dimension = dimension or settings.embedding.dimension
         self.model = settings.embedding.api_model
-        self.base_url = "https://openrouter.ai/api/v1/embeddings"
+        self.base_url = settings.embedding.api_url
     
     @property
     def dimension(self) -> int:
@@ -86,7 +86,9 @@ class OpenRouterEmbedding(EmbeddingProvider):
         if not self.api_key:
             raise ValueError("OPENROUTER_API_KEY not set")
         
-        async with httpx.AsyncClient(timeout=60) as client:
+        from shared.config import get_settings
+        settings = get_settings()
+        async with httpx.AsyncClient(timeout=settings.timeouts.embedding_api) as client:
             response = await client.post(
                 self.base_url,
                 headers={
@@ -112,7 +114,9 @@ class OpenRouterEmbedding(EmbeddingProvider):
     async def embed_query(self, query: str) -> list[float]:
         """Generate embedding for query with instruction."""
         # Qwen3 embedding uses instruction prefix for queries
-        instruction = "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery: "
+        from shared.config import get_settings
+        settings = get_settings()
+        instruction = f"Instruct: {settings.embedding.instruction}\nQuery: "
         formatted_query = instruction + query
         
         embeddings = await self.embed([formatted_query])
@@ -142,17 +146,19 @@ class LocalEmbedding(EmbeddingProvider):
     
     def __init__(
         self,
-        model_name: str = "Qwen/Qwen3-Embedding-0.6B",
-        dimension: int = 1024,
+        model_name: str | None = None,
+        dimension: int | None = None,
         device: str | None = None,
         use_flash_attention: bool = False,
-        max_length: int = 32768,
+        max_length: int | None = None,
     ) -> None:
-        self.model_name = model_name
-        self._dimension = dimension
+        from shared.config import get_settings
+        settings = get_settings()
+        self.model_name = model_name or settings.embedding.model_name
+        self._dimension = dimension or settings.embedding.dimension
         self.device = device or ("cuda" if self._has_cuda() else "cpu")
         self.use_flash_attention = use_flash_attention
-        self.max_length = max_length
+        self.max_length = max_length or settings.embedding.max_length
     
     def _has_cuda(self) -> bool:
         try:
@@ -251,18 +257,22 @@ class LocalEmbedding(EmbeddingProvider):
         model, tokenizer = self._load_model()
         loop = asyncio.get_event_loop()
         
+        from shared.config import get_settings
+        settings = get_settings()
+        
         # Check VRAM pressure and adjust batch size
-        batch_size = 32  # Default batch size
+        batch_size = settings.embedding.batch_size  # Default batch size
         try:
             from shared.hardware.detector import detect_hardware
             hw = detect_hardware()
             if hw.cuda_available:
                 hw.refresh_vram()
-                if hw.vram_pressure() > 0.8:
-                    batch_size = 8
-                    logger.warning(f"VRAM pressure high ({hw.vram_pressure()*100:.1f}%), reducing batch to {batch_size}")
-                elif hw.vram_pressure() > 0.6:
-                    batch_size = 16
+                pressure = hw.vram_pressure()
+                if pressure > settings.hardware.critical_pressure_threshold:
+                    batch_size = settings.embedding.high_pressure_batch_size
+                    logger.warning(f"VRAM pressure high ({pressure*100:.1f}%), reducing batch to {batch_size}")
+                elif pressure > settings.hardware.high_pressure_threshold:
+                    batch_size = settings.embedding.med_pressure_batch_size
         except Exception:
             pass
         
@@ -307,7 +317,8 @@ class LocalEmbedding(EmbeddingProvider):
     async def embed_query(self, query: str, task: str | None = None) -> list[float]:
         """Generate embedding for query with instruction (official Qwen3 pattern)."""
         if task is None:
-            task = "Given a web search query, retrieve relevant passages that answer the query"
+            from shared.config import get_settings
+            task = get_settings().embedding.instruction
         
         # Format query with instruction
         formatted_query = self._get_detailed_instruct(task, query)

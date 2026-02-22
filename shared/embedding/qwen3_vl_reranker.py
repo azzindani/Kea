@@ -44,11 +44,14 @@ class VLRerankerProvider:
     
     def __init__(
         self,
-        model_name: str = "Qwen/Qwen3-VL-Embedding-2B",
+        model_name: str | None = None,
         device: str | None = None,
         use_flash_attention: bool = False,
     ) -> None:
-        self.model_name = model_name
+        from shared.config import get_settings
+        settings = get_settings()
+        # VLReranker uses the VL Embedding model for similarity-based scoring
+        self.model_name = model_name or settings.vl_reranker.model_name or settings.vl_embedding.model_name
         self.device = device or ("cuda" if self._has_cuda() else "cpu")
         if self.device == "cuda":
             self.device = "cuda:0"
