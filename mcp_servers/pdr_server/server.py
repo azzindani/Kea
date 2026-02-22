@@ -30,7 +30,7 @@ except ImportError:
 # Tools - use aliased imports to avoid naming collisions
 from mcp_servers.pdr_server.tools import famafrench, market_global, dashboards, market_symbols, central_bank, commercial
 from shared.logging.main import setup_logging
-setup_logging()
+setup_logging(force_stderr=True)
 
 mcp = FastMCP("pdr_server", dependencies=["pandas_datareader", "pandas"])
 
@@ -183,3 +183,4 @@ class PdrServer:
         if hasattr(self.mcp, '_tool_manager') and hasattr(self.mcp._tool_manager, '_tools'):
              return list(self.mcp._tool_manager._tools.values())
         return []
+

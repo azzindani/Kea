@@ -33,7 +33,7 @@ logger = structlog.get_logger()
 
 # Create the FastMCP server
 from shared.logging.main import setup_logging
-setup_logging()
+setup_logging(force_stderr=True)
 
 mcp = FastMCP("xgboost_server", dependencies=["xgboost", "scikit-learn", "numpy", "pandas", "joblib", "scipy"])
 DataInput = Union[List[List[Any]], List[Dict[str, Any]], str, Dict[str, Any]]
@@ -104,3 +104,4 @@ class XgboostServer:
         if hasattr(self.mcp, '_tool_manager') and hasattr(self.mcp._tool_manager, '_tools'):
              return list(self.mcp._tool_manager._tools.values())
         return []
+

@@ -18,7 +18,7 @@ from mcp_servers.finviz_server.tools import (
 )
 from typing import List, Dict, Any, Optional
 from shared.logging.main import setup_logging, get_logger
-setup_logging()
+setup_logging(force_stderr=True)
 logger = get_logger(__name__)
 
 # Create the FastMCP server
@@ -315,5 +315,6 @@ class FinvizServer:
         if hasattr(self.mcp, '_tool_manager') and hasattr(self.mcp._tool_manager, '_tools'):
             return list(self.mcp._tool_manager._tools.values())
         return []
+
 
 

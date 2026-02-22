@@ -16,7 +16,7 @@ if root_path not in sys.path:
 from shared.mcp.fastmcp import FastMCP
 from typing import List, Dict, Any, Union, Optional
 from shared.logging.main import setup_logging, get_logger
-setup_logging()
+setup_logging(force_stderr=True)
 logger = get_logger(__name__)
 
 from mcp_servers.analysis_server.tools import stats_ops
@@ -386,3 +386,4 @@ class AnalysisServer:
         if hasattr(self.mcp, '_tool_manager') and hasattr(self.mcp._tool_manager, '_tools'):
             return list(self.mcp._tool_manager._tools.values())
         return []
+

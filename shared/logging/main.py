@@ -192,7 +192,7 @@ class ConsoleRenderer:
         
         return f"[log.timestamp]{timestamp}[/] [bold {level_style}]{symbol} {level.upper():<8}[/] [log.logger]{logger_name:<12}[/]{io_hint} {message}{flag_str}"
 
-def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optional[str] = None):
+def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optional[str] = None, force_stderr: bool = True):
     """Standardized logging setup for all codebases."""
     from shared.config import get_settings
     settings = get_settings()
@@ -211,9 +211,11 @@ def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optiona
     if log_format == "console":
         from rich.console import Console
         from rich.logging import RichHandler
-        handler = RichHandler(console=Console(theme=_get_rich_theme()), show_time=False, show_path=False, markup=True, rich_tracebacks=True)
+        # Standard: Logs should go to stderr to avoid breaking stdio-based protocols (like MCP)
+        console = Console(theme=_get_rich_theme(), stderr=force_stderr)
+        handler = RichHandler(console=console, show_time=False, show_path=False, markup=True, rich_tracebacks=True)
     else:
-        handler = logging.StreamHandler(sys.stderr)
+        handler = logging.StreamHandler(sys.stderr if force_stderr else sys.stdout)
         
     root_logger.addHandler(handler)
     root_logger.setLevel(getattr(logging, raw_level.upper()))

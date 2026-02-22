@@ -12,7 +12,7 @@ from shared.logging.main import setup_logging, get_logger
 import ccxt.async_support as ccxt
 import asyncio
 
-setup_logging()
+setup_logging(force_stderr=True)
 logger = get_logger(__name__)
 
 # Create the FastMCP server
@@ -306,3 +306,4 @@ class CcxtServer:
         if hasattr(self.mcp, '_tool_manager') and hasattr(self.mcp._tool_manager, '_tools'):
             return list(self.mcp._tool_manager._tools.values())
         return []
+
