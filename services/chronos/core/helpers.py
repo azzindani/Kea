@@ -5,7 +5,7 @@ Cron expression parsing and due-time detection.
 """
 
 from __future__ import annotations
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
 from shared.config import get_settings
@@ -18,7 +18,7 @@ def next_run(cron_expr: str) -> datetime | None:
     try:
         from croniter import croniter
 
-        now = datetime.now(UTC)
+        now = datetime.utcnow()
         return croniter(cron_expr, now).get_next(datetime)
     except Exception as e:
         logger.warning(f"Invalid cron expression '{cron_expr}': {e}")
@@ -36,9 +36,7 @@ def is_due(next_run_at: Any, tolerance_s: float | None = None) -> bool:
     if isinstance(next_run_at, str):
         next_run_at = datetime.fromisoformat(next_run_at)
         
-    if next_run_at.tzinfo is None:
-        next_run_at = next_run_at.replace(tzinfo=UTC)
         
-    now = datetime.now(UTC)
+    now = datetime.utcnow()
     from datetime import timedelta
     return now >= next_run_at - timedelta(seconds=tolerance_s)

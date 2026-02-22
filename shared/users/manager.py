@@ -6,7 +6,7 @@ Manages user CRUD operations with PostgreSQL backend.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 import asyncio
 import os

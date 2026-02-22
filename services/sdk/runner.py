@@ -4,6 +4,7 @@ import uuid
 from shared.logging.main import get_logger
 from services.sdk.api import AutonomousClient
 from services.sdk.metrics import MetricsCollector, JobMetrics
+from shared.config import get_settings
 
 logger = get_logger(__name__)
 
@@ -45,7 +46,7 @@ class JobRunner:
             }
             
             response = await self.client.post("/api/v1/jobs/", json=payload)
-            if response.status_code != 200:
+            if response.status_code != get_settings().status_codes.ok:
                 raise RuntimeError(f"Failed to submit job: {response.text}")
             
             job_data = response.json()
@@ -71,7 +72,7 @@ class JobRunner:
                     status_resp = await self.client.get(f"/api/v1/jobs/{job_id}")
                     poll_errors = 0  # Reset on success
                     
-                    if status_resp.status_code != 200:
+                    if status_resp.status_code != get_settings().status_codes.ok:
                         logger.warning(f"Status check failed: {status_resp.status_code}")
                         continue
                     
@@ -95,7 +96,7 @@ class JobRunner:
             # 3. Retrieve Results
             if status == "completed":
                 result_resp = await self.client.get(f"/api/v1/jobs/{job_id}/result")
-                if result_resp.status_code == 200:
+                if result_resp.status_code == get_settings().status_codes.ok:
                     result_data = result_resp.json()
                     
                     # Store the report
@@ -117,7 +118,7 @@ class JobRunner:
                 # Try to get error details
                 if status == "failed":
                     status_resp = await self.client.get(f"/api/v1/jobs/{job_id}")
-                    if status_resp.status_code == 200:
+                    if status_resp.status_code == get_settings().status_codes.ok:
                         error_msg = status_resp.json().get("error", error_msg)
                 
                 self.metrics.end_job(success=False, error=error_msg)

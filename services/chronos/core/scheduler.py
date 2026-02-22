@@ -23,7 +23,7 @@ async def fire_task(task: dict) -> None:
     
     payload = {
         "query": task["query"],
-        "depth": task.get("depth", settings.kernel.default_depth),
+        "depth": task.get("depth", settings.jobs.default_depth),
         "max_sources": task.get("max_sources", settings.chronos.default_max_sources),
     }
     
@@ -58,3 +58,4 @@ async def scheduler_loop() -> None:
             logger.error(f"Chronos scheduler loop error: {e}")
             
         await asyncio.sleep(settings.chronos.poll_interval)
+

@@ -46,14 +46,14 @@ class SystemCapabilities(BaseModel):
 # Routes
 # ============================================================================
 
-_start_time = datetime.now(__import__("datetime").UTC)
+_start_time = datetime.utcnow()
 
 
 @router.get("/health", response_model=SystemHealth)
 async def system_health():
     """Get system health status."""
     settings = get_settings()
-    uptime = (datetime.now(__import__("datetime").UTC) - _start_time).total_seconds()
+    uptime = (datetime.utcnow() - _start_time).total_seconds()
 
     return SystemHealth(
         status="healthy",

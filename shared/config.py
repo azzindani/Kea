@@ -241,6 +241,10 @@ class JobSettings(BaseModel):
     default_limit: int = 20
     max_limit: int = 100
     id_prefix: str = "job-"
+    default_depth: int = 2
+    default_max_steps: int = 20
+    max_depth: int = 5
+    max_steps: int = 100
 
 
 class MemorySettings(BaseModel):
@@ -270,12 +274,6 @@ class RateLimitSettings(BaseModel):
     ]
 
 
-class KernelSettings(BaseModel):
-    """Kernel operational parameters."""
-    default_depth: int = 2
-    default_max_steps: int = 20
-    max_depth: int = 5
-    max_steps: int = 100
 
 
 class RAGSettings(BaseModel):
@@ -393,6 +391,8 @@ class HttpStatusSettings(BaseModel):
     unprocessable_entity: int = 422
     too_many_requests: int = 429
     internal_error: int = 500
+    not_implemented: int = 501
+    bad_gateway: int = 502
     service_unavailable: int = 503
 
 
@@ -419,7 +419,6 @@ class Settings(BaseSettings):
     timeouts: TimeoutSettings = TimeoutSettings()
     governance: GovernanceSettings = GovernanceSettings()
     auth: AuthSettings = AuthSettings()
-    kernel: KernelSettings = KernelSettings()
     api: ApiSettings = ApiSettings()
     feature_flags: FeatureFlags = FeatureFlags()
     s3: S3Settings = S3Settings()

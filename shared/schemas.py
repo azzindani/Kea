@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, TypedDict
+from typing import Any
 
 from pydantic import BaseModel, Field
 from shared.config import get_settings
@@ -29,7 +29,7 @@ class SuccessResponse(BaseModel):
     status: str = "success"
     message: str | None = None
     data: Any | None = None
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(__import__("datetime").UTC))
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
 class AuditEventType(str, Enum):
@@ -98,7 +98,7 @@ class AtomicInsight(BaseModel):
     origin_url: str = Field(..., description="Originating URL")
     origin_title: str = Field(default="", description="Originating document title")
     confidence_score: float = Field(default_factory=lambda: get_settings().memory.min_confidence, ge=0.0, le=1.0)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(__import__("datetime").UTC))
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class JobStatus(str, Enum):
@@ -122,7 +122,7 @@ class Origin(BaseModel):
     url: str
     title: str
     domain: str
-    accessed_at: datetime = Field(default_factory=lambda: datetime.now(__import__("datetime").UTC))
+    created_at: datetime = Field(default_factory=datetime.utcnow)
     content_hash: str = ""
     reliability_score: float = 0.5
 
@@ -145,8 +145,8 @@ class JobRequest(BaseModel):
 
     query: str
     job_type: JobType = JobType.AUTONOMOUS
-    depth: int = Field(default_factory=lambda: get_settings().kernel.default_depth)
-    max_steps: int = Field(default_factory=lambda: get_settings().kernel.default_max_steps)
+    depth: int = Field(default_factory=lambda: get_settings().jobs.default_depth)
+    max_steps: int = Field(default_factory=lambda: get_settings().jobs.default_max_steps)
     context_hints: list[str] = Field(default_factory=list)
 
 
@@ -183,7 +183,7 @@ class ToolInvocation(BaseModel):
     result: Any | None = None
     is_error: bool = False
     duration_ms: float = 0.0
-    invoked_at: datetime = Field(default_factory=lambda: datetime.now(__import__("datetime").UTC))
+    invoked_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 # ============================================================================

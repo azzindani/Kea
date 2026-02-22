@@ -9,6 +9,7 @@ import httpx
 from typing import Optional, Dict, Any
 
 from shared.logging.main import get_logger
+from shared.config import get_settings
 
 logger = get_logger(__name__)
 
@@ -76,7 +77,7 @@ class AutonomousClient:
                 },
             )
             
-            if response.status_code == 200:
+            if response.status_code == get_settings().status_codes.ok:
                 data = response.json()
                 self.access_token = data["access_token"]
                 self.refresh_token = data["refresh_token"]
@@ -97,7 +98,7 @@ class AutonomousClient:
             },
         )
         
-        if response.status_code == 200:
+        if response.status_code == get_settings().status_codes.ok:
             data = response.json()
             self.access_token = data["access_token"]
             self.refresh_token = data["refresh_token"]

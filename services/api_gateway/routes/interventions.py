@@ -237,7 +237,10 @@ async def get_intervention(intervention_id: str) -> Any:
         logger.warning(f"DB fetch failed: {e}")
         r = None
     if r is None:
-        raise HTTPException(status_code=404, detail="Intervention not found")
+        raise HTTPException(
+            status_code=get_settings().status_codes.not_found, 
+            detail="Intervention not found"
+        )
     return InterventionRequest(
         intervention_id=r["intervention_id"],
         job_id=r["job_id"],
@@ -262,7 +265,10 @@ async def respond_to_intervention(intervention_id: str, response: InterventionRe
     if r is None:
         raise HTTPException(status_code=404, detail="Intervention not found")
     if r["status"] != "pending":
-        raise HTTPException(status_code=400, detail="Intervention already responded to")
+        raise HTTPException(
+            status_code=get_settings().status_codes.bad_request, 
+            detail="Intervention already responded to"
+        )
 
     if response.decision == "approved":
         new_status = InterventionStatus.APPROVED

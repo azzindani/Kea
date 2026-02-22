@@ -64,7 +64,11 @@ async def get_vector_store() -> PostgresVectorStore:
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok", "service": "vault"}
+    return {
+        "status": "ok", 
+        "service": "vault", 
+        "timestamp": datetime.utcnow().isoformat()
+    }
 
 
 # ============================================================================
@@ -91,7 +95,10 @@ async def log_event(request: LogEventRequest) -> dict:
         try:
             event_type = AuditEventType(request.event_type.lower())
         except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid event type: {request.event_type}")
+            raise HTTPException(
+                status_code=get_settings().status_codes.bad_request, 
+                detail=f"Invalid event type: {request.event_type}"
+            )
 
     entry_id = await audit.log(
         event_type=event_type,
@@ -129,7 +136,7 @@ class SaveSessionRequest(BaseModel):
     facts: list[dict[str, Any]] = []
 
 
-@app.post("/persistence/sessions", status_code=201)
+@app.post("/persistence/sessions", status_code=get_settings().status_codes.created)
 async def save_execution_session(request: SaveSessionRequest) -> dict:
     """Persist execution results to the vector store for later retrieval."""
     store = await get_vector_store()

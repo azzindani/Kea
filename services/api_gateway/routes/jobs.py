@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Query
 from pydantic import BaseModel, Field
 
 from shared.schemas import JobType, JobStatus
@@ -36,14 +36,16 @@ ORCHESTRATOR_URL = ServiceRegistry.get_url(ServiceName.ORCHESTRATOR)
 # Database Setup
 # ============================================================================
 
-CREATE_JOBS_TABLE = """
+def _get_create_jobs_table_sql() -> str:
+    settings = get_settings()
+    return f"""
 CREATE TABLE IF NOT EXISTS system_jobs (
     job_id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
     query TEXT NOT NULL,
     job_type TEXT NOT NULL,
-    depth INTEGER DEFAULT 2,
-    max_steps INTEGER DEFAULT 20,
+    depth INTEGER DEFAULT {settings.jobs.default_depth},
+    max_steps INTEGER DEFAULT {settings.jobs.default_max_steps},
     status TEXT NOT NULL,
     progress REAL DEFAULT 0.0,
     created_at TIMESTAMPTZ NOT NULL,
@@ -61,7 +63,7 @@ async def ensure_table_exists():
     """Create jobs table if not exists."""
     try:
         pool = await get_database_pool()
-        await pool.execute(CREATE_JOBS_TABLE)
+        await pool.execute(_get_create_jobs_table_sql())
         logger.debug("Jobs table ensured")
     except Exception as e:
         logger.warning(f"Could not create jobs table (may already exist): {e}")
@@ -320,14 +322,14 @@ class CreateJobRequest(BaseModel):
     query: str = Field(..., min_length=1)
     job_type: JobType = JobType.AUTONOMOUS
     depth: int = Field(
-        default_factory=lambda: get_settings().kernel.default_depth, 
+        default_factory=lambda: get_settings().jobs.default_depth, 
         ge=1, 
-        le=get_settings().kernel.max_depth
+        le=get_settings().jobs.max_depth
     )
     max_steps: int = Field(
-        default_factory=lambda: get_settings().kernel.default_max_steps, 
+        default_factory=lambda: get_settings().jobs.default_max_steps, 
         ge=1, 
-        le=get_settings().kernel.max_steps
+        le=get_settings().jobs.max_steps
     )
 
 

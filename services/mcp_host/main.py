@@ -1,15 +1,12 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI, HTTPException
-import fastapi
+from fastapi import FastAPI
 import uvicorn
 from prometheus_client import make_asgi_app
 from contextlib import asynccontextmanager
 
 from shared.logging.main import get_logger, setup_logging, LogConfig, RequestLoggingMiddleware
-import os
-
 import asyncio
 from shared.schemas import (
     ToolRequest, BatchToolRequest, ToolResponse, ToolSearchRequest, ToolOutput
@@ -66,7 +63,8 @@ async def health():
         "status": "ok", 
         "service": "mcp_host",
         "servers_available": count,
-        "active_sessions": len(registry.active_sessions)
+        "active_sessions": len(registry.active_sessions),
+        "timestamp": datetime.utcnow().isoformat()
     }
 
 
@@ -138,7 +136,7 @@ async def execute_tool(request: ToolRequest):
             server_name = registry.get_server_for_tool(request.tool_name)
             
         if not server_name:
-             raise ValueError(f"Tool {request.tool_name} not found in any server")
+            raise ValueError(f"Tool {request.tool_name} not found in any server")
 
         # Ephemeral Execution (Spawn -> Run -> Stop)
         result = await registry.execute_tool_ephemeral(
@@ -182,8 +180,8 @@ async def execute_batch(request: BatchToolRequest):
                 await registry.list_all_tools()
             server_name = registry.get_server_for_tool(task.tool_name)
             if not server_name:
-                 await registry.list_all_tools()
-                 server_name = registry.get_server_for_tool(task.tool_name)
+                await registry.list_all_tools()
+                server_name = registry.get_server_for_tool(task.tool_name)
             
             if not server_name:
                 raise ValueError(f"Tool {task.tool_name} not found")

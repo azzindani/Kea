@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from shared.logging.main import get_logger
@@ -90,7 +90,7 @@ async def list_providers():
         env_key = f"{p.name.upper()}_API_KEY"
         api_key_set = bool(os.getenv(env_key))
         if not api_key_set and p.name == "openrouter":
-             api_key_set = bool(settings.llm.openrouter_api_key)
+            api_key_set = bool(get_settings().llm.openrouter_api_key)
 
         # Get models for this provider
         provider_models = [m.id for m in settings.llm.models if m.provider == p.name]
@@ -149,7 +149,10 @@ async def _get_provider() -> OpenRouterProvider:
     settings = get_settings()
     api_key = os.getenv("OPENROUTER_API_KEY") or settings.llm.openrouter_api_key
     if not api_key:
-        raise HTTPException(status_code=500, detail="OPENROUTER_API_KEY not set")
+        raise HTTPException(
+            status_code=get_settings().status_codes.internal_error, 
+            detail="OPENROUTER_API_KEY not set"
+        )
     return OpenRouterProvider(api_key=api_key)
 
 
@@ -168,7 +171,10 @@ async def generate(request: GenerateRequest) -> dict:
             ) for m in request.messages
         ]
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid message format: {e}")
+        raise HTTPException(
+            status_code=get_settings().status_codes.bad_request, 
+            detail=f"Invalid message format: {e}"
+        ) from e
 
     fallback_model = settings.llm.fallback_model
     
@@ -194,8 +200,9 @@ async def generate(request: GenerateRequest) -> dict:
         except Exception as exc:
             if model == fallback_model:
                 raise HTTPException(
-                    status_code=502, detail=f"LLM API error (all providers failed): {exc}"
-                )
+                    status_code=get_settings().status_codes.bad_gateway, 
+                    detail=f"LLM API error (all providers failed): {exc}"
+                ) from exc
             logger.warning(f"Primary model {model} failed, trying fallback {fallback_model}: {exc}")
 
 
@@ -214,8 +221,6 @@ async def disable_provider(provider: str):
 @router.get("/config")
 async def get_llm_config():
     """Get current LLM configuration."""
-    from shared.config import get_settings
-
     settings = get_settings()
 
     return {

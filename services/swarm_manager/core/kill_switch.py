@@ -23,7 +23,7 @@ class BlacklistEntry:
     name: str
     reason: str
     until: datetime
-    created_at: datetime = field(default_factory=lambda: datetime.now(__import__("datetime").UTC))
+    created_at: datetime = field(default_factory=datetime.utcnow)
 
 
 class KillSwitch:
@@ -99,8 +99,7 @@ class KillSwitch:
         from shared.config import get_settings
         duration_minutes = duration_minutes or get_settings().swarm.default_blacklist_duration_minutes
         
-        from datetime import UTC
-        until = datetime.now(UTC) + timedelta(minutes=duration_minutes)
+        until = datetime.utcnow() + timedelta(minutes=duration_minutes)
         self._blacklisted_tools[tool_name] = BlacklistEntry(
             name=tool_name,
             reason=reason,
@@ -119,9 +118,8 @@ class KillSwitch:
         if tool_name not in self._blacklisted_tools:
             return False
         
-        from datetime import UTC
         entry = self._blacklisted_tools[tool_name]
-        if datetime.now(UTC) > entry.until:
+        if datetime.utcnow() > entry.until:
             # Expired, remove
             del self._blacklisted_tools[tool_name]
             return False

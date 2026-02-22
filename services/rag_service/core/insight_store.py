@@ -248,7 +248,7 @@ class InsightStore:
             origin_url=metadata.get("origin_url", ""),
             origin_title=metadata.get("origin_title", ""),
             confidence_score=metadata.get("confidence_score", get_settings().rag.default_confidence),
-            created_at=datetime.fromisoformat(metadata.get("created_at", datetime.now(__import__("datetime").UTC).isoformat())),
+            created_at=datetime.fromisoformat(metadata.get("created_at", datetime.utcnow().isoformat())),
         )
     
     def _result_to_insight(self, result) -> AtomicInsight:

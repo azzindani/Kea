@@ -76,7 +76,7 @@ async def register(request: RegisterRequest):
     existing = await user_manager.get_by_email(request.email)
     if existing:
         raise HTTPException(
-            status_code=400,
+            status_code=get_settings().status_codes.bad_request,
             detail="Email already registered",
         )
     
@@ -120,13 +120,13 @@ async def login(request: LoginRequest, response: Response):
     
     if not user:
         raise HTTPException(
-            status_code=401,
+            status_code=get_settings().status_codes.unauthorized,
             detail="Invalid email or password",
         )
     
     if not user.is_active:
         raise HTTPException(
-            status_code=403,
+            status_code=get_settings().status_codes.forbidden,
             detail="Account is deactivated",
         )
     
@@ -205,14 +205,14 @@ async def refresh_token(request: RefreshRequest):
     
     if not payload or payload.get("type") != "refresh":
         raise HTTPException(
-            status_code=401,
+            status_code=get_settings().status_codes.unauthorized,
             detail="Invalid refresh token",
         )
     
     user_id = payload.get("sub")
     if not user_id:
         raise HTTPException(
-            status_code=401,
+            status_code=get_settings().status_codes.unauthorized,
             detail="Invalid token payload",
         )
     
@@ -221,7 +221,7 @@ async def refresh_token(request: RefreshRequest):
     
     if not user or not user.is_active:
         raise HTTPException(
-            status_code=401,
+            status_code=get_settings().status_codes.unauthorized,
             detail="User not found or inactive",
         )
     

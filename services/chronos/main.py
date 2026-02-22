@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
@@ -42,8 +42,8 @@ class ScheduleRequest(BaseModel):
     """Create a new scheduled system job."""
     query: str = Field(..., description="System query to run on schedule")
     cron_expr: str = Field(..., description="Cron expression e.g. '0 8 * * *' for 08:00 daily")
-    depth: int = Field(default_factory=lambda: get_settings().kernel.default_depth, ge=1, le=get_settings().kernel.max_depth)
-    max_steps: int = Field(default_factory=lambda: get_settings().kernel.default_max_steps, ge=1, le=get_settings().kernel.max_steps)
+    depth: int = Field(default_factory=lambda: get_settings().jobs.default_depth, ge=1, le=get_settings().jobs.max_depth)
+    max_steps: int = Field(default_factory=lambda: get_settings().jobs.default_max_steps, ge=1, le=get_settings().jobs.max_steps)
     max_sources: int = Field(default_factory=lambda: get_settings().chronos.default_max_sources)
     enabled: bool = Field(default=True)
 
@@ -105,7 +105,7 @@ app.mount("/metrics", make_asgi_app())
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok", "service": "chronos", "timestamp": datetime.now(UTC).isoformat()}
+    return {"status": "ok", "service": "chronos", "timestamp": datetime.utcnow().isoformat()}
 
 
 @app.post("/schedule", response_model=SuccessResponse, status_code=get_settings().status_codes.created)
@@ -125,7 +125,7 @@ async def create_schedule(req: ScheduleRequest) -> SuccessResponse:
         "depth": req.depth,
         "max_sources": req.max_sources,
         "enabled": req.enabled,
-        "created_at": datetime.now(UTC).isoformat(),
+        "created_at": datetime.utcnow().isoformat(),
         "last_run_at": None,
         "next_run_at": nxt,
     }
@@ -165,12 +165,15 @@ async def list_schedules() -> list[ScheduledTask]:
     return result
 
 
-@app.delete("/schedule/{task_id}", status_code=204)
+@app.delete("/schedule/{task_id}", status_code=get_settings().status_codes.no_content)
 async def delete_schedule(task_id: str) -> None:
     """Delete a scheduled task."""
     deleted = await delete_task_db(task_id)
     if not deleted:
-        raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+        raise HTTPException(
+            status_code=get_settings().status_codes.not_found, 
+            detail=f"Task {task_id} not found"
+        )
 
 
 if __name__ == "__main__":

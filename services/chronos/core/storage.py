@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS scheduled_tasks (
     task_id     TEXT PRIMARY KEY,
     query       TEXT NOT NULL,
     cron_expr   TEXT NOT NULL,
-    depth       INTEGER NOT NULL DEFAULT {settings.kernel.default_depth},
+    depth       INTEGER NOT NULL DEFAULT {settings.jobs.default_depth},
     max_sources INTEGER NOT NULL DEFAULT {settings.chronos.default_max_sources},
     enabled     BOOLEAN NOT NULL DEFAULT TRUE,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),

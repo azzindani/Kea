@@ -53,8 +53,8 @@ app.mount("/metrics", make_asgi_app())
 
 @app.get("/health")
 async def health() -> dict:
-    from datetime import UTC, datetime
-    return {"status": "ok", "service": "swarm_manager", "timestamp": datetime.now(UTC).isoformat()}
+    from datetime import datetime
+    return {"status": "ok", "service": "swarm_manager", "timestamp": datetime.utcnow().isoformat()}
 
 
 # ============================================================================
@@ -111,7 +111,7 @@ class BlacklistRequest(BaseModel):
     duration_minutes: int = settings.swarm.default_blacklist_duration_minutes
 
 
-@app.post("/kill-switch/activate", status_code=200)
+@app.post("/kill-switch/activate", status_code=get_settings().status_codes.ok)
 async def activate_kill_switch(request: EmergencyStopRequest) -> dict:
     """Trigger an emergency stop of all agents."""
     switch = get_kill_switch()
@@ -120,7 +120,7 @@ async def activate_kill_switch(request: EmergencyStopRequest) -> dict:
     return {"activated": True, "reason": request.reason}
 
 
-@app.delete("/kill-switch", status_code=200)
+@app.delete("/kill-switch", status_code=get_settings().status_codes.ok)
 async def resume_from_emergency() -> dict:
     """Resume operations after an emergency stop."""
     switch = get_kill_switch()
@@ -140,7 +140,7 @@ async def kill_switch_status() -> dict:
     }
 
 
-@app.post("/kill-switch/blacklist/{tool_name}", status_code=201)
+@app.post("/kill-switch/blacklist/{tool_name}", status_code=get_settings().status_codes.created)
 async def blacklist_tool(tool_name: str, request: BlacklistRequest) -> dict:
     """Temporarily blacklist a tool."""
     switch = get_kill_switch()
@@ -150,7 +150,7 @@ async def blacklist_tool(tool_name: str, request: BlacklistRequest) -> dict:
     return {"tool": tool_name, "blacklisted": True, "duration_minutes": request.duration_minutes}
 
 
-@app.delete("/kill-switch/blacklist/{tool_name}", status_code=200)
+@app.delete("/kill-switch/blacklist/{tool_name}", status_code=get_settings().status_codes.ok)
 async def unblacklist_tool(tool_name: str) -> dict:
     """Remove a tool from the blacklist."""
     switch = get_kill_switch()
@@ -191,7 +191,7 @@ async def list_agent_escalations() -> dict:
     }
 
 
-@app.post("/agents/{work_id}/resolve", status_code=200)
+@app.post("/agents/{work_id}/resolve", status_code=get_settings().status_codes.ok)
 async def resolve_agent_escalation(work_id: str, resolution: str = "resolved") -> dict:
     """Resolve a pending escalation for a work item."""
     supervisor = get_supervisor()
@@ -199,7 +199,10 @@ async def resolve_agent_escalation(work_id: str, resolution: str = "resolved") -
         await supervisor.resolve_escalation(work_id, resolution)
         return {"work_id": work_id, "resolved": True, "resolution": resolution}
     except Exception as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(
+            status_code=get_settings().status_codes.not_found, 
+            detail=str(e)
+        ) from e
 
 
 # ============================================================================

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
 
 from shared.logging.main import get_logger
@@ -56,7 +56,10 @@ async def list_tools(client: MCPClient = Depends(get_mcp_client)):
         }
     except Exception as e:
         logger.error(f"Failed to list tools: {e}")
-        raise HTTPException(status_code=503, detail=f"MCP Host unavailable: {str(e)}")
+        raise HTTPException(
+            status_code=get_settings().status_codes.service_unavailable, 
+            detail=f"MCP Host unavailable: {str(e)}"
+        )
 
 
 @router.get("/search")
@@ -74,7 +77,10 @@ async def search_tools(
         }
     except Exception as e:
         logger.error(f"Failed to search tools: {e}")
-        raise HTTPException(status_code=503, detail=f"MCP Host unavailable: {str(e)}")
+        raise HTTPException(
+            status_code=get_settings().status_codes.service_unavailable, 
+            detail=f"MCP Host unavailable: {str(e)}"
+        )
 
 
 @router.post("/invoke", response_model=ToolCallResponse)
@@ -97,7 +103,10 @@ async def invoke_tool(request: ToolCallRequest, client: MCPClient = Depends(get_
         )
     except Exception as e:
         logger.error(f"Tool invocation error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=get_settings().status_codes.internal_error, 
+            detail=str(e)
+        )
 
 
 @router.post("/tools/invoke", response_model=ToolCallResponse)

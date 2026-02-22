@@ -170,8 +170,8 @@ class OrchestratorClient:
         max_steps: int | None = None,
     ) -> dict[str, Any]:
         settings = get_settings()
-        depth = depth or settings.kernel.default_depth
-        max_steps = max_steps or settings.kernel.default_max_steps
+        depth = depth or settings.jobs.default_depth
+        max_steps = max_steps or settings.jobs.default_max_steps
         
         response = await self._request(
             "POST",
@@ -188,7 +188,7 @@ class OrchestratorClient:
     ) -> AsyncIterator[dict[str, Any]]:
         """Stream execution results via SSE."""
         settings = get_settings()
-        depth = depth or settings.kernel.default_depth
+        depth = depth or settings.jobs.default_depth
         
         client = await self._get_client()
         

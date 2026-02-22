@@ -21,7 +21,6 @@ from prometheus_client import make_asgi_app
 from shared.config import get_settings
 from shared.logging.main import get_logger, setup_logging, LogConfig, RequestLoggingMiddleware
 from shared.service_registry import ServiceName, ServiceRegistry
-from shared.vocab import load_vocab
 
 # Load settings
 settings = get_settings()
@@ -71,15 +70,15 @@ class ExecutionRequest(BaseModel):
     """General execution request."""
     query: str = Field(..., min_length=1, description="Task query")
     depth: int = Field(
-        default=settings.kernel.default_depth, 
+        default=settings.jobs.default_depth, 
         ge=1, 
-        le=settings.kernel.max_depth, 
+        le=settings.jobs.max_depth, 
         description="Execution depth"
     )
     max_steps: int = Field(
-        default=settings.kernel.default_max_steps, 
+        default=settings.jobs.default_max_steps, 
         ge=1, 
-        le=settings.kernel.max_steps, 
+        le=settings.jobs.max_steps, 
         description="Max steps"
     )
 
@@ -101,10 +100,12 @@ class ExecutionResponse(BaseModel):
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
+    from datetime import datetime
     return {
         "status": "healthy",
         "service": "orchestrator",
         "mode": "redesign",
+        "timestamp": datetime.utcnow().isoformat(),
     }
 
 
@@ -115,7 +116,7 @@ async def list_tools():
         mcp_url = ServiceRegistry.get_url(ServiceName.MCP_HOST)
         async with httpx.AsyncClient(timeout=settings.mcp.discovery_timeout) as client:
             resp = await client.get(f"{mcp_url}/tools")
-            if resp.status_code == 200:
+            if resp.status_code == get_settings().status_codes.ok:
                 return resp.json()
     except Exception as e:
         logger.warning(f"Could not reach MCP Host for tool list: {e}")
@@ -128,7 +129,7 @@ async def start_execution(request: ExecutionRequest):
     Start execution job (Redesign in progress).
     """
     raise HTTPException(
-        status_code=501, 
+        status_code=get_settings().status_codes.not_implemented, 
         detail="Kernel engine is currently under redesign."
     )
 
@@ -143,15 +144,21 @@ async def call_tool(tool_name: str, arguments: dict[str, Any]):
                 f"{mcp_url}/tools/execute",
                 json={"tool_name": tool_name, "arguments": arguments},
             )
-            if resp.status_code == 404:
-                raise HTTPException(status_code=404, detail=f"Tool {tool_name} not found")
-            if resp.status_code != 200:
+            if resp.status_code == get_settings().status_codes.not_found:
+                raise HTTPException(
+                    status_code=get_settings().status_codes.not_found, 
+                    detail=f"Tool {tool_name} not found"
+                )
+            if resp.status_code != get_settings().status_codes.ok:
                 raise HTTPException(status_code=resp.status_code, detail=resp.text)
             return resp.json()
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=get_settings().status_codes.internal_error, 
+            detail=str(e)
+        )
 
 
 @app.get("/execute/stream")
@@ -164,8 +171,8 @@ async def stream_execution(
     Stream execution results (Redesign in progress).
     """
     global settings
-    depth = depth or settings.kernel.default_depth
-    max_steps = max_steps or settings.kernel.default_max_steps
+    depth = depth or settings.jobs.default_depth
+    max_steps = max_steps or settings.jobs.default_max_steps
     async def event_generator():
         yield f"data: {json.dumps({'event': 'error', 'message': 'Kernel engine is under redesign.'})}\n\n"
 

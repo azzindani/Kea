@@ -102,7 +102,7 @@ class RAGServiceClient:
         """Get a fact by ID."""
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.get(f"{self.base_url}/facts/{fact_id}")
-            if response.status_code == 404:
+            if response.status_code == get_settings().status_codes.not_found:
                 return None
             response.raise_for_status()
             return response.json()
@@ -136,7 +136,7 @@ class RAGServiceClient:
         """Get artifact content by ID."""
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.get(f"{self.base_url}/artifacts/{artifact_id}")
-            if response.status_code == 404:
+            if response.status_code == get_settings().status_codes.not_found:
                 return None
             response.raise_for_status()
             return response.content

@@ -10,7 +10,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any
 from uuid import uuid4
 
 
@@ -136,7 +135,7 @@ class Conversation:
             title=title or "New Conversation",
         )
     
-    def to_dict(self, include_messages: bool = False) -> dict:
+    def to_dict(self, _include_messages: bool = False) -> dict:
         data = {
             "conversation_id": self.conversation_id,
             "user_id": self.user_id,

@@ -154,15 +154,18 @@ class InsightResponse(BaseModel):
 
 @app.get("/health")
 async def health_check():
-    from datetime import UTC, datetime
-    return {"status": "healthy", "service": "rag_service", "timestamp": datetime.now(UTC).isoformat()}
+    from datetime import datetime
+    return {"status": "healthy", "service": "rag_service", "timestamp": datetime.utcnow().isoformat()}
 
 
 @app.post("/insights", response_model=dict)
 async def add_insight(request: AddInsightRequest):
     """Add a new atomic insight."""
     if not insight_store:
-        raise HTTPException(status_code=503, detail="Insight store not initialized")
+        raise HTTPException(
+            status_code=get_settings().status_codes.service_unavailable, 
+            detail="Insight store not initialized"
+        )
 
     insight = AtomicInsight(
         insight_id="",
@@ -184,7 +187,10 @@ async def add_insight(request: AddInsightRequest):
 async def search_insights(request: SearchRequest):
     """Search for insights."""
     if not insight_store:
-        raise HTTPException(status_code=503, detail="Insight store not initialized")
+        raise HTTPException(
+            status_code=get_settings().status_codes.service_unavailable, 
+            detail="Insight store not initialized"
+        )
 
     insights = await insight_store.search(
         query=request.query,
@@ -213,11 +219,17 @@ async def search_insights(request: SearchRequest):
 async def get_insight(insight_id: str):
     """Get a specific insight."""
     if not insight_store:
-        raise HTTPException(status_code=503, detail="Insight store not initialized")
+        raise HTTPException(
+            status_code=get_settings().status_codes.service_unavailable, 
+            detail="Insight store not initialized"
+        )
 
     insight = await insight_store.get_insight(insight_id)
     if not insight:
-        raise HTTPException(status_code=404, detail="Insight not found")
+        raise HTTPException(
+            status_code=get_settings().status_codes.not_found, 
+            detail="Insight not found"
+        )
 
     return InsightResponse(
         insight_id=insight.insight_id,
@@ -235,7 +247,10 @@ async def get_insight(insight_id: str):
 async def delete_insight(insight_id: str):
     """Delete an insight."""
     if not insight_store:
-        raise HTTPException(status_code=503, detail="Insight store not initialized")
+        raise HTTPException(
+            status_code=get_settings().status_codes.service_unavailable, 
+            detail="Insight store not initialized"
+        )
 
     await insight_store.delete_insight(insight_id)
     return {"message": "Insight deleted"}
@@ -245,7 +260,10 @@ async def delete_insight(insight_id: str):
 async def list_entities():
     """List all unique entities."""
     if not insight_store:
-        raise HTTPException(status_code=503, detail="Insight store not initialized")
+        raise HTTPException(
+            status_code=get_settings().status_codes.service_unavailable, 
+            detail="Insight store not initialized"
+        )
 
     entities = await insight_store.get_entities()
     return {"entities": entities}
@@ -296,7 +314,10 @@ async def _ingest_job(request: IngestRequest):
 async def ingest_dataset(request: IngestRequest, background_tasks: BackgroundTasks):
     """Trigger background ingestion of a generic HF dataset."""
     if not dataset_loader:
-        raise HTTPException(status_code=503, detail="Dataset service not initialized")
+        raise HTTPException(
+            status_code=get_settings().status_codes.service_unavailable, 
+            detail="Dataset service not initialized"
+        )
 
     background_tasks.add_task(_ingest_job, request)
     return {"message": "Ingestion started", "dataset": request.dataset_name}
@@ -306,7 +327,10 @@ async def ingest_dataset(request: IngestRequest, background_tasks: BackgroundTas
 async def delete_dataset(dataset_id: str):
     """Unload/Delete a dataset."""
     if not insight_store:
-        raise HTTPException(status_code=503, detail="Insight store not initialized")
+        raise HTTPException(
+            status_code=get_settings().status_codes.service_unavailable, 
+            detail="Insight store not initialized"
+        )
 
     count = await insight_store.delete_by_dataset(dataset_id)
     return {"message": "Dataset deleted", "count": count}
@@ -352,7 +376,10 @@ class KnowledgeSyncRequest(BaseModel):
 async def search_knowledge(request: KnowledgeSearchRequest):
     """Semantic search for knowledge items (skills, rules, personas)."""
     if not knowledge_store:
-        raise HTTPException(status_code=503, detail="Knowledge store not initialized")
+        raise HTTPException(
+            status_code=get_settings().status_codes.service_unavailable, 
+            detail="Knowledge store not initialized"
+        )
 
     results = await knowledge_store.search(
         query=request.query,
@@ -382,11 +409,17 @@ async def search_knowledge(request: KnowledgeSearchRequest):
 async def get_knowledge(knowledge_id: str):
     """Get a specific knowledge item by ID."""
     if not knowledge_store:
-        raise HTTPException(status_code=503, detail="Knowledge store not initialized")
+        raise HTTPException(
+            status_code=get_settings().status_codes.service_unavailable, 
+            detail="Knowledge store not initialized"
+        )
 
     item = await knowledge_store.get_by_id(knowledge_id)
     if not item:
-        raise HTTPException(status_code=404, detail="Knowledge item not found")
+        raise HTTPException(
+            status_code=get_settings().status_codes.not_found, 
+            detail="Knowledge item not found"
+        )
 
     return KnowledgeResponse(
         knowledge_id=item["knowledge_id"],
@@ -406,7 +439,10 @@ async def sync_knowledge(
 ):
     """Trigger background indexing of knowledge files from the knowledge/ directory."""
     if not knowledge_store:
-        raise HTTPException(status_code=503, detail="Knowledge store not initialized")
+        raise HTTPException(
+            status_code=get_settings().status_codes.service_unavailable, 
+            detail="Knowledge store not initialized"
+        )
 
     background_tasks.add_task(_sync_knowledge_job, request.domain, request.category)
     return {"message": "Knowledge sync started"}
@@ -439,7 +475,10 @@ async def _sync_knowledge_job(
 async def knowledge_stats():
     """Get knowledge registry statistics."""
     if not knowledge_store:
-        raise HTTPException(status_code=503, detail="Knowledge store not initialized")
+        raise HTTPException(
+            status_code=get_settings().status_codes.service_unavailable, 
+            detail="Knowledge store not initialized"
+        )
 
     count = await knowledge_store.count()
     return {"total_items": count}

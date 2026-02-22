@@ -78,7 +78,10 @@ async def search_insights(request: SearchRequest) -> dict:
         return {"query": request.query, "results": insights, "total": len(insights)}
     except httpx.HTTPError as exc:
         logger.warning(f"RAG search failed: {exc}")
-        raise HTTPException(status_code=502, detail=f"RAG service unavailable: {exc}")
+        raise HTTPException(
+            status_code=get_settings().status_codes.bad_gateway, 
+            detail=f"RAG service unavailable: {exc}"
+        )
 
 
 @router.get("/insights/{insight_id}")
@@ -87,8 +90,11 @@ async def get_insight(insight_id: str) -> dict:
     try:
         async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
             resp = await client.get(f"{_rag_url()}/insights/{insight_id}")
-        if resp.status_code == 404:
-            raise HTTPException(status_code=404, detail="Insight not found")
+        if resp.status_code == get_settings().status_codes.not_found:
+            raise HTTPException(
+                status_code=get_settings().status_codes.not_found, 
+                detail="Insight not found"
+            )
         resp.raise_for_status()
         return resp.json()
     except HTTPException:
@@ -166,7 +172,10 @@ async def get_session(session_id: str) -> dict:
         pool = await get_database_pool()
         row = await pool.fetchrow("SELECT * FROM system_jobs WHERE job_id = $1", session_id)
         if row is None:
-            raise HTTPException(status_code=404, detail="Session not found")
+            raise HTTPException(
+                status_code=get_settings().status_codes.not_found, 
+                detail="Session not found"
+            )
         r = dict(row)
         for k in ("created_at", "completed_at", "updated_at"):
             if r.get(k):
@@ -176,4 +185,7 @@ async def get_session(session_id: str) -> dict:
         raise
     except Exception as exc:
         logger.warning(f"Session fetch failed: {exc}")
-        raise HTTPException(status_code=404, detail="Session not found")
+        raise HTTPException(
+            status_code=get_settings().status_codes.not_found, 
+            detail="Session not found"
+        )

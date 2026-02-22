@@ -393,9 +393,8 @@ class ComplianceEngine:
             for i in all_issues
         )
         
-        from datetime import UTC
         report = ComplianceReport(
-            timestamp=datetime.now(UTC),
+            timestamp=datetime.utcnow(),
             operation=operation,
             standards_checked=standards,
             checks_passed=checks_passed,
@@ -560,8 +559,7 @@ class ProceduralAgent:
         
         current_context = context.copy()
         current_context["procedure_id"] = procedure_id
-        from datetime import UTC
-        current_context["started_at"] = datetime.now(UTC).isoformat()
+        current_context["started_at"] = datetime.utcnow().isoformat()
         
         for step in procedure.steps:
             logger.debug(f"Executing step: {step.name}")
@@ -584,8 +582,7 @@ class ProceduralAgent:
                     raise ValueError(f"Step validation failed: {step.name}")
                 logger.warning(f"Step validation failed (optional): {step.name}")
         
-        from datetime import UTC
-        current_context["completed_at"] = datetime.now(UTC).isoformat()
+        current_context["completed_at"] = datetime.utcnow().isoformat()
         
         return current_context
 
