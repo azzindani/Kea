@@ -17,9 +17,6 @@ from contextlib import contextmanager
 
 import structlog
 from pydantic import BaseModel, Field
-from rich.console import Console
-from rich.logging import RichHandler
-from rich.theme import Theme
 
 # ============================================================================
 # 🎭 Level & Symbol standards
@@ -51,21 +48,23 @@ LEVEL_SYMBOLS = {
     "warning": "⚠️ ", "error": "❌", "critical": "💀", "alert": "🚨", "emergency": "☢️ "
 }
 
-LOG_THEME = Theme({
-    "logging.level.success": "bright_green bold",
-    "logging.level.info": "bright_blue bold",
-    "logging.level.notice": "bright_cyan bold italic",
-    "logging.level.warning": "bright_yellow bold",
-    "logging.level.error": "bright_red bold",
-    "logging.level.critical": "bright_magenta bold",
-    "logging.level.alert": "white on bright_red bold",
-    "logging.level.emergency": "white on bright_red bold blink",
-    "logging.level.debug": "cyan",
-    "log.timestamp": "blue",
-    "log.logger": "magenta",
-    "log.key": "cyan",
-    "log.value": "green",
-})
+def _get_rich_theme():
+    from rich.theme import Theme
+    return Theme({
+        "logging.level.success": "bright_green bold",
+        "logging.level.info": "bright_blue bold",
+        "logging.level.notice": "bright_cyan bold italic",
+        "logging.level.warning": "bright_yellow bold",
+        "logging.level.error": "bright_red bold",
+        "logging.level.critical": "bright_magenta bold",
+        "logging.level.alert": "white on bright_red bold",
+        "logging.level.emergency": "white on bright_red bold blink",
+        "logging.level.debug": "cyan",
+        "log.timestamp": "blue",
+        "log.logger": "magenta",
+        "log.key": "cyan",
+        "log.value": "green",
+    })
 
 # Defaults (updated by setup_logging)
 DEFAULT_FLAGS = {
@@ -163,7 +162,8 @@ class JSONRPCLog(BaseModel):
 class ConsoleRenderer:
     """Custom structlog renderer for high-end vibrant console output."""
     def __init__(self, colors: bool = True):
-        self.console = Console(theme=LOG_THEME, force_terminal=colors)
+        from rich.console import Console
+        self.console = Console(theme=_get_rich_theme(), force_terminal=colors)
         
     def __call__(self, logger: Any, method_name: str, event_dict: Dict[str, Any]) -> str:
         level = method_name.lower()
@@ -209,7 +209,9 @@ def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optiona
         root_logger.removeHandler(h)
         
     if log_format == "console":
-        handler = RichHandler(console=Console(theme=LOG_THEME), show_time=False, show_path=False, markup=True, rich_tracebacks=True)
+        from rich.console import Console
+        from rich.logging import RichHandler
+        handler = RichHandler(console=Console(theme=_get_rich_theme()), show_time=False, show_path=False, markup=True, rich_tracebacks=True)
     else:
         handler = logging.StreamHandler(sys.stderr)
         
