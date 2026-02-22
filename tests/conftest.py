@@ -6,6 +6,8 @@ Shared fixtures for all tests.
 
 import pytest
 import os
+import asyncio
+from shared.config import get_settings
 
 
 # ============================================================================
@@ -41,19 +43,19 @@ def event_loop():
 @pytest.fixture
 def api_gateway_url():
     """API Gateway base URL."""
-    return os.getenv("API_GATEWAY_URL", "http://localhost:8080")
+    return get_settings().services.gateway
 
 
 @pytest.fixture
 def orchestrator_url():
     """Orchestrator service URL."""
-    return os.getenv("ORCHESTRATOR_URL", "http://localhost:8000")
+    return get_settings().services.orchestrator
 
 
 @pytest.fixture
 def rag_service_url():
     """RAG service URL."""
-    return os.getenv("RAG_SERVICE_URL", "http://localhost:8001")
+    return get_settings().services.rag_service
 
 
 # ============================================================================

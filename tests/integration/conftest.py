@@ -8,12 +8,14 @@ These tests require running services.
 import os
 import pytest
 import httpx
+from shared.config import get_settings
 
+settings = get_settings()
 
-# Service URLs
-API_GATEWAY_URL = os.getenv("API_GATEWAY_URL", "http://localhost:8080")
-ORCHESTRATOR_URL = os.getenv("ORCHESTRATOR_URL", "http://localhost:8000")
-RAG_SERVICE_URL = os.getenv("RAG_SERVICE_URL", "http://localhost:8001")
+# Service URLs from central config
+API_GATEWAY_URL = settings.services.gateway
+ORCHESTRATOR_URL = settings.services.orchestrator
+RAG_SERVICE_URL = settings.services.rag_service
 
 # Test user credentials
 TEST_USER_EMAIL = "integration_test@example.com"

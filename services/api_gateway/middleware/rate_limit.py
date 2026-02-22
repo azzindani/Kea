@@ -206,6 +206,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         key = self._get_key(request)
         
         # Check rate limit
+        settings = get_settings()
         window = settings.rate_limit.default_window_seconds
         if self._postgres_limiter:
             allowed, remaining = await self._postgres_limiter.is_allowed(

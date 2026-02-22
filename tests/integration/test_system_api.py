@@ -13,7 +13,9 @@ import pytest
 import httpx
 
 
-API_URL = "http://localhost:8000"
+from shared.config import get_settings
+
+API_URL = get_settings().services.gateway
 
 
 class TestSystemCapabilities:

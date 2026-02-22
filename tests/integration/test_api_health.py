@@ -11,9 +11,14 @@ import httpx
 
 
 # Base URLs for services
-API_GATEWAY_URL = "http://localhost:8000"
-ORCHESTRATOR_URL = "http://localhost:8001"
-RAG_SERVICE_URL = "http://localhost:8003"
+from shared.config import get_settings
+
+settings = get_settings()
+
+# Base URLs for services
+API_GATEWAY_URL = settings.services.gateway
+ORCHESTRATOR_URL = settings.services.orchestrator
+RAG_SERVICE_URL = settings.services.rag_service
 
 
 async def check_service_available(url: str) -> bool:
