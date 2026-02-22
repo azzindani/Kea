@@ -142,19 +142,55 @@ Project/
 
 ---
 
-## 🎯 Operational Focus Tiers
+## 🎯 Human Kernel: Pyramid Architecture
 
-**CRITICAL**: To optimize context management and maintain system integrity, Kea follows a **5-Tier Operational Focus** structure.
+**CRITICAL**: Kea is a fractal corporation, and at the center of this corporation is the **Human Kernel**. To maximize modularity and enable system-wide improvements, the Human Kernel is being redesigned around a **Layered Pyramid Architecture**, initially prototyped in the `redesign/` directory.
 
-| Tier | Area | Component | Description |
+In this architecture, lower tiers represent the most fundamental, generalized building blocks. Modifying a lower tier cascades improvements to all upper tiers automatically (provided API contracts remain stable). Higher tiers coordinate and combine lower-tier functions to achieve complex behavior.
+
+```text
+                        ▲
+                       / \
+                      /   \
+                     /     \
+                    /Tier 5 \   <-- The Autonomous Ego (The Lifecycle Controller)
+                   /---------\
+                  /  Tier 4   \  <-- Execution Engine (The OODA Loop)
+                 /-------------\
+                /    Tier 3     \ <-- Complex Orchestration (Calls T2, T1, T0)
+               /-----------------\
+              /      Tier 2       \ <-- Intermediate Logic (Calls T1, T0)
+             /---------------------\
+            /        Tier 1         \ <-- Core Kernel (`kernel/`) (Calls T0)
+           /-------------------------\
+          /          Tier 0           \ <-- Base Standards (`shared/`)
+         /-----------------------------\
+```
+
+### The Human Kernel Tiers
+
+| Tier | Area | Component Scope | Description |
 | :--- | :--- | :--- | :--- |
-| **Tier 1** | **Core Brain** | `kernel/` | Logic, reasoning, and hierarchical planning. |
-| **Tier 2** | **System Body** | `services/`, `shared/` | Infrastructure, API routing, and core schemas. |
-| **Tier 3** | **Execution Engine** | `orchestrator/`, `configs/` | Background processing and operational settings. |
-| **Tier 4** | **Intelligence** | `knowledge/`, `mcp_servers/`| Skills, rules, and external tool integrations. |
-| **Tier 5** | **Support** | `migrations/`, `k8s/` | DB versioning, orchestration, and support manifests. |
+| **Tier 5** | **The Autonomous Ego** | Lifecycle Controller | Governs single-agent lifecycle, identity, and high-level goal persistence. |
+| **Tier 4** | **Execution Engine** | The OODA Loop | Manages rapid Observe-Orient-Decide-Act cycles and environment interaction. |
+| **Tier 3** | **Complex Orchestration** | Planner & Workflow Builder | Graph/Workflow building (like n8n), node assembly, parallel/sequential task scheduling. |
+| **Tier 2** | **Cognitive Engines** | Curiosity & Exploration | Task decomposition, what-if scenarios, and exploration/curiosity engines. |
+| **Tier 1** | **Core Processing** | `kernel/` primitives | Classification, intention detection, and urgency measurement. |
+| **Tier 0** | **Base Foundation** | `shared/` | The bedrock. Most general functions, basic abstractions, and system standards. |
 
-**Rule**: Unless explicitly requested, your primary focus for improvements, fixes, and refactors should be **Tiers 1-3**. Tiers 4-5 are considered stable and should only be modified when explicitly instructed.
+### 🏢 Corporate Kernel & Architectural Analogies
+
+The Human Kernel operates as an "employee" within the broader Kea corporate infrastructure. To execute tasks, the Kernel must be equipped with knowledge and tools from its environment:
+
+- **Orchestrator (The Office)**: Where the Human Kernel runs and processes its cognitive cycles.
+- **RAG Service (The Library/Knowledge)**: Provides the agent with necessary context, rules, skills, roles, and procedures to enhance context engineering.
+- **MCP Host (The Factory/Desk)**: The agent's workstation, loaded with tools (APIs, IDEs, local system commands) to manipulate the world.
+- **Vault (The Data Center)**: System memory and context history database.
+
+**The Corporate Kernel (Tier 6+)**:
+The Kea "fractal corporation" scales recursively. Sitting above Tier 5 (the individual agent) is the **Corporate Kernel**. It handles macro-orchestration, dynamically spawning, assigning, and scaling multiple Human Kernels as needed based on task requirements and hardware availability.
+
+**Redesign Phase Focus**: Code implementations will first be prototyped in the `redesign/` directory. No production code changes will be made during this pure architecture phase. Additionally, all architectural designs, flows, and structures within the `redesign/` directory MUST be documented visually using Mermaid diagrams (````mermaid`).
 
 ---
 
