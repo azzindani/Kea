@@ -14,6 +14,7 @@ from typing import Any, AsyncIterator
 
 from shared.logging.main import get_logger
 from shared.environment import get_environment_config
+from shared.config import get_settings
 
 
 logger = get_logger(__name__)
