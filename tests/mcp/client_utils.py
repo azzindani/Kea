@@ -14,8 +14,8 @@ def get_server_params(server_name: str, extra_dependencies: list[str] = None):
     Returns:
         StdioServerParameters: Configured parameters to spawn the server.
     """
-    # Default dependencies usually needed
-    deps = ["mcp", "structlog"]
+    # Default dependencies usually needed by shared utilities (logging, config)
+    deps = ["mcp", "structlog", "pydantic-settings", "pydantic"]
     if extra_dependencies:
         deps.extend(extra_dependencies)
         

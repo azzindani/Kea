@@ -49,22 +49,25 @@ LEVEL_SYMBOLS = {
 }
 
 def _get_rich_theme():
-    from rich.theme import Theme
-    return Theme({
-        "logging.level.success": "bright_green bold",
-        "logging.level.info": "bright_blue bold",
-        "logging.level.notice": "bright_cyan bold italic",
-        "logging.level.warning": "bright_yellow bold",
-        "logging.level.error": "bright_red bold",
-        "logging.level.critical": "bright_magenta bold",
-        "logging.level.alert": "white on bright_red bold",
-        "logging.level.emergency": "white on bright_red bold blink",
-        "logging.level.debug": "cyan",
-        "log.timestamp": "blue",
-        "log.logger": "magenta",
-        "log.key": "cyan",
-        "log.value": "green",
-    })
+    try:
+        from rich.theme import Theme
+        return Theme({
+            "logging.level.success": "bright_green bold",
+            "logging.level.info": "bright_blue bold",
+            "logging.level.notice": "bright_cyan bold italic",
+            "logging.level.warning": "bright_yellow bold",
+            "logging.level.error": "bright_red bold",
+            "logging.level.critical": "bright_magenta bold",
+            "logging.level.alert": "white on bright_red bold",
+            "logging.level.emergency": "white on bright_red bold blink",
+            "logging.level.debug": "cyan",
+            "log.timestamp": "blue",
+            "log.logger": "magenta",
+            "log.key": "cyan",
+            "log.value": "green",
+        })
+    except ImportError:
+        return None
 
 # Defaults (updated by setup_logging)
 DEFAULT_FLAGS = {
@@ -162,10 +165,16 @@ class JSONRPCLog(BaseModel):
 class ConsoleRenderer:
     """Custom structlog renderer for high-end vibrant console output."""
     def __init__(self, colors: bool = True):
-        from rich.console import Console
-        self.console = Console(theme=_get_rich_theme(), force_terminal=colors)
+        try:
+            from rich.console import Console
+            self.console = Console(theme=_get_rich_theme(), force_terminal=colors)
+            self._rich_available = True
+        except ImportError:
+            self._rich_available = False
         
     def __call__(self, logger: Any, method_name: str, event_dict: Dict[str, Any]) -> str:
+        if not self._rich_available:
+            return str(event_dict)  # Basic fallback
         level = method_name.lower()
         symbol = LEVEL_SYMBOLS.get(level, "•")
         timestamp = event_dict.pop("timestamp", datetime.now().strftime("%H:%M:%S"))
@@ -209,11 +218,16 @@ def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optiona
         root_logger.removeHandler(h)
         
     if log_format == "console":
-        from rich.console import Console
-        from rich.logging import RichHandler
-        # Standard: Logs should go to stderr to avoid breaking stdio-based protocols (like MCP)
-        console = Console(theme=_get_rich_theme(), stderr=force_stderr)
-        handler = RichHandler(console=console, show_time=False, show_path=False, markup=True, rich_tracebacks=True)
+        try:
+            from rich.console import Console
+            from rich.logging import RichHandler
+            # Standard: Logs should go to stderr to avoid breaking stdio-based protocols (like MCP)
+            console = Console(theme=_get_rich_theme(), stderr=force_stderr)
+            handler = RichHandler(console=console, show_time=False, show_path=False, markup=True, rich_tracebacks=True)
+        except ImportError:
+            # Fallback if rich is not installed (e.g. in some isolated MCP environments)
+            handler = logging.StreamHandler(sys.stderr if force_stderr else sys.stdout)
+            handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
     else:
         handler = logging.StreamHandler(sys.stderr if force_stderr else sys.stdout)
         

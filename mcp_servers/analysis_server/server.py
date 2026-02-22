@@ -155,9 +155,6 @@ def plot_confusion_matrix(file_path: str, y_true: str, y_pred: str, output_path:
     from mcp_servers.analysis_server.tools import plot_ops
     return plot_ops.plot_confusion_matrix(file_path, y_true, y_pred, output_path)
 
-if __name__ == "__main__":
-    mcp.run()
-
 
 # ==========================================
 # 4. Statistical Tests (New)
@@ -373,6 +370,9 @@ def signal_resample(file_path: str, column: str, num_samples: int) -> str:
     """
     from mcp_servers.analysis_server.tools import signal_ops
     return signal_ops.signal_resample(file_path, column, num_samples)
+
+if __name__ == "__main__":
+    mcp.run()
 
 class AnalysisServer:
 

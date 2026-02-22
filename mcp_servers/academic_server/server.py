@@ -107,3 +107,6 @@ class AcademicServer:
         if hasattr(self.mcp, '_tool_manager') and hasattr(self.mcp._tool_manager, '_tools'):
              return list(self.mcp._tool_manager._tools.values())
         return []
+    async def run(self):
+        """Run the server."""
+        self.mcp.run()
