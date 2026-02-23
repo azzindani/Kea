@@ -7,7 +7,7 @@ data, not an exception.
 
 Usage::
 
-    from redesign.tier_0.standard_io import (
+    from shared.standard_io import (
         # Core types
         Signal, Result, KernelError, ModuleRef, Metrics,
         SignalKind, ResultStatus, ErrorCategory, Severity,
@@ -35,7 +35,7 @@ Usage::
 
 Protocol Bridges (translate between internal/external protocols)::
 
-    from redesign.tier_0.standard_io import (
+    from shared.standard_io import (
         signal_to_tool_call, tool_result_to_signal,
         result_to_http_response, http_request_to_signal,
     )
