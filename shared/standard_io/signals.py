@@ -6,27 +6,18 @@ is discouraged — these functions generate IDs, stamp timestamps, and merge
 default tags to ensure consistency across the entire kernel.
 
 ID Generation:
-    Uses UUID4 with sig_ prefix as interim implementation.
-    Will delegate to id_and_hash.generate_id("signal") when the T0 ID module
-    is implemented with ULID support for time-sortable identifiers.
+    Delegates to shared.id_and_hash.generate_id("signal") which produces
+    ULID-based, time-sortable, Stripe-prefixed identifiers (sig_<ULID>).
 """
 
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
 from typing import Any
 
+from shared.id_and_hash import generate_id
+
 from .types import KernelError, ModuleRef, Signal, SignalKind
-
-
-def _generate_signal_id() -> str:
-    """Generate a unique signal ID with sig_ prefix.
-
-    Interim implementation using UUID4. Will be replaced by
-    id_and_hash.generate_id("signal") for ULID-based time-sortable IDs.
-    """
-    return f"sig_{uuid.uuid4().hex}"
 
 
 # ============================================================================
@@ -68,7 +59,7 @@ def create_signal(
         merged_tags.update(tags)
 
     return Signal(
-        id=_generate_signal_id(),
+        id=generate_id("signal"),
         kind=kind,
         body=body,
         origin=origin,
