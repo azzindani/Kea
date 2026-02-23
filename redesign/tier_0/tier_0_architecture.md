@@ -12,6 +12,7 @@ Tier 0 forms the bedrock of the entire Kea system, primarily residing within the
 - **Observability**: Houses base loggers (e.g., `structlog` bindings), telemetry, and tracing components.
 - **Configurations**: Parses system variables, paths, and API keys.
 - **Cache Hierarchy**: Multi-tier caching infrastructure (L1 working, L2 session, L3 result, L4 decision) used by all upper tiers.
+- **Standard I/O Protocol**: Defines Signal, Result, and KernelError — the universal data types flowing through the kernel. Includes protocol bridges between internal (kernel bus) and external (MCP/HTTP) communication.
 
 ## Architecture
 
@@ -24,6 +25,7 @@ flowchart TD
         %% Components
         nConfig["Configuration Loader"]
         nSchemas["Universal Base Schemas (Pydantic)"]
+        nStdIO["Standard I/O Protocol<br>(Signal / Result / KernelError)"]
         nHardware["Hardware & OS Detection"]
         nLogging["Root Observability (Structlog/OTel)"]
         nProtocols["Core Interface Protocols (ABCs)"]
@@ -31,7 +33,8 @@ flowchart TD
 
         %% Flow Details
         nConfig -.-> nProtocols
-        nSchemas -.-> nProtocols
+        nSchemas -.-> nStdIO
+        nStdIO -.-> nProtocols
         nHardware -.-> nLogging
         nHardware -.-> nCache
     end
@@ -48,7 +51,7 @@ flowchart TD
     classDef t0 fill:#451A03,stroke:#F59E0B,stroke-width:2px,color:#fff
     classDef t1 fill:#14532D,stroke:#22C55E,stroke-width:2px,color:#fff
     
-    class sTier0,nConfig,nSchemas,nHardware,nLogging,nProtocols,nCache t0
+    class sTier0,nConfig,nSchemas,nStdIO,nHardware,nLogging,nProtocols,nCache t0
     class sTier1,nT1Core t1
 ```
 
@@ -56,12 +59,24 @@ flowchart TD
 
 | Module | Function | Signature | Purpose |
 |--------|----------|-----------|---------|
-| `standard_io` | `validate_message_envelope` | `(raw_payload: dict) -> MCPMessage` | Parse and validate MCP JSON-RPC 2.0 messages |
-| `standard_io` | `create_request` | `(method: str, params: dict \| None, entity_type: str) -> Request` | Factory for MCP request objects |
-| `standard_io` | `create_notification` | `(method: str, params: dict \| None) -> Notification` | Factory for fire-and-forget broadcasts |
-| `standard_io` | `create_success_response` | `(request_id: str, result: dict) -> SuccessResponse` | Factory for success response objects |
-| `standard_io` | `create_error_response` | `(request_id: str, code: int, message: str, data: dict \| None) -> ErrorResponse` | Factory for structured error objects |
-| `standard_io` | `match_response_to_request` | `(request_id: str, response_pool: list[MCPMessage]) -> SuccessResponse \| ErrorResponse \| None` | Correlate async responses by ID |
+| `standard_io` | `create_signal` | `(kind: SignalKind, body: dict, origin: ModuleRef, trace_id: str, tags: dict \| None, parent_id: str \| None) -> Signal` | Universal signal factory |
+| `standard_io` | `create_text_signal` | `(text: str, origin: ModuleRef, trace_id: str, tags: dict \| None) -> Signal` | TEXT signal from string |
+| `standard_io` | `create_data_signal` | `(data: Any, schema: str, origin: ModuleRef, trace_id: str, tags: dict \| None) -> Signal` | DATA signal from typed data |
+| `standard_io` | `create_file_signal` | `(file_id: str, file_type: str, path: str \| None, origin: ModuleRef, trace_id: str) -> Signal` | FILE signal from reference |
+| `standard_io` | `create_command_signal` | `(action: str, target: ModuleRef, origin: ModuleRef, trace_id: str, payload: dict \| None) -> Signal` | COMMAND signal for control flow |
+| `standard_io` | `create_error_signal` | `(error: KernelError, origin: ModuleRef, trace_id: str) -> Signal` | Wrap KernelError as pipeline signal |
+| `standard_io` | `ok` | `(signals: list[Signal], metrics: Metrics) -> Result` | Successful result factory |
+| `standard_io` | `partial` | `(signals: list[Signal], error: KernelError, metrics: Metrics) -> Result` | Partial success factory |
+| `standard_io` | `fail` | `(error: KernelError, metrics: Metrics) -> Result` | Failed result factory |
+| `standard_io` | `skip` | `(reason: str, metrics: Metrics) -> Result` | Skipped result factory |
+| `standard_io` | `create_error` | `(code: str, category: ErrorCategory, severity: Severity, message: str, source: ModuleRef, retry: bool, detail: dict \| None, cause: KernelError \| None) -> KernelError` | Universal error factory |
+| `standard_io` | `wrap_error` | `(outer_code: str, inner: KernelError, source: ModuleRef, message: str \| None) -> KernelError` | Wrap lower-tier error with context |
+| `standard_io` | `tool_result_to_signal` | `(result: ToolResult, tool_name: str, trace_id: str) -> list[Signal]` | Bridge: MCP ToolResult → Signals |
+| `standard_io` | `signal_to_tool_call` | `(signal: Signal) -> ToolCallRequest` | Bridge: Signal → MCP ToolCallRequest |
+| `standard_io` | `result_to_http_response` | `(result: Result) -> SuccessResponse \| ProblemDetails` | Bridge: Result → HTTP envelope |
+| `standard_io` | `http_request_to_signal` | `(request: JobRequest, trace_id: str) -> Signal` | Bridge: HTTP request → Signal |
+| `standard_io` | `validate_signal` | `(signal: Signal) -> Signal \| KernelError` | Validate body matches kind conventions |
+| `standard_io` | `validate_result` | `(result: Result) -> Result \| KernelError` | Validate result consistency |
 | `normalization` | `select_normalization_strategy` | `(signal_metadata: SignalMetadata) -> NormalizationStrategy` | Route signals to appropriate normalizer |
 | `normalization` | `min_max_scale` | `(value: float, min_bound: float, max_bound: float) -> float` | Bounded linear normalization to [0.0, 1.0] |
 | `normalization` | `z_score_normalize` | `(value: float, running_stats: RunningStatistics) -> float` | Statistical normalization for unbounded data |
