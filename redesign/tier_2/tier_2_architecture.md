@@ -49,3 +49,24 @@ flowchart TD
     class sTier2,nDecomp,nCuriosity,nSims t2
     class nT3Engine,sTier3 t3
 ```
+
+## Function Registry
+
+| Module | Function | Signature | Purpose |
+|--------|----------|-----------|---------|
+| `task_decomposition` | `decompose_goal` | `async (context: WorldState) -> list[SubTaskItem]` | Top-level goal decomposition |
+| `task_decomposition` | `analyze_goal_complexity` | `async (context, intent, entities) -> ComplexityAssessment` | Evaluate goal complexity |
+| `task_decomposition` | `split_into_sub_goals` | `(assessment: ComplexityAssessment) -> list[SubGoal]` | Split into logical sub-goals |
+| `task_decomposition` | `build_dependency_array` | `(sub_goals: list[SubGoal]) -> DependencyGraph` | Task ordering via topological sort |
+| `task_decomposition` | `map_required_skills` | `(sub_goals, dependency_graph) -> list[SubTaskItem]` | Skill/role mapping per sub-task |
+| `curiosity_engine` | `explore_gaps` | `async (task_state: WorldState) -> list[ExplorationTask]` | Top-level gap exploration |
+| `curiosity_engine` | `detect_missing_variables` | `(task_state, validation_result) -> list[KnowledgeGap]` | Identify missing data/variables |
+| `curiosity_engine` | `formulate_questions` | `(gaps: list[KnowledgeGap]) -> list[ExplorationQuery]` | Generate investigation queries |
+| `curiosity_engine` | `route_exploration_strategy` | `(queries: list[ExplorationQuery]) -> list[ExplorationTask]` | Route to RAG/Web/Scan |
+| `what_if_scenario` | `simulate_outcomes` | `async (proposed_action, knowledge) -> SimulationVerdict` | Top-level simulation (Approve/Reject/Modify) |
+| `what_if_scenario` | `generate_outcome_branches` | `(action, knowledge) -> list[OutcomeBranch]` | Generate success/fail trees |
+| `what_if_scenario` | `predict_consequences` | `async (branches) -> list[ConsequencePrediction]` | Environmental impact prediction |
+| `what_if_scenario` | `calculate_risk_reward` | `(predictions) -> SimulationVerdict` | Risk/reward ratio + verdict |
+| `attention_and_plausibility` | `run_cognitive_filters` | `async (task_state: TaskState) -> RefinedState \| SanityAlert` | Top-level attention + plausibility check |
+| `attention_and_plausibility` | `filter_attention` | `async (task_state: TaskState) -> FilteredState` | Mask irrelevant noise |
+| `attention_and_plausibility` | `check_plausibility` | `async (filtered_state: FilteredState) -> PlausibilityResult` | Fact/logic/sanity verification |

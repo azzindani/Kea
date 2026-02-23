@@ -60,3 +60,20 @@ flowchart TD
     class sTier4,nT4Engine t4
     class sTier5,nIdentity,nLifecycle,nGoal t5
 ```
+
+## Function Registry
+
+| Module | Function | Signature | Purpose |
+|--------|----------|-----------|---------|
+| `lifecycle_controller` | `run_lifecycle` | `async (spawn_request: SpawnRequest) -> AgentLifecycle` | Top-level agent lifecycle runner |
+| `lifecycle_controller` | `initialize_agent` | `async (spawn_request, vault_client) -> AgentIdentity` | Agent genesis and registration |
+| `lifecycle_controller` | `load_cognitive_profile` | `async (profile_id: str, vault_client) -> CognitiveProfile` | Load persona/skills from Vault |
+| `lifecycle_controller` | `set_identity_constraints` | `(profile: CognitiveProfile) -> IdentityContext` | Enforce immutable role boundaries |
+| `lifecycle_controller` | `track_macro_objective` | `(objective: MacroObjective) -> ObjectiveState` | Track grand goal across OODA epochs |
+| `lifecycle_controller` | `control_sleep_wake` | `async (signal: LifecycleSignal) -> LifecycleState` | Start/Pause/Panic/Terminate control |
+| `lifecycle_controller` | `commit_epoch_memory` | `async (short_term_summary, vault_client) -> None` | Persist epoch to Vault |
+| `energy_and_interrupts` | `enforce_energy_authority` | `async (cost_telemetry, interrupt_queue) -> ControlDecision` | Top-level resource + interrupt monitor |
+| `energy_and_interrupts` | `track_budget` | `(cost_event, budget_state) -> BudgetState` | Accumulate API/compute costs |
+| `energy_and_interrupts` | `check_budget_exhaustion` | `(budget_state: BudgetState) -> bool` | Budget threshold check |
+| `energy_and_interrupts` | `handle_interrupt` | `async (interrupt_signal) -> InterruptAction` | Process corporate override/kill signals |
+| `energy_and_interrupts` | `manage_lifecycle_state` | `async (trigger: ControlTrigger) -> LifecycleTransition` | Execute state transitions |
