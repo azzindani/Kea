@@ -79,3 +79,30 @@ flowchart TB
 1. **The Black Box of Tier 2**: Notice how Tier 3 does not know *how* `Task Decomposition` works. It simply hands the Goal to Tier 2 and expects an array of logical steps back.
 2. **Parallelization**: Tier 3's routing algorithms (`Calculate Dependency Edges`) determine if Step A and Step B rely on each other. If not, it wires the DAG to execute them in parallel, vastly speeding up the agent's real-time OODA loop.
 3. **The `What-If` Loop**: Before finalizing a highly complex DAG, Tier 3 passes the compiled prototype back down to Tier 2's `What-If Engine` for a fast offline dry-run to ensure the agent won't trap itself in an infinite loop.
+
+## Function Decomposition
+
+### `synthesize_plan`
+- **Signature**: `async synthesize_plan(objective: str, state: AgentState) -> CompiledDAG`
+- **Description**: Top-level orchestrator. Takes a high-level objective and current agent state, delegates decomposition to Tier 2, maps sub-tasks to executable nodes, calculates dependency edges, compiles the prototype DAG, and validates it via the What-If engine. Returns a finalized `CompiledDAG` ready for Tier 4 execution, or re-enters the routing loop if the simulation rejects the graph.
+- **Calls**: Tier 2 `task_decomposition.decompose_goal()`, Tier 2 `curiosity_engine.explore_gaps()`, `map_subtasks_to_nodes()`, `calculate_dependency_edges()`, `compile_dag()`, `review_dag_with_simulation()`.
+
+### `map_subtasks_to_nodes`
+- **Signature**: `map_subtasks_to_nodes(subtasks: list[SubTaskItem]) -> list[ExecutableNode]`
+- **Description**: Step 1. Translates each `SubTaskItem` (from Tier 2 decomposition) into an `ExecutableNode` schema object. Each node wraps the action callable, input/output schemas, assigned tool bindings, and metadata. Uses the Node Assembler factory (`assemble_node()`) to guarantee standard I/O wrapping and telemetry injection.
+- **Calls**: `node_assembler.assemble_node()`, Tier 0 schema formatting.
+
+### `calculate_dependency_edges`
+- **Signature**: `calculate_dependency_edges(nodes: list[ExecutableNode]) -> list[Edge]`
+- **Description**: Step 2. Analyzes input/output contracts between nodes to determine execution ordering. Nodes whose inputs are satisfied by another node's outputs are wired sequentially. Nodes with no data dependencies are wired for parallel execution. Returns a list of directed `Edge` objects defining the DAG topology.
+- **Calls**: Topological sort, dependency analysis on node schemas.
+
+### `compile_dag`
+- **Signature**: `compile_dag(nodes: list[ExecutableNode], edges: list[Edge]) -> CompiledDAG`
+- **Description**: Step 3. Assembles the nodes and edges into a `CompiledDAG` object compatible with LangGraph's state machine format. Generates the state schema (a Tier 0 Pydantic model) from the union of all node input/output types. Validates that the graph is acyclic and all node inputs are reachable.
+- **Calls**: LangGraph `StateGraph` construction, Tier 0 Pydantic model generation.
+
+### `review_dag_with_simulation`
+- **Signature**: `async review_dag_with_simulation(dag: CompiledDAG) -> SimulationVerdict`
+- **Description**: Step 4. Passes the compiled prototype DAG to Tier 2's What-If engine for a fast offline dry-run. Checks for infinite loops, unreachable nodes, excessive parallelism, and resource over-commitment. Returns `APPROVE` (graph is safe), `REJECT` (re-route back to edge calculation), or `MODIFY` (append safeguard nodes).
+- **Calls**: Tier 2 `what_if_scenario.simulate_outcomes()`.

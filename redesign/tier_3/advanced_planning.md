@@ -76,3 +76,30 @@ flowchart TB
     class sPlanner,nSequence,nToolMatch,nHypothesis,nTracker t3
     class sT4,nT4Observe t4
 ```
+
+## Function Decomposition
+
+### `plan_advanced`
+- **Signature**: `async plan_advanced(subtasks: list[SubTaskItem], constraints: PlanningConstraints) -> TrackedPlan`
+- **Description**: Top-level orchestrator. Takes decomposed sub-tasks and planning constraints (time, priority, budget), sequences them optimally, binds MCP tools, generates expected output hypotheses, and injects a progress tracker. Returns a `TrackedPlan` object containing fully bound, sequenced nodes ready for DAG compilation.
+- **Calls**: `sequence_and_prioritize()`, `bind_tools()`, `generate_hypotheses()`, `inject_progress_tracker()`.
+
+### `sequence_and_prioritize`
+- **Signature**: `sequence_and_prioritize(subtasks: list[SubTaskItem], constraints: PlanningConstraints) -> list[SequencedTask]`
+- **Description**: Step 1: DAG sequencing and prioritization. Orders nodes not just by logical dependency but by a cost/speed/fidelity routing algorithm. When constraints emphasize speed, cheap parallel paths are preferred. When constraints emphasize accuracy, sequential high-fidelity paths are chosen. Algorithm weights are config-driven.
+- **Calls**: Config-driven weight profiles from `shared/config.py`.
+
+### `bind_tools`
+- **Signature**: `async bind_tools(sequenced_tasks: list[SequencedTask], mcp_registry: MCPToolRegistry) -> list[BoundTask]`
+- **Description**: Step 2: Tool selection and binding. Matches each sequenced task's action type to the appropriate MCP tool from the available registry (e.g., Python interpreter, vector search, file system API). Validates tool availability and compatibility with the task's input/output schemas. Returns tasks with their tool bindings attached.
+- **Calls**: MCP registry lookup, schema compatibility check.
+
+### `generate_hypotheses`
+- **Signature**: `generate_hypotheses(bound_tasks: list[BoundTask]) -> list[ExpectedOutcome]`
+- **Description**: Step 3: Hypothesis generation. For each bound task, calculates the expected output schema and success criteria (e.g., "file should exist at path X", "response status should be 200"). These hypotheses become the checkpoints that Tier 4 evaluates after execution. If an expectation is unmet, the Reflection engine is triggered.
+- **Calls**: Schema introspection on output types.
+
+### `inject_progress_tracker`
+- **Signature**: `inject_progress_tracker(tasks: list[BoundTask], hypotheses: list[ExpectedOutcome]) -> TrackedPlan`
+- **Description**: Step 4. Creates and attaches a `ProgressTracker` state object to the plan. This object travels with the DAG through the OODA loop, mapping exactly how close the agent is to completing the overarching goal (% nodes completed, % hypotheses met, total cost consumed). Enables Tier 4 Observe to report progress and Tier 5 to evaluate epoch completion.
+- **Calls**: Tier 0 `ProgressTracker` schema construction.

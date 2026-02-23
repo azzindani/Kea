@@ -551,6 +551,82 @@ class SecuritySettings(BaseModel):
     max_body_size_mb: int = 10
 
 
+class IdSettings(BaseModel):
+    """ID generation and hashing settings."""
+    # Entity type → strategy routing
+    ulid_entities: list[str] = [
+        "agent", "job", "memory", "signal", "task",
+        "node", "workflow", "insight", "conversation",
+    ]
+    uuid_entities: list[str] = [
+        "session", "nonce", "token", "request",
+    ]
+    # All other entity types with payload → deterministic hash
+
+    # Stripe-style entity prefixes
+    prefixes: dict[str, str] = {
+        "agent": "agt_",
+        "job": "job_",
+        "signal": "sig_",
+        "task": "tsk_",
+        "node": "node_",
+        "workflow": "wf_",
+        "memory": "mem_",
+        "session": "ses_",
+        "nonce": "nonce_",
+        "token": "tok_",
+        "request": "req_",
+        "document": "doc_",
+        "embedding": "emb_",
+        "insight": "ins_",
+        "conversation": "conv_",
+    }
+
+    # Deterministic hash namespace (UUIDv5)
+    hash_namespace: str = "kea.ai"
+
+
+class CacheHierarchySettings(BaseModel):
+    """Multi-tier cache hierarchy settings."""
+    # L1: Working cache (current OODA cycle)
+    l1_max_items: int = 9          # 7 ± 2
+
+    # L2: Session cache (conversation scope)
+    l2_max_items: int = 256
+    l2_ttl_seconds: int = 300      # 5 min
+
+    # L3: Result cache (cross-session deduplication)
+    l3_max_items: int = 1024
+    l3_ttl_seconds: int = 3600     # 60 min
+
+    # L4: Decision cache (anti-oscillation ring buffer)
+    l4_max_items: int = 64
+    l4_ttl_seconds: int = 30
+
+    # Pressure eviction batch size
+    pressure_evict_batch_size: int = 32
+
+
+class NormalizationSettings(BaseModel):
+    """Mathematical normalization settings."""
+    # Z-score clipping bound (values beyond ±N σ are clipped)
+    z_score_clip: float = 3.0
+
+    # Softmax temperature (higher = flatter distribution)
+    softmax_temperature: float = 1.0
+
+    # Source type → strategy routing
+    bounded_sources: list[str] = [
+        "cosine", "tool_confidence", "percentage", "similarity",
+    ]
+    unbounded_sources: list[str] = [
+        "bm25", "tfidf", "relevance_score",
+    ]
+    distribution_sources: list[str] = [
+        "classification", "intent", "category",
+    ]
+
+
 class HttpStatusSettings(BaseModel):
     """Standardized HTTP Status Codes."""
     ok: int = 200
@@ -615,6 +691,9 @@ class Settings(BaseSettings):
     hardware: HardwareSettings = HardwareSettings()
     knowledge: KnowledgeSettings = KnowledgeSettings()
     status_codes: HttpStatusSettings = HttpStatusSettings()
+    ids: IdSettings = IdSettings()
+    cache_hierarchy: CacheHierarchySettings = CacheHierarchySettings()
+    normalization: NormalizationSettings = NormalizationSettings()
 
     model_config = SettingsConfigDict(
         env_file=".env",

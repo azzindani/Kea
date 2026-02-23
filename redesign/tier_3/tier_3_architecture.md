@@ -56,3 +56,30 @@ flowchart TD
     class sTier3,nPlanner,nDAGGen,nNodeGen t3
     class nT4Engine,sTier4 t4
 ```
+
+## Function Registry
+
+| Module | Function | Signature | Purpose |
+|--------|----------|-----------|---------|
+| `graph_synthesizer` | `synthesize_plan` | `async (objective: str, state: AgentState) -> CompiledDAG` | Top-level DAG synthesis |
+| `graph_synthesizer` | `map_subtasks_to_nodes` | `(subtasks: list[SubTaskItem]) -> list[ExecutableNode]` | Convert sub-tasks to graph nodes |
+| `graph_synthesizer` | `calculate_dependency_edges` | `(nodes: list[ExecutableNode]) -> list[Edge]` | Determine sequential vs parallel edges |
+| `graph_synthesizer` | `compile_dag` | `(nodes, edges) -> CompiledDAG` | Assemble LangGraph state machine |
+| `graph_synthesizer` | `review_dag_with_simulation` | `async (dag: CompiledDAG) -> SimulationVerdict` | What-if dry-run validation |
+| `node_assembler` | `assemble_node` | `(instruction, input_schema, output_schema) -> StateNodeFunction` | Top-level node factory |
+| `node_assembler` | `wrap_in_standard_io` | `(action_callable: Callable) -> WrappedCallable` | Try/except + ErrorResponse wrapping |
+| `node_assembler` | `inject_telemetry` | `(wrapped_callable, trace_id: str) -> InstrumentedCallable` | OpenTelemetry + structlog injection |
+| `node_assembler` | `hook_input_validation` | `(callable, input_schema) -> ValidatedCallable` | Pre-execution Pydantic gate |
+| `node_assembler` | `hook_output_validation` | `(callable, output_schema) -> StateNodeFunction` | Post-execution Pydantic gate |
+| `advanced_planning` | `plan_advanced` | `async (subtasks, constraints) -> TrackedPlan` | Top-level advanced planning |
+| `advanced_planning` | `sequence_and_prioritize` | `(subtasks, constraints) -> list[SequencedTask]` | Cost/speed/fidelity routing |
+| `advanced_planning` | `bind_tools` | `async (sequenced_tasks, mcp_registry) -> list[BoundTask]` | MCP tool selection and binding |
+| `advanced_planning` | `generate_hypotheses` | `(bound_tasks) -> list[ExpectedOutcome]` | Expected output schema generation |
+| `advanced_planning` | `inject_progress_tracker` | `(tasks, hypotheses) -> TrackedPlan` | Attach progress tracking state |
+| `reflection_and_guardrails` | `run_pre_execution_check` | `async (dag: CompiledDAG) -> ApprovalResult` | Pre-execution conscience gate |
+| `reflection_and_guardrails` | `evaluate_consensus` | `async (dag_candidates) -> CompiledDAG` | Multi-path weighted voting |
+| `reflection_and_guardrails` | `check_value_guardrails` | `(dag: CompiledDAG) -> GuardrailResult` | Ethics/security/corporate policy gate |
+| `reflection_and_guardrails` | `run_post_execution_reflection` | `async (result, expected) -> ReflectionInsight` | Post-execution optimization |
+| `reflection_and_guardrails` | `critique_execution` | `(result, expected) -> CritiqueReport` | Compare actual vs expected outcomes |
+| `reflection_and_guardrails` | `optimize_loop` | `(critique: CritiqueReport) -> OptimizationSuggestion` | Generate improvement suggestions |
+| `reflection_and_guardrails` | `commit_policy_update` | `async (suggestion) -> ReflectionInsight` | Persist lessons to long-term memory |
