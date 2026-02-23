@@ -1,10 +1,10 @@
 # Team Orchestration & Information Exchange
 
 ## Overview
-Once multiple Tier 5 agents are spawned by Tier 6, they need to talk to each other to accomplish the Master Objective. Since they run completely isolated from each other (Zero-Trust boundaries), they cannot share their internal Short-Term Memories directly. 
+Once multiple Tier 6 agents (Conscious Observers, each wrapping a full T1-T5 Human Kernel) are spawned by Tier 7, they need to talk to each other to accomplish the Master Objective. Since they run completely isolated from each other (Zero-Trust boundaries), they cannot share their internal Short-Term Memories directly.
 
 - **Information Exchange (Artifact Bus)**: The physical "watercooler" of the corporation. When an agent creates a file, insight, or artifact, it publishes it to the Artifact Bus. Other agents subscribed to that artifact type can instantly pull it into their own OODA Loops (via Tier 4 `Observe`).
-- **Team Orchestration**: Acts as the Manager/Director of the spawned swarm. It listens to the status reported by every Tier 5 Ego. If the Coder Agent finishes its DAG, the Team Orchestrator signals the Reviewer Agent to wake up and start evaluating the Coder's Artifact.
+- **Team Orchestration**: Acts as the Manager/Director of the spawned swarm. It listens to the status reported by every Tier 6 Conscious Observer. If the Coder Agent finishes its DAG, the Team Orchestrator signals the Reviewer Agent to wake up and start evaluating the Coder's Artifact.
 
 ## Architecture & Flow
 
@@ -15,48 +15,52 @@ config:
 ---
 flowchart TB
     %% Communication Fabric
-    subgraph sCommBus["Tier 6: Information Exchange (The Artifact Bus)"]
+    subgraph sCommBus["Tier 7: Information Exchange (The Artifact Bus)"]
         nTopicA["Topic: Code Commits"]
         nTopicB["Topic: QA Reports"]
     end
 
     %% Swarm Manager
-    subgraph sSwarm["Tier 6: Team Orchestrator"]
+    subgraph sSwarm["Tier 7: Team Orchestrator"]
         nManager["Swarm Manager<br>(Tracks Global Progress)"]
     end
 
     %% Individual Agents (Isolated)
-    subgraph sAgent1["Tier 5: Human Kernel (Coder)"]
+    subgraph sAgent1["Tier 6: Conscious Observer (Coder)"]
         direction TB
+        nT6CoderMind["Conscious Monitor"]
         nT5CoderEgo["Ego Status"]
         nT4CoderOODA["OODA Loop<br>(Publishes Code)"]
     end
 
-    subgraph sAgent2["Tier 5: Human Kernel (Reviewer)"]
+    subgraph sAgent2["Tier 6: Conscious Observer (Reviewer)"]
         direction TB
+        nT6RevMind["Conscious Monitor"]
         nT5RevEgo["Ego Status"]
         nT4RevOODA["OODA Loop<br>(Reads Code, Publishes QA)"]
     end
 
     %% Data Flow
-    nManager -- "Wakes up Coder" --> nT5CoderEgo
-    nT5CoderEgo -- "Reports 100%" --> nManager
-    
+    nManager -- "Wakes up Coder" --> nT6CoderMind
+    nT6CoderMind -- "Reports 100%" --> nManager
+
     nT4CoderOODA -- "Write: artifact.py" --> nTopicA
-    nManager -- "Wakes up Reviewer" --> nT5RevEgo
+    nManager -- "Wakes up Reviewer" --> nT6RevMind
     nTopicA -- "Read: artifact.py" --> nT4RevOODA
-    
+
     nT4RevOODA -- "Write: qa_fail.json" --> nTopicB
     nTopicB -- "Alert: QA Failed" --> nManager
-    nManager -- "Wakes up Coder (Retry)" --> nT5CoderEgo
+    nManager -- "Wakes up Coder (Retry)" --> nT6CoderMind
 
     %% Styling
-    classDef t5 fill:#2E1065,stroke:#8B5CF6,stroke-width:1px,color:#fff
-    classDef t6 fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#fff
+    classDef t6 fill:#7C2D12,stroke:#FB923C,stroke-width:1px,color:#fff
+    classDef t7 fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#fff
     classDef t4 fill:#312E81,stroke:#6366F1,stroke-width:1px,color:#fff
-    
-    class sCommBus,sSwarm,nTopicA,nTopicB,nManager t6
-    class sAgent1,sAgent2,nT5CoderEgo,nT5RevEgo t5
+    classDef t5 fill:#2E1065,stroke:#8B5CF6,stroke-width:1px,color:#fff
+
+    class sCommBus,sSwarm,nTopicA,nTopicB,nManager t7
+    class sAgent1,sAgent2,nT6CoderMind,nT6RevMind t6
+    class nT5CoderEgo,nT5RevEgo t5
     class nT4CoderOODA,nT4RevOODA t4
 ```
 
@@ -64,7 +68,7 @@ flowchart TB
 
 ### `orchestrate_team`
 - **Signature**: `async orchestrate_team(agent_handles: list[AgentHandle], master_goal: MasterObjective) -> TeamResult`
-- **Description**: Top-level team management loop. Monitors progress across all spawned agents, sequences workflow handoffs (e.g., Coder finishes -> Reviewer starts), handles agent failures and re-spawning, and aggregates final results. Returns a `TeamResult` containing the combined artifacts, completion status, and performance metrics for the enterprise objective.
+- **Description**: Top-level team management loop. Monitors progress across all spawned Tier 6 Conscious Observers, sequences workflow handoffs (e.g., Coder finishes -> Reviewer starts), handles agent failures and re-spawning, and aggregates final results. Returns a `TeamResult` containing the combined artifacts, completion status, and performance metrics for the enterprise objective.
 - **Calls**: `track_team_progress()`, `signal_agent_wake()`, `sequence_workflow()`.
 
 ### `publish_artifact`
@@ -84,13 +88,13 @@ flowchart TB
 
 ### `track_team_progress`
 - **Signature**: `async track_team_progress(agent_handles: list[AgentHandle]) -> TeamProgressReport`
-- **Description**: Polls the status of all spawned Tier 5 Egos and aggregates their progress into a global `TeamProgressReport`. Tracks which agents are active, completed, failed, or sleeping. Calculates overall enterprise objective completion percentage and identifies blockers.
-- **Calls**: Tier 5 status API for each agent handle.
+- **Description**: Polls the status of all spawned Tier 6 Conscious Observers and aggregates their progress into a global `TeamProgressReport`. Tracks which agents are active, completed, failed, or sleeping. Calculates overall enterprise objective completion percentage and identifies blockers.
+- **Calls**: Tier 6 status API for each agent handle.
 
 ### `signal_agent_wake`
 - **Signature**: `async signal_agent_wake(agent_handle: AgentHandle, reason: WakeReason) -> None`
 - **Description**: Sends a wake signal to a specific sleeping or suspended agent. Used by the Team Orchestrator to trigger workflow continuation (e.g., "Reviewer, wake up: Coder has published code for you to review"). The `reason` payload includes the triggering event and any artifact references.
-- **Calls**: Tier 5 `lifecycle_controller.control_sleep_wake()` via service API.
+- **Calls**: Tier 6 `conscious_observer.handle_corporate_signal()` via service API.
 
 ### `sequence_workflow`
 - **Signature**: `async sequence_workflow(completion_event: CompletionEvent, workflow_rules: list[WorkflowRule]) -> None`

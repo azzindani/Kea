@@ -1,7 +1,7 @@
 # Lifecycle Controller (Autonomous Ego)
 
 ## Overview
-The Lifecycle Controller represents Tier 5, the literal "Ego" or peak of the individual Human Kernel pyramid. Where the OODA loop (Tier 4) thinks in milliseconds and seconds, the Lifecycle Controller thinks in hours, days, and complete epochs. 
+The Lifecycle Controller represents Tier 5, the "Ego" of the individual Human Kernel. Where the OODA loop (Tier 4) thinks in milliseconds and seconds, the Lifecycle Controller thinks in hours, days, and complete epochs. It is wrapped by **Tier 6 (The Conscious Observer)**, which monitors output quality and controls selective activation, but delegates all lifecycle decisions to this tier.
 
 Its job is to define the agent's identity, hold its macro-objectives (the grand goal spanning across hundreds of OODA loops), and ensure the long-term memory of its existence is safely stored in the persistent Vault Data Center.
 
@@ -13,8 +13,13 @@ config:
   layout: dagre
 ---
 flowchart TB
+    %% Tier 6 Conscious Observer
+    subgraph sTier6["Tier 6: Conscious Observer"]
+        nConscious["Metacognitive Monitor"]
+    end
+
     %% The Corporate Overseer
-    subgraph sCorp["Corporate Kernel (Tier 6+)"]
+    subgraph sCorp["Corporate Kernel (Tier 7)"]
         nManager["Multi-Agent Orchestrator"]
     end
 
@@ -47,7 +52,8 @@ flowchart TB
     end
 
     %% Routing
-    nManager -- "Spawn Agent (Task X)" --> nSpawner
+    nManager -- "Spawn Agent (Task X)" --> nConscious
+    nConscious -- "Delegate Lifecycle" --> nSpawner
     nProfiles -- "Load Profile" --> nSpawner
     
     nSleepWake -- "Start / Pause / Terminate" --> nOODA
@@ -62,8 +68,11 @@ flowchart TB
     classDef corp fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#fff
     classDef ext fill:#525252,stroke:#A3A3A3,stroke-width:1px,color:#fff
     
+    classDef t6 fill:#7C2D12,stroke:#FB923C,stroke-width:1px,color:#fff
+
     class sVault,nLongMem,nProfiles ext
     class sCorp,nManager corp
+    class sTier6,nConscious t6
     class sT5,nSpawner,nEgo,nMacroGoal,nSleepWake,nCommit t5
     class sT4,nOODA t4
 ```
@@ -77,12 +86,12 @@ flowchart TB
 
 ### `run_lifecycle`
 - **Signature**: `async run_lifecycle(spawn_request: SpawnRequest) -> AgentLifecycle`
-- **Description**: Top-level lifecycle runner. Initializes the agent (genesis), loads its cognitive profile, sets identity constraints, starts the OODA loop with the macro-objective, monitors for sleep/wake/panic signals, and commits epoch memory on completion. Returns the final `AgentLifecycle` report to the Corporate Kernel.
+- **Description**: Top-level lifecycle runner. Initializes the agent (genesis), loads its cognitive profile, sets identity constraints, starts the OODA loop with the macro-objective, monitors for sleep/wake/panic signals, and commits epoch memory on completion. Returns the final `AgentLifecycle` report to Tier 6 (Conscious Observer) and Tier 7 (Corporate Kernel).
 - **Calls**: `initialize_agent()`, `load_cognitive_profile()`, `set_identity_constraints()`, `track_macro_objective()`, `control_sleep_wake()`, `commit_epoch_memory()`.
 
 ### `initialize_agent`
 - **Signature**: `async initialize_agent(spawn_request: SpawnRequest, vault_client: VaultClient) -> AgentIdentity`
-- **Description**: Agent Genesis. Creates a new agent instance by generating a unique agent ID (via Tier 0 `generate_id()`), registering it in the Vault, and initializing its internal state structures (empty Short-Term Memory, fresh OODA state). The `spawn_request` from Tier 6 contains the assigned role, objective, and resource budget.
+- **Description**: Agent Genesis. Creates a new agent instance by generating a unique agent ID (via Tier 0 `generate_id()`), registering it in the Vault, and initializing its internal state structures (empty Short-Term Memory, fresh OODA state). The `spawn_request` from Tier 7 (via Tier 6) contains the assigned role, objective, and resource budget.
 - **Calls**: Tier 0 `id_and_hash.generate_id()`, Vault Service HTTP API.
 
 ### `load_cognitive_profile`

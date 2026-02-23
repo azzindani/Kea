@@ -1,21 +1,26 @@
 # Tier 5: The Autonomous Ego (Lifecycle Controller)
 
 ## Overview
-Tier 5 is the peak of the individual Human Kernel pyramid. It holds the "Self" concept for the agent, governing long-term existence, overarching priorities, identity configuration, and major state transitions (like waking, sleeping, or migrating). 
+Tier 5 holds the "Self" concept for the agent, governing long-term existence, overarching priorities, identity configuration, and major state transitions (like waking, sleeping, or migrating). It is supervised by **Tier 6 (The Conscious Observer)**, which adds metacognitive oversight — hallucination control, confidence calibration, and selective activation — on top of T5's lifecycle management.
 
-**CRITICAL RULE**: Tier 5 dictates the *macro* state to Tier 4 (e.g., "Start working on objective X", "Go to sleep, network is down"), but does not micromanage the OODA iterations. It acts as the ultimate authority for a singular agent.
+**CRITICAL RULE**: Tier 5 dictates the *macro* state to Tier 4 (e.g., "Start working on objective X", "Go to sleep, network is down"), but does not micromanage the OODA iterations. Tier 6 observes T5's decisions and can inject quality feedback (e.g., "outputs are poorly grounded, adjust approach") but does not override lifecycle control directly.
 
 ## Scope & Responsibilities
 - **Identity & Persistence**: Manages the agent's core identity constraints, long-term goals, and final memory summarization for persistence in the Vault Data Center.
 - **Lifecycle Management**: Wakes the agent up, handles interrupts, puts the agent into deep sleep or fallback mode when necessary.
-- **Status Reporting**: Represents the state of the singular human kernel to external controllers (like the Corporate Kernel).
+- **Status Reporting**: Reports the state of the singular human kernel upward to Tier 6 (Conscious Observer) and Tier 7 (Corporate Kernel).
 
 ## Architecture
 
 ```mermaid
 flowchart TD
+    %% Tier 6 Conscious Observer
+    subgraph sTier6["Tier 6: Conscious Observer"]
+        nConscious["Metacognitive Oversight<br>(Hallucination + Activation + Confidence)"]
+    end
+
     %% Parent Corporate Control
-    subgraph sCorp["Corporate Kernel (Tier 6+)"]
+    subgraph sCorp["Corporate Kernel (Tier 7)"]
         nCorp["Director / Macro-Orchestrator"]
     end
 
@@ -27,11 +32,11 @@ flowchart TD
     %% T5 Scope
     subgraph sTier5["Tier 5: Autonomous Ego"]
         direction TB
-        
+
         nIdentity["Identity Configurator"]
         nLifecycle["Waker / Sleeper / Fallback"]
         nGoal["Macro-Objective Tracker"]
-        
+
         nIdentity <--> nGoal
         nLifecycle <--> nGoal
     end
@@ -41,24 +46,28 @@ flowchart TD
         direction TB
         nT4Engine["OODA Loop Instance"]
     end
-    
+
     %% Flows
-    nCorp == "Spawns & Assigns" ==> nIdentity
+    nCorp == "Spawns & Assigns" ==> nConscious
+    nConscious == "Delegates Lifecycle" ==> nIdentity
+    nConscious -. "Quality Feedback" .-> nGoal
     nGoal == "Commits Epochs" ==> nVault
     nIdentity == "Loads Profiles" ==> nVault
-    
+
     nLifecycle == "Activates/Pauses" ==> nT4Engine
     nGoal == "Passes Objectives" ==> nT4Engine
-    
+
     classDef corp fill:#0f172a,stroke:#475569,stroke-width:2px,color:#fff
     classDef vault fill:#525252,stroke:#A3A3A3,stroke-width:1px,color:#fff
     classDef t4 fill:#312E81,stroke:#6366F1,stroke-width:1px,color:#fff
     classDef t5 fill:#2E1065,stroke:#8B5CF6,stroke-width:2px,color:#fff
-    
+    classDef t6 fill:#7C2D12,stroke:#FB923C,stroke-width:1px,color:#fff
+
     class sCorp,nCorp corp
     class sDataCenter,nVault vault
     class sTier4,nT4Engine t4
     class sTier5,nIdentity,nLifecycle,nGoal t5
+    class sTier6,nConscious t6
 ```
 
 ## Function Registry

@@ -3,7 +3,7 @@
 ## Overview
 Tier 0 forms the bedrock of the entire Kea system, primarily residing within the `shared/` directory. It contains the most general functions, fundamental abstractions, network protocols, configuration parsers, database schemas, and global standards.
 
-**CRITICAL RULE**: Tier 0 MUST NOT import or depend on any component from Tiers 1 through 5. It is completely blind to upper-level cognitive logic.
+**CRITICAL RULE**: Tier 0 MUST NOT import or depend on any component from Tiers 1 through 6. It is completely blind to upper-level cognitive logic.
 
 ## Scope & Responsibilities
 - **Data Schemas**: Defines Pydantic models for universal data structures.
@@ -11,6 +11,7 @@ Tier 0 forms the bedrock of the entire Kea system, primarily residing within the
 - **Hardware Abstraction**: Detects available resources (GPU, RAM, cores) to enable Adaptive Scalability.
 - **Observability**: Houses base loggers (e.g., `structlog` bindings), telemetry, and tracing components.
 - **Configurations**: Parses system variables, paths, and API keys.
+- **Cache Hierarchy**: Multi-tier caching infrastructure (L1 working, L2 session, L3 result, L4 decision) used by all upper tiers.
 
 ## Architecture
 
@@ -26,11 +27,13 @@ flowchart TD
         nHardware["Hardware & OS Detection"]
         nLogging["Root Observability (Structlog/OTel)"]
         nProtocols["Core Interface Protocols (ABCs)"]
-        
+        nCache["Cache Hierarchy (L1-L4)"]
+
         %% Flow Details
         nConfig -.-> nProtocols
         nSchemas -.-> nProtocols
         nHardware -.-> nLogging
+        nHardware -.-> nCache
     end
 
     %% T1 Interface
@@ -45,7 +48,7 @@ flowchart TD
     classDef t0 fill:#451A03,stroke:#F59E0B,stroke-width:2px,color:#fff
     classDef t1 fill:#14532D,stroke:#22C55E,stroke-width:2px,color:#fff
     
-    class sTier0,nConfig,nSchemas,nHardware,nLogging,nProtocols t0
+    class sTier0,nConfig,nSchemas,nHardware,nLogging,nProtocols,nCache t0
     class sTier1,nT1Core t1
 ```
 
@@ -70,3 +73,8 @@ flowchart TD
 | `id_and_hash` | `generate_uuid4` | `() -> str` | Cryptographically random identifier |
 | `id_and_hash` | `generate_deterministic_hash` | `(payload: bytes, namespace: str) -> str` | Content-based idempotent identifier |
 | `id_and_hash` | `inject_entity_prefix` | `(raw_id: str, entity_type: str) -> str` | Apply Stripe-style prefix (agt_, job_, etc.) |
+| `cache_hierarchy` | `read_cache` | `(key: str, level: CacheLevel \| None) -> CacheEntry \| None` | Cascading read from specified or all levels |
+| `cache_hierarchy` | `write_cache` | `(key: str, value: Any, level: CacheLevel, ttl: int \| None) -> None` | Write to specific cache level |
+| `cache_hierarchy` | `invalidate` | `(key: str, level: CacheLevel \| None) -> int` | Remove entry from specific or all levels |
+| `cache_hierarchy` | `generate_cache_key` | `(namespace: str, payload: bytes) -> str` | Content-addressed key via deterministic hash |
+| `cache_hierarchy` | `pressure_evict` | `(target_freed_bytes: int) -> int` | Free memory under hardware pressure |

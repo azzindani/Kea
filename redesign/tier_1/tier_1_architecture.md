@@ -11,6 +11,7 @@ Tier 1 represents the fundamental cognitive and computational building blocks fo
 - **Urgency Measurement**: Determining the priority/time-sensitivity of incoming information.
 - **Entity Extraction**: Identifying and standardizing real-world objects, numbers, parameters, or entities in a text.
 - **Validation**: Fundamental logical and type sanity-checks on parsed data.
+- **Signal Tagging**: The combined output of classification + intent + urgency produces `SignalTags` consumed by Tier 6's Activation Router for selective module activation. This makes T1 the first stage of the "cognitive bus" — it classifies the signal so the Conscious Observer knows which modules to wake.
 
 ## Architecture
 
@@ -40,18 +41,28 @@ flowchart TD
         direction TB
         nT2Engine["Curiosity / What-If Engine"]
     end
-    
+
+    %% T6 Consumer
+    subgraph sTier6["Tier 6: Conscious Observer"]
+        direction TB
+        nT6Router["Activation Router<br>(Reads Signal Tags)"]
+    end
+
     %% Dependencies
     nT2Engine == "Executes" ==> sTier1
     sTier1 == "Imports" ==> sTier0
+    nT6Router -. "Reads Signal Tags" .-> sTier1
     
     classDef t0 fill:#451A03,stroke:#F59E0B,stroke-width:1px,color:#fff
     classDef t1 fill:#14532D,stroke:#22C55E,stroke-width:2px,color:#fff
     classDef t2 fill:#064E3B,stroke:#10B981,stroke-width:1px,color:#fff
     
+    classDef t6 fill:#7C2D12,stroke:#FB923C,stroke-width:1px,color:#fff
+
     class nT0,sTier0 t0
     class sTier1,nClassifier,nIntent,nUrgency,nEntity,nValidator t1
     class nT2Engine,sTier2 t2
+    class sTier6,nT6Router t6
 ```
 
 ## Function Registry

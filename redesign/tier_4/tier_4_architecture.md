@@ -48,7 +48,11 @@ flowchart TD
     subgraph sTier5["Tier 5: Autonomous Ego"]
         nT5["Lifecycle Controller"]
     end
-    
+    subgraph sTier6["Tier 6: Conscious Observer"]
+        nT6["Activation Router + Quality Gate"]
+    end
+
+    nT6 == "Activation Map" ==> sTier4
     nT5 == "Wakes/Sleeps" ==> sTier4
     nDecide == "Requests Plan" ==> sTier3
     sTier3 == "Returns Graph" ==> nAct
@@ -58,11 +62,13 @@ flowchart TD
     classDef t3 fill:#1E3A8A,stroke:#3B82F6,stroke-width:1px,color:#fff
     classDef t4 fill:#312E81,stroke:#6366F1,stroke-width:2px,color:#fff
     classDef t5 fill:#2E1065,stroke:#8B5CF6,stroke-width:1px,color:#fff
-    
+    classDef t6 fill:#7C2D12,stroke:#FB923C,stroke-width:1px,color:#fff
+
     class sWorld,nMCP,nRAG,nLocalMem fill:#525252,stroke:#A3A3A3,stroke-width:1px,color:#fff
     class sTier3,nT3 t3
     class sTier4,nObserve,nOrient,nDecide,nAct t4
     class sTier5,nT5 t5
+    class sTier6,nT6 t6
 ```
 
 ## Function Registry
