@@ -628,7 +628,7 @@ class NormalizationSettings(BaseModel):
 
 
 class KernelSettings(BaseModel):
-    """Kernel Tier 1 & Tier 2 processing settings."""
+    """Kernel Tier 1 through Tier 4 processing settings."""
 
     # --- T1: Classification ---
     classification_confidence_threshold: float = 0.80
@@ -719,6 +719,49 @@ class KernelSettings(BaseModel):
     # --- T2: Task Decomposition ---
     complexity_atomic_threshold: int = 1
     complexity_compound_threshold: int = 3
+
+    # --- T3: Graph Synthesizer ---
+    max_dag_review_iterations: int = 3
+    max_parallel_branches: int = 16
+    dag_compilation_timeout_ms: float = 5000.0
+
+    # --- T3: Node Assembler ---
+    node_execution_timeout_ms: float = 30000.0
+    node_input_validation_strict: bool = True
+    node_output_validation_strict: bool = True
+
+    # --- T3: Advanced Planning ---
+    planning_speed_weight: float = 0.4
+    planning_cost_weight: float = 0.3
+    planning_fidelity_weight: float = 0.3
+    max_hypothesis_count: int = 10
+
+    # --- T3: Reflection & Guardrails ---
+    guardrail_max_consensus_candidates: int = 5
+    guardrail_approval_threshold: float = 0.7
+    guardrail_forbidden_actions: list[str] = [
+        "data_exfiltration", "unauthorized_access", "privilege_escalation",
+        "privacy_violation", "resource_abuse",
+    ]
+    reflection_min_score_gap: float = 0.2
+
+    # --- T4: OODA Loop ---
+    ooda_max_cycles: int = 100
+    ooda_poll_timeout_ms: float = 1000.0
+    ooda_tick_interval_ms: float = 50.0
+    ooda_blocked_retry_limit: int = 3
+
+    # --- T4: Async Multitasking ---
+    async_poll_interval_ms: float = 2000.0
+    max_parked_dags: int = 32
+    context_switch_overhead_ms: float = 10.0
+
+    # --- T4: Short-Term Memory ---
+    stm_max_events: int = 256
+    stm_max_entities: int = 512
+    stm_default_entity_ttl_seconds: int = 3600
+    stm_max_age_seconds: int = 7200
+    stm_context_max_items: int = 50
 
 
 class HttpStatusSettings(BaseModel):
