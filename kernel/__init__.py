@@ -13,7 +13,9 @@ Tier Structure (implemented modules)::
     Tier 3: Complex Orchestration (kernel/) → Graph Synthesizer, Node Assembler, Planning, Guardrails
     Tier 4: Execution Engine (kernel/)   → OODA Loop, Async Multitasking, Short-Term Memory
 
-    Tier 5+: Future tiers (lifecycle, observer, corporate kernel)
+    Tier 5: Autonomous Ego (kernel/)    → Lifecycle Controller, Energy & Interrupts
+    Tier 6: Conscious Observer (kernel/) → Self Model, Activation Router, Load Monitor,
+                                           Hallucination Monitor, Confidence Calibrator, Noise Gate
 
 Tier 1 — Core Processing Primitives:
     classification/             Signal classification via linguistic + semantic + hybrid merge
@@ -40,6 +42,18 @@ Tier 4 — Execution Engine:
     ooda_loop/                  Observe-Orient-Decide-Act continuous execution cycle
     async_multitasking/         DAG parking, context switching, deep sleep delegation
     short_term_memory/          Ephemeral RAM: event history, entity cache, DAG state tracking
+
+Tier 5 — Autonomous Ego:
+    lifecycle_controller/       Agent genesis, identity, sleep/wake/panic, epoch memory
+    energy_and_interrupts/      Budget tracking, exhaustion detection, corporate interrupts
+
+Tier 6 — Conscious Observer (Metacognitive Oversight):
+    self_model/                 Capability maps, cognitive state, accuracy tracking
+    activation_router/          Selective module activation, pipeline selection, pressure adaptation
+    cognitive_load_monitor/     Load measurement, loop/stall/oscillation/drift detection
+    hallucination_monitor/      Claim extraction, grading (GROUNDED/INFERRED/FABRICATED)
+    confidence_calibrator/      Domain-specific calibration curves, overconfidence detection
+    noise_gate/                 Final quality checkpoint, rejection with retry guidance
 
 Integration Protocol:
     - All functions accept Signal(s) and return Result
@@ -236,6 +250,144 @@ from kernel.short_term_memory import (
     EpochSummary,
 )
 
+# ============================================================================
+# Tier 5: Autonomous Ego
+# ============================================================================
+
+from kernel.lifecycle_controller import (
+    run_lifecycle,
+    initialize_agent,
+    load_cognitive_profile,
+    set_identity_constraints,
+    track_macro_objective,
+    control_sleep_wake,
+    commit_epoch_memory,
+    SpawnRequest,
+    AgentIdentity,
+    CognitiveProfile,
+    IdentityContext,
+    LifecyclePhase,
+    LifecycleSignal,
+    LifecycleSignalType,
+    LifecycleState,
+    ObjectiveState,
+    ObjectiveStatus,
+    AgentLifecycle,
+)
+
+from kernel.energy_and_interrupts import (
+    enforce_energy_authority,
+    track_budget,
+    check_budget_exhaustion,
+    check_budget_warning,
+    handle_interrupt,
+    manage_lifecycle_state,
+    CostDimension,
+    CostEvent,
+    BudgetState,
+    InterruptType,
+    InterruptSignal,
+    InterruptAction,
+    ControlTriggerSource,
+    ControlTrigger,
+    LifecycleTransition,
+    ControlAction,
+    ControlDecision,
+)
+
+# ============================================================================
+# Tier 6: Conscious Observer (Metacognitive Oversight)
+# ============================================================================
+
+from kernel.self_model import (
+    run_self_model,
+    assess_capability,
+    get_current_state,
+    update_cognitive_state,
+    update_accuracy_history,
+    get_calibration_history,
+    detect_capability_gap,
+    refresh_capability_map,
+    SignalTags,
+    CapabilityGap,
+    CapabilityAssessment,
+    ProcessingPhase,
+    AgentCognitiveState,
+    CalibrationDataPoint,
+    CalibrationHistory,
+    CalibrationCurve,
+)
+
+from kernel.activation_router import (
+    compute_activation_map,
+    classify_signal_complexity,
+    select_pipeline,
+    check_decision_cache,
+    cache_decision,
+    ComplexityLevel,
+    ModuleActivation,
+    PipelineConfig,
+    ActivationMap,
+)
+
+from kernel.cognitive_load_monitor import (
+    monitor_cognitive_load,
+    measure_load,
+    detect_loop,
+    detect_stall,
+    detect_oscillation,
+    detect_goal_drift,
+    recommend_action,
+    CycleTelemetry,
+    CognitiveLoad,
+    LoopDetection,
+    OscillationDetection,
+    GoalDriftDetection,
+    LoadAction,
+    LoadRecommendation,
+)
+
+from kernel.hallucination_monitor import (
+    verify_grounding,
+    classify_claims,
+    grade_claim,
+    calculate_grounding_score,
+    trace_evidence_chain,
+    ClaimType,
+    Claim,
+    Origin,
+    EvidenceLink,
+    ClaimGradeLevel,
+    ClaimGrade,
+    GroundingReport,
+)
+
+from kernel.confidence_calibrator import (
+    run_confidence_calibration,
+    calibrate_confidence,
+    detect_overconfidence,
+    detect_underconfidence,
+    update_calibration_curve,
+    get_calibration_curve,
+    CalibratedConfidence,
+)
+
+from kernel.noise_gate import (
+    filter_output,
+    apply_quality_threshold,
+    annotate_output,
+    generate_rejection_feedback,
+    check_retry_budget,
+    clear_retry_budget,
+    ToolOutput,
+    QualityMetadata,
+    FilteredOutput,
+    RejectedOutput,
+    RejectionDimension,
+    RetryGuidance,
+    RetryBudgetStatus,
+)
+
 
 __all__ = [
     # --- Tier 1: Core Processing ---
@@ -372,4 +524,120 @@ __all__ = [
     "NodeExecutionStatus",
     "ContextSlice",
     "EpochSummary",
+    # --- Tier 5: Autonomous Ego ---
+    # Lifecycle Controller
+    "run_lifecycle",
+    "initialize_agent",
+    "load_cognitive_profile",
+    "set_identity_constraints",
+    "track_macro_objective",
+    "control_sleep_wake",
+    "commit_epoch_memory",
+    "SpawnRequest",
+    "AgentIdentity",
+    "CognitiveProfile",
+    "IdentityContext",
+    "LifecyclePhase",
+    "LifecycleSignal",
+    "LifecycleSignalType",
+    "LifecycleState",
+    "ObjectiveState",
+    "ObjectiveStatus",
+    "AgentLifecycle",
+    # Energy & Interrupts
+    "enforce_energy_authority",
+    "track_budget",
+    "check_budget_exhaustion",
+    "check_budget_warning",
+    "handle_interrupt",
+    "manage_lifecycle_state",
+    "CostDimension",
+    "CostEvent",
+    "BudgetState",
+    "InterruptType",
+    "InterruptSignal",
+    "InterruptAction",
+    "ControlTriggerSource",
+    "ControlTrigger",
+    "LifecycleTransition",
+    "ControlAction",
+    "ControlDecision",
+    # --- Tier 6: Conscious Observer ---
+    # Self Model
+    "run_self_model",
+    "assess_capability",
+    "get_current_state",
+    "update_cognitive_state",
+    "update_accuracy_history",
+    "get_calibration_history",
+    "detect_capability_gap",
+    "refresh_capability_map",
+    "SignalTags",
+    "CapabilityGap",
+    "CapabilityAssessment",
+    "ProcessingPhase",
+    "AgentCognitiveState",
+    "CalibrationDataPoint",
+    "CalibrationHistory",
+    "CalibrationCurve",
+    # Activation Router
+    "compute_activation_map",
+    "classify_signal_complexity",
+    "select_pipeline",
+    "check_decision_cache",
+    "cache_decision",
+    "ComplexityLevel",
+    "ModuleActivation",
+    "PipelineConfig",
+    "ActivationMap",
+    # Cognitive Load Monitor
+    "monitor_cognitive_load",
+    "measure_load",
+    "detect_loop",
+    "detect_stall",
+    "detect_oscillation",
+    "detect_goal_drift",
+    "recommend_action",
+    "CycleTelemetry",
+    "CognitiveLoad",
+    "LoopDetection",
+    "OscillationDetection",
+    "GoalDriftDetection",
+    "LoadAction",
+    "LoadRecommendation",
+    # Hallucination Monitor
+    "verify_grounding",
+    "classify_claims",
+    "grade_claim",
+    "calculate_grounding_score",
+    "trace_evidence_chain",
+    "ClaimType",
+    "Claim",
+    "Origin",
+    "EvidenceLink",
+    "ClaimGradeLevel",
+    "ClaimGrade",
+    "GroundingReport",
+    # Confidence Calibrator
+    "run_confidence_calibration",
+    "calibrate_confidence",
+    "detect_overconfidence",
+    "detect_underconfidence",
+    "update_calibration_curve",
+    "get_calibration_curve",
+    "CalibratedConfidence",
+    # Noise Gate
+    "filter_output",
+    "apply_quality_threshold",
+    "annotate_output",
+    "generate_rejection_feedback",
+    "check_retry_budget",
+    "clear_retry_budget",
+    "ToolOutput",
+    "QualityMetadata",
+    "FilteredOutput",
+    "RejectedOutput",
+    "RejectionDimension",
+    "RetryGuidance",
+    "RetryBudgetStatus",
 ]

@@ -628,7 +628,7 @@ class NormalizationSettings(BaseModel):
 
 
 class KernelSettings(BaseModel):
-    """Kernel Tier 1 through Tier 4 processing settings."""
+    """Kernel Tier 1 through Tier 6 processing settings."""
 
     # --- T1: Classification ---
     classification_confidence_threshold: float = 0.80
@@ -762,6 +762,64 @@ class KernelSettings(BaseModel):
     stm_default_entity_ttl_seconds: int = 3600
     stm_max_age_seconds: int = 7200
     stm_context_max_items: int = 50
+
+    # --- T5: Lifecycle Controller ---
+    lifecycle_panic_retry_interval_ms: float = 600000.0  # 10 minutes
+    lifecycle_epoch_commit_threshold: int = 5  # objectives completed before commit
+    lifecycle_max_objectives: int = 100
+
+    # --- T5: Energy & Interrupts ---
+    budget_token_limit: int = 1_000_000
+    budget_cost_limit: float = 100.0
+    budget_epoch_token_limit: int = 200_000
+    budget_warning_threshold: float = 0.8  # warn at 80% consumption
+    budget_exhaustion_threshold: float = 0.95
+
+    # --- T6: Self Model ---
+    self_model_calibration_window: int = 100
+    self_model_calibration_ema_decay: float = 0.1
+    self_model_capability_cache_ttl_seconds: int = 300
+
+    # --- T6: Activation Router ---
+    activation_urgency_weight: float = 0.30
+    activation_structural_weight: float = 0.25
+    activation_domain_weight: float = 0.25
+    activation_gap_weight: float = 0.20
+    activation_cache_ttl_seconds: int = 30
+    activation_pressure_moderate: float = 0.6
+    activation_pressure_high: float = 0.8
+
+    # --- T6: Cognitive Load Monitor ---
+    load_compute_weight: float = 0.40
+    load_time_weight: float = 0.35
+    load_breadth_weight: float = 0.25
+    load_loop_detection_window: int = 10
+    load_loop_repeat_threshold: int = 3
+    load_stall_multiplier: float = 3.0
+    load_threshold_simplify: float = 0.6
+    load_threshold_escalate: float = 0.8
+    load_threshold_abort: float = 0.95
+    load_goal_drift_threshold: float = 0.4
+
+    # --- T6: Hallucination Monitor ---
+    grounding_similarity_threshold: float = 0.65
+    grounding_inferred_weight: float = 0.5
+    grounding_grounded_weight: float = 1.0
+    grounding_fabricated_weight: float = 0.0
+
+    # --- T6: Confidence Calibrator ---
+    calibration_overconfidence_threshold: float = 0.2
+    calibration_underconfidence_threshold: float = 0.2
+    calibration_default_curve: dict[str, float] = {
+        "0.0": 0.0, "0.1": 0.1, "0.2": 0.2, "0.3": 0.3,
+        "0.4": 0.4, "0.5": 0.5, "0.6": 0.6, "0.7": 0.7,
+        "0.8": 0.8, "0.9": 0.9, "1.0": 1.0,
+    }
+
+    # --- T6: Noise Gate ---
+    noise_gate_grounding_threshold: float = 0.6
+    noise_gate_confidence_threshold: float = 0.5
+    noise_gate_max_retries: int = 3
 
 
 class HttpStatusSettings(BaseModel):
