@@ -4,11 +4,13 @@ MCP Tool Tests: Scraper Tools.
 Tests for scraper MCP tools via API.
 """
 
+
 import pytest
-import asyncio
 from mcp import ClientSession
 from mcp.client.stdio import stdio_client
+
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_fetch_example_com():
@@ -31,7 +33,7 @@ async def test_fetch_example_com():
             else:
                 assert not res.isError
                 assert "Example Domain" in content_str or "example" in content_str.lower()
-    
+
     if "skip_msg" in locals():
         pytest.skip(skip_msg)
 
@@ -51,7 +53,7 @@ async def test_fetch_with_timeout():
             else:
                 assert not res.isError
                 assert "Example Domain" in content_str
-    
+
     if "skip_msg" in locals():
         pytest.skip(skip_msg)
 
@@ -74,7 +76,7 @@ async def test_batch_multiple_urls():
             else:
                 assert not res.isError
                 assert "example" in content_str.lower()
-    
+
     if "skip_msg" in locals():
         pytest.skip(skip_msg)
 

@@ -4,11 +4,12 @@ Test Fixtures and Configuration.
 Shared fixtures for all tests.
 """
 
-import pytest
-import os
 import asyncio
-from shared.config import get_settings
+import os
 
+import pytest
+
+from shared.config import get_settings
 
 # ============================================================================
 # Pytest Configuration
@@ -65,9 +66,10 @@ def rag_service_url():
 @pytest.fixture
 def sample_fact():
     """Sample atomic fact for testing."""
-    from shared.schemas import AtomicFact
     from datetime import datetime
-    
+
+    from shared.schemas import AtomicFact
+
     return AtomicFact(
         fact_id="test-fact-001",
         entity="Test Entity",
@@ -124,8 +126,8 @@ def sample_research_state():
 @pytest.fixture
 def mock_tool_result():
     """Mock MCP tool result."""
-    from shared.mcp.protocol import ToolResult, TextContent
-    
+    from shared.mcp.protocol import TextContent, ToolResult
+
     return ToolResult(
         content=[TextContent(text="Mock tool result")],
         isError=False,
@@ -135,8 +137,8 @@ def mock_tool_result():
 @pytest.fixture
 def mock_error_result():
     """Mock MCP error result."""
-    from shared.mcp.protocol import ToolResult, TextContent
-    
+    from shared.mcp.protocol import TextContent, ToolResult
+
     return ToolResult(
         content=[TextContent(text="Error: Test error")],
         isError=True,
@@ -151,7 +153,7 @@ def mock_error_result():
 async def http_client():
     """Async HTTP client for tests."""
     import httpx
-    
+
     async with httpx.AsyncClient(timeout=30) as client:
         yield client
 
@@ -168,7 +170,7 @@ def setup_test_environment(monkeypatch):
     # Set environment to development mode (test mode works but dev is more permissive)
     monkeypatch.setenv("ENVIRONMENT", "development")
     monkeypatch.setenv("TEST_MODE", "1")
-    
+
     # Disable external services that may not be available in test environment
     if not os.getenv("QDRANT_URL"):
         monkeypatch.setenv("QDRANT_URL", "")
@@ -182,11 +184,11 @@ def reset_singleton_managers():
     Reset singleton manager instances between tests to avoid state leakage.
     """
     yield
-    
+
     # Reset singletons after each test
-    import shared.users.manager as user_mgr
     import shared.conversations.manager as conv_mgr
-    
+    import shared.users.manager as user_mgr
+
     user_mgr._user_manager = None
     user_mgr._api_key_manager = None
     conv_mgr._conversation_manager = None
@@ -200,14 +202,14 @@ async def db_session():
     Uses savepoints to rollback after each test.
     """
     from shared.database.connection import get_database_pool
-    
+
     pool = await get_database_pool()
-    
+
     async with pool.acquire() as conn:
         # Start a transaction
         tr = conn.transaction()
         await tr.start()
-        
+
         try:
             yield conn
         finally:
@@ -229,15 +231,16 @@ async def shared_db_pool():
     This creates a single pool for the entire test session,
     avoiding repeated pool creation/destruction overhead.
     """
-    from shared.database.connection import DatabasePool, DatabaseConfig
     import os
-    
+
+    from shared.database.connection import DatabaseConfig, DatabasePool
+
     db_url = os.getenv("DATABASE_URL", "")
     if not db_url:
         # No PostgreSQL configured, skip pool creation
         yield None
         return
-    
+
     config = DatabaseConfig(
         url=db_url,
         min_connections=5,
@@ -245,7 +248,7 @@ async def shared_db_pool():
     )
     pool = DatabasePool(config)
     await pool.initialize()
-    
+
     yield pool
-    
+
     await pool.close()

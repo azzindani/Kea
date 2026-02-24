@@ -1,8 +1,10 @@
+
 import pytest
-import asyncio
-from tests.mcp.client_utils import SafeClientSession as ClientSession
 from mcp.client.stdio import stdio_client
+
+from tests.mcp.client_utils import SafeClientSession as ClientSession
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_html5lib_real_simulation():
@@ -10,7 +12,7 @@ async def test_html5lib_real_simulation():
     REAL SIMULATION: Verify HTML5Lib Server (Parsing, Walking).
     """
     params = get_server_params("html5lib_server", extra_dependencies=["html5lib"])
-    
+
     html_content = """
     <!DOCTYPE html>
     <html>
@@ -26,13 +28,13 @@ async def test_html5lib_real_simulation():
         </body>
     </html>
     """
-    
-    print(f"\n--- Starting Real-World Simulation: HTML5Lib Server ---")
-    
+
+    print("\n--- Starting Real-World Simulation: HTML5Lib Server ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. Parse String
             print("1. Parsing HTML String...")
             res = await session.call_tool("parse_string", arguments={"html_input": html_content})
@@ -45,8 +47,8 @@ async def test_html5lib_real_simulation():
             print("2. Walking Tree (Print)...")
             res = await session.call_tool("walk_tree_print", arguments={"html_input": html_content})
             if not res.isError:
-                 print(f" \033[92m[PASS]\033[0m Standard output received")
-            
+                 print(" \033[92m[PASS]\033[0m Standard output received")
+
             # 3. Sanitize
             print("3. Sanitizing (Removing <script>)...")
             dirty_html = "<div><script>alert(1)</script>Clean</div>"

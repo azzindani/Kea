@@ -1,8 +1,8 @@
-import pytest
-
 import asyncio
-import sys
 import os
+import sys
+
+import pytest
 
 # Add root to path
 sys.path.append(os.getcwd())

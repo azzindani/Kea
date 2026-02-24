@@ -5,7 +5,7 @@ Real tests that exercise the full API from registration to research.
 """
 
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 
 from services.api_gateway.main import app
 
@@ -20,7 +20,7 @@ async def async_client():
 
 class TestCompleteUserFlow:
     """Test complete user journey from signup to research."""
-    
+
     @pytest.mark.asyncio
     async def test_full_user_journey(self, async_client):
         """
@@ -44,7 +44,7 @@ class TestCompleteUserFlow:
         assert register_response.status_code == 200
         access_token = register_response.json()["access_token"]
         headers = {"Authorization": f"Bearer {access_token}"}
-        
+
         # 2. Create conversation
         conv_response = await async_client.post(
             "/api/v1/conversations",
@@ -53,7 +53,7 @@ class TestCompleteUserFlow:
         )
         assert conv_response.status_code == 200
         conv_id = conv_response.json()["conversation_id"]
-        
+
         # 3. Send message
         msg_response = await async_client.post(
             f"/api/v1/conversations/{conv_id}/messages",
@@ -62,7 +62,7 @@ class TestCompleteUserFlow:
         )
         assert msg_response.status_code == 200
         assert "assistant_message" in msg_response.json()
-        
+
         # 4. Get conversation with history
         history_response = await async_client.get(
             f"/api/v1/conversations/{conv_id}",
@@ -71,7 +71,7 @@ class TestCompleteUserFlow:
         assert history_response.status_code == 200
         messages = history_response.json()["messages"]
         assert len(messages) >= 2  # At least user + assistant
-        
+
         # 5. List conversations
         list_response = await async_client.get(
             "/api/v1/conversations",
@@ -79,7 +79,7 @@ class TestCompleteUserFlow:
         )
         assert list_response.status_code == 200
         assert list_response.json()["total"] >= 1
-        
+
         # 6. Logout
         logout_response = await async_client.post(
             "/api/v1/auth/logout",
@@ -90,7 +90,7 @@ class TestCompleteUserFlow:
 
 class TestAPIKeyFlow:
     """Test API key authentication flow."""
-    
+
     @pytest.mark.asyncio
     async def test_api_key_full_flow(self, async_client):
         """
@@ -102,7 +102,7 @@ class TestAPIKeyFlow:
         """
         import uuid
         unique_id = str(uuid.uuid4())[:8]
-        
+
         # 1. Register
         register_response = await async_client.post(
             "/api/v1/auth/register",
@@ -114,7 +114,7 @@ class TestAPIKeyFlow:
         )
         access_token = register_response.json()["access_token"]
         headers = {"Authorization": f"Bearer {access_token}"}
-        
+
         # 2. Create API key
         key_response = await async_client.post(
             "/api/v1/users/me/keys",
@@ -125,17 +125,17 @@ class TestAPIKeyFlow:
         key_data = key_response.json()
         api_key = key_data["raw_key"]
         key_id = key_data["key"]["key_id"]  # Nested under 'key'
-        
+
         # 3. Use API key for requests
         api_headers = {"X-API-Key": api_key}
-        
+
         conv_response = await async_client.post(
             "/api/v1/conversations",
             headers=api_headers,
             json={"title": "API Key Conversation"},
         )
         assert conv_response.status_code == 200
-        
+
         # 4. Verify key appears in list
         list_response = await async_client.get(
             "/api/v1/users/me/keys",
@@ -145,14 +145,14 @@ class TestAPIKeyFlow:
         # Response is a list directly, not {"keys": [...]}
         key_names = [k["name"] for k in list_response.json()]
         assert "E2E Test Key" in key_names
-        
+
         # 5. Revoke key
         delete_response = await async_client.delete(
             f"/api/v1/users/me/keys/{key_id}",
             headers=headers,
         )
         assert delete_response.status_code == 200
-        
+
         # 6. Verify key no longer works
         blocked_response = await async_client.post(
             "/api/v1/conversations",
@@ -164,7 +164,7 @@ class TestAPIKeyFlow:
 
 class TestConversationFlow:
     """Test complete conversation management flow."""
-    
+
     @pytest.fixture
     async def authenticated_client(self, async_client):
         """Create authenticated client."""
@@ -178,7 +178,7 @@ class TestConversationFlow:
         )
         token = response.json()["access_token"]
         return async_client, {"Authorization": f"Bearer {token}"}
-    
+
     @pytest.mark.asyncio
     async def test_conversation_lifecycle(self, authenticated_client):
         """
@@ -191,7 +191,7 @@ class TestConversationFlow:
         6. Delete
         """
         client, headers = authenticated_client
-        
+
         # 1. Create
         create_response = await client.post(
             "/api/v1/conversations",
@@ -199,7 +199,7 @@ class TestConversationFlow:
             json={"title": "Lifecycle Test"},
         )
         conv_id = create_response.json()["conversation_id"]
-        
+
         # 2. Send multiple messages
         for msg in ["First question", "Follow up", "Another question"]:
             await client.post(
@@ -207,14 +207,14 @@ class TestConversationFlow:
                 headers=headers,
                 json={"content": msg},
             )
-        
+
         # Verify message count increased
         get_response = await client.get(
             f"/api/v1/conversations/{conv_id}",
             headers=headers,
         )
         assert len(get_response.json()["messages"]) >= 6
-        
+
         # 3. Pin
         pin_response = await client.put(
             f"/api/v1/conversations/{conv_id}",
@@ -222,7 +222,7 @@ class TestConversationFlow:
             json={"is_pinned": True},
         )
         assert pin_response.json()["is_pinned"] is True
-        
+
         # 4. Archive
         archive_response = await client.put(
             f"/api/v1/conversations/{conv_id}",
@@ -230,15 +230,15 @@ class TestConversationFlow:
             json={"is_archived": True},
         )
         assert archive_response.json()["is_archived"] is True
-        
+
         # 5. Search (using title)
         search_response = await client.get(
-            f"/api/v1/conversations/search?q=Lifecycle",
+            "/api/v1/conversations/search?q=Lifecycle",
             headers=headers,
         )
         # Search should return results with at least our conversation
         assert search_response.status_code == 200
-        
+
         # 6. Delete
         delete_response = await client.delete(
             f"/api/v1/conversations/{conv_id}",
@@ -249,20 +249,20 @@ class TestConversationFlow:
 
 class TestHealthEndpoints:
     """Test health check endpoints."""
-    
+
     @pytest.mark.asyncio
     async def test_basic_health(self, async_client):
         """Test /health endpoint."""
         response = await async_client.get("/health")
-        
+
         assert response.status_code == 200
         assert response.json()["status"] == "healthy"
-    
+
     @pytest.mark.asyncio
     async def test_full_health(self, async_client):
         """Test /health/full endpoint."""
         response = await async_client.get("/health/full")
-        
+
         # In test environment, external services may be unavailable
         # Accept both 200 (all healthy) and 503 (some services down)
         assert response.status_code in [200, 503]

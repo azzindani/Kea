@@ -1,8 +1,11 @@
-import pytest
 import os
+
+import pytest
 from mcp import ClientSession
 from mcp.client.stdio import stdio_client
+
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_plotly_real_simulation():
@@ -10,20 +13,20 @@ async def test_plotly_real_simulation():
     REAL SIMULATION: Verify Plotly Server (Visualization).
     """
     params = get_server_params("plotly_server", extra_dependencies=["plotly", "kaleido", "pandas", "numpy", "scipy", "statsmodels"])
-    
+
     data = [
         {"x": 1, "y": 2, "category": "A"},
         {"x": 2, "y": 3, "category": "B"},
         {"x": 3, "y": 5, "category": "A"},
         {"x": 4, "y": 8, "category": "B"}
     ]
-    
+
     print("\n--- Starting Real-World Simulation: Plotly Server ---")
-    
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. Scatter
             print("1. Plotting Scatter...")
             res = await session.call_tool("plot_scatter", arguments={"data": data, "x": "x", "y": "y", "color": "category"})

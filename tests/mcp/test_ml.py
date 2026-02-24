@@ -1,8 +1,10 @@
+
 import pytest
-import asyncio
-from tests.mcp.client_utils import SafeClientSession as ClientSession
 from mcp.client.stdio import stdio_client
+
+from tests.mcp.client_utils import SafeClientSession as ClientSession
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_ml_real_simulation():
@@ -10,16 +12,16 @@ async def test_ml_real_simulation():
     REAL SIMULATION: Verify ML Server (AutoML, Clustering).
     """
     params = get_server_params("ml_server", extra_dependencies=["scikit-learn", "pandas", "numpy"])
-    
+
     # Iris dataset URL
     data_url = "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv"
-    
-    print(f"\n--- Starting Real-World Simulation: ML Server ---")
-    
+
+    print("\n--- Starting Real-World Simulation: ML Server ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. Feature Importance
             print("1. Feature Importance (Target: species)...")
             res = await session.call_tool("feature_importance", arguments={"data_url": data_url, "target_column": "species"})

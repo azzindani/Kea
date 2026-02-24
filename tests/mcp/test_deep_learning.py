@@ -1,8 +1,10 @@
+
 import pytest
-import asyncio
-from tests.mcp.client_utils import SafeClientSession as ClientSession
 from mcp.client.stdio import stdio_client
+
+from tests.mcp.client_utils import SafeClientSession as ClientSession
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_dl_real_simulation():
@@ -10,16 +12,16 @@ async def test_dl_real_simulation():
     REAL SIMULATION: Verify Deep Learning Server (TensorFlow).
     """
     params = get_server_params("deep_learning_server", extra_dependencies=["tensorflow", "pandas", "numpy", "scikit-learn", "structlog"])
-    
+
     # Iris dataset URL (Small enough for quick training tests)
     data_url = "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv"
-    
-    print(f"\n--- Starting Real-World Simulation: Deep Learning Server ---")
-    
+
+    print("\n--- Starting Real-World Simulation: Deep Learning Server ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. Build Dense Network
             print("1. Building Dense Network...")
             res = await session.call_tool("build_dense_network", arguments={"input_dim": 4, "output_dim": 3, "hidden_layers": [32, 16], "task": "classification"})
@@ -43,8 +45,8 @@ async def test_dl_real_simulation():
             if model_config_dict:
                 print("2. Training Model...")
                 res = await session.call_tool("train_deep_model", arguments={
-                    "data_url": data_url, 
-                    "target_column": "species", 
+                    "data_url": data_url,
+                    "target_column": "species",
                     "model_config": model_config_dict,
                     "epochs": 5,
                     "batch_size": 16

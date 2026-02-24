@@ -1,8 +1,10 @@
+
 import pytest
-import asyncio
-from tests.mcp.client_utils import SafeClientSession as ClientSession
 from mcp.client.stdio import stdio_client
+
+from tests.mcp.client_utils import SafeClientSession as ClientSession
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_finta_real_simulation():
@@ -10,7 +12,7 @@ async def test_finta_real_simulation():
     REAL SIMULATION: Verify Finta Server (Technical Indicators) with synthetic data.
     """
     params = get_server_params("finta_server", extra_dependencies=["finta", "pandas"])
-    
+
     # Synthetic Data (OHLCV)
     data = [
         {"open": 10, "high": 12, "low": 9, "close": 11, "volume": 100},
@@ -21,13 +23,13 @@ async def test_finta_real_simulation():
         {"open": 15, "high": 17, "low": 14, "close": 14, "volume": 150}, # Downtick
         {"open": 14, "high": 15, "low": 13, "close": 13, "volume": 160},
     ]
-    
-    print(f"\n--- Starting Real-World Simulation: Finta Server ---")
-    
+
+    print("\n--- Starting Real-World Simulation: Finta Server ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. RSI
             print("1. Calculating RSI...")
             res = await session.call_tool("calculate_rsi", arguments={"data": data})
@@ -47,7 +49,7 @@ async def test_finta_real_simulation():
             res = await session.call_tool("calculate_bbands", arguments={"data": data})
             if not res.isError:
                  print(f" \033[92m[PASS]\033[0m BBands Data: {res.content[0].text[:1000]}...")
-            
+
             # 4. Ichimoku (Cloud)
             print("4. Calculating Ichimoku (Cloud)...")
             res = await session.call_tool("calculate_ichimoku", arguments={"data": data})

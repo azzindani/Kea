@@ -1,8 +1,10 @@
+
 import pytest
-import asyncio
 from mcp import ClientSession
 from mcp.client.stdio import stdio_client
+
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_tradingview_real_simulation():
@@ -10,15 +12,15 @@ async def test_tradingview_real_simulation():
     REAL SIMULATION: Verify TradingView Server (TA/Screener).
     """
     params = get_server_params("tradingview_server", extra_dependencies=["tradingview_ta", "requests"])
-    
+
     symbol = "AAPL"
-    
-    print(f"\n--- Starting Real-World Simulation: TradingView Server ---")
-    
+
+    print("\n--- Starting Real-World Simulation: TradingView Server ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. TA Summary
             print(f"1. Getting TA Summary for {symbol}...")
             res = await session.call_tool("get_ta_summary", arguments={"symbol": symbol, "exchange": "NASDAQ", "interval": "1d"})

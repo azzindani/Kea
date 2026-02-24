@@ -1,9 +1,10 @@
-import pytest
-import asyncio
-import json
 import ast
-from tests.mcp.client_utils import SafeClientSession as ClientSession
+import json
+
+import pytest
 from mcp.client.stdio import stdio_client
+
+from tests.mcp.client_utils import SafeClientSession as ClientSession
 from tests.mcp.client_utils import get_server_params
 
 
@@ -26,34 +27,34 @@ async def test_newspaper_real_simulation():
     REAL SIMULATION: Verify Newspaper Server (Article Extraction).
     """
     params = get_server_params("newspaper_server", extra_dependencies=[
-        "newspaper4k", 
-        "lxml[html_clean]", 
-        "trafilatura", 
-        "feedparser", 
-        "httpx", 
-        "nltk", 
-        "python-dotenv", 
+        "newspaper4k",
+        "lxml[html_clean]",
+        "trafilatura",
+        "feedparser",
+        "httpx",
+        "nltk",
+        "python-dotenv",
         "wrapt"
     ])
-    
+
     # Use CNN - more stable and permissive for automated testing simulations
     url = "https://www.cnn.com"
-    
-    print(f"\n--- Starting Real-World Simulation: Newspaper Server ---")
-    
+
+    print("\n--- Starting Real-World Simulation: Newspaper Server ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. Build Source
             print(f"1. Building Source ({url})...")
             res = await session.call_tool("build_source", arguments={"url": url})
             if res.isError:
                  print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
-                 # If build fails (network), try a simpler direct article logic if possible, 
+                 # If build fails (network), try a simpler direct article logic if possible,
                  # but for now we proceed.
             else:
-                 print(f" \033[92m[PASS]\033[0m Source built")
+                 print(" \033[92m[PASS]\033[0m Source built")
 
             # 2. Get Articles List
             print("2. Getting Articles List...")
@@ -76,16 +77,16 @@ async def test_newspaper_real_simulation():
                             print(f" \033[92m[PASS]\033[0m Title: {title}")
 
                         # 4. NLP
-                        print(f"4. NLP Analysis...")
+                        print("4. NLP Analysis...")
                         res = await session.call_tool("get_article_nlp", arguments={"url": article_url})
                         if not res.isError and res.content:
-                            print(f" \033[92m[PASS]\033[0m NLP Data received")
+                            print(" \033[92m[PASS]\033[0m NLP Data received")
                     else:
-                        print(f" \033[93m[WARN]\033[0m No valid article URLs found in response")
+                        print(" \033[93m[WARN]\033[0m No valid article URLs found in response")
                 else:
-                    print(f" \033[93m[WARN]\033[0m Empty article list (network issue — treating as pass)")
+                    print(" \033[93m[WARN]\033[0m Empty article list (network issue — treating as pass)")
             else:
-                print(f" \033[93m[WARN]\033[0m Article list request failed (network issue — treating as pass)")
+                print(" \033[93m[WARN]\033[0m Article list request failed (network issue — treating as pass)")
 
             # 5. Trending
             print("5. Google Trending Terms...")
@@ -95,7 +96,7 @@ async def test_newspaper_real_simulation():
                 if trends:
                     print(f" \033[92m[PASS]\033[0m Trends: {trends}")
                 else:
-                    print(f" \033[93m[WARN]\033[0m Empty trends (network issue — treating as pass)")
+                    print(" \033[93m[WARN]\033[0m Empty trends (network issue — treating as pass)")
 
     print("--- Newspaper Simulation Complete ---")
 

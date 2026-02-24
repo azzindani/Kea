@@ -1,28 +1,30 @@
+
 import pytest
-import asyncio
-from tests.mcp.client_utils import SafeClientSession as ClientSession
 from mcp.client.stdio import stdio_client
+
+from tests.mcp.client_utils import SafeClientSession as ClientSession
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_google_search_server():
     """Verify Google Search Server executes using MCP Client."""
-    
+
     params = get_server_params("google_search_server", extra_dependencies=["googlesearch-python", "beautifulsoup4"])
-    
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. Discover Tools
             tools_res = await session.list_tools()
             tools = tools_res.tools
             print(f"\nDiscovered {len(tools)} tools via Client.")
-            
+
             tool_names = [t.name for t in tools]
             assert "search_google" in tool_names
             assert "find_pdf" in tool_names
-            
+
             print("Google Search verification passed (Tools present).")
 
 @pytest.mark.asyncio
@@ -31,9 +33,9 @@ async def test_google_real_simulation():
     REAL SIMULATION: Perform actual Google searches.
     """
     params = get_server_params("google_search_server", extra_dependencies=["googlesearch-python", "beautifulsoup4"])
-    
-    print(f"\n--- Starting Real-World Simulation: Google Search ---")
-    
+
+    print("\n--- Starting Real-World Simulation: Google Search ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
@@ -50,11 +52,11 @@ async def test_google_real_simulation():
                 print(f" \033[93m[WARN]\033[0m Tool returned error: {error_text}")
                 print("   (Network restriction or rate limit — treating as pass)")
             elif not res.content:
-                print(f" \033[93m[WARN]\033[0m Empty results (Google rate limiting — treating as pass)")
+                print(" \033[93m[WARN]\033[0m Empty results (Google rate limiting — treating as pass)")
             else:
                 content = res.content[0].text
                 if len(content) < 10 or content == "[]":
-                    print(f" \033[93m[WARN]\033[0m Empty results (Google rate limiting — treating as pass)")
+                    print(" \033[93m[WARN]\033[0m Empty results (Google rate limiting — treating as pass)")
                 else:
                     print(f" \033[92m[PASS]\033[0m Got {len(content)} chars of result")
                     assert "Python" in content or "python" in content.lower()

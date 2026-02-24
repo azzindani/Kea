@@ -4,12 +4,12 @@ Pytest Configuration for Real Integration Tests.
 Provides fixtures for OpenRouter LLM, streaming helpers, and shared resources.
 """
 
+import asyncio
 import os
 import sys
-import asyncio
 import time
+
 import pytest
-from typing import AsyncIterator
 
 # Ensure project root is in path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -101,22 +101,22 @@ async def stream_and_collect(provider, messages, config):
     set to reasoning (some free models put all output in reasoning field).
     """
     await rate_limit_wait()  # Rate limiting
-    
+
     full_content = ""
     reasoning_content = ""
     chunks = []
-    
+
     async for chunk in provider.stream(messages, config):
         chunks.append(chunk)
         if chunk.is_reasoning:
             reasoning_content += chunk.reasoning or ""
         else:
             full_content += chunk.content or ""
-    
+
     # Fallback: if content is empty but reasoning has content, use reasoning
     if not full_content.strip() and reasoning_content.strip():
         full_content = reasoning_content
-    
+
     return full_content, reasoning_content, chunks
 
 
@@ -128,14 +128,14 @@ async def print_stream(provider, messages, config, label="Response"):
     set to reasoning (some free models put all output in reasoning field).
     """
     await rate_limit_wait()  # Rate limiting
-    
+
     print(f"\n{'='*60}")
     print(f"🤖 {label}:")
     print("-" * 60)
-    
+
     full_content = ""
     reasoning_content = ""
-    
+
     async for chunk in provider.stream(messages, config):
         if chunk.is_reasoning:
             if not reasoning_content:
@@ -147,12 +147,12 @@ async def print_stream(provider, messages, config, label="Response"):
                 print("\n\n📝 Response:")
             print(chunk.content or "", end="", flush=True)
             full_content += chunk.content or ""
-    
+
     # Fallback: if content is empty but reasoning has content, use reasoning
     if not full_content.strip() and reasoning_content.strip():
         full_content = reasoning_content
-        print(f"\n(Using reasoning as content)")
-    
+        print("\n(Using reasoning as content)")
+
     print(f"\n{'='*60}\n")
     return full_content, reasoning_content
 

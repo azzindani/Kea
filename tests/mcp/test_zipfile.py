@@ -1,10 +1,12 @@
-import pytest
-import asyncio
 import os
 import shutil
+
+import pytest
 from mcp import ClientSession
 from mcp.client.stdio import stdio_client
+
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_zipfile_real_simulation():
@@ -12,22 +14,22 @@ async def test_zipfile_real_simulation():
     REAL SIMULATION: Verify Zipfile Server.
     """
     params = get_server_params("zipfile_server", extra_dependencies=["pandas"])
-    
+
     zip_path = "test_archive.zip"
     file_name = "hello.txt"
     content = "Hello Zip World"
-    
+
     if os.path.exists(zip_path):
         os.remove(zip_path)
-    
+
     abs_zip_path = os.path.abspath(zip_path)
-    
-    print(f"\n--- Starting Real-World Simulation: Zipfile Server ---")
-    
+
+    print("\n--- Starting Real-World Simulation: Zipfile Server ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. Create New Zip
             print(f"1. Creating Zip: {zip_path}...")
             res = await session.call_tool("create_new_zip", arguments={"path": abs_zip_path})

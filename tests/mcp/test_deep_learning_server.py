@@ -1,10 +1,10 @@
+
 import pytest
-import asyncio
-import numpy as np
-import pandas as pd
-from tests.mcp.client_utils import SafeClientSession as ClientSession
 from mcp.client.stdio import stdio_client
+
+from tests.mcp.client_utils import SafeClientSession as ClientSession
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_deep_learning_server(tmp_path):
@@ -12,21 +12,21 @@ async def test_deep_learning_server(tmp_path):
     Verify Deep Learning Tools: Layers, Optimizers, Components, Applications.
     """
     params = get_server_params("deep_learning_server", extra_dependencies=["tensorflow", "pandas", "numpy", "scikit-learn", "structlog"])
-    
-    print(f"\n--- Starting DL Server Simulation ---")
-    
+
+    print("\n--- Starting DL Server Simulation ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # --- Previous Tests (Brief) ---
             await session.call_tool("add_dense", arguments={"units": 32})
-            
+
             # --- New Tests ---
-            
+
             # 4. Components
             print("4. Testing Components (Loss/Metric/Init)...")
-            
+
             # Loss
             res = await session.call_tool("loss_categorical_crossentropy", arguments={"from_logits": True})
             assert not res.isError

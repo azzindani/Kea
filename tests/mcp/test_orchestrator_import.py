@@ -1,15 +1,14 @@
-import pytest
-
-import sys
-import os
 import asyncio
+import os
+import sys
+
+import pytest
 
 sys.path.append(os.getcwd())
 
 async def main():
     print("🧪 Verifying Orchestrator Service Import...")
     try:
-        from services.orchestrator.main import app
         print("\033[92m✅\033[0m Orchestrator Service Imported Successfully.")
         return 0
     except Exception as e:

@@ -1,8 +1,10 @@
+
 import pytest
-import asyncio
 from mcp import ClientSession
 from mcp.client.stdio import stdio_client
+
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_security_real_simulation():
@@ -10,13 +12,13 @@ async def test_security_real_simulation():
     REAL SIMULATION: Verify Security Server (Scanning/Sanitization).
     """
     params = get_server_params("security_server", extra_dependencies=["httpx"])
-    
-    print(f"\n--- Starting Real-World Simulation: Security Server ---")
-    
+
+    print("\n--- Starting Real-World Simulation: Security Server ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. Content Sanitizer
             print("1. Sanitizing HTML...")
             dirty_html = "<script>alert('xss')</script><b>Hello</b>"

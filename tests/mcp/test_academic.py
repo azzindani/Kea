@@ -1,8 +1,10 @@
+
 import pytest
-import asyncio
-from tests.mcp.client_utils import SafeClientSession as ClientSession
 from mcp.client.stdio import stdio_client
+
+from tests.mcp.client_utils import SafeClientSession as ClientSession
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_academic_real_simulation():
@@ -10,18 +12,18 @@ async def test_academic_real_simulation():
     REAL SIMULATION: Verify Academic Server tools with real queries.
     """
     params = get_server_params("academic_server", extra_dependencies=["requests", "beautifulsoup4"])
-    
-    print(f"\n--- Starting Real-World Simulation: Academic Server ---")
-    
+
+    print("\n--- Starting Real-World Simulation: Academic Server ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. Discover
             tools_res = await session.list_tools()
             tool_names = [t.name for t in tools_res.tools]
             print(f"Discovered {len(tool_names)} tools: {tool_names}")
-            
+
             # 2. PubMed Search
             if "pubmed_search" in tool_names:
                 query = "CRISPR"
@@ -59,14 +61,14 @@ async def test_academic_real_simulation():
                 print(f"4. Testing Crossref Lookup ('{doi}')...")
                 res = await session.call_tool("crossref_lookup", arguments={"doi": doi})
                 if not res.isError:
-                     print(f" \033[92m[PASS]\033[0m Found metadata")
+                     print(" \033[92m[PASS]\033[0m Found metadata")
                 else:
                      print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
 
             # 6. Paper Downloader
             if "paper_downloader" in tool_names:
                 # Use open access DOI
-                doi = "10.1371/journal.pcbi.1004668" 
+                doi = "10.1371/journal.pcbi.1004668"
                 print(f"5. Testing Paper Downloader ('{doi}')...")
                 res = await session.call_tool("paper_downloader", arguments={"doi": doi})
                 if not res.isError:

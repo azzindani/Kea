@@ -1,8 +1,10 @@
+
 import pytest
-import asyncio
 from mcp import ClientSession
 from mcp.client.stdio import stdio_client
+
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_xmltodict_real_simulation():
@@ -10,15 +12,15 @@ async def test_xmltodict_real_simulation():
     REAL SIMULATION: Verify XmlToDict Server.
     """
     params = get_server_params("xmltodict_server", extra_dependencies=["xmltodict"])
-    
+
     xml_str = """<root><person><name>John</name><age>30</age></person></root>"""
-    
-    print(f"\n--- Starting Real-World Simulation: XmlToDict Server ---")
-    
+
+    print("\n--- Starting Real-World Simulation: XmlToDict Server ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. Parse XML String
             print(f"1. Parsing XML: '{xml_str}'...")
             res = await session.call_tool("parse_xml_string", arguments={"xml_input": xml_str})

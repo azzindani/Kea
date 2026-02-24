@@ -1,13 +1,15 @@
 """
 MCP Tool Tests: Analysis Tools.
 """
-import pytest
-import asyncio
-import pandas as pd
+
 import numpy as np
-from tests.mcp.client_utils import SafeClientSession as ClientSession
+import pandas as pd
+import pytest
 from mcp.client.stdio import stdio_client
+
+from tests.mcp.client_utils import SafeClientSession as ClientSession
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_analysis_real_simulation(tmp_path):
@@ -15,7 +17,7 @@ async def test_analysis_real_simulation(tmp_path):
     REAL SIMULATION: Verify Analysis Tools including Advanced Plots, Stats, Signals.
     """
     params = get_server_params("analysis_server", extra_dependencies=["pandas", "numpy", "scipy", "scikit-learn", "matplotlib", "seaborn", "statsmodels"])
-    
+
     # Create dummy data
     data_path = tmp_path / "data.csv"
     df = pd.DataFrame({
@@ -27,15 +29,15 @@ async def test_analysis_real_simulation(tmp_path):
     df.to_csv(data_path, index=False)
     data_url = str(data_path)
 
-    print(f"\n--- Starting Real-World Simulation: Analysis Server ---")
-    
+    print("\n--- Starting Real-World Simulation: Analysis Server ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # --- Previous Tests (Brief) ---
             # await session.call_tool("plot_scatter", arguments={"file_path": data_url, "x": "val1", "y": "val2"})
-            
+
             # --- New Tests ---
 
             # 4. Advanced Plots
@@ -54,7 +56,7 @@ async def test_analysis_real_simulation(tmp_path):
                 "file_path": data_url, "x": "val1", "y": "val2"
             })
             assert not res.isError
-            
+
             # 5. Advanced Stats
             print("5. Advanced Stats (ANOVA)...")
             res = await session.call_tool("stat_anova_oneway", arguments={

@@ -1,8 +1,10 @@
+
 import pytest
-import asyncio
-from tests.mcp.client_utils import SafeClientSession as ClientSession
 from mcp.client.stdio import stdio_client
+
+from tests.mcp.client_utils import SafeClientSession as ClientSession
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_browser_full_coverage():
@@ -10,17 +12,17 @@ async def test_browser_full_coverage():
     REAL SIMULATION: Verify Browser Agent (100% Tool Coverage).
     """
     params = get_server_params("browser_agent_server", extra_dependencies=["browser-use", "playwright"])
-    
+
     # Target for browsing
     url = "https://example.com"
     query = "AI agents"
-    
-    print(f"\n--- Starting 100% Coverage Simulation: Browser Agent ---")
-    
+
+    print("\n--- Starting 100% Coverage Simulation: Browser Agent ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. Search (Human-like)
             print(" [1] Testing human_like_search...")
             # Using dry run or real search with minimal sites to be fast
@@ -38,14 +40,14 @@ async def test_browser_full_coverage():
             # 4. Memory
             print(" [4] Testing memory tools...")
             await session.call_tool("search_memory_add", arguments={
-                "query": query, 
-                "url": url, 
-                "title": "Example", 
+                "query": query,
+                "url": url,
+                "title": "Example",
                 "summary": "AI stuff",
                 "relevance_score": 0.9,
                 "credibility_score": 1.0
             })
-            
+
             res = await session.call_tool("search_memory_recall", arguments={"query": query})
             # Check calling works, don't assert strict content if memory is ephemeral or empty
             if not res.isError:

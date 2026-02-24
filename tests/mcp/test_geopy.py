@@ -1,8 +1,10 @@
+
 import pytest
-import asyncio
-from tests.mcp.client_utils import SafeClientSession as ClientSession
 from mcp.client.stdio import stdio_client
+
+from tests.mcp.client_utils import SafeClientSession as ClientSession
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_geopy_real_simulation():
@@ -10,13 +12,13 @@ async def test_geopy_real_simulation():
     REAL SIMULATION: Verify Geopy Server (Geocoding, Distance).
     """
     params = get_server_params("geopy_server", extra_dependencies=["geopy", "pandas"])
-    
-    print(f"\n--- Starting Real-World Simulation: Geopy Server ---")
-    
+
+    print("\n--- Starting Real-World Simulation: Geopy Server ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. Geocode
             address = "Empire State Building, New York"
             print(f"1. Geocoding '{address}'...")
@@ -24,7 +26,7 @@ async def test_geopy_real_simulation():
             if not res.isError:
                 print(f" \033[92m[PASS]\033[0m Coords: {res.content[0].text}")
                 # Parse lat/lon for next step if possible, hardcode for safety
-                lat1, lon1 = 40.748, -73.985 
+                lat1, lon1 = 40.748, -73.985
             else:
                 print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
                 lat1, lon1 = 40.748, -73.985

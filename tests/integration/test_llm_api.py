@@ -4,9 +4,8 @@ Integration Tests: LLM API.
 Tests for /api/v1/llm/* endpoints.
 """
 
-import pytest
 import httpx
-
+import pytest
 
 from shared.config import get_settings
 
@@ -15,30 +14,30 @@ API_URL = get_settings().services.gateway
 
 class TestLLMProviders:
     """Tests for LLM provider endpoints."""
-    
+
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_list_providers(self):
         """List LLM providers."""
         async with httpx.AsyncClient(timeout=10) as client:
             response = await client.get(f"{API_URL}/api/v1/llm/providers")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert "providers" in data
         assert len(data["providers"]) > 0
-    
+
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_list_models(self):
         """List available models."""
         async with httpx.AsyncClient(timeout=10) as client:
             response = await client.get(f"{API_URL}/api/v1/llm/models")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert "models" in data
-        
+
         # Verify model structure
         if data["models"]:
             model = data["models"][0]
@@ -49,14 +48,14 @@ class TestLLMProviders:
 
 class TestLLMConfig:
     """Tests for LLM configuration."""
-    
+
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_get_config(self):
         """Get LLM configuration."""
         async with httpx.AsyncClient(timeout=10) as client:
             response = await client.get(f"{API_URL}/api/v1/llm/config")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert "default_provider" in data
@@ -65,14 +64,14 @@ class TestLLMConfig:
 
 class TestLLMUsage:
     """Tests for LLM usage statistics."""
-    
+
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_get_usage(self):
         """Get LLM usage stats."""
         async with httpx.AsyncClient(timeout=10) as client:
             response = await client.get(f"{API_URL}/api/v1/llm/usage")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert "total_requests" in data
@@ -81,7 +80,7 @@ class TestLLMUsage:
 
 class TestLLMGenerate:
     """Tests for direct LLM generation."""
-    
+
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_generate(self):
@@ -95,7 +94,7 @@ class TestLLMGenerate:
                     "max_tokens": 50,
                 }
             )
-        
+
         # May fail if API key not set
         if response.status_code == 200:
             data = response.json()

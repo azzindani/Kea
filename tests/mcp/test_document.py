@@ -1,7 +1,9 @@
 import pytest
-from tests.mcp.client_utils import SafeClientSession as ClientSession
 from mcp.client.stdio import stdio_client
+
+from tests.mcp.client_utils import SafeClientSession as ClientSession
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_document_real_simulation():
@@ -9,13 +11,13 @@ async def test_document_real_simulation():
     REAL SIMULATION: Verify Document Server (PDF, Docx, HTML Parsing).
     """
     params = get_server_params("document_server", extra_dependencies=["httpx", "pymupdf", "python-docx", "pandas", "beautifulsoup4"])
-    
+
     print("\n--- Starting Real-World Simulation: Document Server ---")
-    
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. HTML Parser (Wikipedia)
             print("1. HTML Parser (Wikipedia - Python)...")
             url = "https://en.wikipedia.org/wiki/Python_(programming_language)"
@@ -47,12 +49,12 @@ async def test_document_real_simulation():
             # 4. Docx Parser
             print("4. Docx Parser (Create dummy)...")
             import os
-            
+
             # Use absolute path to ensure server can find it
             cwd = os.getcwd()
             docx_path = os.path.join(cwd, "test_doc_parser.docx")
             xlsx_path = os.path.join(cwd, "test_doc_parser.xlsx")
-            
+
             # Attempt to create dummy files locally
             try:
                 import docx
@@ -62,7 +64,7 @@ async def test_document_real_simulation():
                 print(" \033[92m[INFO]\033[0m Local docx created.")
             except ImportError:
                 print(" \033[93m[INFO]\033[0m Test environment lacks python-docx, skipping local file creation.")
-                
+
             if os.path.exists(docx_path):
                 res = await session.call_tool("docx_parser", arguments={"url": docx_path})
                 if not res.isError:
@@ -71,7 +73,7 @@ async def test_document_real_simulation():
                     print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
             else:
                 print(" \033[93m[SKIP]\033[0m Docx file not found, skipping tool test.")
-                
+
             # 5. Xlsx Parser
             print("5. Xlsx Parser (Create dummy)...")
             try:
@@ -90,7 +92,7 @@ async def test_document_real_simulation():
                     print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
             else:
                 print(" \033[93m[SKIP]\033[0m Xlsx file not found, skipping tool test.")
- 
+
             # Cleanup
             if os.path.exists(docx_path): os.remove(docx_path)
             if os.path.exists(xlsx_path): os.remove(xlsx_path)

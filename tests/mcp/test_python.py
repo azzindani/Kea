@@ -1,8 +1,10 @@
+
 import pytest
-import asyncio
 from mcp import ClientSession
 from mcp.client.stdio import stdio_client
+
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_python_real_simulation():
@@ -10,13 +12,13 @@ async def test_python_real_simulation():
     REAL SIMULATION: Verify Python Server (Code Execution).
     """
     params = get_server_params("python_server", extra_dependencies=["pandas", "duckdb", "numpy"])
-    
-    print(f"\n--- Starting Real-World Simulation: Python Server ---")
-    
+
+    print("\n--- Starting Real-World Simulation: Python Server ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. Execute Code
             print("1. Executing Code...")
             code = "print('Hello World'); x = 10 + 20"

@@ -1,8 +1,10 @@
+
 import pytest
-import asyncio
-from tests.mcp.client_utils import SafeClientSession as ClientSession
 from mcp.client.stdio import stdio_client
+
+from tests.mcp.client_utils import SafeClientSession as ClientSession
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_finviz_real_simulation():
@@ -10,13 +12,13 @@ async def test_finviz_real_simulation():
     REAL SIMULATION: Verify Finviz Server (Screener, News, Quotes).
     """
     params = get_server_params("finviz_server", extra_dependencies=["finvizfinance", "pandas", "lxml"])
-    
-    print(f"\n--- Starting Real-World Simulation: Finviz Server ---")
-    
+
+    print("\n--- Starting Real-World Simulation: Finviz Server ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. Screener (Top Gainers)
             print("1. Screening Top Gainers...")
             res = await session.call_tool("screen_top_gainers", arguments={"limit": 5})
@@ -52,7 +54,7 @@ async def test_finviz_real_simulation():
             res = await session.call_tool("get_crypto_performance")
             if not res.isError:
                 print(f" \033[92m[PASS]\033[0m Crypto: {res.content[0].text[:1000]}...")
-            
+
             # 6. Technical Table
             print("6. Getting Technical Table (Limit 5)...")
             res = await session.call_tool("get_technical_table", arguments={"limit": 5})

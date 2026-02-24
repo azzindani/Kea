@@ -1,8 +1,10 @@
+
 import pytest
-import asyncio
-from tests.mcp.client_utils import SafeClientSession as ClientSession
 from mcp.client.stdio import stdio_client
+
+from tests.mcp.client_utils import SafeClientSession as ClientSession
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_analysis_agent_real_simulation():
@@ -11,24 +13,24 @@ async def test_analysis_agent_real_simulation():
     """
     # Dependencies include all since it imports from others
     params = get_server_params("analysis_server", extra_dependencies=["pandas", "numpy", "scikit-learn", "xgboost", "tensorflow", "structlog"])
-    
+
     data_url = "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv"
-    
-    print(f"\n--- Starting Real-World Simulation: Analysis Agent ---")
-    
+
+    print("\n--- Starting Real-World Simulation: Analysis Agent ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. Super Tool Execution
             print("1. Running 'analyze_data_science_project'...")
             # We use a broad goal to trigger defaults
             res = await session.call_tool("analyze_data_science_project", arguments={
-                "dataset_url": data_url, 
-                "target_column": "species", 
+                "dataset_url": data_url,
+                "target_column": "species",
                 "goal": "Classify flower species with high accuracy"
             })
-            
+
             if not res.isError:
                  import json
                  try:

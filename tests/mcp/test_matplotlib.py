@@ -1,9 +1,11 @@
-import pytest
-import asyncio
 import os
-from tests.mcp.client_utils import SafeClientSession as ClientSession
+
+import pytest
 from mcp.client.stdio import stdio_client
+
+from tests.mcp.client_utils import SafeClientSession as ClientSession
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_matplotlib_real_simulation():
@@ -11,13 +13,13 @@ async def test_matplotlib_real_simulation():
     REAL SIMULATION: Verify Matplotlib Server (Plotting).
     """
     params = get_server_params("matplotlib_server", extra_dependencies=["matplotlib", "pandas", "seaborn", "scipy"])
-    
-    print(f"\n--- Starting Real-World Simulation: Matplotlib Server ---")
-    
+
+    print("\n--- Starting Real-World Simulation: Matplotlib Server ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. Plot Line
             print("1. Plotting Line Chart...")
             x = [1, 2, 3, 4, 5]
@@ -66,14 +68,14 @@ async def test_matplotlib_real_simulation():
             res = await session.call_tool("plot_hist", arguments={"x": data, "title": "Hist Test"})
             if not res.isError:
                  print(f" \033[92m[PASS]\033[0m Hist Saved: {res.content[0].text}")
-            
+
             # 5. Heatmap
             print("5. Plotting Heatmap...")
             matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
             res = await session.call_tool("plot_heatmap", arguments={"data": matrix, "title": "Heatmap Test"})
             if not res.isError:
                  print(f" \033[92m[PASS]\033[0m Heatmap Saved: {res.content[0].text}")
-                 
+
             # 6. 3D Surface
             print("6. Plotting 3D Surface...")
             # Simple meshgrid data simulation
@@ -83,7 +85,7 @@ async def test_matplotlib_real_simulation():
             res = await session.call_tool("plot_surface", arguments={"X": X, "Y": Y, "Z": Z, "title": "3D Test"})
             if not res.isError:
                  print(f" \033[92m[PASS]\033[0m 3D Saved: {res.content[0].text}")
-                 
+
             # Cleanup all
             # (Assuming cleanup logic is improved or just manual check)
 

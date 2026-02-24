@@ -1,9 +1,11 @@
-import pytest
-import asyncio
 import os
-from tests.mcp.client_utils import SafeClientSession as ClientSession
+
+import pytest
 from mcp.client.stdio import stdio_client
+
+from tests.mcp.client_utils import SafeClientSession as ClientSession
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_ffmpeg_real_simulation():
@@ -11,13 +13,13 @@ async def test_ffmpeg_real_simulation():
     REAL SIMULATION: Verify FFmpeg Server (Validation, Probing).
     """
     params = get_server_params("ffmpeg_server", extra_dependencies=["ffmpeg-python", "pandas"])
-    
-    print(f"\n--- Starting Real-World Simulation: FFmpeg Server ---")
-    
+
+    print("\n--- Starting Real-World Simulation: FFmpeg Server ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. Check Availability
             print("1. Checking FFmpeg Availability...")
             res = await session.call_tool("check_ffmpeg_available")
@@ -36,17 +38,17 @@ async def test_ffmpeg_real_simulation():
             test_output = "test_out.mkv"
             try:
                 import ffmpeg
-            
+
                 # Generate 3 seconds of video
                 ffmpeg.input('testsrc=size=320x240:rate=30', f='lavfi').output(test_video, t=3).overwrite_output().run(quiet=True)
                 print(" \033[92m[PASS]\033[0m Test video generated")
-                
+
                 # 4. Probe & Info
                 print("4. Probing & Info...")
                 res = await session.call_tool("probe_file", arguments={"path": test_video})
                 if not res.isError:
                     print(f" \033[92m[PASS]\033[0m Probe: {res.content[0].text[:1000]}...")
-                
+
                 res = await session.call_tool("get_duration", arguments={"path": test_video})
                 print(f" \033[92m[PASS]\033[0m Duration: {res.content[0].text}")
 
@@ -58,7 +60,7 @@ async def test_ffmpeg_real_simulation():
                 res = await session.call_tool("convert_format", arguments={"input_path": test_video, "output_path": test_output})
                 if not res.isError:
                      print(f" \033[92m[PASS]\033[0m Conversion: {res.content[0].text}")
-                
+
             except ImportError:
                 print(" [WARN] ffmpeg-python not installed in test env. Skipping generation.")
             except Exception as e:
