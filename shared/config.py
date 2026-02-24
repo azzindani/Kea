@@ -627,6 +627,100 @@ class NormalizationSettings(BaseModel):
     ]
 
 
+class KernelSettings(BaseModel):
+    """Kernel Tier 1 & Tier 2 processing settings."""
+
+    # --- T1: Classification ---
+    classification_confidence_threshold: float = 0.80
+    classification_linguistic_weight: float = 0.4
+    classification_semantic_weight: float = 0.6
+    classification_fallback_label: str = "UNCLASSIFIED"
+
+    # --- T1: Intent / Sentiment / Urgency ---
+    intent_labels: list[str] = [
+        "CREATE", "DELETE", "QUERY", "UPDATE", "NAVIGATE",
+        "CONFIGURE", "ANALYZE", "COMMUNICATE", "UNKNOWN",
+    ]
+    sentiment_labels: list[str] = [
+        "POSITIVE", "NEGATIVE", "NEUTRAL", "FRUSTRATED", "URGENT",
+    ]
+    urgency_bands: list[str] = [
+        "CRITICAL", "HIGH", "NORMAL", "LOW",
+    ]
+    urgency_keywords_critical: list[str] = [
+        "immediately", "asap", "emergency", "urgent", "critical",
+        "now", "right now", "right away",
+    ]
+    urgency_keywords_high: list[str] = [
+        "soon", "quickly", "fast", "priority", "important",
+        "time-sensitive", "hurry",
+    ]
+    urgency_keywords_low: list[str] = [
+        "whenever", "no rush", "low priority", "when you can",
+        "at your convenience", "eventually", "someday",
+    ]
+
+    # --- T1: Scoring ---
+    scoring_semantic_weight: float = 0.4
+    scoring_precision_weight: float = 0.35
+    scoring_reward_weight: float = 0.25
+    scoring_admin_reward_boost: float = 0.15
+    scoring_creative_semantic_boost: float = 0.10
+
+    # --- T1: Validation ---
+    validation_strict_mode: bool = True
+
+    # --- T1: Modality ---
+    modality_keyframe_interval_seconds: float = 5.0
+    modality_supported_extensions: dict[str, str] = {
+        ".txt": "TEXT", ".md": "TEXT", ".csv": "TEXT", ".json": "TEXT",
+        ".pdf": "DOCUMENT", ".xlsx": "DOCUMENT", ".docx": "DOCUMENT",
+        ".png": "IMAGE", ".jpg": "IMAGE", ".jpeg": "IMAGE",
+        ".gif": "IMAGE", ".webp": "IMAGE", ".svg": "IMAGE",
+        ".mp3": "AUDIO", ".wav": "AUDIO", ".flac": "AUDIO", ".ogg": "AUDIO",
+        ".mp4": "VIDEO", ".avi": "VIDEO", ".mov": "VIDEO", ".mkv": "VIDEO",
+    }
+
+    # --- T1: Location & Time ---
+    temporal_recency_mappings: dict[str, int] = {
+        "email": 86400,        # 24 hours in seconds
+        "chat": 3600,          # 1 hour
+        "stock": 300,          # 5 minutes
+        "news": 259200,        # 3 days
+        "log": 86400,          # 24 hours
+        "default": 604800,     # 7 days
+    }
+    spatial_scope_multipliers: dict[str, float] = {
+        "coffee": 0.005,       # ~500m radius in degrees
+        "restaurant": 0.01,    # ~1km
+        "logistics": 1.0,      # ~100km
+        "travel": 10.0,        # ~1000km
+        "default": 0.1,        # ~10km
+    }
+
+    # --- T2: What-If / Simulation ---
+    risk_threshold_approve: float = 0.3
+    risk_threshold_reject: float = 0.7
+    max_simulation_branches: int = 8
+
+    # --- T2: Attention / Plausibility ---
+    attention_relevance_threshold: float = 0.3
+    plausibility_confidence_threshold: float = 0.6
+
+    # --- T2: Curiosity ---
+    curiosity_strategy_mappings: dict[str, str] = {
+        "knowledge": "RAG",
+        "factual": "WEB",
+        "tool": "SCAN",
+        "context": "RAG",
+        "default": "RAG",
+    }
+
+    # --- T2: Task Decomposition ---
+    complexity_atomic_threshold: int = 1
+    complexity_compound_threshold: int = 3
+
+
 class HttpStatusSettings(BaseModel):
     """Standardized HTTP Status Codes."""
     ok: int = 200
@@ -694,6 +788,7 @@ class Settings(BaseSettings):
     ids: IdSettings = IdSettings()
     cache_hierarchy: CacheHierarchySettings = CacheHierarchySettings()
     normalization: NormalizationSettings = NormalizationSettings()
+    kernel: KernelSettings = KernelSettings()
 
     model_config = SettingsConfigDict(
         env_file=".env",
