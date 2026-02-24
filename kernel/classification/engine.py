@@ -1,0 +1,304 @@
+"""
+Tier 1 Classification — Engine.
+
+Universal Classification Kernel: three-layer architecture for fast,
+deterministic text classification.
+
+    Layer A: Linguistic Analysis (regex + POS tagging)
+    Layer B: Semantic Proximity (vector embedding cosine match)
+    Layer C: Hybrid Merge (weighted fusion + confidence threshold)
+
+All functions accept/return Standard I/O types (Signal → Result).
+"""
+
+from __future__ import annotations
+
+import re
+import time
+from typing import Any
+
+from shared.config import get_settings
+from shared.logging.main import get_logger
+from shared.normalization import min_max_scale, softmax_transform
+from shared.standard_io import (
+    Metrics,
+    ModuleRef,
+    Result,
+    Signal,
+    create_data_signal,
+    fail,
+    ok,
+    processing_error,
+)
+
+from .types import (
+    ClassificationResult,
+    ClassProfileRules,
+    FallbackTrigger,
+    LabelScore,
+    LinguisticResult,
+    SemanticResult,
+)
+
+log = get_logger(__name__)
+
+_MODULE = "classification"
+_TIER = 1
+
+
+def _ref(fn: str) -> ModuleRef:
+    return ModuleRef(tier=_TIER, module=_MODULE, function=fn)
+
+
+# ============================================================================
+# Layer A: Linguistic Analysis
+# ============================================================================
+
+
+def run_linguistic_analysis(
+    text: str,
+    profile_rules: ClassProfileRules,
+) -> LinguisticResult:
+    """Layer A — fast regex pattern matching and POS tagging.
+
+    Scans text against compiled regex patterns and part-of-speech rules
+    defined in the class profile. Returns scored candidate labels.
+    """
+    candidates: dict[str, float] = {}
+    matched_patterns: list[str] = []
+    matched_pos: list[str] = []
+    text_lower = text.lower()
+
+    # Regex pattern matching
+    for rule in profile_rules.pattern_rules:
+        if re.search(rule.pattern, text_lower):
+            matched_patterns.append(rule.pattern)
+            candidates[rule.label] = candidates.get(rule.label, 0.0) + rule.weight
+
+    # POS-based heuristic matching (lightweight, no external model dependency)
+    words = text.split()
+    for rule in profile_rules.pos_rules:
+        # Simplified POS heuristic: check for imperative verbs, nouns, etc.
+        for pos_tag in rule.required_pos:
+            if pos_tag == "VERB" and words and words[0].lower() in _IMPERATIVE_VERBS:
+                matched_pos.append(pos_tag)
+                candidates[rule.label] = candidates.get(rule.label, 0.0) + rule.weight
+            elif pos_tag == "NOUN" and any(w[0].isupper() for w in words[1:] if w):
+                matched_pos.append(pos_tag)
+                candidates[rule.label] = candidates.get(rule.label, 0.0) + (rule.weight * 0.5)
+
+    # Normalize scores
+    if candidates:
+        max_score = max(candidates.values())
+        if max_score > 0:
+            candidates = {
+                label: min_max_scale(score, 0.0, max_score)
+                for label, score in candidates.items()
+            }
+
+    return LinguisticResult(
+        candidates=[
+            LabelScore(label=label, score=score)
+            for label, score in sorted(candidates.items(), key=lambda x: x[1], reverse=True)
+        ],
+        matched_patterns=matched_patterns,
+        matched_pos_tags=matched_pos,
+    )
+
+
+# Common imperative verbs for POS heuristic
+_IMPERATIVE_VERBS = frozenset({
+    "create", "delete", "remove", "update", "modify", "change",
+    "get", "find", "search", "list", "show", "display",
+    "send", "deploy", "build", "run", "start", "stop",
+    "add", "set", "configure", "install", "analyze", "check",
+    "open", "close", "save", "load", "export", "import",
+    "move", "copy", "rename", "help", "explain", "describe",
+})
+
+
+# ============================================================================
+# Layer B: Semantic Proximity
+# ============================================================================
+
+
+async def run_semantic_proximity(
+    text: str,
+    profile_rules: ClassProfileRules,
+) -> SemanticResult:
+    """Layer B — vector embedding cosine similarity match.
+
+    Converts text into a vector embedding and computes cosine similarity
+    against pre-indexed intent vectors from the class profile.
+    """
+    if not profile_rules.intent_vectors:
+        return SemanticResult(candidates=[], embedding_used=False)
+
+    try:
+        from shared.embedding import get_model_manager
+
+        manager = get_model_manager()
+        text_embedding = await manager.embed_single(text)
+
+        candidates: list[LabelScore] = []
+        for intent_vec in profile_rules.intent_vectors:
+            similarity = _cosine_similarity(text_embedding, intent_vec.embedding)
+            score = min_max_scale(similarity, 0.0, 1.0)
+            candidates.append(LabelScore(label=intent_vec.label, score=score))
+
+        candidates.sort(key=lambda x: x.score, reverse=True)
+        return SemanticResult(candidates=candidates, embedding_used=True)
+
+    except Exception as exc:
+        log.warning(
+            "Semantic proximity unavailable, falling back to linguistic only",
+            error=str(exc),
+        )
+        return SemanticResult(candidates=[], embedding_used=False)
+
+
+def _cosine_similarity(vec_a: list[float], vec_b: list[float]) -> float:
+    """Compute cosine similarity between two vectors."""
+    if len(vec_a) != len(vec_b) or not vec_a:
+        return 0.0
+    dot_product = sum(a * b for a, b in zip(vec_a, vec_b))
+    norm_a = sum(a * a for a in vec_a) ** 0.5
+    norm_b = sum(b * b for b in vec_b) ** 0.5
+    if norm_a == 0.0 or norm_b == 0.0:
+        return 0.0
+    return dot_product / (norm_a * norm_b)
+
+
+# ============================================================================
+# Layer C: Hybrid Merge
+# ============================================================================
+
+
+def merge_classification_layers(
+    linguistic: LinguisticResult,
+    semantic: SemanticResult,
+    threshold: float,
+) -> ClassificationResult | FallbackTrigger:
+    """Layer C — weighted fusion of Layer A and Layer B, threshold filter.
+
+    Combines linguistic and semantic scores using config-driven weights.
+    If no label clears the confidence threshold, returns FallbackTrigger.
+    """
+    settings = get_settings().kernel
+    ling_weight = settings.classification_linguistic_weight
+    sem_weight = settings.classification_semantic_weight
+
+    # If semantic is unavailable, linguistic takes full weight
+    if not semantic.candidates:
+        ling_weight = 1.0
+        sem_weight = 0.0
+
+    # Merge scores by label
+    merged: dict[str, float] = {}
+    for candidate in linguistic.candidates:
+        merged[candidate.label] = candidate.score * ling_weight
+    for candidate in semantic.candidates:
+        merged[candidate.label] = merged.get(candidate.label, 0.0) + (candidate.score * sem_weight)
+
+    if not merged:
+        return FallbackTrigger(
+            reason="No candidates produced by either classification layer",
+            candidates=[],
+        )
+
+    # Apply softmax for probability distribution
+    labels = list(merged.keys())
+    raw_scores = list(merged.values())
+    probabilities = softmax_transform(raw_scores)
+
+    ranked = sorted(
+        [LabelScore(label=label, score=prob) for label, prob in zip(labels, probabilities)],
+        key=lambda x: x.score,
+        reverse=True,
+    )
+
+    top = ranked[0]
+
+    if top.score >= threshold:
+        return ClassificationResult(
+            labels=ranked,
+            top_label=top.label,
+            confidence=top.score,
+            linguistic_contribution=ling_weight,
+            semantic_contribution=sem_weight,
+        )
+
+    return FallbackTrigger(
+        reason=f"Top candidate '{top.label}' scored {top.score:.3f}, below threshold {threshold:.3f}",
+        best_guess=top,
+        candidates=ranked,
+    )
+
+
+# ============================================================================
+# Top-Level Orchestrator
+# ============================================================================
+
+
+async def classify(
+    text: str,
+    profile_rules: ClassProfileRules,
+) -> Result:
+    """Top-level classification orchestrator.
+
+    Runs Layer A (linguistic) and Layer B (semantic) in parallel,
+    merges via Layer C (hybrid fusion), applies confidence threshold.
+
+    Returns:
+        Result with ClassificationResult or FallbackTrigger as data signal.
+    """
+    ref = _ref("classify")
+    start = time.perf_counter()
+    trace_id = ""
+
+    try:
+        settings = get_settings().kernel
+        threshold = settings.classification_confidence_threshold
+
+        # Run Layer A (sync) and Layer B (async)
+        linguistic = run_linguistic_analysis(text, profile_rules)
+        semantic = await run_semantic_proximity(text, profile_rules)
+
+        # Merge via Layer C
+        result = merge_classification_layers(linguistic, semantic, threshold)
+
+        elapsed = (time.perf_counter() - start) * 1000
+        metrics = Metrics(duration_ms=elapsed, module_ref=ref)
+
+        if isinstance(result, ClassificationResult):
+            schema_name = "ClassificationResult"
+        else:
+            schema_name = "FallbackTrigger"
+
+        signal = create_data_signal(
+            data=result.model_dump(),
+            schema=schema_name,
+            origin=ref,
+            trace_id=trace_id,
+            tags={"domain": "classification"},
+        )
+
+        log.info(
+            "Classification complete",
+            top_label=result.top_label if isinstance(result, ClassificationResult) else "FALLBACK",
+            confidence=result.confidence if isinstance(result, ClassificationResult) else 0.0,
+            duration_ms=round(elapsed, 2),
+        )
+
+        return ok(signals=[signal], metrics=metrics)
+
+    except Exception as exc:
+        elapsed = (time.perf_counter() - start) * 1000
+        metrics = Metrics(duration_ms=elapsed, module_ref=ref)
+        error = processing_error(
+            message=f"Classification failed: {exc}",
+            source=ref,
+            detail={"text_length": len(text), "error_type": type(exc).__name__},
+        )
+        log.error("Classification failed", error=str(exc))
+        return fail(error=error, metrics=metrics)

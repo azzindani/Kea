@@ -627,6 +627,201 @@ class NormalizationSettings(BaseModel):
     ]
 
 
+class KernelSettings(BaseModel):
+    """Kernel Tier 1 through Tier 6 processing settings."""
+
+    # --- T1: Classification ---
+    classification_confidence_threshold: float = 0.80
+    classification_linguistic_weight: float = 0.4
+    classification_semantic_weight: float = 0.6
+    classification_fallback_label: str = "UNCLASSIFIED"
+
+    # --- T1: Intent / Sentiment / Urgency ---
+    intent_labels: list[str] = [
+        "CREATE", "DELETE", "QUERY", "UPDATE", "NAVIGATE",
+        "CONFIGURE", "ANALYZE", "COMMUNICATE", "UNKNOWN",
+    ]
+    sentiment_labels: list[str] = [
+        "POSITIVE", "NEGATIVE", "NEUTRAL", "FRUSTRATED", "URGENT",
+    ]
+    urgency_bands: list[str] = [
+        "CRITICAL", "HIGH", "NORMAL", "LOW",
+    ]
+    urgency_keywords_critical: list[str] = [
+        "immediately", "asap", "emergency", "urgent", "critical",
+        "now", "right now", "right away",
+    ]
+    urgency_keywords_high: list[str] = [
+        "soon", "quickly", "fast", "priority", "important",
+        "time-sensitive", "hurry",
+    ]
+    urgency_keywords_low: list[str] = [
+        "whenever", "no rush", "low priority", "when you can",
+        "at your convenience", "eventually", "someday",
+    ]
+
+    # --- T1: Scoring ---
+    scoring_semantic_weight: float = 0.4
+    scoring_precision_weight: float = 0.35
+    scoring_reward_weight: float = 0.25
+    scoring_admin_reward_boost: float = 0.15
+    scoring_creative_semantic_boost: float = 0.10
+
+    # --- T1: Validation ---
+    validation_strict_mode: bool = True
+
+    # --- T1: Modality ---
+    modality_keyframe_interval_seconds: float = 5.0
+    modality_supported_extensions: dict[str, str] = {
+        ".txt": "TEXT", ".md": "TEXT", ".csv": "TEXT", ".json": "TEXT",
+        ".pdf": "DOCUMENT", ".xlsx": "DOCUMENT", ".docx": "DOCUMENT",
+        ".png": "IMAGE", ".jpg": "IMAGE", ".jpeg": "IMAGE",
+        ".gif": "IMAGE", ".webp": "IMAGE", ".svg": "IMAGE",
+        ".mp3": "AUDIO", ".wav": "AUDIO", ".flac": "AUDIO", ".ogg": "AUDIO",
+        ".mp4": "VIDEO", ".avi": "VIDEO", ".mov": "VIDEO", ".mkv": "VIDEO",
+    }
+
+    # --- T1: Location & Time ---
+    temporal_recency_mappings: dict[str, int] = {
+        "email": 86400,        # 24 hours in seconds
+        "chat": 3600,          # 1 hour
+        "stock": 300,          # 5 minutes
+        "news": 259200,        # 3 days
+        "log": 86400,          # 24 hours
+        "default": 604800,     # 7 days
+    }
+    spatial_scope_multipliers: dict[str, float] = {
+        "coffee": 0.005,       # ~500m radius in degrees
+        "restaurant": 0.01,    # ~1km
+        "logistics": 1.0,      # ~100km
+        "travel": 10.0,        # ~1000km
+        "default": 0.1,        # ~10km
+    }
+
+    # --- T2: What-If / Simulation ---
+    risk_threshold_approve: float = 0.3
+    risk_threshold_reject: float = 0.7
+    max_simulation_branches: int = 8
+
+    # --- T2: Attention / Plausibility ---
+    attention_relevance_threshold: float = 0.3
+    plausibility_confidence_threshold: float = 0.6
+
+    # --- T2: Curiosity ---
+    curiosity_strategy_mappings: dict[str, str] = {
+        "knowledge": "RAG",
+        "factual": "WEB",
+        "tool": "SCAN",
+        "context": "RAG",
+        "default": "RAG",
+    }
+
+    # --- T2: Task Decomposition ---
+    complexity_atomic_threshold: int = 1
+    complexity_compound_threshold: int = 3
+
+    # --- T3: Graph Synthesizer ---
+    max_dag_review_iterations: int = 3
+    max_parallel_branches: int = 16
+    dag_compilation_timeout_ms: float = 5000.0
+
+    # --- T3: Node Assembler ---
+    node_execution_timeout_ms: float = 30000.0
+    node_input_validation_strict: bool = True
+    node_output_validation_strict: bool = True
+
+    # --- T3: Advanced Planning ---
+    planning_speed_weight: float = 0.4
+    planning_cost_weight: float = 0.3
+    planning_fidelity_weight: float = 0.3
+    max_hypothesis_count: int = 10
+
+    # --- T3: Reflection & Guardrails ---
+    guardrail_max_consensus_candidates: int = 5
+    guardrail_approval_threshold: float = 0.7
+    guardrail_forbidden_actions: list[str] = [
+        "data_exfiltration", "unauthorized_access", "privilege_escalation",
+        "privacy_violation", "resource_abuse",
+    ]
+    reflection_min_score_gap: float = 0.2
+
+    # --- T4: OODA Loop ---
+    ooda_max_cycles: int = 100
+    ooda_poll_timeout_ms: float = 1000.0
+    ooda_tick_interval_ms: float = 50.0
+    ooda_blocked_retry_limit: int = 3
+
+    # --- T4: Async Multitasking ---
+    async_poll_interval_ms: float = 2000.0
+    max_parked_dags: int = 32
+    context_switch_overhead_ms: float = 10.0
+
+    # --- T4: Short-Term Memory ---
+    stm_max_events: int = 256
+    stm_max_entities: int = 512
+    stm_default_entity_ttl_seconds: int = 3600
+    stm_max_age_seconds: int = 7200
+    stm_context_max_items: int = 50
+
+    # --- T5: Lifecycle Controller ---
+    lifecycle_panic_retry_interval_ms: float = 600000.0  # 10 minutes
+    lifecycle_epoch_commit_threshold: int = 5  # objectives completed before commit
+    lifecycle_max_objectives: int = 100
+
+    # --- T5: Energy & Interrupts ---
+    budget_token_limit: int = 1_000_000
+    budget_cost_limit: float = 100.0
+    budget_epoch_token_limit: int = 200_000
+    budget_warning_threshold: float = 0.8  # warn at 80% consumption
+    budget_exhaustion_threshold: float = 0.95
+
+    # --- T6: Self Model ---
+    self_model_calibration_window: int = 100
+    self_model_calibration_ema_decay: float = 0.1
+    self_model_capability_cache_ttl_seconds: int = 300
+
+    # --- T6: Activation Router ---
+    activation_urgency_weight: float = 0.30
+    activation_structural_weight: float = 0.25
+    activation_domain_weight: float = 0.25
+    activation_gap_weight: float = 0.20
+    activation_cache_ttl_seconds: int = 30
+    activation_pressure_moderate: float = 0.6
+    activation_pressure_high: float = 0.8
+
+    # --- T6: Cognitive Load Monitor ---
+    load_compute_weight: float = 0.40
+    load_time_weight: float = 0.35
+    load_breadth_weight: float = 0.25
+    load_loop_detection_window: int = 10
+    load_loop_repeat_threshold: int = 3
+    load_stall_multiplier: float = 3.0
+    load_threshold_simplify: float = 0.6
+    load_threshold_escalate: float = 0.8
+    load_threshold_abort: float = 0.95
+    load_goal_drift_threshold: float = 0.4
+
+    # --- T6: Hallucination Monitor ---
+    grounding_similarity_threshold: float = 0.65
+    grounding_inferred_weight: float = 0.5
+    grounding_grounded_weight: float = 1.0
+    grounding_fabricated_weight: float = 0.0
+
+    # --- T6: Confidence Calibrator ---
+    calibration_overconfidence_threshold: float = 0.2
+    calibration_underconfidence_threshold: float = 0.2
+    calibration_default_curve: dict[str, float] = {
+        "0.0": 0.0, "0.1": 0.1, "0.2": 0.2, "0.3": 0.3,
+        "0.4": 0.4, "0.5": 0.5, "0.6": 0.6, "0.7": 0.7,
+        "0.8": 0.8, "0.9": 0.9, "1.0": 1.0,
+    }
+
+    # --- T6: Noise Gate ---
+    noise_gate_grounding_threshold: float = 0.6
+    noise_gate_confidence_threshold: float = 0.5
+    noise_gate_max_retries: int = 3
+
+
 class HttpStatusSettings(BaseModel):
     """Standardized HTTP Status Codes."""
     ok: int = 200
@@ -694,6 +889,7 @@ class Settings(BaseSettings):
     ids: IdSettings = IdSettings()
     cache_hierarchy: CacheHierarchySettings = CacheHierarchySettings()
     normalization: NormalizationSettings = NormalizationSettings()
+    kernel: KernelSettings = KernelSettings()
 
     model_config = SettingsConfigDict(
         env_file=".env",
