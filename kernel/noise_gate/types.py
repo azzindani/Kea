@@ -7,11 +7,10 @@ rejection feedback, and retry budget management.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
-
 
 # ============================================================================
 # Tool Output (input from Tier 4)
@@ -66,7 +65,7 @@ class FilteredOutput(BaseModel):
 # ============================================================================
 
 
-class RejectionDimension(str, Enum):
+class RejectionDimension(StrEnum):
     """Which quality dimension caused the rejection."""
 
     GROUNDING = "grounding"

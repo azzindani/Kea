@@ -6,13 +6,13 @@ Pydantic models for the validation cascade: Syntax → Structure → Types → B
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 
-class ValidationGate(str, Enum):
+class ValidationGate(StrEnum):
     """Which validation gate was evaluated."""
 
     SYNTAX = "syntax"

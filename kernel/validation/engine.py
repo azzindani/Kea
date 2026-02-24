@@ -14,6 +14,8 @@ from typing import Any
 from pydantic import BaseModel, ValidationError
 
 from shared.config import get_settings
+from shared.inference_kit import InferenceKit
+from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
 from shared.standard_io import (
     Metrics,
@@ -139,7 +141,6 @@ def check_types(
 
         # Use Pydantic's own validation for accurate type checking
         try:
-            test_data = {field_name: value}
             # Construct a minimal model for this field
             expected_schema.model_validate(
                 {**{k: parsed_data.get(k) for k in schema_fields if k in parsed_data}},
@@ -209,9 +210,10 @@ def package_validation_error(
 # ============================================================================
 
 
-def validate(
+async def validate(
     raw_data: Any,
     expected_schema: type[BaseModel],
+    kit: InferenceKit | None = None,
 ) -> Result:
     """Top-level validation sentinel.
 
@@ -268,6 +270,33 @@ def validate(
             error_resp = package_validation_error("bounds", details, raw_data)
             return _validation_result(ref, start, error_resp)
         gates_passed.append(ValidationGate.BOUNDS)
+
+        # Gate 5: Semantic Coherence Check (LLM)
+        if kit and kit.has_llm:
+            try:
+                system_msg = LLMMessage(
+                    role="system",
+                    content=(
+                        "You are a semantic validator. Does this data logically make sense in the context of what it represents? "
+                        "Respond EXACTLY with JSON: {\"passed\": true/false, \"reasoning\": \"...\"}"
+                    )
+                )
+                user_msg = LLMMessage(role="user", content=json.dumps(parsed))
+                resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
+
+                content = resp.content.strip()
+                if content.startswith("```json"):
+                    content = content[7:-3].strip()
+                elif content.startswith("```"):
+                    content = content[3:-3].strip()
+                data = json.loads(content)
+
+                if not data.get("passed", True):
+                    error_resp = package_validation_error("semantic", data.get("reasoning", "Semantic validation failed"), raw_data)
+                    return _validation_result(ref, start, error_resp)
+            except Exception as e:
+                log.warning("LLM semantic validation failed", error=str(e))
+                pass
 
         # All gates passed
         success = SuccessResult(validated_data=parsed, gates_passed=gates_passed)

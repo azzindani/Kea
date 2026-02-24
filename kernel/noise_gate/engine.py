@@ -11,8 +11,12 @@ Final quality checkpoint before output leaves the kernel:
 from __future__ import annotations
 
 import time
-from typing import Union
 
+from kernel.confidence_calibrator.types import CalibratedConfidence
+from kernel.hallucination_monitor.types import (
+    ClaimGradeLevel,
+    GroundingReport,
+)
 from shared.config import get_settings
 from shared.logging.main import get_logger
 from shared.standard_io import (
@@ -23,12 +27,6 @@ from shared.standard_io import (
     fail,
     ok,
     processing_error,
-)
-
-from kernel.confidence_calibrator.types import CalibratedConfidence
-from kernel.hallucination_monitor.types import (
-    ClaimGradeLevel,
-    GroundingReport,
 )
 
 from .types import (
@@ -281,7 +279,7 @@ async def filter_output(
             quality_bar_override,
         )
 
-        result_data: Union[FilteredOutput, RejectedOutput]
+        result_data: FilteredOutput | RejectedOutput
 
         if passes:
             result_data = annotate_output(output, grounding, confidence)

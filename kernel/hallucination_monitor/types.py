@@ -6,18 +6,17 @@ Pydantic models for claim extraction, grading, and grounding verification.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
-
 
 # ============================================================================
 # Claims
 # ============================================================================
 
 
-class ClaimType(str, Enum):
+class ClaimType(StrEnum):
     """What kind of claim this is."""
 
     FACTUAL = "factual"       # Verifiable fact (needs evidence)
@@ -79,7 +78,7 @@ class EvidenceLink(BaseModel):
 # ============================================================================
 
 
-class ClaimGradeLevel(str, Enum):
+class ClaimGradeLevel(StrEnum):
     """Three-grade grounding system."""
 
     GROUNDED = "grounded"       # Direct evidence found

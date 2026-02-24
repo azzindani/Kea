@@ -7,11 +7,9 @@ capability maps, cognitive state, and accuracy tracking.
 
 from __future__ import annotations
 
-from enum import Enum
-from typing import Any
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
-
 
 # ============================================================================
 # Signal Tags (input from Tier 1)
@@ -78,7 +76,7 @@ class CapabilityAssessment(BaseModel):
 # ============================================================================
 
 
-class ProcessingPhase(str, Enum):
+class ProcessingPhase(StrEnum):
     """Which T6 temporal phase the agent is in."""
 
     PRE_EXECUTION = "pre_execution"

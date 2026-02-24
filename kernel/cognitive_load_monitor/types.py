@@ -7,10 +7,9 @@ and graduated response actions.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
-
 
 # ============================================================================
 # Cycle Telemetry (input)
@@ -102,7 +101,7 @@ class GoalDriftDetection(BaseModel):
 # ============================================================================
 
 
-class LoadAction(str, Enum):
+class LoadAction(StrEnum):
     """Graduated response to cognitive load issues."""
 
     CONTINUE = "continue"     # Normal operation

@@ -7,12 +7,12 @@ and risk/reward analysis before live execution.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class VerdictDecision(str, Enum):
+class VerdictDecision(StrEnum):
     """Simulation outcome decision."""
 
     APPROVE = "approve"     # Risk acceptable, proceed

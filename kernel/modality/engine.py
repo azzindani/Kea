@@ -131,7 +131,7 @@ async def decompose_document(doc_path: str) -> DocumentParts:
     except ImportError:
         # Fallback: attempt basic text reading
         try:
-            with open(doc_path, "r", encoding="utf-8", errors="replace") as f:
+            with open(doc_path, encoding="utf-8", errors="replace") as f:
                 content = f.read()
             return DocumentParts(
                 text_blocks=[content] if content else [],

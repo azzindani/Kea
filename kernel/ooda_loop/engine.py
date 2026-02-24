@@ -14,12 +14,21 @@ relying on Short-Term Memory to track state.
 
 from __future__ import annotations
 
+import json
 import time
-from datetime import datetime, timezone
 from typing import Any
 
+from kernel.graph_synthesizer.types import ExecutableDAG, NodeStatus
+from kernel.short_term_memory.engine import ShortTermMemory
+from kernel.short_term_memory.types import (
+    EventSource,
+    NodeExecutionStatus,
+    ObservationEvent,
+)
 from shared.config import get_settings
 from shared.id_and_hash import generate_id
+from shared.inference_kit import InferenceKit
+from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
 from shared.standard_io import (
     Metrics,
@@ -30,15 +39,6 @@ from shared.standard_io import (
     ok,
     processing_error,
 )
-
-from kernel.short_term_memory.engine import ShortTermMemory
-from kernel.short_term_memory.types import (
-    ContextSlice,
-    EventSource,
-    NodeExecutionStatus,
-    ObservationEvent,
-)
-from kernel.graph_synthesizer.types import ExecutableDAG, NodeStatus
 
 from .types import (
     ActionResult,
@@ -80,7 +80,6 @@ async def observe(
     Drops each event into the Short-Term Memory's HistoryQueue.
     Must never block on slow sources; uses configurable poll timeouts.
     """
-    settings = get_settings().kernel
     observations: list[ObservationEvent] = []
 
     # In the kernel implementation, event_stream polling is abstracted.
@@ -111,6 +110,7 @@ async def orient(
     observations: list[ObservationEvent],
     stm: ShortTermMemory,
     rag_context: dict[str, Any] | None = None,
+    kit: InferenceKit | None = None,
 ) -> OrientedState:
     """Update the working context by merging new observations with knowledge.
 
@@ -118,7 +118,7 @@ async def orient(
     Here we work with injected RAG context and Short-Term Memory.
     """
     # Read existing context from STM
-    context_slice = stm.read_context()
+    context_slice = await stm.read_context(kit=kit)
 
     # Detect blocking conditions
     is_blocked = False
@@ -137,6 +137,30 @@ async def orient(
     # Summarize observations
     summaries = [obs.description for obs in observations[:10]]
     observation_summary = "; ".join(summaries) if summaries else "No new observations"
+
+    # LLM Context Analysis
+    if kit and kit.has_llm and observations:
+        try:
+            system_msg = LLMMessage(
+                role="system",
+                content="Analyze observations. Is the agent blocked? Provide a concise summary. Respond EXACTLY with JSON: {\"is_blocked\": true/false, \"blocking_reason\": \"...\", \"summary\": \"...\"}"
+            )
+            user_msg = LLMMessage(role="user", content=f"Observations: {summaries}")
+            resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
+
+            content = resp.content.strip()
+            if content.startswith("```json"):
+                content = content[7:-3].strip()
+            elif content.startswith("```"):
+                content = content[3:-3].strip()
+            data = json.loads(content)
+
+            is_blocked = bool(data.get("is_blocked", is_blocked))
+            blocking_reason = data.get("blocking_reason", blocking_reason)
+            observation_summary = data.get("summary", observation_summary)
+        except Exception as e:
+            log.warning("LLM orientation failed", error=str(e))
+            pass
 
     # Detect state changes
     state_changes: list[str] = []
@@ -376,6 +400,7 @@ async def run_ooda_cycle(
     event_stream: EventStream | None = None,
     pending_events: list[ObservationEvent] | None = None,
     rag_context: dict[str, Any] | None = None,
+    kit: InferenceKit | None = None,
 ) -> CycleResult:
     """Execute one complete Observe-Orient-Decide-Act cycle.
 
@@ -390,7 +415,7 @@ async def run_ooda_cycle(
     observations = await observe(event_stream, stm, pending_events)
 
     # Phase 2: Orient
-    oriented = await orient(observations, stm, rag_context)
+    oriented = await orient(observations, stm, rag_context, kit)
 
     # Phase 3: Decide
     decision = await decide(
@@ -454,6 +479,7 @@ async def run_ooda_loop(
     initial_state: AgentState,
     stm: ShortTermMemory | None = None,
     active_dag: ExecutableDAG | None = None,
+    kit: InferenceKit | None = None,
 ) -> Result:
     """Continuous OODA loop runner.
 
@@ -488,6 +514,7 @@ async def run_ooda_loop(
                 state=state,
                 stm=stm,
                 active_dag=active_dag,
+                kit=kit,
             )
 
             # Collect artifacts

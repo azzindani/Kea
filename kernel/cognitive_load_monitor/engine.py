@@ -15,7 +15,12 @@ from __future__ import annotations
 import hashlib
 import time
 
+import numpy as np
+
+from kernel.activation_router.types import ActivationMap
+from kernel.ooda_loop.types import Decision
 from shared.config import get_settings
+from shared.inference_kit import InferenceKit
 from shared.logging.main import get_logger
 from shared.standard_io import (
     Metrics,
@@ -26,9 +31,6 @@ from shared.standard_io import (
     ok,
     processing_error,
 )
-
-from kernel.activation_router.types import ActivationMap
-from kernel.ooda_loop.types import Decision
 
 from .types import (
     CognitiveLoad,
@@ -250,6 +252,7 @@ def detect_oscillation(recent_decisions: list[Decision]) -> OscillationDetection
 async def detect_goal_drift(
     recent_outputs: list[str],
     original_objective: str,
+    kit: InferenceKit | None = None,
 ) -> GoalDriftDetection:
     """Compute semantic similarity between recent outputs and the objective.
 
@@ -262,6 +265,28 @@ async def detect_goal_drift(
 
     if not recent_outputs or not original_objective:
         return GoalDriftDetection()
+
+    if kit and kit.has_embedder:
+        try:
+            obj_emb = await kit.embedder.embed(original_objective)
+            similarities = []
+            for out in recent_outputs:
+                out_emb = await kit.embedder.embed(out)
+                score = np.dot(obj_emb, out_emb) / (np.linalg.norm(obj_emb) * np.linalg.norm(out_emb))
+                similarities.append(round(float(score), 4))
+
+            avg_similarity = sum(similarities) / max(1, len(similarities))
+            is_drifting = avg_similarity < drift_threshold
+            drift_magnitude = max(0.0, 1.0 - avg_similarity)
+
+            return GoalDriftDetection(
+                is_drifting=is_drifting,
+                similarity_trend=similarities,
+                drift_magnitude=round(drift_magnitude, 4),
+            )
+        except Exception as e:
+            log.warning("Embedding goal drift failed, falling back", error=str(e))
+            pass
 
     # Kernel-level heuristic: keyword overlap as similarity proxy.
     # The orchestrator service layer replaces this with embedding similarity.
@@ -403,6 +428,7 @@ async def monitor_cognitive_load(
     recent_decisions: list[Decision],
     recent_outputs: list[str] | None = None,
     original_objective: str = "",
+    kit: InferenceKit | None = None,
 ) -> Result:
     """Top-level cognitive load monitor.
 
@@ -426,7 +452,7 @@ async def monitor_cognitive_load(
 
         drift = GoalDriftDetection()
         if recent_outputs and original_objective:
-            drift = await detect_goal_drift(recent_outputs, original_objective)
+            drift = await detect_goal_drift(recent_outputs, original_objective, kit)
 
         # Get recommendation
         recommendation = recommend_action(

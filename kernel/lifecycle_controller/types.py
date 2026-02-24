@@ -7,11 +7,10 @@ macro-objective tracking, and lifecycle state control.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
-
 
 # ============================================================================
 # Spawn Request (input from Tier 7 via Tier 6)
@@ -119,7 +118,7 @@ class IdentityContext(BaseModel):
 # ============================================================================
 
 
-class LifecycleSignalType(str, Enum):
+class LifecycleSignalType(StrEnum):
     """Types of lifecycle control signals."""
 
     START = "start"         # Begin OODA loop execution
@@ -137,7 +136,7 @@ class LifecycleSignal(BaseModel):
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
-class LifecyclePhase(str, Enum):
+class LifecyclePhase(StrEnum):
     """Macro-level agent lifecycle phases."""
 
     INITIALIZING = "initializing"
@@ -162,7 +161,7 @@ class LifecycleState(BaseModel):
 # ============================================================================
 
 
-class ObjectiveStatus(str, Enum):
+class ObjectiveStatus(StrEnum):
     """Status of a macro-objective."""
 
     PENDING = "pending"

@@ -13,9 +13,11 @@ Agent lifecycle management:
 from __future__ import annotations
 
 import time
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
 
+from kernel.ooda_loop.types import MacroObjective
+from kernel.short_term_memory import ShortTermMemory
+from kernel.short_term_memory.types import EpochSummary
 from shared.config import get_settings
 from shared.id_and_hash import generate_id
 from shared.logging.main import get_logger
@@ -28,10 +30,6 @@ from shared.standard_io import (
     ok,
     processing_error,
 )
-
-from kernel.short_term_memory import ShortTermMemory
-from kernel.short_term_memory.types import EpochSummary
-from kernel.ooda_loop.types import MacroObjective
 
 from .types import (
     AgentIdentity,
@@ -58,7 +56,7 @@ def _ref(fn: str) -> ModuleRef:
 
 
 def _now_utc() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 # ============================================================================

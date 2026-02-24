@@ -12,8 +12,13 @@ Accuracy-confidence alignment:
 from __future__ import annotations
 
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
+from kernel.self_model.engine import update_accuracy_history
+from kernel.self_model.types import (
+    CalibrationCurve,
+    CalibrationHistory,
+)
 from shared.config import get_settings
 from shared.logging.main import get_logger
 from shared.standard_io import (
@@ -25,13 +30,6 @@ from shared.standard_io import (
     ok,
     processing_error,
 )
-
-from kernel.self_model.types import (
-    CalibrationCurve,
-    CalibrationHistory,
-)
-
-from kernel.self_model.engine import update_accuracy_history
 
 from .types import CalibratedConfidence
 
@@ -71,8 +69,6 @@ def calibrate_confidence(
 
     Formula: calibrated = min(historical_correction(stated), grounding_score)
     """
-    settings = get_settings().kernel
-
     # Get calibration curve for this domain
     curve = get_calibration_curve(domain)
 
@@ -216,7 +212,7 @@ def update_calibration_curve(
 
     curve.bin_mapping[bin_key] = round(updated, 6)
     curve.sample_count += 1
-    curve.last_updated_utc = datetime.now(timezone.utc).isoformat()
+    curve.last_updated_utc = datetime.now(UTC).isoformat()
 
     # Update the stored curve
     _domain_curves[domain] = curve
@@ -253,7 +249,7 @@ def get_calibration_curve(domain: str = "general") -> CalibrationCurve:
         domain=domain,
         bin_mapping=dict(settings.calibration_default_curve),
         sample_count=0,
-        last_updated_utc=datetime.now(timezone.utc).isoformat(),
+        last_updated_utc=datetime.now(UTC).isoformat(),
     )
 
     # Cache it for future use

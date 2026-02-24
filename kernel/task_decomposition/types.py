@@ -7,10 +7,9 @@ with dependency graphs and skill mappings.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
-
 
 # ============================================================================
 # World State (Input Context)
@@ -47,7 +46,7 @@ class WorldState(BaseModel):
 # ============================================================================
 
 
-class ComplexityLevel(str, Enum):
+class ComplexityLevel(StrEnum):
     """Goal complexity categories."""
 
     ATOMIC = "atomic"           # Single-step, single-skill

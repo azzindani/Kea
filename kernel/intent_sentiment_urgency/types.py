@@ -7,17 +7,16 @@ probability-scored cognitive labels consumed by higher tiers.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
-
 
 # ============================================================================
 # Enumerations
 # ============================================================================
 
 
-class IntentCategory(str, Enum):
+class IntentCategory(StrEnum):
     """Primary intent categories."""
 
     CREATE = "CREATE"
@@ -31,7 +30,7 @@ class IntentCategory(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
-class SentimentCategory(str, Enum):
+class SentimentCategory(StrEnum):
     """Emotional valence categories."""
 
     POSITIVE = "POSITIVE"
@@ -41,7 +40,7 @@ class SentimentCategory(str, Enum):
     URGENT = "URGENT"
 
 
-class UrgencyBand(str, Enum):
+class UrgencyBand(StrEnum):
     """Priority bands for time-sensitivity."""
 
     CRITICAL = "CRITICAL"

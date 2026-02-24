@@ -7,18 +7,17 @@ and progress tracking.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
-
 
 # ============================================================================
 # Planning Constraints (Input)
 # ============================================================================
 
 
-class PriorityMode(str, Enum):
+class PriorityMode(StrEnum):
     """Routing strategy for sequencing sub-tasks."""
 
     SPEED = "speed"         # Minimize wall-clock time (max parallelism)

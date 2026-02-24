@@ -7,18 +7,17 @@ cycle results, decisions, action results, and loop state.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
-
 
 # ============================================================================
 # Agent State (the central state object flowing through the loop)
 # ============================================================================
 
 
-class AgentStatus(str, Enum):
+class AgentStatus(StrEnum):
     """Macro lifecycle status of the agent within the OODA loop."""
 
     ACTIVE = "active"       # Executing cycles
@@ -120,7 +119,7 @@ class OrientedState(BaseModel):
 # ============================================================================
 
 
-class DecisionAction(str, Enum):
+class DecisionAction(StrEnum):
     """What the Decide phase tells the Act phase to do."""
 
     CONTINUE = "continue"       # Execute next node in current DAG
@@ -185,7 +184,7 @@ class ActionResult(BaseModel):
 # ============================================================================
 
 
-class CycleAction(str, Enum):
+class CycleAction(StrEnum):
     """What the loop should do after a cycle completes."""
 
     CONTINUE = "continue"   # Run another cycle
@@ -210,7 +209,7 @@ class CycleResult(BaseModel):
     )
 
 
-class LoopTerminationReason(str, Enum):
+class LoopTerminationReason(StrEnum):
     """Why the OODA loop terminated."""
 
     OBJECTIVE_COMPLETE = "objective_complete"

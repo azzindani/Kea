@@ -8,13 +8,15 @@ All use lexical rule sets and mathematical normalization — no LLM calls.
 from __future__ import annotations
 
 import asyncio
+import json
 import re
 import time
 
 from shared.config import get_settings
+from shared.inference_kit import InferenceKit
+from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
-from shared.normalization import min_max_scale, normalize_signal_batch, softmax_transform
-from shared.normalization.types import RawSignal, SignalMetadata
+from shared.normalization import min_max_scale, softmax_transform
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -121,6 +123,35 @@ def detect_intent(text: str) -> IntentLabel:
         candidates=candidates,
     )
 
+async def detect_intent_async(text: str, kit: InferenceKit | None = None) -> IntentLabel:
+    label = detect_intent(text)
+    if kit and kit.has_llm and label.confidence < 0.6:
+        try:
+            system_msg = LLMMessage(
+                role="system",
+                content=(
+                    "Classify intent. Options: CREATE, DELETE, QUERY, UPDATE, NAVIGATE, CONFIGURE, ANALYZE, COMMUNICATE, UNKNOWN. "
+                    "Respond exactly with JSON: {\"intent\": \"...\", \"confidence\": 0.95}"
+                )
+            )
+            user_msg = LLMMessage(role="user", content=text)
+            resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
+
+            content = resp.content.strip()
+            if content.startswith("```json"):
+                content = content[7:-3].strip()
+            elif content.startswith("```"):
+                content = content[3:-3].strip()
+            data = json.loads(content)
+
+            intent_val = data.get("intent", "UNKNOWN").upper()
+            if intent_val in [c.value for c in IntentCategory]:
+                label.primary = IntentCategory(intent_val)
+                label.confidence = float(data.get("confidence", label.confidence))
+        except Exception as e:
+            log.warning("LLM intent fallback failed", error=str(e))
+    return label
+
 
 # ============================================================================
 # Sentiment Analysis
@@ -189,6 +220,33 @@ def analyze_sentiment(text: str) -> SentimentLabel:
         valence=valence,
     )
 
+async def analyze_sentiment_async(text: str, kit: InferenceKit | None = None) -> SentimentLabel:
+    label = analyze_sentiment(text)
+    if kit and kit.has_llm:
+        try:
+            system_msg = LLMMessage(
+                role="system",
+                content="Analyze sentiment. Respond EXACTLY in JSON: {\"primary\": \"POSITIVE|NEGATIVE|NEUTRAL|FRUSTRATED\", \"score\": 0.0-1.0, \"valence\": -1.0-1.0}"
+            )
+            user_msg = LLMMessage(role="user", content=text)
+            resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
+
+            content = resp.content.strip()
+            if content.startswith("```json"):
+                content = content[7:-3].strip()
+            elif content.startswith("```"):
+                content = content[3:-3].strip()
+            data = json.loads(content)
+
+            primary_val = data.get("primary", "NEUTRAL").upper()
+            if primary_val in [c.value for c in SentimentCategory]:
+                label.primary = SentimentCategory(primary_val)
+                label.score = float(data.get("score", label.score))
+                label.valence = float(data.get("valence", label.valence))
+        except Exception as e:
+            log.warning("LLM sentiment fallback failed", error=str(e))
+    return label
+
 
 # ============================================================================
 # Urgency Scoring
@@ -250,13 +308,45 @@ def score_urgency(text: str) -> UrgencyLabel:
         temporal_pressure=temporal_pressure,
     )
 
+async def score_urgency_async(text: str, kit: InferenceKit | None = None) -> UrgencyLabel:
+    label = score_urgency(text)
+    if kit and kit.has_llm:
+        try:
+            system_msg = LLMMessage(
+                role="system",
+                content="Evaluate urgency on a 0.0 to 1.0 scale. Respond EXACTLY with JSON: {\"score\": 0.0-1.0}"
+            )
+            user_msg = LLMMessage(role="user", content=text)
+            resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
+
+            content = resp.content.strip()
+            if content.startswith("```json"):
+                content = content[7:-3].strip()
+            elif content.startswith("```"):
+                content = content[3:-3].strip()
+            data = json.loads(content)
+
+            score = float(data.get("score", label.score))
+            label.score = score
+            if score >= 0.8:
+                label.band = UrgencyBand.CRITICAL
+            elif score >= 0.5:
+                label.band = UrgencyBand.HIGH
+            elif score <= 0.2:
+                label.band = UrgencyBand.LOW
+            else:
+                label.band = UrgencyBand.NORMAL
+        except Exception as e:
+            log.warning("LLM urgency fallback failed", error=str(e))
+    return label
+
 
 # ============================================================================
 # Top-Level Orchestrator
 # ============================================================================
 
 
-async def run_primitive_scorers(text: str) -> Result:
+async def run_primitive_scorers(text: str, kit: InferenceKit | None = None) -> Result:
     """Top-level orchestrator — runs all three scorers in parallel.
 
     Returns CognitiveLabels containing normalized probability scores
@@ -266,14 +356,11 @@ async def run_primitive_scorers(text: str) -> Result:
     start = time.perf_counter()
 
     try:
-        # All three are sync but we wrap for uniform async interface
-        loop = asyncio.get_event_loop()
-        intent_task = loop.run_in_executor(None, detect_intent, text)
-        sentiment_task = loop.run_in_executor(None, analyze_sentiment, text)
-        urgency_task = loop.run_in_executor(None, score_urgency, text)
-
+        # Gather all three parallel async calls
         intent, sentiment, urgency = await asyncio.gather(
-            intent_task, sentiment_task, urgency_task,
+            detect_intent_async(text, kit),
+            analyze_sentiment_async(text, kit),
+            score_urgency_async(text, kit),
         )
 
         labels = CognitiveLabels(

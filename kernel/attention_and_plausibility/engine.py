@@ -8,10 +8,15 @@ Two-stage cognitive filtering:
 
 from __future__ import annotations
 
+import json
 import re
 import time
 
+from kernel.intent_sentiment_urgency import detect_intent
+from kernel.scoring import compute_semantic_similarity
 from shared.config import get_settings
+from shared.inference_kit import InferenceKit
+from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
 from shared.standard_io import (
     Metrics,
@@ -22,9 +27,6 @@ from shared.standard_io import (
     ok,
     processing_error,
 )
-
-from kernel.intent_sentiment_urgency import detect_intent
-from kernel.scoring import compute_semantic_similarity
 
 from .types import (
     ContextElement,
@@ -118,6 +120,7 @@ _CONTRADICTION_PATTERNS: list[tuple[str, str]] = [
 
 async def check_plausibility(
     filtered_state: FilteredState,
+    kit: InferenceKit | None = None,
 ) -> PlausibilityResult:
     """Verify that the filtered goal is logically coherent.
 
@@ -161,6 +164,32 @@ async def check_plausibility(
             f"{len(filtered_state.critical_elements)} kept)"
         )
 
+    # LLM semantic plausibility check
+    if kit and kit.has_llm:
+        try:
+            system_msg = LLMMessage(
+                role="system",
+                content="Check goal plausibility. Is it logically coherent and achievable given context? Respond EXACTLY with JSON: {\"is_plausible\": true/false, \"issues\": [\"...\"]}"
+            )
+            context_str = str([e.model_dump() for e in filtered_state.critical_elements])
+            user_msg = LLMMessage(role="user", content=f"Goal: {filtered_state.goal}\nContext: {context_str}")
+            resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
+
+            content = resp.content.strip()
+            if content.startswith("```json"):
+                content = content[7:-3].strip()
+            elif content.startswith("```"):
+                content = content[3:-3].strip()
+            data = json.loads(content)
+
+            if not data.get("is_plausible", True):
+                new_issues = data.get("issues", ["LLM deemed goal implausible"])
+                issues.extend(new_issues)
+
+        except Exception as e:
+            log.warning("LLM plausibility check failed", error=str(e))
+            pass
+
     # Determine verdict
     if issues:
         confidence = max(
@@ -186,6 +215,7 @@ async def check_plausibility(
 
 async def run_cognitive_filters(
     task_state: TaskState,
+    kit: InferenceKit | None = None,
 ) -> Result:
     """Top-level orchestrator — runs attention filter then plausibility check.
 
@@ -199,7 +229,7 @@ async def run_cognitive_filters(
         filtered = await filter_attention(task_state)
 
         # Step 2: Plausibility check
-        plausibility = await check_plausibility(filtered)
+        plausibility = await check_plausibility(filtered, kit)
 
         elapsed = (time.perf_counter() - start) * 1000
         metrics = Metrics(duration_ms=elapsed, module_ref=ref)

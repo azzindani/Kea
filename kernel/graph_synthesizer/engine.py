@@ -11,11 +11,17 @@ JIT DAG compilation pipeline:
 
 from __future__ import annotations
 
+import json
 import time
-from typing import Any
 
+from kernel.task_decomposition import WorldState, decompose_goal
+from kernel.task_decomposition.types import SubTaskItem
+from kernel.what_if_scenario import simulate_outcomes
+from kernel.what_if_scenario.types import CompiledDAG, SimulationVerdict, VerdictDecision
 from shared.config import get_settings
 from shared.id_and_hash import generate_id
+from shared.inference_kit import InferenceKit
+from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
 from shared.standard_io import (
     Metrics,
@@ -26,11 +32,6 @@ from shared.standard_io import (
     ok,
     processing_error,
 )
-
-from kernel.task_decomposition import decompose_goal, WorldState
-from kernel.task_decomposition.types import SubTaskItem
-from kernel.what_if_scenario import simulate_outcomes
-from kernel.what_if_scenario.types import CompiledDAG, SimulationVerdict, VerdictDecision
 
 from .types import (
     ActionInstruction,
@@ -57,7 +58,7 @@ def _ref(fn: str) -> ModuleRef:
 # ============================================================================
 
 
-def map_subtasks_to_nodes(subtasks: list[SubTaskItem]) -> list[ExecutableNode]:
+async def map_subtasks_to_nodes(subtasks: list[SubTaskItem], kit: InferenceKit | None = None) -> list[ExecutableNode]:
     """Translate each SubTaskItem into an ExecutableNode.
 
     Uses the action instruction abstraction to capture what each node
@@ -78,6 +79,25 @@ def map_subtasks_to_nodes(subtasks: list[SubTaskItem]) -> list[ExecutableNode]:
                 "domain": task.domain,
             },
         )
+
+        if kit and kit.has_llm:
+            try:
+                system_msg = LLMMessage(
+                    role="system",
+                    content="Infer the exact action_type for this node (e.g. tool_call, llm_inference, data_transform, general). Respond exactly with JSON: {\"action_type\": \"...\"}"
+                )
+                user_msg = LLMMessage(role="user", content=instruction.description)
+                resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
+
+                content = resp.content.strip()
+                if content.startswith("```json"):
+                    content = content[7:-3].strip()
+                elif content.startswith("```"):
+                    content = content[3:-3].strip()
+                data = json.loads(content)
+                instruction.action_type = data.get("action_type", instruction.action_type)
+            except Exception:
+                pass
 
         node = ExecutableNode(
             node_id=generate_id("node"),
@@ -332,6 +352,7 @@ async def review_dag_with_simulation(dag: ExecutableDAG) -> SimulationVerdict:
 async def synthesize_plan(
     objective: str,
     context: WorldState | None = None,
+    kit: InferenceKit | None = None,
 ) -> Result:
     """Top-level DAG synthesis orchestrator.
 
@@ -377,7 +398,7 @@ async def synthesize_plan(
             )
 
         # Step 1: Map to nodes
-        nodes = map_subtasks_to_nodes(subtasks)
+        nodes = await map_subtasks_to_nodes(subtasks, kit)
 
         # Step 2: Calculate edges
         edges = calculate_dependency_edges(nodes)

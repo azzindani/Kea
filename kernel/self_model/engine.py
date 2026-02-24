@@ -11,10 +11,14 @@ The agent's internal representation of itself:
 
 from __future__ import annotations
 
+import json
 import time
 from typing import Any
 
+from kernel.lifecycle_controller.types import IdentityContext
 from shared.config import get_settings
+from shared.inference_kit import InferenceKit
+from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
 from shared.standard_io import (
     Metrics,
@@ -26,11 +30,8 @@ from shared.standard_io import (
     processing_error,
 )
 
-from kernel.lifecycle_controller.types import IdentityContext
-
 from .types import (
     AgentCognitiveState,
-    CalibrationCurve,
     CalibrationDataPoint,
     CalibrationHistory,
     CapabilityAssessment,
@@ -69,6 +70,7 @@ _cognitive_state: AgentCognitiveState = AgentCognitiveState()
 async def assess_capability(
     signal_tags: SignalTags,
     identity: IdentityContext,
+    kit: InferenceKit | None = None,
 ) -> CapabilityAssessment:
     """Top-level capability check.
 
@@ -76,7 +78,7 @@ async def assess_capability(
     and tool needs against the agent's Capability Map. Returns a
     verdict on whether the agent can handle this signal.
     """
-    gap = detect_capability_gap(signal_tags, identity)
+    gap = await detect_capability_gap(signal_tags, identity, kit)
 
     # If no gap, fully capable
     if gap is None:
@@ -225,9 +227,10 @@ def get_calibration_history() -> CalibrationHistory:
 # ============================================================================
 
 
-def detect_capability_gap(
+async def detect_capability_gap(
     signal_tags: SignalTags,
     identity: IdentityContext | None = None,
+    kit: InferenceKit | None = None,
 ) -> CapabilityGap | None:
     """Compare signal requirements against the agent's Capability Map.
 
@@ -257,6 +260,28 @@ def detect_capability_gap(
     for skill in signal_tags.required_skills:
         if skill not in agent_skills:
             missing_knowledge.append(skill)
+
+    if kit and kit.has_llm and missing_knowledge and agent_skills:
+        try:
+            system_msg = LLMMessage(
+                role="system",
+                content="Given the agent's known skills, are the missing skills actually covered by implication? Return a JSON list of strictly missing skills."
+            )
+            user_msg = LLMMessage(role="user", content=f"Known: {list(agent_skills)}\nMissing: {missing_knowledge}")
+            resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
+
+            content = resp.content.strip()
+            if content.startswith("```json"):
+                content = content[7:-3].strip()
+            elif content.startswith("```"):
+                content = content[3:-3].strip()
+            data = json.loads(content)
+
+            if isinstance(data, list):
+                missing_knowledge = [str(s) for s in data]
+        except Exception as e:
+            log.warning("LLM capability gap check failed", error=str(e))
+            pass
 
     # Check domain coverage
     domains = _knowledge_domains
@@ -336,6 +361,7 @@ async def refresh_capability_map(
 async def run_self_model(
     signal_tags: SignalTags,
     identity: IdentityContext,
+    kit: InferenceKit | None = None,
 ) -> Result:
     """Top-level Self-Model evaluation.
 
@@ -347,7 +373,7 @@ async def run_self_model(
 
     try:
         # Assess capability for this signal
-        assessment = await assess_capability(signal_tags, identity)
+        assessment = await assess_capability(signal_tags, identity, kit)
 
         # Capture current cognitive state
         state = get_current_state()

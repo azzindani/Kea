@@ -11,10 +11,10 @@ Resource monitoring and corporate interrupt handling:
 from __future__ import annotations
 
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
+from kernel.lifecycle_controller.types import LifecyclePhase
 from shared.config import get_settings
-from shared.id_and_hash import generate_id
 from shared.logging.main import get_logger
 from shared.standard_io import (
     Metrics,
@@ -25,8 +25,6 @@ from shared.standard_io import (
     ok,
     processing_error,
 )
-
-from kernel.lifecycle_controller.types import LifecyclePhase
 
 from .types import (
     BudgetState,
@@ -53,7 +51,7 @@ def _ref(fn: str) -> ModuleRef:
 
 
 def _now_utc() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 # ============================================================================

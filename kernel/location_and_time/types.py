@@ -8,17 +8,16 @@ from raw text into strict math-compatible ranges and bounds.
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
-
 
 # ============================================================================
 # Temporal Types
 # ============================================================================
 
 
-class TemporalSignalType(str, Enum):
+class TemporalSignalType(StrEnum):
     """Type of temporal reference extracted from text."""
 
     ABSOLUTE = "absolute"     # "March 15th, 2024"
@@ -53,7 +52,7 @@ class TemporalRange(BaseModel):
 # ============================================================================
 
 
-class SpatialSignalType(str, Enum):
+class SpatialSignalType(StrEnum):
     """Type of spatial reference."""
 
     EXPLICIT = "explicit"     # "New York", GPS coordinates

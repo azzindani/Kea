@@ -10,13 +10,15 @@ Spatiotemporal anchoring pipeline:
 
 from __future__ import annotations
 
+import json
 import re
 import time
 from datetime import datetime, timedelta
 
 from shared.config import get_settings
+from shared.inference_kit import InferenceKit
+from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
-from shared.normalization import min_max_scale
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -188,7 +190,7 @@ def _resolve_single_temporal(
     """Resolve a single temporal signal against system time."""
     key = signal.parsed_value or ""
 
-    _RELATIVE_OFFSETS: dict[str, tuple[timedelta, timedelta]] = {
+    _relative_offsets: dict[str, tuple[timedelta, timedelta]] = {
         "now": (timedelta(hours=0), timedelta(hours=0)),
         "today": (timedelta(hours=0), timedelta(hours=24)),
         "yesterday": (timedelta(hours=24), timedelta(hours=0)),
@@ -202,8 +204,8 @@ def _resolve_single_temporal(
         "recently": (timedelta(days=7), timedelta(hours=0)),
     }
 
-    if key in _RELATIVE_OFFSETS:
-        back, forward = _RELATIVE_OFFSETS[key]
+    if key in _relative_offsets:
+        back, forward = _relative_offsets[key]
         start = system_time - back
         end = system_time + forward if forward else system_time
         confidence = 0.9 if key not in ("recently",) else 0.6
@@ -367,11 +369,12 @@ def fuse_spatiotemporal(
 # ============================================================================
 
 
-def anchor_spatiotemporal(
+async def anchor_spatiotemporal(
     text: str,
     system_time: datetime,
     geo_anchor: GeoAnchor | None = None,
     task_context: str = "",
+    kit: InferenceKit | None = None,
 ) -> Result:
     """Top-level spatiotemporal orchestrator.
 
@@ -395,7 +398,53 @@ def anchor_spatiotemporal(
             temporal = adapt_temporal_ambiguity(temporal, task_context)
             spatial = adapt_spatial_scope(spatial, task_context)
 
-        # Step 4: Fusion
+        # Step 4: LLM refinement
+        if kit and kit.has_llm:
+            try:
+                system_msg = LLMMessage(
+                    role="system",
+                    content=(
+                        "Extract precise temporal ranges or spatial locations. If no precise info exists, return blank fields. "
+                        "Respond EXACTLY with JSON: {\"temporal\": {\"start\": \"YYYY-MM-DDTHH:MM:SSZ\", \"end\": \"...\"}, \"spatial\": {\"min_lat\": float, \"max_lat\": float, \"min_lon\": float, \"max_lon\": float}}"
+                    )
+                )
+                user_msg = LLMMessage(role="user", content=f"Text: {text}\nCurrent Time: {system_time.isoformat()}\nContext: {task_context}")
+                resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
+
+                content = resp.content.strip()
+                if content.startswith("```json"):
+                    content = content[7:-3].strip()
+                elif content.startswith("```"):
+                    content = content[3:-3].strip()
+                data = json.loads(content)
+
+                temp_data = data.get("temporal")
+                if temp_data and "start" in temp_data and "end" in temp_data:
+                    try:
+                        start = datetime.fromisoformat(temp_data["start"].replace("Z", "+00:00"))
+                        end = datetime.fromisoformat(temp_data["end"].replace("Z", "+00:00"))
+                        temporal = TemporalRange(start=start, end=end, confidence=0.9, source_signals=["LLM Extracted"])
+                    except Exception:
+                        pass
+
+                spat_data = data.get("spatial")
+                if spat_data and all(k in spat_data for k in ["min_lat", "max_lat", "min_lon", "max_lon"]):
+                    try:
+                        spatial = SpatialBounds(
+                            min_lat=float(spat_data["min_lat"]),
+                            max_lat=float(spat_data["max_lat"]),
+                            min_lon=float(spat_data["min_lon"]),
+                            max_lon=float(spat_data["max_lon"]),
+                            confidence=0.9,
+                            label="LLM Extracted"
+                        )
+                    except Exception:
+                        pass
+            except Exception as e:
+                log.warning("LLM spatiotemporal extraction failed", error=str(e))
+                pass
+
+        # Step 5: Fusion
         block = fuse_spatiotemporal(temporal, spatial)
 
         elapsed = (time.perf_counter() - start) * 1000

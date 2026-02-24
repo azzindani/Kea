@@ -7,18 +7,17 @@ and lifecycle state transitions.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
-
 
 # ============================================================================
 # Cost Events (input from Tier 4 telemetry)
 # ============================================================================
 
 
-class CostDimension(str, Enum):
+class CostDimension(StrEnum):
     """Categories of resource consumption."""
 
     API_TOKENS = "api_tokens"
@@ -71,7 +70,7 @@ class BudgetState(BaseModel):
 # ============================================================================
 
 
-class InterruptType(str, Enum):
+class InterruptType(StrEnum):
     """Types of corporate interrupt signals."""
 
     PRIORITY_OVERRIDE = "priority_override"  # Drop current, start new task
@@ -94,7 +93,7 @@ class InterruptSignal(BaseModel):
     timestamp_utc: str = Field(..., description="ISO 8601 UTC timestamp")
 
 
-class InterruptAction(str, Enum):
+class InterruptAction(StrEnum):
     """What the lifecycle manager should do in response to an interrupt."""
 
     SWITCH_OBJECTIVE = "switch_objective"
@@ -109,7 +108,7 @@ class InterruptAction(str, Enum):
 # ============================================================================
 
 
-class ControlTriggerSource(str, Enum):
+class ControlTriggerSource(StrEnum):
     """What triggered a lifecycle transition."""
 
     BUDGET_EXHAUSTED = "budget_exhausted"
@@ -143,7 +142,7 @@ class LifecycleTransition(BaseModel):
 # ============================================================================
 
 
-class ControlAction(str, Enum):
+class ControlAction(StrEnum):
     """Top-level control actions."""
 
     CONTINUE = "continue"       # Budget OK, no interrupts

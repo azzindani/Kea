@@ -11,11 +11,21 @@ Pre-execution conscience and post-execution optimization:
 
 from __future__ import annotations
 
+import json
 import time
-from typing import Any
 
+from kernel.advanced_planning.types import ExpectedOutcome
+from kernel.graph_synthesizer.types import ExecutableDAG
+from kernel.task_decomposition.types import WorldState
+from kernel.what_if_scenario import simulate_outcomes
+from kernel.what_if_scenario.types import (
+    CompiledDAG,
+    SimulationVerdict,
+)
 from shared.config import get_settings
 from shared.id_and_hash import generate_id
+from shared.inference_kit import InferenceKit
+from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
 from shared.standard_io import (
     Metrics,
@@ -25,19 +35,7 @@ from shared.standard_io import (
     fail,
     ok,
     processing_error,
-    policy_error,
 )
-
-from kernel.scoring import score
-from kernel.what_if_scenario import simulate_outcomes
-from kernel.what_if_scenario.types import (
-    CompiledDAG,
-    SimulationVerdict,
-    VerdictDecision,
-)
-from kernel.task_decomposition.types import WorldState
-from kernel.graph_synthesizer.types import ExecutableDAG
-from kernel.advanced_planning.types import ExpectedOutcome
 
 from .types import (
     ApprovalDecision,
@@ -69,6 +67,7 @@ def _ref(fn: str) -> ModuleRef:
 
 async def evaluate_consensus(
     dag_candidates: list[ExecutableDAG],
+    kit: InferenceKit | None = None,
 ) -> ExecutableDAG:
     """For critical tasks, score multiple DAG candidates via What-If.
 
@@ -102,7 +101,7 @@ async def evaluate_consensus(
         )
 
         knowledge = WorldState(goal=dag.description)
-        result = await simulate_outcomes(compiled, knowledge)
+        result = await simulate_outcomes(compiled, knowledge, kit)
 
         if result.signals:
             data = result.signals[0].body.get("data", {})
@@ -129,7 +128,7 @@ async def evaluate_consensus(
 # ============================================================================
 
 
-def check_value_guardrails(dag: ExecutableDAG) -> GuardrailResult:
+async def check_value_guardrails(dag: ExecutableDAG, kit: InferenceKit | None = None) -> GuardrailResult:
     """The final ethical/security/corporate gate before execution.
 
     Matches every node against Kea's non-negotiable rules:
@@ -166,6 +165,32 @@ def check_value_guardrails(dag: ExecutableDAG) -> GuardrailResult:
                         severity="warning",
                     ))
 
+        if kit and kit.has_llm:
+            try:
+                system_msg = LLMMessage(
+                    role="system",
+                    content="Check this node for ethical or security violations (e.g., exfiltration, destructive acts). Respond EXACTLY with JSON: {\"is_safe\": true/false, \"reason\": \"...\"}"
+                )
+                user_msg = LLMMessage(role="user", content=f"Node: {desc_lower}\nTools: {node.instruction.required_tools}")
+                resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
+
+                content = resp.content.strip()
+                if content.startswith("```json"):
+                    content = content[7:-3].strip()
+                elif content.startswith("```"):
+                    content = content[3:-3].strip()
+                data = json.loads(content)
+
+                if not data.get("is_safe", True):
+                    violations.append(GuardrailViolation(
+                        rule_id="LLM_SAFETY_CHECK",
+                        node_id=node.node_id,
+                        description=data.get("reason", "Flagged by LLM safety check"),
+                        severity="warning",
+                    ))
+            except Exception:
+                pass
+
     passed = not any(v.severity == "critical" for v in violations)
 
     result = GuardrailResult(
@@ -190,7 +215,7 @@ def check_value_guardrails(dag: ExecutableDAG) -> GuardrailResult:
 # ============================================================================
 
 
-async def run_pre_execution_check(dag: ExecutableDAG) -> Result:
+async def run_pre_execution_check(dag: ExecutableDAG, kit: InferenceKit | None = None) -> Result:
     """Top-level pre-execution orchestrator (The Conscience).
 
     Runs consensus evaluation (if multiple candidates) and value
@@ -201,7 +226,7 @@ async def run_pre_execution_check(dag: ExecutableDAG) -> Result:
 
     try:
         # Check guardrails
-        guardrail_result = check_value_guardrails(dag)
+        guardrail_result = await check_value_guardrails(dag, kit)
 
         if not guardrail_result.passed:
             # Critical violations → reject
@@ -459,6 +484,7 @@ async def commit_policy_update(
 async def run_post_execution_reflection(
     result: ExecutionResult,
     expected: list[ExpectedOutcome],
+    kit: InferenceKit | None = None,
 ) -> Result:
     """Top-level post-execution orchestrator (Continuous Optimization).
 

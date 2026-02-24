@@ -10,11 +10,15 @@ Advanced planning pipeline:
 
 from __future__ import annotations
 
+import json
 import time
 from typing import Any
 
+from kernel.task_decomposition.types import SubTaskItem
 from shared.config import get_settings
 from shared.id_and_hash import generate_id
+from shared.inference_kit import InferenceKit
+from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
 from shared.standard_io import (
     Metrics,
@@ -25,8 +29,6 @@ from shared.standard_io import (
     ok,
     processing_error,
 )
-
-from kernel.task_decomposition.types import SubTaskItem
 
 from .types import (
     BoundTask,
@@ -55,9 +57,10 @@ def _ref(fn: str) -> ModuleRef:
 # ============================================================================
 
 
-def sequence_and_prioritize(
+async def sequence_and_prioritize(
     subtasks: list[SubTaskItem],
     constraints: PlanningConstraints,
+    kit: InferenceKit | None = None,
 ) -> list[SequencedTask]:
     """Order sub-tasks by cost/speed/fidelity routing algorithm.
 
@@ -85,6 +88,27 @@ def sequence_and_prioritize(
         # Heuristic cost/duration estimates based on task characteristics
         est_cost = _estimate_cost(task)
         est_duration = _estimate_duration(task)
+
+        if kit and kit.has_llm:
+            try:
+                system_msg = LLMMessage(
+                    role="system",
+                    content="Estimate the 'cost' (0.0-1.0) and 'duration_ms' for this task. Respond EXACTLY with JSON: {\"cost\": 0.5, \"duration_ms\": 1000.0}"
+                )
+                user_msg = LLMMessage(role="user", content=f"Task: {task.description}\nDependencies: {task.depends_on}\nTools: {task.required_tools}")
+                resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
+
+                content = resp.content.strip()
+                if content.startswith("```json"):
+                    content = content[7:-3].strip()
+                elif content.startswith("```"):
+                    content = content[3:-3].strip()
+                data = json.loads(content)
+
+                est_cost = float(data.get("cost", est_cost))
+                est_duration = float(data.get("duration_ms", est_duration))
+            except Exception:
+                pass
 
         # Priority score: lower = execute first
         # Speed-focused: prioritize short tasks
@@ -322,6 +346,7 @@ async def plan_advanced(
     subtasks: list[SubTaskItem],
     constraints: PlanningConstraints | None = None,
     mcp_registry: MCPToolRegistry | None = None,
+    kit: InferenceKit | None = None,
 ) -> Result:
     """Top-level advanced planning orchestrator.
 
@@ -339,7 +364,7 @@ async def plan_advanced(
 
     try:
         # Step 1: Sequence & prioritize
-        sequenced = sequence_and_prioritize(subtasks, constraints)
+        sequenced = await sequence_and_prioritize(subtasks, constraints, kit)
 
         # Step 2: Bind tools
         bound = await bind_tools(sequenced, mcp_registry)

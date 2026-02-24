@@ -7,12 +7,12 @@ attention masking and plausibility/sanity checking.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class PlausibilityVerdict(str, Enum):
+class PlausibilityVerdict(StrEnum):
     """Result of plausibility check."""
 
     PASS = "pass"       # Task is logically coherent and achievable

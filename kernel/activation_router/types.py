@@ -7,17 +7,16 @@ pipeline templates, and activation maps.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
-
 
 # ============================================================================
 # Complexity Classification
 # ============================================================================
 
 
-class ComplexityLevel(str, Enum):
+class ComplexityLevel(StrEnum):
     """Signal complexity categories driving pipeline selection."""
 
     TRIVIAL = "trivial"       # Greetings, acknowledgments
@@ -32,7 +31,7 @@ class ComplexityLevel(str, Enum):
 # ============================================================================
 
 
-class ModuleActivation(str, Enum):
+class ModuleActivation(StrEnum):
     """Activation state for a single module."""
 
     ACTIVE = "active"

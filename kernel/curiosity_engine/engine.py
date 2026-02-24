@@ -9,10 +9,16 @@ Three-step gap exploration pipeline:
 
 from __future__ import annotations
 
+import json
 import time
 
+# Re-import WorldState from task_decomposition for consistency
+from kernel.task_decomposition.types import WorldState
+from kernel.validation.types import ErrorResponse
 from shared.config import get_settings
 from shared.id_and_hash import generate_id
+from shared.inference_kit import InferenceKit
+from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
 from shared.standard_io import (
     Metrics,
@@ -24,17 +30,12 @@ from shared.standard_io import (
     processing_error,
 )
 
-from kernel.validation.types import ErrorResponse
-
 from .types import (
     ExplorationQuery,
     ExplorationStrategy,
     ExplorationTask,
     KnowledgeGap,
 )
-
-# Re-import WorldState from task_decomposition for consistency
-from kernel.task_decomposition.types import WorldState
 
 log = get_logger(__name__)
 
@@ -63,7 +64,6 @@ def detect_missing_variables(
     gaps: list[KnowledgeGap] = []
 
     # Parse detail from validation error
-    detail = validation_result.detail
     message = validation_result.message
 
     # Extract missing fields from validation error
@@ -78,7 +78,7 @@ def detect_missing_variables(
                     field_name=key,
                     expected_type="unknown",
                     importance=0.8,
-                    context=f"Required by schema but missing from world state",
+                    context="Required by schema but missing from world state",
                 ))
 
     # If no specific fields found, create a general gap
@@ -98,8 +98,9 @@ def detect_missing_variables(
 # ============================================================================
 
 
-def formulate_questions(
+async def formulate_questions(
     gaps: list[KnowledgeGap],
+    kit: InferenceKit | None = None,
 ) -> list[ExplorationQuery]:
     """Translate each KnowledgeGap into an investigation query.
 
@@ -119,6 +120,29 @@ def formulate_questions(
             query_text = f"{gap.field_name} {gap.context}"
         else:  # SCAN
             query_text = f"Discover tool or parameter: {gap.field_name}"
+
+        if kit and kit.has_llm:
+            try:
+                system_msg = LLMMessage(
+                    role="system",
+                    content=(
+                        "Refine this query for better search results. Maintain its core intent. "
+                        "Respond EXACTLY with a JSON string: {\"query\": \"<refined_query>\"}"
+                    )
+                )
+                user_msg = LLMMessage(role="user", content=f"Query: {query_text}")
+                resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
+
+                content = resp.content.strip()
+                if content.startswith("```json"):
+                    content = content[7:-3].strip()
+                elif content.startswith("```"):
+                    content = content[3:-3].strip()
+                data = json.loads(content)
+                query_text = data.get("query", query_text)
+            except Exception as e:
+                log.warning("LLM query refinement failed", error=str(e))
+                pass
 
         queries.append(ExplorationQuery(
             gap=gap,
@@ -190,6 +214,7 @@ def route_exploration_strategy(
 async def explore_gaps(
     task_state: WorldState,
     validation_result: ErrorResponse | None = None,
+    kit: InferenceKit | None = None,
 ) -> Result:
     """Top-level gap exploration orchestrator.
 
@@ -212,7 +237,7 @@ async def explore_gaps(
         gaps = detect_missing_variables(task_state, validation_result)
 
         # Step 2: Formulate questions
-        queries = formulate_questions(gaps)
+        queries = await formulate_questions(gaps, kit)
 
         # Step 3: Route to strategies
         tasks = route_exploration_strategy(queries)

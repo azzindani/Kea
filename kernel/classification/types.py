@@ -7,10 +7,7 @@ Three-layer architecture: Linguistic Analysis, Semantic Proximity, Hybrid Merge.
 
 from __future__ import annotations
 
-from enum import Enum
-
 from pydantic import BaseModel, Field
-
 
 # ============================================================================
 # Input Types

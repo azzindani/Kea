@@ -7,12 +7,12 @@ semantic similarity, precision cross-encoding, and reward compliance.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class ConstraintType(str, Enum):
+class ConstraintType(StrEnum):
     """Type of hard constraint for reward compliance."""
 
     REGEX = "regex"               # Content must match regex pattern

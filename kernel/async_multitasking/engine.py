@@ -12,8 +12,12 @@ DAG parking, context switching, and deep sleep delegation:
 from __future__ import annotations
 
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
+from kernel.graph_synthesizer.types import ExecutableDAG
+from kernel.ooda_loop.types import ActionResult
+from kernel.short_term_memory.engine import ShortTermMemory
+from kernel.short_term_memory.types import NodeExecutionStatus
 from shared.config import get_settings
 from shared.id_and_hash import generate_id
 from shared.logging.main import get_logger
@@ -26,11 +30,6 @@ from shared.standard_io import (
     ok,
     processing_error,
 )
-
-from kernel.short_term_memory.engine import ShortTermMemory
-from kernel.short_term_memory.types import NodeExecutionStatus
-from kernel.graph_synthesizer.types import ExecutableDAG
-from kernel.ooda_loop.types import ActionResult
 
 from .types import (
     DAGQueue,
@@ -107,7 +106,7 @@ async def park_dag_state(
         parked_at_node_id=node_result.node_id,
         resume_event_type=resume_event,
         state_snapshot=dag.state.model_dump(),
-        parked_utc=datetime.now(timezone.utc).isoformat(),
+        parked_utc=datetime.now(UTC).isoformat(),
     )
 
     log.info(
@@ -153,7 +152,7 @@ async def register_wait_listener(
         wait_mode=wait_mode,
         poll_url=poll_url,
         poll_interval_ms=settings.async_poll_interval_ms,
-        registered_utc=datetime.now(timezone.utc).isoformat(),
+        registered_utc=datetime.now(UTC).isoformat(),
     )
 
     log.info(
@@ -222,7 +221,7 @@ async def request_deep_sleep(
         token_id=generate_id("sleep"),
         wake_triggers=wake_triggers,
         parked_dag_count=len(parked_tickets),
-        entered_sleep_utc=datetime.now(timezone.utc).isoformat(),
+        entered_sleep_utc=datetime.now(UTC).isoformat(),
     )
 
     log.info(

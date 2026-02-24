@@ -11,13 +11,15 @@ Ephemeral RAM for the OODA Loop:
 
 from __future__ import annotations
 
-import time
 from collections import OrderedDict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
+
+import numpy as np
 
 from shared.config import get_settings
 from shared.id_and_hash import generate_id
+from shared.inference_kit import InferenceKit
 from shared.logging.main import get_logger
 
 from .types import (
@@ -58,6 +60,7 @@ class ShortTermMemory:
         # Entity cache with TTL
         self._max_entities: int = settings.stm_max_entities
         self._entity_cache: OrderedDict[str, CachedEntity] = OrderedDict()
+        self._entity_embeddings: dict[str, list[float]] = {}
 
         # Telemetry counters
         self._total_events_processed: int = 0
@@ -194,7 +197,7 @@ class ShortTermMemory:
             key=key,
             value=value,
             ttl_seconds=ttl,
-            created_utc=datetime.now(timezone.utc).isoformat(),
+            created_utc=datetime.now(UTC).isoformat(),
         )
 
         # Refresh LRU if key exists
@@ -208,6 +211,7 @@ class ShortTermMemory:
         # Evict oldest if over capacity
         while len(self._entity_cache) > self._max_entities:
             evicted_key, _ = self._entity_cache.popitem(last=False)
+            self._entity_embeddings.pop(evicted_key, None)
             log.debug("Evicted entity from STM cache", key=evicted_key)
 
     def get_entity(self, key: str) -> Any | None:
@@ -220,7 +224,7 @@ class ShortTermMemory:
         # Check TTL expiry
         if entity.ttl_seconds is not None:
             created = datetime.fromisoformat(entity.created_utc)
-            age = (datetime.now(timezone.utc) - created).total_seconds()
+            age = (datetime.now(UTC) - created).total_seconds()
             if age > entity.ttl_seconds:
                 del self._entity_cache[key]
                 return None
@@ -233,10 +237,10 @@ class ShortTermMemory:
     # 4. Context Slice (read for Orient)
     # ========================================================================
 
-    def read_context(self, query: str | None = None) -> ContextSlice:
+    async def read_context(self, query: str | None = None, kit: InferenceKit | None = None) -> ContextSlice:
         """Build a context slice for the OODA Orient phase.
 
-        If query is provided, filters entities by key match.
+        If query is provided, filters entities by key match or semantic closeness.
         Limits output size to prevent context window bloat.
         """
         settings = get_settings().kernel
@@ -253,18 +257,46 @@ class ShortTermMemory:
 
         # Entities (optionally filtered by query)
         entities: dict[str, Any] = {}
+
+        valid_keys = []
         for key, cached in reversed(self._entity_cache.items()):
-            if len(entities) >= max_items:
-                break
             # Check TTL before including
             if cached.ttl_seconds is not None:
                 created = datetime.fromisoformat(cached.created_utc)
-                age = (datetime.now(timezone.utc) - created).total_seconds()
+                age = (datetime.now(UTC) - created).total_seconds()
                 if age > cached.ttl_seconds:
                     continue
+            valid_keys.append(key)
 
-            if query is None or query.lower() in key.lower():
-                entities[key] = cached.value
+        if query and kit and kit.has_embedder:
+            try:
+                query_emb = await kit.embedder.embed(query)
+                scored_keys = []
+                for k in valid_keys:
+                    cached_val = self._entity_cache[k].value
+
+                    if k not in self._entity_embeddings:
+                        self._entity_embeddings[k] = await kit.embedder.embed(str(cached_val))
+
+                    val_emb = self._entity_embeddings[k]
+                    score = np.dot(query_emb, val_emb) / (np.linalg.norm(query_emb) * np.linalg.norm(val_emb))
+                    scored_keys.append((score, k))
+
+                scored_keys.sort(reverse=True, key=lambda x: x[0])
+                for score, k in scored_keys[:max_items]:
+                    if score > 0.6:  # Similarity threshold
+                        entities[k] = self._entity_cache[k].value
+            except Exception as e:
+                log.warning("Semantic context read failed", error=str(e))
+                pass
+
+        # Fallback to simple matching if no semantic matching or few results
+        if not entities:
+            for key in valid_keys:
+                if len(entities) >= max_items:
+                    break
+                if query is None or query.lower() in key.lower() or query.lower() in str(self._entity_cache[key].value).lower():
+                    entities[key] = self._entity_cache[key].value
 
         return ContextSlice(
             dag_snapshots=dag_snapshots,
@@ -356,7 +388,7 @@ class ShortTermMemory:
             max_age_seconds = settings.stm_max_age_seconds
 
         evicted = 0
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Evict expired entities
         expired_keys: list[str] = []
@@ -369,6 +401,7 @@ class ShortTermMemory:
 
         for key in expired_keys:
             del self._entity_cache[key]
+            self._entity_embeddings.pop(key, None)
             evicted += 1
 
         # Evict old events

@@ -631,6 +631,19 @@ toml = [
 ]
 
 [[package]]
+name = "croniter"
+version = "6.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "python-dateutil" },
+    { name = "pytz" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ad/2f/44d1ae153a0e27be56be43465e5cb39b9650c781e001e7864389deb25090/croniter-6.0.0.tar.gz", hash = "sha256:37c504b313956114a983ece2c2b07790b1f1094fe9d81cc94739214748255577", size = 64481, upload-time = "2024-12-17T17:17:47.32Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/07/4b/290b4c3efd6417a8b0c284896de19b1d5855e6dbdb97d2a35e68fa42de85/croniter-6.0.0-py2.py3-none-any.whl", hash = "sha256:2f878c3856f17896979b2a4379ba1f09c83e374931ea15cc835c5dd2eee9b368", size = 25468, upload-time = "2024-12-17T17:17:45.359Z" },
+]
+
+[[package]]
 name = "cryptography"
 version = "46.0.4"
 source = { registry = "https://pypi.org/simple" }
@@ -1861,6 +1874,18 @@ wheels = [
 ]
 
 [[package]]
+name = "markdown-it-py"
+version = "4.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "mdurl" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5b/f5/4ec618ed16cc4f8fb3b701563655a69816155e79e24a17b651541804721d/markdown_it_py-4.0.0.tar.gz", hash = "sha256:cb0a2b4aa34f932c007117b194e945bd74e0ec24133ceb5bac59009cda1cb9f3", size = 73070, upload-time = "2025-08-11T12:57:52.854Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/94/54/e7d793b573f298e1c9013b8c4dade17d481164aa517d1d7148619c2cedbf/markdown_it_py-4.0.0-py3-none-any.whl", hash = "sha256:87327c59b172c5011896038353a81343b6754500a08cd7a4973bb48c6d578147", size = 87321, upload-time = "2025-08-11T12:57:51.923Z" },
+]
+
+[[package]]
 name = "markupsafe"
 version = "3.0.3"
 source = { registry = "https://pypi.org/simple" }
@@ -2021,6 +2046,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/fc/6d/62e76bbb8144d6ed86e202b5edd8a4cb631e7c8130f3f4893c3f90262b10/mcp-1.26.0.tar.gz", hash = "sha256:db6e2ef491eecc1a0d93711a76f28dec2e05999f93afd48795da1c1137142c66", size = 608005, upload-time = "2026-01-24T19:40:32.468Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fd/d9/eaa1f80170d2b7c5ba23f3b59f766f3a0bb41155fbc32a69adfa1adaaef9/mcp-1.26.0-py3-none-any.whl", hash = "sha256:904a21c33c25aa98ddbeb47273033c435e595bbacfdb177f4bd87f6dceebe1ca", size = 233615, upload-time = "2026-01-24T19:40:30.652Z" },
+]
+
+[[package]]
+name = "mdurl"
+version = "0.1.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/d6/54/cfe61301667036ec958cb99bd3efefba235e65cdeb9c84d24a8293ba1d90/mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba", size = 8729, upload-time = "2022-08-14T12:40:10.846Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8", size = 9979, upload-time = "2022-08-14T12:40:09.779Z" },
 ]
 
 [[package]]
@@ -3413,118 +3447,17 @@ wheels = [
 ]
 
 [[package]]
-name = "research-engine"
-version = "0.1.0"
-source = { editable = "." }
+name = "rich"
+version = "14.3.3"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "aiofiles" },
-    { name = "alembic" },
-    { name = "asyncpg" },
-    { name = "beautifulsoup4" },
-    { name = "datasets" },
-    { name = "duckdb" },
-    { name = "fastapi" },
-    { name = "finvizfinance" },
-    { name = "fredapi" },
-    { name = "httpx" },
-    { name = "kaleido" },
-    { name = "langchain-core" },
-    { name = "langgraph" },
-    { name = "lxml" },
-    { name = "matplotlib" },
-    { name = "mcp" },
-    { name = "openai" },
-    { name = "openpyxl" },
-    { name = "opentelemetry-api" },
-    { name = "opentelemetry-exporter-otlp" },
-    { name = "opentelemetry-sdk" },
-    { name = "pandas" },
-    { name = "pgvector" },
-    { name = "playwright" },
-    { name = "plotly" },
-    { name = "prometheus-client" },
-    { name = "pyarrow" },
-    { name = "pydantic" },
-    { name = "pydantic-settings" },
-    { name = "pymupdf" },
-    { name = "python-docx" },
-    { name = "python-dotenv" },
-    { name = "pyyaml" },
-    { name = "scikit-learn" },
-    { name = "scipy" },
-    { name = "seaborn" },
-    { name = "sqlalchemy", extra = ["asyncio"] },
-    { name = "structlog" },
-    { name = "tenacity" },
-    { name = "uvicorn", extra = ["standard"] },
-    { name = "wbgapi" },
-    { name = "wrapt" },
-    { name = "yfinance" },
+    { name = "markdown-it-py" },
+    { name = "pygments" },
 ]
-
-[package.optional-dependencies]
-dev = [
-    { name = "mypy" },
-    { name = "pre-commit" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-    { name = "ruff" },
+sdist = { url = "https://files.pythonhosted.org/packages/b3/c6/f3b320c27991c46f43ee9d856302c70dc2d0fb2dba4842ff739d5f46b393/rich-14.3.3.tar.gz", hash = "sha256:b8daa0b9e4eef54dd8cf7c86c03713f53241884e814f4e2f5fb342fe520f639b", size = 230582, upload-time = "2026-02-19T17:23:12.474Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/14/25/b208c5683343959b670dc001595f2f3737e051da617f66c31f7c4fa93abc/rich-14.3.3-py3-none-any.whl", hash = "sha256:793431c1f8619afa7d3b52b2cdec859562b950ea0d4b6b505397612db8d5362d", size = 310458, upload-time = "2026-02-19T17:23:13.732Z" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiofiles", specifier = ">=23.2.0" },
-    { name = "alembic", specifier = ">=1.13.0" },
-    { name = "asyncpg", specifier = ">=0.29.0" },
-    { name = "beautifulsoup4", specifier = ">=4.12.0" },
-    { name = "datasets", specifier = ">=2.16.0" },
-    { name = "duckdb", specifier = ">=0.9.0" },
-    { name = "fastapi", specifier = ">=0.109.0" },
-    { name = "finvizfinance", specifier = ">=0.14.0" },
-    { name = "fredapi", specifier = ">=0.5.0" },
-    { name = "httpx", specifier = ">=0.26.0" },
-    { name = "kaleido", specifier = ">=0.2.1" },
-    { name = "langchain-core", specifier = ">=0.1.0" },
-    { name = "langgraph", specifier = ">=0.2.0" },
-    { name = "lxml", specifier = ">=5.0.0" },
-    { name = "matplotlib", specifier = ">=3.8.0" },
-    { name = "mcp" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.8.0" },
-    { name = "openai", specifier = ">=1.10.0" },
-    { name = "openpyxl", specifier = ">=3.1.0" },
-    { name = "opentelemetry-api", specifier = ">=1.22.0" },
-    { name = "opentelemetry-exporter-otlp", specifier = ">=1.22.0" },
-    { name = "opentelemetry-sdk", specifier = ">=1.22.0" },
-    { name = "pandas", specifier = ">=2.1.0" },
-    { name = "pgvector", specifier = ">=0.4.2" },
-    { name = "playwright", specifier = ">=1.41.0" },
-    { name = "plotly", specifier = ">=5.18.0" },
-    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.6.0" },
-    { name = "prometheus-client", specifier = ">=0.19.0" },
-    { name = "pyarrow", specifier = ">=14.0.0" },
-    { name = "pydantic", specifier = ">=2.5.0" },
-    { name = "pydantic-settings", specifier = ">=2.1.0" },
-    { name = "pymupdf", specifier = ">=1.23.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4.0" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0" },
-    { name = "python-docx", specifier = ">=1.0.0" },
-    { name = "python-dotenv", specifier = ">=1.0.0" },
-    { name = "pyyaml", specifier = ">=6.0.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
-    { name = "scikit-learn", specifier = ">=1.4.0" },
-    { name = "scipy", specifier = ">=1.12.0" },
-    { name = "seaborn", specifier = ">=0.13.0" },
-    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.0" },
-    { name = "structlog", specifier = ">=24.1.0" },
-    { name = "tenacity", specifier = ">=8.2.0" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.27.0" },
-    { name = "wbgapi", specifier = ">=1.0.0" },
-    { name = "wrapt", specifier = ">=1.14.0" },
-    { name = "yfinance", specifier = ">=0.2.0" },
-]
-provides-extras = ["dev"]
 
 [[package]]
 name = "rpds-py"
@@ -3966,6 +3899,124 @@ sdist = { url = "https://files.pythonhosted.org/packages/ef/52/9ba0f43b686e7f3dd
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a8/45/a132b9074aa18e799b891b91ad72133c98d8042c70f6240e4c5f9dabee2f/structlog-25.5.0-py3-none-any.whl", hash = "sha256:a8453e9b9e636ec59bd9e79bbd4a72f025981b3ba0f5837aebf48f02f37a7f9f", size = 72510, upload-time = "2025-10-27T08:28:21.535Z" },
 ]
+
+[[package]]
+name = "system-engine"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "aiofiles" },
+    { name = "alembic" },
+    { name = "asyncpg" },
+    { name = "beautifulsoup4" },
+    { name = "croniter" },
+    { name = "datasets" },
+    { name = "duckdb" },
+    { name = "fastapi" },
+    { name = "finvizfinance" },
+    { name = "fredapi" },
+    { name = "httpx" },
+    { name = "kaleido" },
+    { name = "langchain-core" },
+    { name = "langgraph" },
+    { name = "lxml" },
+    { name = "matplotlib" },
+    { name = "mcp" },
+    { name = "openai" },
+    { name = "openpyxl" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-otlp" },
+    { name = "opentelemetry-sdk" },
+    { name = "pandas" },
+    { name = "pgvector" },
+    { name = "playwright" },
+    { name = "plotly" },
+    { name = "prometheus-client" },
+    { name = "pyarrow" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "pymupdf" },
+    { name = "python-docx" },
+    { name = "python-dotenv" },
+    { name = "pyyaml" },
+    { name = "rich" },
+    { name = "scikit-learn" },
+    { name = "scipy" },
+    { name = "seaborn" },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+    { name = "structlog" },
+    { name = "tenacity" },
+    { name = "uvicorn", extra = ["standard"] },
+    { name = "wbgapi" },
+    { name = "wrapt" },
+    { name = "yfinance" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "mypy" },
+    { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiofiles", specifier = ">=23.2.0" },
+    { name = "alembic", specifier = ">=1.13.0" },
+    { name = "asyncpg", specifier = ">=0.29.0" },
+    { name = "beautifulsoup4", specifier = ">=4.12.0" },
+    { name = "croniter", specifier = ">=2.0.0" },
+    { name = "datasets", specifier = ">=2.16.0" },
+    { name = "duckdb", specifier = ">=0.9.0" },
+    { name = "fastapi", specifier = ">=0.109.0" },
+    { name = "finvizfinance", specifier = ">=0.14.0" },
+    { name = "fredapi", specifier = ">=0.5.0" },
+    { name = "httpx", specifier = ">=0.26.0" },
+    { name = "kaleido", specifier = ">=0.2.1" },
+    { name = "langchain-core", specifier = ">=0.1.0" },
+    { name = "langgraph", specifier = ">=0.2.0" },
+    { name = "lxml", specifier = ">=5.0.0" },
+    { name = "matplotlib", specifier = ">=3.8.0" },
+    { name = "mcp" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.8.0" },
+    { name = "openai", specifier = ">=1.10.0" },
+    { name = "openpyxl", specifier = ">=3.1.0" },
+    { name = "opentelemetry-api", specifier = ">=1.22.0" },
+    { name = "opentelemetry-exporter-otlp", specifier = ">=1.22.0" },
+    { name = "opentelemetry-sdk", specifier = ">=1.22.0" },
+    { name = "pandas", specifier = ">=2.1.0" },
+    { name = "pgvector", specifier = ">=0.4.2" },
+    { name = "playwright", specifier = ">=1.41.0" },
+    { name = "plotly", specifier = ">=5.18.0" },
+    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.6.0" },
+    { name = "prometheus-client", specifier = ">=0.19.0" },
+    { name = "pyarrow", specifier = ">=14.0.0" },
+    { name = "pydantic", specifier = ">=2.5.0" },
+    { name = "pydantic-settings", specifier = ">=2.1.0" },
+    { name = "pymupdf", specifier = ">=1.23.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4.0" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.0" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0" },
+    { name = "python-docx", specifier = ">=1.0.0" },
+    { name = "python-dotenv", specifier = ">=1.0.0" },
+    { name = "pyyaml", specifier = ">=6.0.0" },
+    { name = "rich", specifier = ">=13.7.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
+    { name = "scikit-learn", specifier = ">=1.4.0" },
+    { name = "scipy", specifier = ">=1.12.0" },
+    { name = "seaborn", specifier = ">=0.13.0" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.0" },
+    { name = "structlog", specifier = ">=24.1.0" },
+    { name = "tenacity", specifier = ">=8.2.0" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.27.0" },
+    { name = "wbgapi", specifier = ">=1.0.0" },
+    { name = "wrapt", specifier = ">=1.14.0" },
+    { name = "yfinance", specifier = ">=0.2.0" },
+]
+provides-extras = ["dev"]
 
 [[package]]
 name = "tabulate"

@@ -9,10 +9,15 @@ Offline counter-factual simulation pipeline:
 
 from __future__ import annotations
 
+import json
 import time
 
+from kernel.intent_sentiment_urgency import score_urgency
+from kernel.task_decomposition.types import WorldState
 from shared.config import get_settings
 from shared.id_and_hash import generate_id
+from shared.inference_kit import InferenceKit
+from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
 from shared.normalization import min_max_scale
 from shared.standard_io import (
@@ -24,9 +29,6 @@ from shared.standard_io import (
     ok,
     processing_error,
 )
-
-from kernel.intent_sentiment_urgency import UrgencyLabel, score_urgency
-from kernel.task_decomposition.types import WorldState
 
 from .types import (
     CompiledDAG,
@@ -118,6 +120,7 @@ def generate_outcome_branches(
 
 async def predict_consequences(
     branches: list[OutcomeBranch],
+    kit: InferenceKit | None = None,
 ) -> list[ConsequencePrediction]:
     """Predict environmental side effects for each outcome branch.
 
@@ -137,17 +140,46 @@ async def predict_consequences(
         elif len(branch.path_steps) > 2:
             resource_impact = "medium"
 
+        # LLM based enrichment
+        state_mutations = [f"State change from: {step}" for step in branch.path_steps if "Execute" in step]
+        external_impacts = (
+            ["External service affected"]
+            if any("external" in step.lower() for step in branch.path_steps)
+            else []
+        )
+
+        if kit and kit.has_llm:
+            try:
+                system_msg = LLMMessage(
+                    role="system",
+                    content="Analyze the consequence branch and predict side effects. Respond EXACTLY with JSON: {\"resource_impact\": \"high|medium|low\", \"state_mutations\": [\"...\"], \"external_impacts\": [\"...\"]}"
+                )
+                user_msg = LLMMessage(role="user", content=f"Branch: {branch.description}\nSteps: {branch.path_steps}")
+                resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
+
+                content = resp.content.strip()
+                if content.startswith("```json"):
+                    content = content[7:-3].strip()
+                elif content.startswith("```"):
+                    content = content[3:-3].strip()
+                data = json.loads(content)
+
+                resource_impact = data.get("resource_impact", resource_impact)
+                if data.get("state_mutations"):
+                    state_mutations.extend(data["state_mutations"])
+                if data.get("external_impacts"):
+                    external_impacts.extend(data["external_impacts"])
+            except Exception as e:
+                log.warning("LLM consequence prediction failed", error=str(e))
+                pass
+
         predictions.append(ConsequencePrediction(
             branch_id=branch.branch_id,
             resource_impact=resource_impact,
-            state_mutations=[f"State change from: {step}" for step in branch.path_steps if "Execute" in step],
+            state_mutations=state_mutations,
             reversible=branch.is_success,
             severity_score=severity,
-            external_impacts=(
-                ["External service affected"]
-                if any("external" in step.lower() for step in branch.path_steps)
-                else []
-            ),
+            external_impacts=external_impacts,
         ))
 
     return predictions
@@ -220,9 +252,9 @@ def calculate_risk_reward(
             if not pred.reversible:
                 safeguards.append(f"Add rollback mechanism for: {pred.branch_id}")
             if pred.external_impacts:
-                safeguards.append(f"Add circuit breaker for external calls")
+                safeguards.append("Add circuit breaker for external calls")
             if pred.resource_impact == "high":
-                safeguards.append(f"Add resource budget check before execution")
+                safeguards.append("Add resource budget check before execution")
 
     return SimulationVerdict(
         decision=decision,
@@ -242,6 +274,7 @@ def calculate_risk_reward(
 async def simulate_outcomes(
     proposed_action: CompiledDAG,
     knowledge: WorldState,
+    kit: InferenceKit | None = None,
 ) -> Result:
     """Top-level simulation orchestrator.
 
@@ -256,7 +289,7 @@ async def simulate_outcomes(
         branches = generate_outcome_branches(proposed_action, knowledge)
 
         # Step 2: Predict consequences
-        predictions = await predict_consequences(branches)
+        predictions = await predict_consequences(branches, kit)
 
         # Step 3: Calculate risk/reward
         verdict = calculate_risk_reward(predictions)

@@ -12,10 +12,13 @@ Selective module activation for energy conservation:
 from __future__ import annotations
 
 import hashlib
+import json
 import time
-from typing import Any
 
+from kernel.self_model.types import CapabilityAssessment, SignalTags
 from shared.config import get_settings
+from shared.inference_kit import InferenceKit
+from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
 from shared.standard_io import (
     Metrics,
@@ -26,8 +29,6 @@ from shared.standard_io import (
     ok,
     processing_error,
 )
-
-from kernel.self_model.types import CapabilityAssessment, SignalTags
 
 from .types import (
     ActivationMap,
@@ -138,7 +139,7 @@ def _build_pipeline_templates() -> dict[ComplexityLevel, PipelineConfig]:
 # ============================================================================
 
 
-def classify_signal_complexity(signal_tags: SignalTags) -> ComplexityLevel:
+async def classify_signal_complexity(signal_tags: SignalTags, kit: InferenceKit | None = None) -> ComplexityLevel:
     """Map signal tags into a ComplexityLevel.
 
     Scoring is weighted: urgency 30%, structural complexity 25%,
@@ -150,6 +151,30 @@ def classify_signal_complexity(signal_tags: SignalTags) -> ComplexityLevel:
     # CRITICAL override: emergency signals bypass scoring
     if signal_tags.urgency in ("critical", "emergency", "panic"):
         return ComplexityLevel.CRITICAL
+
+    if kit and kit.has_llm:
+        try:
+            system_msg = LLMMessage(
+                role="system",
+                content="Classify the complexity of the task (TRIVIAL, SIMPLE, MODERATE, COMPLEX, CRITICAL). Respond EXACTLY with JSON: {\"level\": \"MODERATE\"}"
+            )
+            user_msg = LLMMessage(role="user", content=f"Tags: {signal_tags}")
+            resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
+
+            content = resp.content.strip()
+            if content.startswith("```json"):
+                content = content[7:-3].strip()
+            elif content.startswith("```"):
+                content = content[3:-3].strip()
+            data = json.loads(content)
+
+            lvl_str = data.get("level", "SIMPLE")
+            for lvl in ComplexityLevel:
+                if lvl.value == lvl_str.lower():
+                    return lvl
+        except Exception as e:
+            log.warning("LLM complexity classification failed, falling back", error=str(e))
+            pass
 
     # Score each dimension (0.0 - 1.0)
     urgency_scores = {"low": 0.1, "normal": 0.3, "high": 0.7, "critical": 1.0}
@@ -293,6 +318,7 @@ async def compute_activation_map(
     signal_tags: SignalTags,
     capability: CapabilityAssessment,
     pressure: float = 0.0,
+    kit: InferenceKit | None = None,
 ) -> Result:
     """Top-level activation decision.
 
@@ -322,7 +348,7 @@ async def compute_activation_map(
             return ok(signals=[signal], metrics=metrics)
 
         # Classify complexity
-        complexity = classify_signal_complexity(signal_tags)
+        complexity = await classify_signal_complexity(signal_tags, kit)
 
         # Select pipeline with pressure adaptation
         pipeline = select_pipeline(complexity, pressure)

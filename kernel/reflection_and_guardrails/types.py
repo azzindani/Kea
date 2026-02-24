@@ -7,18 +7,17 @@ reflection/critique, and continuous optimization.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
-
 
 # ============================================================================
 # Pre-Execution: Approval
 # ============================================================================
 
 
-class ApprovalDecision(str, Enum):
+class ApprovalDecision(StrEnum):
     """Pre-execution gate decision."""
 
     APPROVED = "approved"   # Safe to execute
@@ -123,7 +122,7 @@ class CritiqueReport(BaseModel):
 # ============================================================================
 
 
-class OptimizationType(str, Enum):
+class OptimizationType(StrEnum):
     """Category of optimization suggestion."""
 
     TOOL_REBIND = "tool_rebind"             # Try a different MCP tool

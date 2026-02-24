@@ -7,11 +7,10 @@ and deep sleep delegation.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
-
 
 # ============================================================================
 # Parking & Wait State
@@ -43,7 +42,7 @@ class ParkingTicket(BaseModel):
     )
 
 
-class WaitMode(str, Enum):
+class WaitMode(StrEnum):
     """How the system waits for the parked task to complete."""
 
     WEBHOOK = "webhook"     # External service pushes completion
@@ -105,7 +104,7 @@ class DAGQueue(BaseModel):
 # ============================================================================
 
 
-class NextActionKind(str, Enum):
+class NextActionKind(StrEnum):
     """What the OODA loop should do after async task management."""
 
     CONTINUE_CURRENT = "continue_current"   # Keep going with current DAG

@@ -11,12 +11,16 @@ Factory that wraps raw action callables into executable DAG nodes:
 from __future__ import annotations
 
 import functools
+import json
 import time
-from typing import Any, Callable, Coroutine
+from collections.abc import Callable, Coroutine
+from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
-from shared.config import get_settings
+from kernel.graph_synthesizer.types import ActionInstruction, ExecutableNode, NodeStatus
+from shared.inference_kit import InferenceKit
+from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
 from shared.standard_io import (
     Metrics,
@@ -28,10 +32,7 @@ from shared.standard_io import (
     processing_error,
 )
 
-from kernel.graph_synthesizer.types import ActionInstruction, ExecutableNode, NodeStatus
-from kernel.validation import validate
-
-from .types import AssemblyConfig, AssemblyReport, CallableDescriptor
+from .types import AssemblyConfig, AssemblyReport
 
 log = get_logger(__name__)
 
@@ -218,6 +219,7 @@ async def assemble_node(
     output_schema: type[BaseModel] | None = None,
     action_callable: NodeCallable | None = None,
     config: AssemblyConfig | None = None,
+    kit: InferenceKit | None = None,
 ) -> Result:
     """Top-level node factory.
 
@@ -230,7 +232,6 @@ async def assemble_node(
     """
     ref = _ref("assemble_node")
     start = time.perf_counter()
-    settings = get_settings().kernel
 
     if config is None:
         config = AssemblyConfig()
@@ -276,6 +277,27 @@ async def assemble_node(
         from shared.id_and_hash import generate_id
 
         node_id = config.node_id or generate_id("node")
+
+        # LLM based detailing
+        if kit and kit.has_llm:
+            try:
+                system_msg = LLMMessage(
+                    role="system",
+                    content="Provide extra parameters for this node based on its instruction. Respond EXACTLY with JSON dictionary."
+                )
+                user_msg = LLMMessage(role="user", content=instruction.description)
+                resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
+
+                content = resp.content.strip()
+                if content.startswith("```json"):
+                    content = content[7:-3].strip()
+                elif content.startswith("```"):
+                    content = content[3:-3].strip()
+                data = json.loads(content)
+                if isinstance(data, dict):
+                    instruction.parameters.update(data)
+            except Exception:
+                pass
 
         node = ExecutableNode(
             node_id=node_id,

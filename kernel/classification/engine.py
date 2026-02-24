@@ -13,18 +13,19 @@ All functions accept/return Standard I/O types (Signal → Result).
 
 from __future__ import annotations
 
+import json
 import re
 import time
-from typing import Any
 
 from shared.config import get_settings
+from shared.inference_kit import InferenceKit
+from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
 from shared.normalization import min_max_scale, softmax_transform
 from shared.standard_io import (
     Metrics,
     ModuleRef,
     Result,
-    Signal,
     create_data_signal,
     fail,
     ok,
@@ -243,6 +244,7 @@ def merge_classification_layers(
 async def classify(
     text: str,
     profile_rules: ClassProfileRules,
+    kit: InferenceKit | None = None,
 ) -> Result:
     """Top-level classification orchestrator.
 
@@ -266,6 +268,43 @@ async def classify(
 
         # Merge via Layer C
         result = merge_classification_layers(linguistic, semantic, threshold)
+
+        # LLM Tie-breaker if FallbackTrigger
+        if isinstance(result, FallbackTrigger) and kit and kit.has_llm:
+            try:
+                system_msg = LLMMessage(
+                    role="system",
+                    content=(
+                        "You are an expert classifier. Select the best category for the user's text "
+                        "from the provided options. Respond EXACTLY with JSON: "
+                        "{\"category\": \"<best_match>\", \"confidence\": 0.95}"
+                    )
+                )
+                options = [c.label for c in result.candidates]
+                user_msg = LLMMessage(role="user", content=f"Text: {text}\nOptions: {options}")
+                resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
+
+                content = resp.content.strip()
+                if content.startswith("```json"):
+                    content = content[7:-3].strip()
+                elif content.startswith("```"):
+                    content = content[3:-3].strip()
+                data = json.loads(content)
+
+                cat = data.get("category")
+                conf = float(data.get("confidence", 0.8))
+
+                if cat in options and conf >= threshold:
+                    result = ClassificationResult(
+                        labels=result.candidates,
+                        top_label=cat,
+                        confidence=conf,
+                        linguistic_contribution=0.0,
+                        semantic_contribution=0.0,
+                    )
+            except Exception as e:
+                log.warning("LLM fallback classification failed", error=str(e))
+                pass
 
         elapsed = (time.perf_counter() - start) * 1000
         metrics = Metrics(duration_ms=elapsed, module_ref=ref)

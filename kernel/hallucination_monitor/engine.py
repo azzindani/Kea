@@ -11,11 +11,15 @@ Epistemic grounding verification for output claims:
 
 from __future__ import annotations
 
+import json
 import re
 import time
 
+from kernel.noise_gate.types import ToolOutput
 from shared.config import get_settings
 from shared.id_and_hash import generate_id
+from shared.inference_kit import InferenceKit
+from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
 from shared.standard_io import (
     Metrics,
@@ -26,8 +30,6 @@ from shared.standard_io import (
     ok,
     processing_error,
 )
-
-from kernel.noise_gate.types import ToolOutput
 
 from .types import (
     Claim,
@@ -71,7 +73,7 @@ _REASONING_MARKERS = frozenset({
 # ============================================================================
 
 
-def classify_claims(output_text: str) -> list[Claim]:
+async def classify_claims(output_text: str, kit: InferenceKit | None = None) -> list[Claim]:
     """Decompose output text into atomic, classified claims.
 
     Each claim is a sentence-level unit classified as FACTUAL,
@@ -79,6 +81,41 @@ def classify_claims(output_text: str) -> list[Claim]:
     """
     if not output_text.strip():
         return []
+
+    if kit and kit.has_llm:
+        try:
+            system_msg = LLMMessage(
+                role="system",
+                content="Extract atomic claims from this text and classify each as FACTUAL, REASONING, or OPINION. Respond EXACTLY with JSON list of dicts: [{\"text\": \"...\", \"claim_type\": \"FACTUAL\"}]"
+            )
+            user_msg = LLMMessage(role="user", content=output_text)
+            resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
+            content = resp.content.strip()
+            if content.startswith("```json"):
+                content = content[7:-3].strip()
+            elif content.startswith("```"):
+                content = content[3:-3].strip()
+            data = json.loads(content)
+
+            claims = []
+            for i, item in enumerate(data):
+                ctype = ClaimType.FACTUAL
+                if item.get("claim_type") == "OPINION":
+                    ctype = ClaimType.OPINION
+                elif item.get("claim_type") == "REASONING":
+                    ctype = ClaimType.REASONING
+                claims.append(Claim(
+                    claim_id=generate_id("claim"),
+                    text=item["text"],
+                    claim_type=ctype,
+                    source_sentence=item["text"],
+                    position=i,
+                ))
+            if claims:
+                return claims
+        except Exception as e:
+            log.warning("LLM claim classification failed, falling back", error=str(e))
+            pass
 
     # Split into sentences (simple heuristic; service layer uses NLP)
     sentences = re.split(r'(?<=[.!?])\s+', output_text.strip())
@@ -117,6 +154,7 @@ def classify_claims(output_text: str) -> list[Claim]:
 async def grade_claim(
     claim: Claim,
     evidence: list[Origin],
+    kit: InferenceKit | None = None,
 ) -> ClaimGrade:
     """Grade a single claim against the evidence pool.
 
@@ -136,6 +174,43 @@ async def grade_claim(
             best_similarity=1.0,
             reasoning="Opinion claims are grounded by declaration",
         )
+
+    if kit and kit.has_llm and evidence:
+        try:
+            ev_texts = [o.content for o in evidence if o.content]
+            if ev_texts:
+                system_msg = LLMMessage(
+                    role="system",
+                    content="Grade the claim against the provided evidence. Grades: GROUNDED (fully supported), INFERRED (partially derivable), FABRICATED (no support). Respond EXACTLY with JSON: {\"grade\": \"GROUNDED\", \"reasoning\": \"...\", \"similarity\": 0.9}"
+                )
+                user_msg = LLMMessage(role="user", content=f"Claim: {claim.text}\nEvidence: {ev_texts}")
+                resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
+
+                content = resp.content.strip()
+                if content.startswith("```json"):
+                    content = content[7:-3].strip()
+                elif content.startswith("```"):
+                    content = content[3:-3].strip()
+                data = json.loads(content)
+
+                grade_str = data.get("grade", "FABRICATED")
+                if grade_str == "GROUNDED":
+                    grade = ClaimGradeLevel.GROUNDED
+                elif grade_str == "INFERRED":
+                    grade = ClaimGradeLevel.INFERRED
+                else:
+                    grade = ClaimGradeLevel.FABRICATED
+
+                return ClaimGrade(
+                    claim_id=claim.claim_id,
+                    grade=grade,
+                    evidence_links=[],
+                    best_similarity=float(data.get("similarity", 0.0)),
+                    reasoning=data.get("reasoning", "LLM graded"),
+                )
+        except Exception as e:
+            log.warning("LLM claim grading failed, falling back", error=str(e))
+            pass
 
     # For FACTUAL and REASONING claims: compare against evidence
     best_similarity = 0.0
@@ -275,6 +350,7 @@ def trace_evidence_chain(
 async def verify_grounding(
     output: ToolOutput,
     evidence: list[Origin],
+    kit: InferenceKit | None = None,
 ) -> Result:
     """Top-level grounding verification.
 
@@ -287,7 +363,7 @@ async def verify_grounding(
 
     try:
         # Extract and classify claims
-        claims = classify_claims(output.content)
+        claims = await classify_claims(output.content, kit)
 
         # Grade each claim
         claim_grades: list[ClaimGrade] = []
@@ -296,7 +372,7 @@ async def verify_grounding(
         fabricated_count = 0
 
         for claim in claims:
-            grade = await grade_claim(claim, evidence)
+            grade = await grade_claim(claim, evidence, kit)
             claim_grades.append(grade)
 
             if grade.grade == ClaimGradeLevel.GROUNDED:

@@ -7,18 +7,17 @@ DAG state tracking, event history, and entity caching.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
-
 
 # ============================================================================
 # Observation Events
 # ============================================================================
 
 
-class EventSource(str, Enum):
+class EventSource(StrEnum):
     """Where an observation event originated."""
 
     USER = "user"           # User message / input
@@ -52,7 +51,7 @@ class ObservationEvent(BaseModel):
 # ============================================================================
 
 
-class NodeExecutionStatus(str, Enum):
+class NodeExecutionStatus(StrEnum):
     """Status of a specific node within a DAG."""
 
     PENDING = "pending"

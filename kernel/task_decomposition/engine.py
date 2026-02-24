@@ -10,10 +10,16 @@ Goal decomposition pipeline:
 
 from __future__ import annotations
 
+import json
 import time
 
+from kernel.entity_recognition import extract_entities
+from kernel.entity_recognition.types import ValidatedEntity as ValidatedEntityType
+from kernel.intent_sentiment_urgency import IntentLabel, detect_intent
 from shared.config import get_settings
 from shared.id_and_hash import generate_id
+from shared.inference_kit import InferenceKit
+from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
 from shared.standard_io import (
     Metrics,
@@ -24,10 +30,6 @@ from shared.standard_io import (
     ok,
     processing_error,
 )
-
-from kernel.intent_sentiment_urgency import IntentLabel, detect_intent
-from kernel.entity_recognition import ValidatedEntity, extract_entities
-from kernel.entity_recognition.types import ValidatedEntity as ValidatedEntityType
 
 from .types import (
     ComplexityAssessment,
@@ -333,7 +335,7 @@ def _infer_tools(sub_goal: SubGoal) -> list[str]:
 # ============================================================================
 
 
-async def decompose_goal(context: WorldState) -> Result:
+async def decompose_goal(context: WorldState, kit: InferenceKit | None = None) -> Result:
     """Top-level goal decomposition orchestrator.
 
     Takes world state, runs complexity analysis, splits into sub-goals,
@@ -372,6 +374,47 @@ async def decompose_goal(context: WorldState) -> Result:
 
         # Step 4: Map skills
         tasks = map_required_skills(sub_goals, dep_graph)
+
+        # Step 5: LLM Advanced Decomposition
+        if kit and kit.has_llm:
+            try:
+                system_msg = LLMMessage(
+                    role="system",
+                    content=(
+                        "Decompose the task into sub-tasks. "
+                        "Respond EXACTLY in JSON: [{\"id\": \"...\", \"description\": \"...\", \"domain\": \"...\", "
+                        "\"required_skills\": [\"...\"], \"required_tools\": [\"...\"], \"depends_on\": [\"id_...\"], "
+                        "\"inputs\": [\"...\"], \"outputs\": [\"...\"], \"parallelizable\": true/false}]"
+                    )
+                )
+                user_msg = LLMMessage(role="user", content=f"Goal: {context.goal}\nContext: {json.dumps(context.context)}")
+                resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
+
+                content = resp.content.strip()
+                if content.startswith("```json"):
+                    content = content[7:-3].strip()
+                elif content.startswith("```"):
+                    content = content[3:-3].strip()
+                data = json.loads(content)
+
+                if isinstance(data, list) and data:
+                    llm_tasks = []
+                    for t in data:
+                        llm_tasks.append(SubTaskItem(
+                            id=t.get("id", generate_id("task")),
+                            description=t.get("description", ""),
+                            domain=t.get("domain", "general"),
+                            required_skills=t.get("required_skills", []),
+                            required_tools=t.get("required_tools", []),
+                            depends_on=t.get("depends_on", []),
+                            inputs=t.get("inputs", []),
+                            outputs=t.get("outputs", []),
+                            parallelizable=t.get("parallelizable", False)
+                        ))
+                    tasks = llm_tasks
+            except Exception as e:
+                log.warning("LLM task decomposition failed", error=str(e))
+                pass
 
         elapsed = (time.perf_counter() - start) * 1000
         metrics = Metrics(duration_ms=elapsed, module_ref=ref)

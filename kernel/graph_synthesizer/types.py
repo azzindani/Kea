@@ -7,18 +7,17 @@ into executable computational graphs with dependency edges.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
-
 
 # ============================================================================
 # Edge & Dependency Types
 # ============================================================================
 
 
-class EdgeKind(str, Enum):
+class EdgeKind(StrEnum):
     """Classification of dependency edges in the DAG."""
 
     SEQUENTIAL = "sequential"   # B must wait for A
@@ -47,7 +46,7 @@ class Edge(BaseModel):
 # ============================================================================
 
 
-class NodeStatus(str, Enum):
+class NodeStatus(StrEnum):
     """Execution status of a DAG node."""
 
     PENDING = "pending"
