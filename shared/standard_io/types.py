@@ -135,7 +135,7 @@ class Signal(BaseModel):
     kind: SignalKind = Field(..., description="What type of payload")
     body: dict[str, Any] = Field(..., description="The actual payload (typed per kind)")
     origin: ModuleRef = Field(..., description="Who created this signal")
-    trace_id: str = Field(..., min_length=1, description="Correlation ID across the full pipeline")
+    trace_id: str = Field(default="", description="Correlation ID across the full pipeline")
     tags: dict[str, str] = Field(default_factory=dict, description="Flexible metadata")
     created_at: datetime = Field(..., description="UTC timestamp of creation")
     parent_id: str | None = Field(default=None, description="ID of the signal that triggered this one")

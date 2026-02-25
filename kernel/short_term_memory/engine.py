@@ -175,6 +175,12 @@ class ShortTermMemory:
             events = events[:count]
         return events
 
+    @property
+    def history(self):
+        class _History:
+            events = list(self._event_history.values())
+        return _History()
+
     # ========================================================================
     # 3. Entity Cache (TTL-based)
     # ========================================================================
