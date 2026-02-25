@@ -38,6 +38,29 @@ class ModuleActivation(StrEnum):
     DORMANT = "dormant"
 
 
+class ModuleState(BaseModel):
+    """Rich activation state for a single cognitive module.
+
+    Used when callers need more than a binary active/dormant signal,
+    e.g. attaching a confidence score or capability requirements.
+    """
+
+    value: str = Field(
+        ...,
+        description="Activation state value ('active' or 'dormant')",
+    )
+    confidence: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=1.0,
+        description="Confidence in the current activation state",
+    )
+    required_capabilities: list[str] = Field(
+        default_factory=list,
+        description="Capabilities that must be available for this module",
+    )
+
+
 class PipelineConfig(BaseModel):
     """Defines which modules are active for a given pipeline."""
 
@@ -60,16 +83,23 @@ class PipelineConfig(BaseModel):
 
 
 class ActivationMap(BaseModel):
-    """Dictionary of module IDs to ACTIVE/DORMANT states.
+    """Dictionary of module IDs to activation states.
 
     Passed to Tier 4 to control which modules participate
     in the current cognitive cycle.
     """
 
-    pipeline: PipelineConfig = Field(...)
-    module_states: dict[str, ModuleActivation] = Field(
+    pipeline: PipelineConfig | None = Field(
+        default=None,
+        description="Pipeline template that produced this map",
+    )
+    module_states: dict[str, ModuleActivation | ModuleState] = Field(
         default_factory=dict,
-        description="module_name → ACTIVE or DORMANT",
+        description="module_name → activation state (enum or rich model)",
+    )
+    required_tools: list[str] = Field(
+        default_factory=list,
+        description="MCP tools required for the current activation",
     )
     pressure_downgraded: bool = Field(
         default=False,
