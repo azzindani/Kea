@@ -12,6 +12,10 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+# ObservationEvent is defined in short_term_memory and re-exported here
+# so callers can import it from either module.
+from kernel.short_term_memory.types import ObservationEvent as ObservationEvent
+
 # ============================================================================
 # Agent State (the central state object flowing through the loop)
 # ============================================================================

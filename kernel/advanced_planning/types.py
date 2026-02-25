@@ -106,15 +106,29 @@ class MCPToolBinding(BaseModel):
     )
 
 
+class MCPTool(BaseModel):
+    """An MCP tool available in the registry, with full metadata."""
+
+    tool_id: str = Field(..., description="MCP tool identifier")
+    tool_name: str = Field(..., description="Human-readable tool name")
+    description: str = Field(default="", description="What this tool does")
+    compatibility_score: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=1.0,
+        description="Default compatibility score for this tool",
+    )
+
+
 class MCPToolRegistry(BaseModel):
     """Registry of available MCP tools for binding.
 
     Passed in by the caller (Tier 4 or Orchestrator service).
     """
 
-    tools: list[MCPToolBinding] = Field(
+    tools: list[MCPTool] = Field(
         default_factory=list,
-        description="Available MCP tool bindings",
+        description="Available MCP tools",
     )
 
 
