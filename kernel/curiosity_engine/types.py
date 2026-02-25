@@ -16,6 +16,8 @@ class ExplorationStrategy(StrEnum):
     """Where to look for missing information."""
 
     RAG = "rag"
+    WEB = "web"
+    SCAN = "scan"
     LOCAL_MEMORY = "local_memory"
     TOOL_SEARCH = "tool_search"
     HYPOTHETICAL = "hypothetical"
