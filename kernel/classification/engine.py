@@ -294,7 +294,7 @@ async def classify(
                 cat = data.get("category")
                 conf = float(data.get("confidence", 0.8))
 
-                if cat in options and conf >= threshold:
+                if (not options or cat in options) and conf >= threshold:
                     result = ClassificationResult(
                         labels=result.candidates,
                         top_label=cat,

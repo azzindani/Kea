@@ -78,4 +78,5 @@ async def test_llm_fallback_extract_entities():
     assert res.is_success
 
     data = res.unwrap()
-    assert len(data.entities) == 2
+    payload = data.signals[0].body["data"]
+    assert len(payload) == 2

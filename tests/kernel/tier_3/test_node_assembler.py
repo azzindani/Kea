@@ -90,6 +90,6 @@ async def test_assemble_node():
     data = res.unwrap()
     assert len(data.signals) == 1
 
-    # Data is an ExecutableNode structure, but we only have standard result
+    # Data contains a dictionary with 'node' and 'report'
     node_data = data.signals[0].body["data"]
-    assert "node_id" in node_data
+    assert "node_id" in node_data["node"]
