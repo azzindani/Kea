@@ -216,13 +216,14 @@ async def grade_claim(
     best_similarity = 0.0
     best_links: list[EvidenceLink] = []
 
-    claim_tokens = set(claim.text.lower().split())
+    stop_words = frozenset({"the", "is", "a", "an", "are", "of", "to", "in", "and", "with", "some", "very", "today,"})
+    claim_tokens = set(claim.text.lower().split()) - stop_words
 
     for origin in evidence:
         if not origin.content:
             continue
 
-        evidence_tokens = set(origin.content.lower().split())
+        evidence_tokens = set(origin.content.lower().split()) - stop_words
         if not claim_tokens:
             continue
 

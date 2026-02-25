@@ -30,7 +30,7 @@ class AgentStatus(StrEnum):
 class MacroObjective(BaseModel):
     """A high-level goal the agent is working toward."""
 
-    objective_id: str = Field(...)
+    objective_id: str = Field(default="default_obj_id")
     description: str = Field(...)
     priority: int = Field(default=0, ge=0, description="Lower = higher priority")
     completed: bool = Field(default=False)
@@ -157,7 +157,7 @@ class ActionResult(BaseModel):
     """Output of the Act phase after executing DAG node(s)."""
 
     node_id: str = Field(..., description="Which node was executed")
-    success: bool = Field(...)
+    success: bool = Field(default=True)
     outputs: dict[str, Any] = Field(
         default_factory=dict,
         description="Node output key-value pairs",

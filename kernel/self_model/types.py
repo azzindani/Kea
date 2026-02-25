@@ -82,6 +82,7 @@ class ProcessingPhase(StrEnum):
     PRE_EXECUTION = "pre_execution"
     DURING_EXECUTION = "during_execution"
     POST_EXECUTION = "post_execution"
+    OBSERVE = "observe"
     IDLE = "idle"
 
 

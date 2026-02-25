@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 from typing import Any
+from datetime import datetime, UTC
 
 from pydantic import BaseModel, Field
 
@@ -38,7 +39,7 @@ class ObservationEvent(BaseModel):
         default_factory=dict,
         description="Event-specific data",
     )
-    timestamp_utc: str = Field(..., description="ISO 8601 UTC timestamp")
+    timestamp_utc: str = Field(default_factory=lambda: datetime.now(UTC).isoformat(), description="ISO 8601 UTC timestamp")
     priority: int = Field(
         default=0,
         ge=0,

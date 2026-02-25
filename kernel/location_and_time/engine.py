@@ -194,7 +194,7 @@ def _resolve_single_temporal(
         "now": (timedelta(hours=0), timedelta(hours=0)),
         "today": (timedelta(hours=0), timedelta(hours=24)),
         "yesterday": (timedelta(hours=24), timedelta(hours=0)),
-        "tomorrow": (timedelta(hours=-24), timedelta(hours=0)),
+        "tomorrow": (timedelta(hours=0), timedelta(hours=24)),
         "last_hour": (timedelta(hours=1), timedelta(hours=0)),
         "last_week": (timedelta(weeks=1), timedelta(hours=0)),
         "this_week": (timedelta(days=system_time.weekday()), timedelta(hours=0)),

@@ -15,9 +15,21 @@ from pydantic import BaseModel, Field
 class ExplorationStrategy(StrEnum):
     """Where to look for missing information."""
 
-    RAG = "RAG"     # Internal knowledge retrieval
-    WEB = "WEB"     # External web search
-    SCAN = "SCAN"   # Tool/filesystem discovery
+    RAG = "rag"
+    LOCAL_MEMORY = "local_memory"
+    TOOL_SEARCH = "tool_search"
+    HYPOTHETICAL = "hypothetical"
+    INTERACTIVE = "interactive"
+
+    @classmethod
+    def _missing_(cls, value: object) -> Any:
+        # Enable case-insensitive match (e.g., 'rag' -> RAG)
+        if isinstance(value, str):
+            value = value.lower()
+            for member in cls:
+                if member.value == value:
+                    return member
+        return super()._missing_(value)
 
 
 class KnowledgeGap(BaseModel):

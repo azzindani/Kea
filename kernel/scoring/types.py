@@ -20,6 +20,7 @@ class ConstraintType(StrEnum):
     WORD_COUNT = "word_count"     # Content must have N words
     CONTAINS = "contains"         # Content must contain substring
     NOT_CONTAINS = "not_contains" # Content must NOT contain substring
+    MUST_CONTAIN = "must_contain" # Content MUST contain substring
     FILE_EXTENSION = "file_ext"   # Content/path must end with extension
     MAX_LENGTH = "max_length"     # Content must be under N chars
 

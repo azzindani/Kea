@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 from typing import Any
+from datetime import datetime, UTC
 
 from pydantic import BaseModel, Field
 
@@ -29,11 +30,12 @@ class CostDimension(StrEnum):
 class CostEvent(BaseModel):
     """A single cost event from Tier 4 execution."""
 
-    event_id: str = Field(...)
+    event_id: str = Field(default_factory=lambda: "default_cost_id")
     dimension: CostDimension = Field(...)
     amount: float = Field(..., ge=0.0, description="Amount consumed")
     source_node_id: str = Field(default="", description="Which DAG node generated this cost")
-    timestamp_utc: str = Field(..., description="ISO 8601 UTC timestamp")
+    description: str = Field(default="")
+    timestamp_utc: str = Field(default_factory=lambda: datetime.now(UTC).isoformat(), description="ISO 8601 UTC timestamp")
 
 
 # ============================================================================
@@ -82,7 +84,7 @@ class InterruptType(StrEnum):
 class InterruptSignal(BaseModel):
     """A top-down control signal from Corporate Kernel."""
 
-    interrupt_id: str = Field(...)
+    interrupt_id: str = Field(default_factory=lambda: "default_interrupt_id")
     interrupt_type: InterruptType = Field(...)
     reason: str = Field(default="")
     payload: dict[str, Any] = Field(
@@ -90,7 +92,7 @@ class InterruptSignal(BaseModel):
         description="Type-specific data (e.g., new objective for PRIORITY_OVERRIDE)",
     )
     priority: int = Field(default=0, ge=0, description="Signal priority")
-    timestamp_utc: str = Field(..., description="ISO 8601 UTC timestamp")
+    timestamp_utc: str = Field(default_factory=lambda: datetime.now(UTC).isoformat(), description="ISO 8601 UTC timestamp")
 
 
 class InterruptAction(StrEnum):

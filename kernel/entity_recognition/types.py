@@ -41,8 +41,8 @@ class ValidatedEntity(BaseModel):
 
     field_name: str = Field(..., description="Schema field this entity maps to")
     value: str = Field(..., description="Extracted and validated value")
-    original_span: str = Field(..., description="Original text span before validation")
-    entity_type: str = Field(..., description="Resolved entity type")
+    original_span: str = Field(default="", description="Original text span before validation")
+    entity_type: str = Field(default="UNKNOWN", description="Resolved entity type")
     start: int = Field(default=0, ge=0, description="Character start offset in source text")
     end: int = Field(default=0, ge=0, description="Character end offset in source text")
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)

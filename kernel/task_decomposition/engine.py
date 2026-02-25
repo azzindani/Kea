@@ -356,7 +356,7 @@ async def decompose_goal(context: WorldState, kit: InferenceKit | None = None) -
             action: str = ""
             parameter: str = ""
 
-        entity_result = extract_entities(context.goal, GoalEntities)
+        entity_result = await extract_entities(context.goal, GoalEntities)
         entities: list[ValidatedEntityType] = []
         if entity_result.signals:
             data = entity_result.signals[0].body.get("data", [])

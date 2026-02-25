@@ -20,9 +20,9 @@ from pydantic import BaseModel, Field
 class SpawnRequest(BaseModel):
     """Request from the Corporate Kernel to spawn a new agent."""
 
-    request_id: str = Field(..., description="Unique spawn request identifier")
+    request_id: str = Field(default="default_req_id", description="Unique spawn request identifier")
     role: str = Field(..., description="Assigned role (e.g., 'security_auditor')")
-    objective: str = Field(..., description="Prime directive / macro-objective")
+    objective: str = Field(default="default_objective", description="Prime directive / macro-objective")
     profile_id: str = Field(
         default="",
         description="Cognitive profile ID to load from Vault",

@@ -44,7 +44,9 @@ class ClassProfileRules(BaseModel):
     the classification engine uses for a specific agent persona or task context.
     """
 
-    profile_id: str = Field(..., description="Unique profile identifier")
+    profile_id: str = Field(default_factory=lambda: "default_profile_id", description="Unique profile identifier")
+    name: str | None = Field(default=None, description="Profile name")
+    description: str | None = Field(default=None, description="Profile description")
     pattern_rules: list[PatternRule] = Field(default_factory=list)
     pos_rules: list[POSRule] = Field(default_factory=list)
     intent_vectors: list[IntentVector] = Field(default_factory=list)

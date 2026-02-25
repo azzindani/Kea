@@ -182,3 +182,7 @@ class Result(BaseModel):
     signals: list[Signal] = Field(default_factory=list, description="Output signals")
     error: KernelError | None = Field(default=None, description="Populated if ERROR or PARTIAL")
     metrics: Metrics = Field(..., description="Always present — timing, tokens, cache")
+
+    @property
+    def is_success(self) -> bool:
+        return self.status in (ResultStatus.OK, ResultStatus.PARTIAL)

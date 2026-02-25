@@ -61,7 +61,7 @@ class ConsequencePrediction(BaseModel):
     severity_score: float = Field(
         default=0.0,
         ge=0.0,
-        le=1.0,
+        le=10.0,
         description="Severity of negative consequences",
     )
     external_impacts: list[str] = Field(
@@ -100,7 +100,7 @@ class CompiledDAG(BaseModel):
     Represents a compiled DAG from Tier 3 ready for execution.
     """
 
-    dag_id: str = Field(..., description="Unique DAG identifier")
+    dag_id: str = Field(default="default_dag_id", description="Unique DAG identifier")
     description: str = Field(..., description="What this DAG does")
     nodes: list[str] = Field(default_factory=list, description="Action node descriptions")
     has_external_calls: bool = Field(

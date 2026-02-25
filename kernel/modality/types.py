@@ -15,12 +15,20 @@ from pydantic import BaseModel, Field
 class ModalityType(StrEnum):
     """Input modality type."""
 
-    TEXT = "TEXT"
-    AUDIO = "AUDIO"
-    IMAGE = "IMAGE"
-    VIDEO = "VIDEO"
-    DOCUMENT = "DOCUMENT"
-    UNKNOWN = "UNKNOWN"
+    TEXT = "text"
+    AUDIO = "audio"
+    IMAGE = "image"
+    VIDEO = "video"
+    DOCUMENT = "document"
+    UNKNOWN = "unknown"
+    
+    @classmethod
+    def _missing_(cls, value):
+        if isinstance(value, str):
+            for member in cls:
+                if member.value == value.lower():
+                    return member
+        return None
 
 
 class RawInput(BaseModel):

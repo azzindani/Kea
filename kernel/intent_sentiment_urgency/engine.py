@@ -99,9 +99,9 @@ def detect_intent(text: str) -> IntentLabel:
 
     if not scores:
         return IntentLabel(
-            primary=IntentCategory.UNKNOWN,
-            confidence=1.0,
-            candidates=[("UNKNOWN", 1.0)],
+            primary=IntentCategory.QUERY,
+            confidence=0.0,
+            candidates=[("QUERY", 1.0)],
         )
 
     # Softmax normalization for probability distribution

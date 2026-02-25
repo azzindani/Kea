@@ -196,7 +196,7 @@ async def check_plausibility(
             0.0,
             1.0 - (len(issues) * 0.3),
         )
-        verdict = PlausibilityVerdict.FAIL if confidence < 0.5 else PlausibilityVerdict.PASS
+        verdict = PlausibilityVerdict.FAIL
     else:
         verdict = PlausibilityVerdict.PASS
         confidence = min(1.0, intent.confidence + 0.2)
