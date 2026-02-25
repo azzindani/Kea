@@ -7,7 +7,6 @@ from kernel.classification.engine import (
     classify
 )
 from kernel.classification.types import ClassProfileRules
-from shared.config import get_settings
 
 
 @pytest.mark.asyncio
@@ -25,29 +24,29 @@ async def test_classification_comprehensive(text):
     # Using an empty profile for pure engine testing (fallback behavior)
     profile = ClassProfileRules(pattern_rules=[], pos_rules=[], intent_vectors=[])
 
-    print(f"\n[Test]: run_linguistic_analysis")
+    print("\n[Test]: run_linguistic_analysis")
     linguistic_res = run_linguistic_analysis(text, profile)
     assert linguistic_res is not None
     print(f"   Candidates count: {len(linguistic_res.candidates)}")
-    print(f" \033[92m[SUCCESS]\033[0m")
+    print(" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: run_semantic_proximity")
+    print("\n[Test]: run_semantic_proximity")
     semantic_res = await run_semantic_proximity(text, profile)
     assert semantic_res is not None
     print(f"   Embedding used: {semantic_res.embedding_used}")
-    print(f" \033[92m[SUCCESS]\033[0m")
+    print(" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: merge_classification_layers")
+    print("\n[Test]: merge_classification_layers")
     threshold = 0.5
     merged = merge_classification_layers(linguistic_res, semantic_res, threshold)
     assert merged is not None
     print(f"   Result Type: {type(merged).__name__}")
-    print(f" \033[92m[SUCCESS]\033[0m")
+    print(" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: classify")
+    print("\n[Test]: classify")
     res = await classify(text, profile, kit=None)
     assert res.is_success
-    print(f" \033[92m[SUCCESS]\033[0m")
+    print(" \033[92m[SUCCESS]\033[0m")
 
 if __name__ == "__main__":
     import sys

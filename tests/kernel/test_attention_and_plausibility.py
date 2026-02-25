@@ -1,11 +1,11 @@
 import pytest
 
 from kernel.attention_and_plausibility.engine import (
-    apply_attention_filter,
+    filter_attention,
     check_plausibility,
-    run_attention_and_plausibility
+    run_cognitive_filters
 )
-from shared.config import get_settings
+from kernel.attention_and_plausibility.types import TaskState, ContextElement
 
 
 @pytest.mark.asyncio
@@ -19,22 +19,27 @@ async def test_attention_and_plausibility_comprehensive(raw_input, conversation_
     """REAL SIMULATION: Verify Attention & Plausibility Kernel functions with multiple inputs."""
     print(f"\n--- Testing Attention & Plausibility with Input: '{raw_input}' ---")
 
-    print(f"\n[Test]: apply_attention_filter")
-    refined_state = apply_attention_filter(raw_input, conversation_history)
-    assert refined_state is not None
-    print(f"   Is Refined: {refined_state.is_refined}")
-    print(f" \033[92m[SUCCESS]\033[0m")
+    task_state = TaskState(
+        goal=raw_input,
+        context_elements=[ContextElement(key=f"hist_{i}", value=val) for i, val in enumerate(conversation_history)]
+    )
 
-    print(f"\n[Test]: check_plausibility")
-    plausibility_res = await check_plausibility(refined_state, kit=None)
-    assert hasattr(plausibility_res, 'is_plausible')
-    print(f"   Is Plausible: {plausibility_res.is_plausible}")
-    print(f" \033[92m[SUCCESS]\033[0m")
+    print("\n[Test]: filter_attention")
+    filtered_state = filter_attention(task_state)
+    assert filtered_state is not None
+    print(f"   Dropped Count: {filtered_state.dropped_count}")
+    print(" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: run_attention_and_plausibility")
-    res = await run_attention_and_plausibility(raw_input, conversation_history, kit=None)
+    print("\n[Test]: check_plausibility")
+    plausibility_res = await check_plausibility(filtered_state, kit=None)
+    assert hasattr(plausibility_res, 'verdict')
+    print(f"   Verdict: {plausibility_res.verdict}")
+    print(" \033[92m[SUCCESS]\033[0m")
+
+    print("\n[Test]: run_cognitive_filters")
+    res = await run_cognitive_filters(task_state, kit=None)
     assert res.is_success
-    print(f" \033[92m[SUCCESS]\033[0m")
+    print(" \033[92m[SUCCESS]\033[0m")
 
 if __name__ == "__main__":
     import sys

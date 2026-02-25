@@ -1,12 +1,14 @@
 import pytest
 
 from kernel.activation_router.engine import (
-    classify_signal,
-    select_pipeline_template,
-    adapt_to_pressure,
-    cache_routing_decision,
-    run_activation_router
+    classify_signal_complexity,
+    select_pipeline,
+    check_decision_cache,
+    cache_decision,
+    compute_activation_map
 )
+from kernel.activation_router.types import ComplexityLevel
+from kernel.self_model.types import SignalTags, CapabilityAssessment
 from shared.config import get_settings
 
 
@@ -22,36 +24,51 @@ async def test_activation_router_comprehensive(input_text):
     """REAL SIMULATION: Verify Activation Router Kernel functions with multiple inputs."""
     print(f"\n--- Testing Activation Router with Input: '{input_text}' ---")
 
-    print(f"\n[Test]: classify_signal")
-    classification = await classify_signal(input_text, kit=None)
+    tags = SignalTags(
+        urgency="normal",
+        complexity="moderate",
+        intent="query",
+        domain="general"
+    )
+    capability = CapabilityAssessment(
+        verdict=True,
+        confidence=1.0,
+        available_tools=["web_search"]
+    )
+
+    print(f"\n[Test]: classify_signal_complexity")
+    classification = await classify_signal_complexity(tags, kit=None)
     assert classification is not None
-    assert hasattr(classification, 'complexity')
-    print(f"   Complexity: {classification.complexity}")
+    assert isinstance(classification, ComplexityLevel)
+    print(f"   Complexity: {classification.value}")
     print(f" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: select_pipeline_template")
-    template = select_pipeline_template(classification)
-    assert template is not None
-    assert hasattr(template, 'template_id')
-    print(f"   Template ID: {template.template_id}")
+    print(f"\n[Test]: select_pipeline")
+    pipeline = select_pipeline(classification, pressure=0.2)
+    assert pipeline is not None
+    assert hasattr(pipeline, 'pipeline_name')
+    print(f"   Pipeline: {pipeline.pipeline_name}")
     print(f" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: adapt_to_pressure")
+    print(f"\n[Test]: adapt_to_pressure (via select_pipeline)")
     # Test with varying system pressure
     for pressure in [0.1, 0.5, 0.9]:
-        adapted = adapt_to_pressure(template, pressure)
-        assert adapted is not None
-        assert len(adapted.active_modules) > 0
-        print(f"   Pressure {pressure}: {len(adapted.active_modules)} active modules")
+        adapted_pipeline = select_pipeline(classification, pressure)
+        assert adapted_pipeline is not None
+        assert len(adapted_pipeline.active_modules) > 0
+        print(f"   Pressure {pressure}: {len(adapted_pipeline.active_modules)} active modules")
     print(f" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: cache_routing_decision")
+    print(f"\n[Test]: cache_decision")
     # Ensure it doesn't crash
-    cache_routing_decision(input_text, template)
+    activation_map = await compute_activation_map(tags, capability)
+    # Extracting map from result signal
+    map_data = activation_map.signals[0].data
+    cache_decision(tags, map_data)
     print(f" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: run_activation_router")
-    res = await run_activation_router(input_text, kit=None)
+    print(f"\n[Test]: compute_activation_map")
+    res = await compute_activation_map(tags, capability, kit=None)
     assert res.is_success
     print(f" \033[92m[SUCCESS]\033[0m")
 

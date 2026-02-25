@@ -1,51 +1,52 @@
 import pytest
 
 from kernel.scoring.engine import (
-    calculate_priority_score,
-    calculate_readiness_score,
-    run_task_scoring
+    compute_semantic_similarity,
+    compute_precision_score,
+    evaluate_reward_compliance,
+    aggregate_scores,
+    score
 )
-from kernel.graph_synthesizer.types import ExecutableNode, ActionInstruction
-from shared.config import get_settings
+from kernel.scoring.types import NumericScore, ScoringMetadata, Constraint
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("task_desc, urgency_val, deps_met", [
-    ("Critical system recovery", 0.99, True),
-    ("Minor stylistic adjustment", 0.10, True),
-    ("Wait for user approval", 0.80, False),
-    ("Background data indexing", 0.40, True),
-    ("Emergency shutdown", 1.0, True)
+@pytest.mark.parametrize("task_desc", [
+    "Critical system recovery",
 ])
-async def test_scoring_comprehensive(task_desc, urgency_val, deps_met):
-    """REAL SIMULATION: Verify Scoring Kernel functions with multiple task profiles."""
-    print(f"\n--- Testing Scoring: Task='{task_desc}', Urgency={urgency_val}, Deps Met={deps_met} ---")
+async def test_scoring_comprehensive(task_desc):
+    """REAL SIMULATION: Verify Scoring Kernel functions."""
+    print(f"\n--- Testing Scoring: Task='{task_desc}' ---")
 
-    node = ExecutableNode(
-        node_id="n-001",
-        instruction=ActionInstruction(task_id="t-001", description=task_desc, action_type="generic", parameters={}),
-        input_keys=[],
-        output_keys=[],
-        input_schema="dict",
-        output_schema="dict"
-    )
+    print("\n[Test]: compute_semantic_similarity")
+    sim_score = await compute_semantic_similarity("The quick brown fox", "Small brown fox")
+    assert 0.0 <= sim_score <= 1.0
+    print(f"   Similarity Score: {sim_score:.2f}")
+    print(" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: calculate_priority_score")
-    priority_score = calculate_priority_score(node, urgency_val)
-    assert 0.0 <= priority_score <= 1.0
-    print(f"   Priority Score: {priority_score:.2f}")
-    print(f" \033[92m[SUCCESS]\033[0m")
+    print("\n[Test]: compute_precision_score")
+    prec_score = await compute_precision_score("The quick brown fox", "Small brown fox")
+    assert 0.0 <= prec_score <= 1.0
+    print(f"   Precision Score: {prec_score:.2f}")
+    print(" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: calculate_readiness_score")
-    readiness_score = calculate_readiness_score(node, deps_met)
-    assert 0.0 <= readiness_score <= 1.0
-    print(f"   Readiness Score: {readiness_score:.2f}")
-    print(f" \033[92m[SUCCESS]\033[0m")
+    print("\n[Test]: evaluate_reward_compliance")
+    reward_score = evaluate_reward_compliance("The fox jumped", [Constraint(id="c1", rule="must contain fox")])
+    assert reward_score == 1.0
+    print(" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: run_task_scoring")
-    res = await run_task_scoring(node, urgency_val, deps_met)
-    assert res.is_success
-    print(f" \033[92m[SUCCESS]\033[0m")
+    print("\n[Test]: aggregate_scores")
+    metadata = ScoringMetadata(user_role="admin", task_type="technical")
+    final_score = aggregate_scores(semantic=0.8, precision=0.9, reward=1.0, metadata=metadata)
+    assert isinstance(final_score, NumericScore)
+    assert final_score.score > 0.8
+    print(f"   Aggregated Score: {final_score.score:.2f}")
+    print(" \033[92m[SUCCESS]\033[0m")
+
+    print("\n[Test]: score")
+    res = await score("Sample output", "Sample query")
+    assert res.score >= 0.0
+    print(" \033[92m[SUCCESS]\033[0m")
 
 if __name__ == "__main__":
     import sys

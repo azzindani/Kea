@@ -10,7 +10,7 @@ from kernel.entity_recognition.engine import (
 from shared.config import get_settings
 
 
-class TestSchema(BaseModel):
+class EntityMockSchema(BaseModel):
     user_email: str = Field(..., description="The email address to extract")
     amount: float = Field(0.0, description="The monetary amount")
     resource_path: str = Field("", description="File system path")
@@ -43,13 +43,13 @@ async def test_entity_recognition_comprehensive(text):
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: match_spans_to_schema")
-    validated_entities = match_spans_to_schema(spans, TestSchema)
+    validated_entities = match_spans_to_schema(spans, EntityMockSchema)
     assert isinstance(validated_entities, list)
     print(f"   Validated Entities matched to schema: {len(validated_entities)}")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: extract_entities")
-    res = await extract_entities(text, TestSchema, kit=None)
+    res = await extract_entities(text, EntityMockSchema, kit=None)
     assert res.is_success
     print(f" \033[92m[SUCCESS]\033[0m")
 

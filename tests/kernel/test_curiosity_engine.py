@@ -1,12 +1,13 @@
 import pytest
 
 from kernel.curiosity_engine.engine import (
-    identify_missing_info,
-    formulate_investigation_questions,
-    select_exploration_strategy,
-    run_curiosity_engine
+    detect_missing_variables,
+    formulate_questions,
+    route_exploration_strategy,
+    explore_gaps
 )
-from shared.config import get_settings
+from kernel.task_decomposition.types import WorldState
+from kernel.validation.types import ErrorResponse
 
 
 @pytest.mark.asyncio
@@ -20,31 +21,32 @@ async def test_curiosity_engine_comprehensive(failed_val_data, macro_goal):
     """REAL SIMULATION: Verify Curiosity Engine Kernel functions with multiple scenarios."""
     print(f"\n--- Testing Curiosity Engine: Goal='{macro_goal}', Data={failed_val_data} ---")
 
-    print(f"\n[Test]: identify_missing_info")
-    missing_info_list = identify_missing_info(failed_val_data)
-    assert isinstance(missing_info_list, list)
-    print(f"   Missing Information: {missing_info_list}")
-    print(f" \033[92m[SUCCESS]\033[0m")
+    world_state = WorldState(macro_goal=macro_goal)
+    error_resp = ErrorResponse(gate_name="test", failure_detail=failed_val_data.get("error", "none"), raw_data=failed_val_data)
 
-    print(f"\n[Test]: formulate_investigation_questions")
-    questions = await formulate_investigation_questions(missing_info_list, macro_goal, kit=None)
+    print("\n[Test]: detect_missing_variables")
+    gaps = detect_missing_variables(world_state, error_resp)
+    assert isinstance(gaps, list)
+    print(f"   Missing Gaps: {len(gaps)}")
+    print(" \033[92m[SUCCESS]\033[0m")
+
+    print("\n[Test]: formulate_questions")
+    questions = await formulate_questions(gaps, kit=None)
     assert isinstance(questions, list)
     print(f"   Questions Formulated: {len(questions)}")
-    print(f" \033[92m[SUCCESS]\033[0m")
+    print(" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: select_exploration_strategy")
+    print("\n[Test]: route_exploration_strategy")
     if questions:
-        for q in questions:
-            strategy = select_exploration_strategy(q)
-            assert strategy is not None
-            assert hasattr(strategy, 'strategy_id')
-            print(f"   Question '{q[:20]}...' -> Strategy: {strategy.strategy_id}")
-    print(f" \033[92m[SUCCESS]\033[0m")
+        tasks = route_exploration_strategy(questions)
+        assert len(tasks) == len(questions)
+        print(f"   Route Strategy -> Tasks: {len(tasks)}")
+    print(" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: run_curiosity_engine")
-    res = await run_curiosity_engine(failed_val_data, macro_goal, kit=None)
+    print("\n[Test]: explore_gaps")
+    res = await explore_gaps(world_state, error_resp, kit=None)
     assert res.is_success
-    print(f" \033[92m[SUCCESS]\033[0m")
+    print(" \033[92m[SUCCESS]\033[0m")
 
 if __name__ == "__main__":
     import sys

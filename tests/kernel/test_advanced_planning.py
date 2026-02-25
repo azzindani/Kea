@@ -1,12 +1,16 @@
 import pytest
 
 from kernel.advanced_planning.engine import (
-    sequence_subtasks,
-    prioritize_tasks,
-    bind_tools_to_tasks,
-    generate_outcome_hypotheses,
+    sequence_and_prioritize,
+    bind_tools,
+    generate_hypotheses,
     inject_progress_tracker,
-    run_advanced_planning
+    plan_advanced
+)
+from kernel.advanced_planning.types import (
+    PlanningConstraints,
+    MCPToolRegistry,
+    PriorityMode
 )
 from kernel.task_decomposition.types import SubTaskItem
 from shared.config import get_settings
@@ -29,33 +33,31 @@ async def test_advanced_planning_comprehensive(subtasks_data):
     """REAL SIMULATION: Verify Advanced Planning Kernel functions with multiple inputs."""
     print(f"\n--- Testing Advanced Planning with {len(subtasks_data)} Subtasks ---")
 
-    print(f"\n[Test]: sequence_subtasks")
-    sequenced = sequence_subtasks(subtasks_data)
+    constraints = PlanningConstraints(priority_mode=PriorityMode.BALANCED)
+    registry = MCPToolRegistry()
+
+    print(f"\n[Test]: sequence_and_prioritize")
+    sequenced = await sequence_and_prioritize(subtasks_data, constraints)
     assert len(sequenced) == len(subtasks_data)
     print(f" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: prioritize_tasks")
-    prioritized = prioritize_tasks(sequenced)
-    assert len(prioritized) == len(subtasks_data)
-    print(f" \033[92m[SUCCESS]\033[0m")
-
-    print(f"\n[Test]: bind_tools_to_tasks")
-    bound = await bind_tools_to_tasks(prioritized)
+    print(f"\n[Test]: bind_tools")
+    bound = await bind_tools(sequenced, registry)
     assert len(bound) == len(subtasks_data)
     print(f" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: generate_outcome_hypotheses")
-    hypothesized = await generate_outcome_hypotheses(bound, kit=None)
-    assert len(hypothesized) == len(subtasks_data)
+    print(f"\n[Test]: generate_hypotheses")
+    hypotheses = generate_hypotheses(bound)
+    assert len(hypotheses) <= len(subtasks_data)
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: inject_progress_tracker")
-    tracked_plan = inject_progress_tracker(hypothesized)
+    tracked_plan = inject_progress_tracker(bound, hypotheses, constraints)
     assert len(tracked_plan.tasks) == len(subtasks_data)
     print(f" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: run_advanced_planning")
-    res = await run_advanced_planning(subtasks_data, kit=None)
+    print(f"\n[Test]: plan_advanced")
+    res = await plan_advanced(subtasks_data, kit=None)
     assert res.is_success
     print(f" \033[92m[SUCCESS]\033[0m")
 

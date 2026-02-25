@@ -3,11 +3,12 @@ import pytest
 from kernel.location_and_time.engine import (
     extract_temporal_signals,
     extract_spatial_signals,
-    resolve_to_utc_ranges,
-    resolve_to_bounding_boxes,
-    adapt_to_task_context,
-    fuse_spatiotemporal_block,
-    run_spatiotemporal_anchoring
+    resolve_temporal_hierarchy,
+    resolve_spatial_hierarchy,
+    adapt_temporal_ambiguity,
+    adapt_spatial_scope,
+    fuse_spatiotemporal,
+    anchor_spatiotemporal
 )
 from shared.config import get_settings
 
@@ -25,45 +26,36 @@ async def test_location_and_time_comprehensive(input_text):
     print(f"\n--- Testing Location & Time: Text='{input_text}' ---")
 
     print(f"\n[Test]: extract_temporal_signals")
-    temporal_signals = extract_temporal_signals(input_text)
+    temporal_signals = await extract_temporal_signals(input_text)
     assert isinstance(temporal_signals, list)
     print(f"   Temporal Signals found: {len(temporal_signals)}")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: extract_spatial_signals")
-    spatial_signals = extract_spatial_signals(input_text)
+    spatial_signals = await extract_spatial_signals(input_text)
     assert isinstance(spatial_signals, list)
     print(f"   Spatial Signals found: {len(spatial_signals)}")
     print(f" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: resolve_to_utc_ranges")
-    utc_ranges = resolve_to_utc_ranges(temporal_signals)
-    assert isinstance(utc_ranges, list)
-    print(f"   UTC Ranges resolved: {len(utc_ranges)}")
+    print(f"\n[Test]: resolve_temporal_hierarchy")
+    from datetime import datetime
+    temp_range = resolve_temporal_hierarchy(temporal_signals, datetime.now())
+    assert temp_range is not None
     print(f" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: resolve_to_bounding_boxes")
-    bounding_boxes = resolve_to_bounding_boxes(spatial_signals)
-    assert isinstance(bounding_boxes, list)
-    print(f"   Bounding Boxes resolved: {len(bounding_boxes)}")
+    print(f"\n[Test]: resolve_spatial_hierarchy")
+    from kernel.location_and_time.types import GeoAnchor
+    bounds = resolve_spatial_hierarchy(spatial_signals, GeoAnchor(latitude=0, longitude=0))
+    assert bounds is not None
     print(f" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: adapt_to_task_context")
-    # Simulate adaptation with a dummy context
-    adapted_ranges, adapted_boxes = adapt_to_task_context(utc_ranges, bounding_boxes, "report_generation")
-    assert len(adapted_ranges) == len(utc_ranges)
-    assert len(adapted_boxes) == len(bounding_boxes)
-    print(f" \033[92m[SUCCESS]\033[0m")
-
-    print(f"\n[Test]: fuse_spatiotemporal_block")
-    st_block = fuse_spatiotemporal_block(adapted_ranges, adapted_boxes)
+    print(f"\n[Test]: fuse_spatiotemporal")
+    st_block = fuse_spatiotemporal(temp_range, bounds)
     assert st_block is not None
-    assert hasattr(st_block, 'timestamp_utc')
-    print(f"   Fused Timestamp: {st_block.timestamp_utc}")
     print(f" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: run_spatiotemporal_anchoring")
-    res = await run_spatiotemporal_anchoring(input_text, kit=None)
+    print(f"\n[Test]: anchor_spatiotemporal")
+    res = await anchor_spatiotemporal(input_text, kit=None)
     assert res.is_success
     print(f" \033[92m[SUCCESS]\033[0m")
 

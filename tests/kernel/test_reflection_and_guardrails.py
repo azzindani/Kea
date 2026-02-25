@@ -1,12 +1,13 @@
 import pytest
 
 from kernel.reflection_and_guardrails.engine import (
-    run_pre_execution_checks,
-    run_post_execution_critique,
-    run_reflection
+    run_pre_execution_check,
+    run_post_execution_reflection,
+    evaluate_consensus,
+    check_value_guardrails
 )
-from kernel.graph_synthesizer.types import ExecutableGraph
-from shared.config import get_settings
+from kernel.graph_synthesizer.types import ExecutableDAG
+from kernel.reflection_and_guardrails.types import ExecutionResult
 
 
 @pytest.mark.asyncio
@@ -20,22 +21,28 @@ async def test_reflection_and_guardrails_comprehensive(objective, execution_outp
     """REAL SIMULATION: Verify Reflection & Guardrails Kernel functions with multiple inputs."""
     print(f"\n--- Testing Reflection & Guardrails: Objective='{objective}' ---")
 
-    dag = ExecutableGraph(dag_id="dag-test", nodes=[], edges=[], objective=objective)
+    dag = ExecutableDAG(dag_id="dag-test", nodes=[], edges=[], objective=objective)
 
-    print(f"\n[Test]: run_pre_execution_checks")
-    pre_res = await run_pre_execution_checks(dag, kit=None)
+    print(f"\n[Test]: run_pre_execution_check")
+    pre_res = await run_pre_execution_check(dag, kit=None)
     assert pre_res.is_success
-    # Even if dangerous, it might succeed in 'running' the check but return a status inside signals
     print(f" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: run_post_execution_critique")
-    post_res = await run_post_execution_critique(dag, execution_outputs, kit=None)
+    print(f"\n[Test]: evaluate_consensus")
+    consensus_res = await evaluate_consensus([dag], kit=None)
+    assert consensus_res is not None
+    print(f" \033[92m[SUCCESS]\033[0m")
+
+    print(f"\n[Test]: check_value_guardrails")
+    guard_res = await check_value_guardrails(dag, kit=None)
+    assert guard_res is not None
+    print(f" \033[92m[SUCCESS]\033[0m")
+
+    print(f"\n[Test]: run_post_execution_reflection")
+    # Need ExecutionResult and list[ExpectedOutcome]
+    exec_res = ExecutionResult(dag_id=dag.dag_id, completed_nodes=[], failed_nodes=[], outputs=execution_outputs)
+    post_res = await run_post_execution_reflection(exec_res, expected=[], kit=None)
     assert post_res.is_success
-    print(f" \033[92m[SUCCESS]\033[0m")
-
-    print(f"\n[Test]: run_reflection")
-    res = await run_reflection(dag, execution_outputs, kit=None)
-    assert res.is_success
     print(f" \033[92m[SUCCESS]\033[0m")
 
 if __name__ == "__main__":

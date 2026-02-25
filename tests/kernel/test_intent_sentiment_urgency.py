@@ -1,10 +1,10 @@
 import pytest
 
 from kernel.intent_sentiment_urgency.engine import (
-    classify_intent,
+    detect_intent,
     analyze_sentiment,
     score_urgency,
-    run_detection_pipeline
+    run_primitive_scorers
 )
 from shared.config import get_settings
 
@@ -21,17 +21,18 @@ async def test_intent_sentiment_urgency_comprehensive(text_input):
     """REAL SIMULATION: Verify Intent, Sentiment, & Urgency Kernel functions with multiple inputs."""
     print(f"\n--- Testing Intent, Sentiment & Urgency: Text='{text_input[:40]}...' ---")
 
-    print(f"\n[Test]: classify_intent")
-    intent_data = classify_intent(text_input)
+    print(f"\n[Test]: detect_intent")
+    intent_data = detect_intent(text_input)
     assert intent_data is not None
-    assert intent_data.primary is not None
-    print(f"   Primary Intent: {intent_data.primary.value}")
+    # Assuming intent_data has 'intents' list which contains IntentLabel objects
+    assert len(intent_data.intents) > 0
+    print(f"   Primary Intent: {intent_data.intents[0].category.value}")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: analyze_sentiment")
     sentiment_data = analyze_sentiment(text_input)
     assert sentiment_data is not None
-    print(f"   Sentiment Score: {sentiment_data.score:.2f} (Label: {sentiment_data.label})")
+    print(f"   Sentiment Score: {sentiment_data.score:.2f} (Label: {sentiment_data.category.value})")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: score_urgency")
@@ -40,8 +41,8 @@ async def test_intent_sentiment_urgency_comprehensive(text_input):
     print(f"   Urgency Score: {urgency_data.score:.2f}")
     print(f" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: run_detection_pipeline")
-    res = await run_detection_pipeline(text_input, kit=None)
+    print(f"\n[Test]: run_primitive_scorers")
+    res = await run_primitive_scorers(text_input, kit=None)
     assert res.is_success
     print(f" \033[92m[SUCCESS]\033[0m")
 

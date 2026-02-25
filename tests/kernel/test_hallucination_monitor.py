@@ -1,12 +1,13 @@
 import pytest
 
 from kernel.hallucination_monitor.engine import (
-    extract_claims,
     classify_claims,
-    grade_claims,
-    run_hallucination_monitor
+    grade_claim,
+    calculate_grounding_score,
+    verify_grounding
 )
-from shared.config import get_settings
+from kernel.hallucination_monitor.types import Origin
+from kernel.ooda_loop.types import ActionResult as ToolOutput
 
 
 @pytest.mark.asyncio
@@ -36,28 +37,33 @@ async def test_hallucination_monitor_comprehensive(source_text, evidence_context
     """REAL SIMULATION: Verify Hallucination Monitor Kernel functions with multiple scenarios."""
     print(f"\n--- Testing Hallucination Monitor: Text='{source_text[:30]}...' ---")
 
-    print(f"\n[Test]: extract_claims")
-    claims_list = await extract_claims(source_text, kit=None)
+    evidence = [Origin(origin_id="ev1", content=evidence_context)]
+
+    print("\n[Test]: classify_claims")
+    claims_list = await classify_claims(source_text, kit=None)
     assert isinstance(claims_list, list)
-    print(f"   Claims found: {len(claims_list)}")
-    print(f" \033[92m[SUCCESS]\033[0m")
+    print(f"   Claims found and classified: {len(claims_list)}")
+    print(" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: classify_claims")
-    classified_claims = classify_claims(claims_list)
-    assert len(classified_claims) == len(claims_list)
-    print(f" \033[92m[SUCCESS]\033[0m")
+    print("\n[Test]: grade_claim")
+    grades = []
+    for claim in claims_list:
+        grade = grade_claim(claim, evidence, kit=None)
+        grades.append(grade)
+        print(f"     - Claim: {claim.text[:20]}... -> Grade: {grade.grade.value}")
+    print(" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: grade_claims")
-    graded_claims = await grade_claims(classified_claims, evidence_context, kit=None)
-    assert len(graded_claims) == len(claims_list)
-    for gc in graded_claims:
-        print(f"     - Claim: {gc.claim_text[:20]}... -> Grade: {gc.grounding_grade.value}")
-    print(f" \033[92m[SUCCESS]\033[0m")
+    print("\n[Test]: calculate_grounding_score")
+    score = calculate_grounding_score(grades)
+    assert 0.0 <= score <= 1.0
+    print(f"   Overall Score: {score}")
+    print(" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: run_hallucination_monitor")
-    res = await run_hallucination_monitor(source_text, evidence_context, kit=None)
+    print("\n[Test]: verify_grounding")
+    output = ToolOutput(node_id="test", outputs={"response": source_text})
+    res = await verify_grounding(output, evidence, kit=None)
     assert res.is_success
-    print(f" \033[92m[SUCCESS]\033[0m")
+    print(" \033[92m[SUCCESS]\033[0m")
 
 if __name__ == "__main__":
     import sys

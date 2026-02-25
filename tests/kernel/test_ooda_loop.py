@@ -1,12 +1,13 @@
 import pytest
 
 from kernel.ooda_loop.engine import (
-    run_observe_phase,
-    run_orient_phase,
-    run_decide_phase,
-    run_act_phase,
+    observe,
+    orient,
+    decide,
+    act,
     run_ooda_loop
 )
+from kernel.ooda_loop.types import AgentState, EventStream, MacroObjective
 from kernel.short_term_memory.engine import ShortTermMemory
 from shared.config import get_settings
 
@@ -24,31 +25,34 @@ async def test_ooda_loop_comprehensive(objective_text):
     print(f"\n--- Testing OODA Loop: Objective='{objective_text}' ---")
 
     stm = ShortTermMemory()
+    obj = MacroObjective(description=objective_text)
+    state = AgentState(agent_id="test_agent", current_objectives=[obj])
+    stream = EventStream(stream_id="test_stream")
 
-    print(f"\n[Test]: run_observe_phase")
-    observation_res = await run_observe_phase(stm)
-    assert observation_res.is_success
-    print(f" \033[92m[SUCCESS]\033[0m")
+    print("\n[Test]: observe")
+    events = await observe(stream, stm)
+    assert isinstance(events, list)
+    print(" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: run_orient_phase")
-    orientation_res = await run_orient_phase(observation_res, stm)
-    assert orientation_res.is_success
-    print(f" \033[92m[SUCCESS]\033[0m")
+    print("\n[Test]: orient")
+    oriented_state = await orient(events, stm, kit=None)
+    assert oriented_state is not None
+    print(" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: run_decide_phase")
-    decision_res = await run_decide_phase(orientation_res, kit=None)
-    assert decision_res.is_success
-    print(f" \033[92m[SUCCESS]\033[0m")
+    print("\n[Test]: decide")
+    decision = await decide(oriented_state, current_objectives=state.current_objectives, stm=stm)
+    assert decision is not None
+    print(" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: run_act_phase")
-    action_res = await run_act_phase(decision_res, stm)
-    assert action_res.is_success
-    print(f" \033[92m[SUCCESS]\033[0m")
+    print("\n[Test]: act")
+    action_res = await act(decision, active_dag=None, stm=stm)
+    assert isinstance(action_res, list)
+    print(" \033[92m[SUCCESS]\033[0m")
 
-    print(f"\n[Test]: run_ooda_loop")
-    res = await run_ooda_loop(objective_text, stm=stm)
+    print("\n[Test]: run_ooda_loop")
+    res = await run_ooda_loop(state, stm=stm, kit=None)
     assert res.is_success
-    print(f" \033[92m[SUCCESS]\033[0m")
+    print(" \033[92m[SUCCESS]\033[0m")
 
 if __name__ == "__main__":
     import sys
