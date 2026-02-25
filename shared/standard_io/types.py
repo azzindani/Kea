@@ -186,3 +186,9 @@ class Result(BaseModel):
     @property
     def is_success(self) -> bool:
         return self.status in (ResultStatus.OK, ResultStatus.PARTIAL)
+
+    def unwrap(self) -> "Result":
+        """Test convenience method."""
+        if not self.is_success:
+            raise ValueError(f"Cannot unwrap failed Result: {self.error}")
+        return self

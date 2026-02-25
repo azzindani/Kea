@@ -78,7 +78,7 @@ async def analyze_goal_complexity(
         est_tasks = 1
         reasoning = f"Single intent ({intent.primary.value}) with {entity_count} entities in one domain"
 
-    elif entity_count <= settings.complexity_compound_threshold or len(domains) <= 1:
+    elif entity_count <= settings.complexity_compound_threshold and len(domains) <= 1:
         level = ComplexityLevel.COMPOUND
         est_tasks = max(2, entity_count)
         reasoning = (

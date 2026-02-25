@@ -161,10 +161,10 @@ def _check_constraint(content: str, constraint: Constraint) -> bool:
             max_words = int(constraint.value)
             return len(content.split()) <= max_words
 
-        elif constraint.constraint_type == ConstraintType.CONTAINS:
+        elif constraint.constraint_type in (ConstraintType.CONTAINS, ConstraintType.MUST_CONTAIN):
             return constraint.value in content
 
-        elif constraint.constraint_type == ConstraintType.NOT_CONTAINS:
+        elif constraint.constraint_type in (ConstraintType.NOT_CONTAINS, ConstraintType.MUST_NOT_CONTAIN):
             return constraint.value not in content
 
         elif constraint.constraint_type == ConstraintType.FILE_EXTENSION:

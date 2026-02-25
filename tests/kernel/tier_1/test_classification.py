@@ -80,6 +80,6 @@ async def test_llm_fallback_classify():
     assert res.is_success
 
     data = res.unwrap()
-    assert isinstance(data, ClassificationResult)
-    assert data.top_label == "SALES"
-    assert data.confidence == 0.90
+    payload = data.signals[0].body["data"]
+    assert payload["top_label"] == "SALES"
+    assert payload["confidence"] == 0.90
