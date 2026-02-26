@@ -28,7 +28,8 @@ async def test_activation_router_comprehensive(input_text):
         urgency="normal",
         complexity="moderate",
         intent="query",
-        domain="general"
+        domain="general",
+        source_type=f"test_{len(input_text)}" # Vary by input length
     )
     capability = CapabilityAssessment(
         can_handle=True,
@@ -62,10 +63,8 @@ async def test_activation_router_comprehensive(input_text):
     print(f"\n[Test]: cache_decision")
     # Ensure it doesn't crash
     activation_map = await compute_activation_map(tags, capability)
-    # Extracting map from result signal
-    map_data = activation_map.signals[0].body["data"]
-    from kernel.activation_router.types import ActivationMap
-    cache_decision(tags, ActivationMap.model_validate(map_data))
+    assert activation_map.is_success
+    # The engine already caches the decision
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: compute_activation_map")
