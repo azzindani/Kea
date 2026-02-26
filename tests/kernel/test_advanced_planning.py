@@ -29,7 +29,7 @@ from shared.config import get_settings
     # Scenario 3: Empty (Edge case)
     []
 ])
-async def test_advanced_planning_comprehensive(subtasks_data):
+async def test_advanced_planning_comprehensive(subtasks_data, inference_kit):
     """REAL SIMULATION: Verify Advanced Planning Kernel functions with multiple inputs."""
     print(f"\n--- Testing Advanced Planning with {len(subtasks_data)} Subtasks ---")
 
@@ -37,28 +37,38 @@ async def test_advanced_planning_comprehensive(subtasks_data):
     registry = MCPToolRegistry()
 
     print(f"\n[Test]: sequence_and_prioritize")
+    print(f"   [INPUT]: {len(subtasks_data)} subtasks")
     sequenced = await sequence_and_prioritize(subtasks_data, constraints)
     assert len(sequenced) == len(subtasks_data)
+    print(f"   [OUTPUT]: Sequenced {len(sequenced)} tasks")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: bind_tools")
+    print(f"   [INPUT]: {len(sequenced)} tasks")
     bound = await bind_tools(sequenced, registry)
     assert len(bound) == len(subtasks_data)
+    print(f"   [OUTPUT]: Tools bound to {len(bound)} tasks")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: generate_hypotheses")
+    print(f"   [INPUT]: {len(bound)} bound tasks")
     hypotheses = generate_hypotheses(bound)
     assert len(hypotheses) <= len(subtasks_data)
+    print(f"   [OUTPUT]: Generated {len(hypotheses)} hypotheses")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: inject_progress_tracker")
+    print(f"   [INPUT]: {len(bound)} tasks, {len(hypotheses)} hypotheses")
     tracked_plan = inject_progress_tracker(bound, hypotheses, constraints)
     assert len(tracked_plan.tasks) == len(subtasks_data)
+    print(f"   [OUTPUT]: Progress tracker injected")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: plan_advanced")
-    res = await plan_advanced(subtasks_data, kit=None)
+    print(f"   [INPUT]: {len(subtasks_data)} subtasks")
+    res = await plan_advanced(subtasks_data, kit=inference_kit)
     assert res.is_success
+    print(f"   [OUTPUT]: Status={res.status}, Signals count={len(res.signals)}")
     print(f" \033[92m[SUCCESS]\033[0m")
 
 if __name__ == "__main__":

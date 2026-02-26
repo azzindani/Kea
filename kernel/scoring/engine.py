@@ -15,6 +15,7 @@ import re
 import time
 
 from shared.config import get_settings
+from shared.inference_kit import InferenceKit
 from shared.logging.main import get_logger
 from shared.normalization import min_max_scale
 from shared.standard_io import (
@@ -44,18 +45,27 @@ def _ref(fn: str) -> ModuleRef:
 # ============================================================================
 
 
-async def compute_semantic_similarity(content: str, query: str) -> float:
+async def compute_semantic_similarity(
+    content: str,
+    query: str,
+    kit: InferenceKit | None = None,
+) -> float:
     """Compute cosine similarity between content and query embeddings.
 
     Captures broad meaning alignment. Falls back to token overlap
     if embedding model is unavailable.
+    Uses kit.embedder when available, falls back to global ModelManager.
     """
     try:
-        from shared.embedding import get_model_manager
+        if kit and kit.has_embedder:
+            content_emb = await kit.embedder.embed_single(content)
+            query_emb = await kit.embedder.embed_single(query)
+        else:
+            from shared.embedding.model_manager import get_model_manager
 
-        manager = get_model_manager()
-        content_emb = await manager.embed_single(content)
-        query_emb = await manager.embed_single(query)
+            manager = get_model_manager()
+            content_emb = await manager.embed_single(content)
+            query_emb = await manager.embed_single(query)
 
         # Cosine similarity
         dot_product = sum(a * b for a, b in zip(content_emb, query_emb))
@@ -84,17 +94,25 @@ async def compute_semantic_similarity(content: str, query: str) -> float:
 # ============================================================================
 
 
-async def compute_precision_score(content: str, query: str) -> float:
+async def compute_precision_score(
+    content: str,
+    query: str,
+    kit: InferenceKit | None = None,
+) -> float:
     """Cross-encoder reranking for exact semantic match.
 
     Catches negation patterns and precise intent that cosine similarity misses.
     Falls back to substring-based heuristic if reranker unavailable.
+    Uses kit.embedder (rerank_single) when available, falls back to global ModelManager.
     """
     try:
-        from shared.embedding import get_model_manager
+        if kit and kit.has_reranker:
+            rerank_score = await kit.embedder.rerank_single(query, content)
+        else:
+            from shared.embedding.model_manager import get_model_manager
 
-        manager = get_model_manager()
-        rerank_score = await manager.rerank_single(query, content)
+            manager = get_model_manager()
+            rerank_score = await manager.rerank_single(query, content)
         return min_max_scale(rerank_score, 0.0, 1.0)
 
     except Exception:
@@ -232,6 +250,7 @@ async def score(
     query: str,
     constraints: list[Constraint] | None = None,
     metadata: ScoringMetadata | None = None,
+    kit: InferenceKit | None = None,
 ) -> Result:
     """Top-level hybrid evaluation orchestrator.
 
@@ -245,8 +264,8 @@ async def score(
 
     try:
         # Run semantic and precision in parallel, reward is sync
-        semantic_task = compute_semantic_similarity(content, query)
-        precision_task = compute_precision_score(content, query)
+        semantic_task = compute_semantic_similarity(content, query, kit)
+        precision_task = compute_precision_score(content, query, kit)
 
         semantic, precision = await asyncio.gather(semantic_task, precision_task)
         reward = evaluate_reward_compliance(content, final_constraints)

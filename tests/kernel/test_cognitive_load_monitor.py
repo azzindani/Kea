@@ -38,52 +38,60 @@ from kernel.ooda_loop.types import Decision, DecisionAction
         "Financial analysis objective"
     )
 ])
-async def test_cognitive_load_monitor_comprehensive(telemetry_data, decisions, outputs, objective):
+async def test_cognitive_load_monitor_comprehensive(telemetry_data, decisions, outputs, objective, inference_kit):
     """REAL SIMULATION: Verify Cognitive Load Monitor Kernel functions with multiple scenarios."""
     print(f"\n--- Testing Cognitive Load Monitor Scenario: Tokens={telemetry_data.tokens_consumed}, Objective: '{objective}' ---")
 
     activation_map = ActivationMap(module_states={})
 
     print("\n[Test]: measure_load")
+    print(f"   [INPUT]: tokens={telemetry_data.tokens_consumed}, cycle={telemetry_data.cycle_number}")
     load = measure_load(activation_map, telemetry_data)
     assert load is not None
     assert hasattr(load, 'aggregate')
-    print(f"   Aggregate Load: {load.aggregate}")
+    print(f"   [OUTPUT]: Aggregate Load={load.aggregate:.2f}")
     print(" \033[92m[SUCCESS]\033[0m")
 
     print("\n[Test]: detect_loop")
+    print(f"   [INPUT]: {len(decisions)} decisions")
     loops = detect_loop(decisions)
     assert loops is not None
-    print(f"   Is Looping: {loops.is_looping}")
+    print(f"   [OUTPUT]: Is Looping={loops.is_looping}")
     print(" \033[92m[SUCCESS]\033[0m")
 
     print("\n[Test]: detect_stall")
+    print(f"   [INPUT]: actual={telemetry_data.cycle_duration_ms}, expected={telemetry_data.expected_duration_ms}")
     stall = detect_stall(telemetry_data.cycle_duration_ms, telemetry_data.expected_duration_ms)
-    print(f"   Stall Detected: {stall}")
+    print(f"   [OUTPUT]: Stall Detected={stall}")
     print(" \033[92m[SUCCESS]\033[0m")
 
     print("\n[Test]: detect_oscillation")
+    print(f"   [INPUT]: {len(decisions)} decisions")
     oscillation = detect_oscillation(decisions)
     assert oscillation is not None
-    print(f"   Oscillation Detected: {oscillation.is_oscillating}")
+    print(f"   [OUTPUT]: Oscillation Detected={oscillation.is_oscillating}")
     print(" \033[92m[SUCCESS]\033[0m")
 
     print("\n[Test]: detect_goal_drift")
-    drift = await detect_goal_drift(outputs, objective, kit=None)
+    print(f"   [INPUT]: objective='{objective}', outputs_count={len(outputs)}")
+    drift = await detect_goal_drift(outputs, objective, kit=inference_kit)
     assert drift is not None
-    print(f"   Goal Drift Detected: {drift.is_drifting}")
+    print(f"   [OUTPUT]: Goal Drift Detected={drift.is_drifting}")
     print(" \033[92m[SUCCESS]\033[0m")
 
     print("\n[Test]: recommend_action")
+    print(f"   [INPUT]: load={load.aggregate:.2f}, looping={loops.is_looping}, stall={stall}, oscillation={oscillation.is_oscillating}, drift={drift.is_drifting}")
     recommendation = recommend_action(load, loops, stall, oscillation, drift)
     assert recommendation is not None
     assert isinstance(recommendation.action, LoadAction)
-    print(f"   Recommended Action: {recommendation.action}")
+    print(f"   [OUTPUT]: Recommended Action={recommendation.action}")
     print(" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: monitor_cognitive_load")
+    print(f"   [INPUT]: objective='{objective}'")
     res = await monitor_cognitive_load(activation_map, telemetry_data, decisions, outputs, objective)
     assert res.is_success
+    print(f"   [OUTPUT]: Status={res.status}, Signals count={len(res.signals)}")
     print(f" \033[92m[SUCCESS]\033[0m")
 
 if __name__ == "__main__":

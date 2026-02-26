@@ -33,36 +33,41 @@ from kernel.noise_gate.types import ToolOutput
         "Financial records indicate a 10% growth in revenue but costs remained flat."
     )
 ])
-async def test_hallucination_monitor_comprehensive(source_text, evidence_context):
+async def test_hallucination_monitor_comprehensive(source_text, evidence_context, inference_kit):
     """REAL SIMULATION: Verify Hallucination Monitor Kernel functions with multiple scenarios."""
     print(f"\n--- Testing Hallucination Monitor: Text='{source_text[:30]}...' ---")
 
     evidence = [Origin(origin_id="ev1", content=evidence_context)]
 
     print("\n[Test]: classify_claims")
-    claims_list = await classify_claims(source_text, kit=None)
+    print(f"   [INPUT]: text='{source_text[:30]}...'")
+    claims_list = await classify_claims(source_text, kit=inference_kit)
     assert isinstance(claims_list, list)
-    print(f"   Claims found and classified: {len(claims_list)}")
+    print(f"   [OUTPUT]: Claims found count={len(claims_list)}")
     print(" \033[92m[SUCCESS]\033[0m")
 
     print("\n[Test]: grade_claim")
     grades = []
+    print(f"   [INPUT]: {len(claims_list)} claims, evidence count={len(evidence)}")
     for claim in claims_list:
-        grade = await grade_claim(claim, evidence, kit=None)
+        grade = await grade_claim(claim, evidence, kit=inference_kit)
         grades.append(grade)
-        print(f"     - Claim: {claim.text[:20]}... -> Grade: {grade.grade.value}")
+        print(f"     - [OUTPUT]: Claim='{claim.text[:20]}...' -> Grade={grade.grade.value}")
     print(" \033[92m[SUCCESS]\033[0m")
 
     print("\n[Test]: calculate_grounding_score")
+    print(f"   [INPUT]: {len(grades)} grades")
     score = calculate_grounding_score(grades)
     assert 0.0 <= score <= 1.0
-    print(f"   Overall Score: {score}")
+    print(f"   [OUTPUT]: Overall Grounding Score={score:.2f}")
     print(" \033[92m[SUCCESS]\033[0m")
 
     print("\n[Test]: verify_grounding")
     output = ToolOutput(output_id="test-out", content=source_text)
-    res = await verify_grounding(output, evidence, kit=None)
+    print(f"   [INPUT]: source_text='{source_text[:30]}...'")
+    res = await verify_grounding(output, evidence, kit=inference_kit)
     assert res.is_success
+    print(f"   [OUTPUT]: Status={res.status}, Signals count={len(res.signals)}")
     print(" \033[92m[SUCCESS]\033[0m")
 
 if __name__ == "__main__":

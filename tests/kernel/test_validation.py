@@ -32,36 +32,41 @@ class ValidationMockSchema(BaseModel):
     # Bounds Error ('id' is non-positive)
     ({"id": 0, "tag": "test", "priority": 0.5}, False)
 ])
-async def test_validation_comprehensive(input_data, expected_pass):
+async def test_validation_comprehensive(input_data, expected_pass, inference_kit):
     """REAL SIMULATION: Verify Validation Kernel functions with multiple input scenarios."""
     print(f"\n--- Testing Validation: Data={input_data}, Expected Pass={expected_pass} ---")
 
     print(f"\n[Test]: check_syntax")
+    print(f"   [INPUT]: data={input_data}")
     syntax_res = check_syntax(input_data)
-    print(f"   Syntax Result: {syntax_res.passed}")
+    print(f"   [OUTPUT]: Syntax Result={syntax_res.passed}")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     # Proceed to subsequent gates only if syntax passed
     if syntax_res.passed:
         print(f"\n[Test]: check_structure")
+        print(f"   [INPUT]: data={input_data}")
         struct_res = check_structure(input_data if isinstance(input_data, dict) else {}, ValidationMockSchema)
-        print(f"   Structure Result: {struct_res.passed}")
+        print(f"   [OUTPUT]: Structure Result={struct_res.passed}")
         print(f" \033[92m[SUCCESS]\033[0m")
 
         print(f"\n[Test]: check_types")
+        print(f"   [INPUT]: data={input_data}")
         type_res = check_types(input_data if isinstance(input_data, dict) else {}, ValidationMockSchema)
-        print(f"   Type Result: {type_res.passed}")
+        print(f"   [OUTPUT]: Type Result={type_res.passed}")
         print(f" \033[92m[SUCCESS]\033[0m")
 
         print(f"\n[Test]: check_bounds")
+        print(f"   [INPUT]: data={input_data}")
         bounds_res = check_bounds(input_data if isinstance(input_data, dict) else {}, ValidationMockSchema)
-        print(f"   Bounds Result: {bounds_res.passed}")
+        print(f"   [OUTPUT]: Bounds Result={bounds_res.passed}")
         print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: validate")
-    res = await validate(input_data, ValidationMockSchema, kit=None)
+    print(f"   [INPUT]: data={input_data}, schema='{ValidationMockSchema.__name__}'")
+    res = await validate(input_data, ValidationMockSchema, kit=inference_kit)
     assert res.is_success == expected_pass
-    print(f"   Cascade Final Outcome: {'Passed' if res.is_success else 'Failed'}")
+    print(f"   [OUTPUT]: Cascade Final Outcome={'Passed' if res.is_success else 'Failed'}")
     print(f" \033[92m[SUCCESS]\033[0m")
 
 if __name__ == "__main__":

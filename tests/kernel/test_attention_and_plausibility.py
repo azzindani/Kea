@@ -15,7 +15,7 @@ from kernel.attention_and_plausibility.types import TaskState, ContextElement
     ("kjashdkjashd kjahsdkjahsd", []),
     ("Tell me a joke about robots", ["system just rebooted"])
 ])
-async def test_attention_and_plausibility_comprehensive(raw_input, conversation_history):
+async def test_attention_and_plausibility_comprehensive(raw_input, conversation_history, inference_kit):
     """REAL SIMULATION: Verify Attention & Plausibility Kernel functions with multiple inputs."""
     print(f"\n--- Testing Attention & Plausibility with Input: '{raw_input}' ---")
 
@@ -25,20 +25,24 @@ async def test_attention_and_plausibility_comprehensive(raw_input, conversation_
     )
 
     print("\n[Test]: filter_attention")
+    print(f"   [INPUT]: goal='{raw_input}', context_elements={len(task_state.context_elements)}")
     filtered_state = await filter_attention(task_state)
     assert filtered_state is not None
-    print(f"   Dropped Count: {filtered_state.dropped_count}")
+    print(f"   [OUTPUT]: Dropped Count={filtered_state.dropped_count}")
     print(" \033[92m[SUCCESS]\033[0m")
 
     print("\n[Test]: check_plausibility")
-    plausibility_res = await check_plausibility(filtered_state, kit=None)
+    print(f"   [INPUT]: goal='{filtered_state.goal}'")
+    plausibility_res = await check_plausibility(filtered_state, kit=inference_kit)
     assert hasattr(plausibility_res, 'verdict')
-    print(f"   Verdict: {plausibility_res.verdict}")
+    print(f"   [OUTPUT]: Verdict={plausibility_res.verdict}")
     print(" \033[92m[SUCCESS]\033[0m")
 
     print("\n[Test]: run_cognitive_filters")
-    res = await run_cognitive_filters(task_state, kit=None)
+    print(f"   [INPUT]: goal='{raw_input}'")
+    res = await run_cognitive_filters(task_state, kit=inference_kit)
     assert res.is_success
+    print(f"   [OUTPUT]: Status={res.status}, Signals count={len(res.signals)}")
     print(" \033[92m[SUCCESS]\033[0m")
 
 if __name__ == "__main__":

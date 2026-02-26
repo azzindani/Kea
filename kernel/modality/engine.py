@@ -13,6 +13,7 @@ import os
 import time
 
 from shared.config import get_settings
+from shared.inference_kit import InferenceKit
 from shared.logging.main import get_logger
 from shared.standard_io import (
     Metrics,
@@ -200,13 +201,16 @@ async def parse_vision(image_path: str) -> str:
 # ============================================================================
 
 
-async def embed_text(text: str) -> list[float]:
+async def embed_text(text: str, kit: InferenceKit | None = None) -> list[float]:
     """Generate dense vector embedding from text.
 
-    Delegates to shared.embedding model manager.
+    Uses kit.embedder when available, falls back to global ModelManager.
     """
     try:
-        from shared.embedding import get_model_manager
+        if kit and kit.has_embedder:
+            return await kit.embedder.embed_single(text)
+
+        from shared.embedding.model_manager import get_model_manager
 
         manager = get_model_manager()
         return await manager.embed_single(text)
@@ -220,7 +224,7 @@ async def embed_text(text: str) -> list[float]:
 # ============================================================================
 
 
-async def ingest(input_data: RawInput) -> Result:
+async def ingest(input_data: RawInput, kit: InferenceKit | None = None) -> Result:
     """Top-level modality ingestion orchestrator.
 
     Detects modality, creates file handle passthrough, routes through
@@ -243,25 +247,25 @@ async def ingest(input_data: RawInput) -> Result:
         if modality == ModalityType.TEXT:
             cognitive_context = input_data.content or ""
             if cognitive_context:
-                associative_memory = await embed_text(cognitive_context)
+                associative_memory = await embed_text(cognitive_context, kit)
 
         elif modality == ModalityType.DOCUMENT and input_data.file_path:
             parts = await decompose_document(input_data.file_path)
             cognitive_context = "\n\n".join(parts.text_blocks) if parts.text_blocks else None
             if cognitive_context:
-                associative_memory = await embed_text(cognitive_context)
+                associative_memory = await embed_text(cognitive_context, kit)
 
         elif modality == ModalityType.AUDIO and input_data.file_path:
             transcript = await transcribe_audio(input_data.file_path)
             cognitive_context = transcript
             if transcript:
-                associative_memory = await embed_text(transcript)
+                associative_memory = await embed_text(transcript, kit)
 
         elif modality == ModalityType.IMAGE and input_data.file_path:
             description = await parse_vision(input_data.file_path)
             cognitive_context = description
             if description:
-                associative_memory = await embed_text(description)
+                associative_memory = await embed_text(description, kit)
 
         elif modality == ModalityType.VIDEO and input_data.file_path:
             parts = await decompose_video(input_data.file_path)

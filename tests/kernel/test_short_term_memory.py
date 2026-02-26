@@ -20,6 +20,7 @@ async def test_short_term_memory_comprehensive(event_description, importance_lev
     stm = ShortTermMemory()
 
     print("\n[Test]: push_event")
+    print(f"   [INPUT]: event='{event_description[:30]}...', importance='{importance_level}'")
     from kernel.short_term_memory.types import EventSource
     event = ObservationEvent(
         event_id="evt-test",
@@ -27,40 +28,43 @@ async def test_short_term_memory_comprehensive(event_description, importance_lev
         description=event_description
     )
     stm.push_event(event)
-    assert len(stm.get_recent_events()) > 0
-    print(f"   Event History Count: {len(stm.get_recent_events())}")
+    events = stm.get_recent_events()
+    assert len(events) > 0
+    print(f"   [OUTPUT]: Event History Count={len(events)}")
     print("[SUCCESS]")
 
     print("\n[Test]: cache_entity")
     entity_id = "ent-001"
     entity_val = {"type": "user_pref", "value": "dark_mode"}
+    print(f"   [INPUT]: entity_id='{entity_id}', value='{entity_val['value']}'")
     stm.cache_entity(entity_id, entity_val)
-    # Testing internal cache
-    print(f"   Outcome: Entity '{entity_id}' cached")
+    print(f"   [OUTPUT]: Outcome=Entity '{entity_id}' cached")
     print("[SUCCESS]")
 
     print("\n[Test]: update_dag_state")
     dag_id = "dag-99"
-    # Need to register first
+    print(f"   [INPUT]: dag_id='{dag_id}', status='{NodeExecutionStatus.COMPLETED.value}'")
     stm.register_dag(dag_id, ["node-3"])
     stm.update_dag_state(dag_id, "node-3", NodeExecutionStatus.COMPLETED)
     snapshot = stm.get_dag_snapshot(dag_id)
     assert snapshot.completion_percentage == 100.0
-    print(f"   Outcome: DAG '{dag_id}' updated to COMPLETED")
+    print(f"   [OUTPUT]: Outcome=DAG '{dag_id}' updated to COMPLETED (Progress={snapshot.completion_percentage}%)")
     print("[SUCCESS]")
 
     print("\n[Test]: read_context")
+    print(f"   [INPUT]: stm_size={len(stm.get_recent_events())}")
     oriented_ctx = await stm.read_context()
     assert oriented_ctx is not None
     assert len(oriented_ctx.recent_events) > 0
-    print(f"   Context Sliced: {len(oriented_ctx.recent_events)} events included")
+    print(f"   [OUTPUT]: Context Sliced={len(oriented_ctx.recent_events)} events included")
     print("[SUCCESS]")
 
     print("\n[Test]: flush_to_summarizer")
+    print(f"   [INPUT]: flushing memory")
     summary = stm.flush_to_summarizer()
     assert summary is not None
     assert summary.epoch_id.startswith("epoch_")
-    print(f"   Epoch ID: {summary.epoch_id}")
+    print(f"   [OUTPUT]: Epoch ID={summary.epoch_id}")
     print("[SUCCESS]")
 
 if __name__ == "__main__":

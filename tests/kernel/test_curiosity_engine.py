@@ -17,7 +17,7 @@ from kernel.validation.types import ErrorResponse
     ({}, "Just general exploration"),
     ({"error": "Model version mismatch", "expected": "v2", "got": "v1"}, "Run sentiment analysis on latest tweets")
 ])
-async def test_curiosity_engine_comprehensive(failed_val_data, macro_goal):
+async def test_curiosity_engine_comprehensive(failed_val_data, macro_goal, inference_kit):
     """REAL SIMULATION: Verify Curiosity Engine Kernel functions with multiple scenarios."""
     print(f"\n--- Testing Curiosity Engine: Goal='{macro_goal}', Data={failed_val_data} ---")
 
@@ -26,27 +26,35 @@ async def test_curiosity_engine_comprehensive(failed_val_data, macro_goal):
     error_resp = ErrorResponse(gate=ValidationGate.SYNTAX, message=failed_val_data.get("error", "none"), raw_data=failed_val_data)
 
     print("\n[Test]: detect_missing_variables")
+    print(f"   [INPUT]: goal='{macro_goal}', error='{error_resp.message}'")
     gaps = detect_missing_variables(world_state, error_resp)
     assert isinstance(gaps, list)
-    print(f"   Missing Gaps: {len(gaps)}")
+    print(f"   [OUTPUT]: Missing Gaps count={len(gaps)}")
     print(" \033[92m[SUCCESS]\033[0m")
 
     print("\n[Test]: formulate_questions")
-    questions = await formulate_questions(gaps, kit=None)
+    print(f"   [INPUT]: {len(gaps)} gaps")
+    questions = await formulate_questions(gaps, kit=inference_kit)
     assert isinstance(questions, list)
-    print(f"   Questions Formulated: {len(questions)}")
+    print(f"   [OUTPUT]: Questions Formulated count={len(questions)}")
     print(" \033[92m[SUCCESS]\033[0m")
 
     print("\n[Test]: route_exploration_strategy")
     if questions:
+        print(f"   [INPUT]: {len(questions)} questions")
         tasks = route_exploration_strategy(questions)
         assert len(tasks) == len(questions)
-        print(f"   Route Strategy -> Tasks: {len(tasks)}")
+        print(f"   [OUTPUT]: Route Strategy -> Tasks count={len(tasks)}")
+    else:
+        print(f"   [INPUT]: No questions to route")
+        print(f"   [OUTPUT]: Skipped strategy routing")
     print(" \033[92m[SUCCESS]\033[0m")
 
     print("\n[Test]: explore_gaps")
-    res = await explore_gaps(world_state, error_resp, kit=None)
+    print(f"   [INPUT]: goal='{macro_goal}'")
+    res = await explore_gaps(world_state, error_resp, kit=inference_kit)
     assert res.is_success
+    print(f"   [OUTPUT]: Status={res.status}, Signals count={len(res.signals)}")
     print(" \033[92m[SUCCESS]\033[0m")
 
 if __name__ == "__main__":

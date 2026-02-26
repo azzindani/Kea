@@ -27,35 +27,44 @@ async def test_confidence_calibrator_comprehensive(stated_conf, grounding_score,
     history = CalibrationHistory()
 
     print(f"\n[Test]: get_calibration_curve")
+    print(f"   [INPUT]: domain='{domain}'")
     curve = get_calibration_curve(domain)
     assert curve is not None
     assert curve.domain == domain
+    print(f"   [OUTPUT]: Curve Domain='{curve.domain}'")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: calibrate_confidence")
+    print(f"   [INPUT]: stated={stated_conf}, grounding={grounding_score}")
     calibrated_res = calibrate_confidence(stated_conf, grounding_score, history, domain=domain)
     assert calibrated_res is not None
     assert calibrated_res.calibrated_confidence <= grounding_score
-    print(f"   Calibrated Confidence: {calibrated_res.calibrated_confidence}")
+    print(f"   [OUTPUT]: Calibrated Confidence={calibrated_res.calibrated_confidence:.2f}")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: detect_overconfidence")
+    print(f"   [INPUT]: stated={stated_conf}, calibrated={calibrated_res.calibrated_confidence}")
     overconf = detect_overconfidence(stated_conf, calibrated_res.calibrated_confidence)
-    print(f"   Is Overconfident: {overconf}")
+    print(f"   [OUTPUT]: Is Overconfident={overconf}")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: detect_underconfidence")
+    print(f"   [INPUT]: stated={stated_conf}, calibrated={calibrated_res.calibrated_confidence}")
     underconf = detect_underconfidence(stated_conf, calibrated_res.calibrated_confidence)
-    print(f"   Is Underconfident: {underconf}")
+    print(f"   [OUTPUT]: Is Underconfident={underconf}")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: update_calibration_curve")
+    print(f"   [INPUT]: stated={stated_conf}, grounding={grounding_score}")
     update_calibration_curve(stated_conf, grounding_score, domain=domain)
+    print(f"   [OUTPUT]: Curve updated")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: run_confidence_calibration")
+    print(f"   [INPUT]: stated={stated_conf}, grounding={grounding_score}")
     res = await run_confidence_calibration(stated_conf, grounding_score, history, domain=domain)
     assert res.is_success
+    print(f"   [OUTPUT]: Status={res.status}")
     print(f" \033[92m[SUCCESS]\033[0m")
 
 if __name__ == "__main__":

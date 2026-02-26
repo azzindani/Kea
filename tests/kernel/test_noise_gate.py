@@ -25,8 +25,9 @@ async def test_noise_gate_comprehensive(output_text, grounding_score, calibrated
     print(f"\n--- Testing Noise Gate: Grounding={grounding_score}, Confidence={calibrated_confidence_val} ---")
 
     print(f"\n[Test]: apply_quality_threshold")
+    print(f"   [INPUT]: grounding={grounding_score}, confidence={calibrated_confidence_val}")
     passed_gate = apply_quality_threshold(grounding_score, calibrated_confidence_val)
-    print(f"   Quality Passed: {passed_gate}")
+    print(f"   [OUTPUT]: Quality Passed={passed_gate}")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     output = ToolOutput(output_id="test-out", content=output_text)
@@ -38,27 +39,39 @@ async def test_noise_gate_comprehensive(output_text, grounding_score, calibrated
 
     print(f"\n[Test]: annotate_output")
     if passed_gate:
+        print(f"   [INPUT]: output_text='{output_text[:20]}...'")
         annotated = annotate_output(output, grounding, confidence)
         assert annotated.quality is not None
-        print(f"   Outcome: Output Annotated with metadata")
+        print(f"   [OUTPUT]: Outcome=Output Annotated with metadata")
+    else:
+        print(f"   [INPUT]: Gate failed")
+        print(f"   [OUTPUT]: Skipped annotation")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: generate_rejection_feedback")
     if not passed_gate:
+        print(f"   [INPUT]: grounding={grounding_score}")
         rejected = generate_rejection_feedback(output, grounding, confidence)
         assert rejected.guidance is not None
-        print(f"   Outcome: Rejection feedback generated")
+        print(f"   [OUTPUT]: Outcome=Rejection feedback generated")
+    else:
+        print(f"   [INPUT]: Gate passed")
+        print(f"   [OUTPUT]: Skipped rejection feedback")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: check_retry_budget")
     trace_id = "tr-12345"
+    print(f"   [INPUT]: trace_id='{trace_id}'")
     retry_status = check_retry_budget(trace_id)
     assert retry_status.retries_used >= 1
+    print(f"   [OUTPUT]: Retries used={retry_status.retries_used}")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: filter_output")
+    print(f"   [INPUT]: output_text='{output_text[:20]}...'")
     res = await filter_output(output, grounding, confidence)
     assert res.is_success
+    print(f"   [OUTPUT]: Status={res.status}, Signals count={len(res.signals)}")
     print(" \033[92m[SUCCESS]\033[0m")
 
 if __name__ == "__main__":

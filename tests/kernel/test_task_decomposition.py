@@ -20,7 +20,7 @@ from shared.config import get_settings
     "Initialize the production database, migrate the old schema, and verify the data integrity.",
     ""
 ])
-async def test_task_decomposition_comprehensive(high_level_goal):
+async def test_task_decomposition_comprehensive(high_level_goal, inference_kit):
     """REAL SIMULATION: Verify Task Decomposition Kernel functions with multiple goals."""
     print(f"\n--- Testing Task Decomposition: Goal='{high_level_goal}' ---")
 
@@ -28,30 +28,37 @@ async def test_task_decomposition_comprehensive(high_level_goal):
     intent = IntentLabel(primary=IntentCategory.QUERY, confidence=1.0)
 
     print(f"\n[Test]: analyze_goal_complexity")
+    print(f"   [INPUT]: goal='{high_level_goal}'")
     complexity_assessment = await analyze_goal_complexity(ws, intent, entities=[])
     assert complexity_assessment is not None
-    print(f"   Complexity Level: {complexity_assessment.level}")
+    print(f"   [OUTPUT]: Complexity Level={complexity_assessment.level}")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: split_into_sub_goals")
+    print(f"   [INPUT]: complexity_level={complexity_assessment.level}")
     sub_goals = split_into_sub_goals(complexity_assessment)
     assert isinstance(sub_goals, list)
-    print(f"   Sub-goals generated: {len(sub_goals)}")
+    print(f"   [OUTPUT]: Sub-goals generated={len(sub_goals)}")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: build_dependency_array")
+    print(f"   [INPUT]: {len(sub_goals)} sub-goals")
     dependency_graph = build_dependency_array(sub_goals)
     assert dependency_graph is not None
-    print(f"   Dependency relations mapped")
+    print(f"   [OUTPUT]: Dependency relations mapped (nodes={len(dependency_graph.nodes() if hasattr(dependency_graph, 'nodes') else 'N/A')})")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: map_required_skills")
+    print(f"   [INPUT]: {len(sub_goals)} sub-goals")
     map_required_skills(sub_goals, dependency_graph)
+    print(f"   [OUTPUT]: Skills mapped to nodes")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: decompose_goal")
-    res = await decompose_goal(ws, kit=None)
+    print(f"   [INPUT]: goal='{high_level_goal}'")
+    res = await decompose_goal(ws, kit=inference_kit)
     assert res.is_success
+    print(f"   [OUTPUT]: Status={res.status}, Signals count={len(res.signals)}")
     print(f" \033[92m[SUCCESS]\033[0m")
 
 if __name__ == "__main__":

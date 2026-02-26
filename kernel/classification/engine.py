@@ -126,20 +126,25 @@ _IMPERATIVE_VERBS = frozenset({
 async def run_semantic_proximity(
     text: str,
     profile_rules: ClassProfileRules,
+    kit: InferenceKit | None = None,
 ) -> SemanticResult:
     """Layer B — vector embedding cosine similarity match.
 
     Converts text into a vector embedding and computes cosine similarity
     against pre-indexed intent vectors from the class profile.
+    Uses kit.embedder when available, falls back to global ModelManager.
     """
     if not profile_rules.intent_vectors:
         return SemanticResult(candidates=[], embedding_used=False)
 
     try:
-        from shared.embedding import get_model_manager
+        if kit and kit.has_embedder:
+            text_embedding = await kit.embedder.embed_single(text)
+        else:
+            from shared.embedding.model_manager import get_model_manager
 
-        manager = get_model_manager()
-        text_embedding = await manager.embed_single(text)
+            manager = get_model_manager()
+            text_embedding = await manager.embed_single(text)
 
         candidates: list[LabelScore] = []
         for intent_vec in profile_rules.intent_vectors:
@@ -264,7 +269,7 @@ async def classify(
 
         # Run Layer A (sync) and Layer B (async)
         linguistic = run_linguistic_analysis(text, profile_rules)
-        semantic = await run_semantic_proximity(text, profile_rules)
+        semantic = await run_semantic_proximity(text, profile_rules, kit)
 
         # Merge via Layer C
         result = merge_classification_layers(linguistic, semantic, threshold)

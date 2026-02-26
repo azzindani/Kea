@@ -252,3 +252,48 @@ async def shared_db_pool():
     yield pool
 
     await pool.close()
+
+
+# ============================================================================
+# Inference Kit Fixture
+# ============================================================================
+
+@pytest.fixture(scope="session")
+def inference_kit():
+    """Real InferenceKit with OpenRouter LLM + embedding/reranker.
+
+    If OPENROUTER_API_KEY is unset the LLM slot is None and engines
+    fall back to heuristic logic — tests still pass, they just won't
+    exercise the LLM code paths.
+    """
+    from shared.inference_kit import InferenceKit
+    from shared.llm.provider import LLMConfig
+
+    settings = get_settings()
+
+    # --- LLM Provider ---
+    llm = None
+    llm_config = None
+    try:
+        from shared.llm.openrouter import OpenRouterProvider
+
+        llm = OpenRouterProvider()
+        llm_config = LLMConfig(
+            model=settings.llm.default_model,
+            temperature=settings.llm.temperature,
+            max_tokens=settings.llm.max_tokens,
+        )
+    except (ValueError, Exception):
+        # No API key or import error — LLM unavailable
+        pass
+
+    # --- Embedder (ModelManager facade) ---
+    embedder = None
+    try:
+        from shared.embedding.model_manager import get_model_manager
+
+        embedder = get_model_manager()
+    except Exception:
+        pass
+
+    return InferenceKit(llm=llm, llm_config=llm_config, embedder=embedder)
