@@ -7,7 +7,7 @@ from kernel.hallucination_monitor.engine import (
     verify_grounding
 )
 from kernel.hallucination_monitor.types import Origin
-from kernel.ooda_loop.types import ActionResult as ToolOutput
+from kernel.noise_gate.types import ToolOutput
 
 
 @pytest.mark.asyncio
@@ -60,7 +60,7 @@ async def test_hallucination_monitor_comprehensive(source_text, evidence_context
     print(" \033[92m[SUCCESS]\033[0m")
 
     print("\n[Test]: verify_grounding")
-    output = ToolOutput(node_id="test", outputs={"response": source_text})
+    output = ToolOutput(output_id="test-out", content=source_text)
     res = await verify_grounding(output, evidence, kit=None)
     assert res.is_success
     print(" \033[92m[SUCCESS]\033[0m")

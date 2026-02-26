@@ -21,7 +21,7 @@ async def test_what_if_scenario_comprehensive(action_description, context_data):
     """REAL SIMULATION: Verify What-If Scenario Kernel functions with multiple inputs."""
     print(f"\n--- Testing What-If Scenario: Action='{action_description}' ---")
 
-    ws = WorldState(macro_goal=action_description)
+    ws = WorldState(goal=action_description)
 
     print(f"\n[Test]: generate_outcome_branches")
     branches = await generate_outcome_branches(action_description, ws, kit=None)

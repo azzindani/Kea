@@ -22,7 +22,8 @@ async def test_curiosity_engine_comprehensive(failed_val_data, macro_goal):
     print(f"\n--- Testing Curiosity Engine: Goal='{macro_goal}', Data={failed_val_data} ---")
 
     world_state = WorldState(goal=macro_goal)
-    error_resp = ErrorResponse(gate_name="test", failure_detail=failed_val_data.get("error", "none"), raw_data=failed_val_data)
+    from kernel.validation.types import ValidationGate
+    error_resp = ErrorResponse(gate=ValidationGate.SYNTAX, message=failed_val_data.get("error", "none"), raw_data=failed_val_data)
 
     print("\n[Test]: detect_missing_variables")
     gaps = detect_missing_variables(world_state, error_resp)

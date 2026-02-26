@@ -40,7 +40,8 @@ async def test_self_model_comprehensive(input_signal, target_domain):
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: update_cognitive_state")
-    update_cognitive_state(agent_id="test_agent", processing_phase="idle")
+    from kernel.self_model.types import ProcessingPhase
+    update_cognitive_state(agent_id="test_agent", processing_phase=ProcessingPhase.IDLE)
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: detect_capability_gap")

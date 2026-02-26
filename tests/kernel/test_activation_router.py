@@ -63,7 +63,7 @@ async def test_activation_router_comprehensive(input_text):
     # Ensure it doesn't crash
     activation_map = await compute_activation_map(tags, capability)
     # Extracting map from result signal
-    map_data = activation_map.signals[0].data
+    map_data = activation_map.signals[0].body["data"]
     cache_decision(tags, map_data)
     print(f" \033[92m[SUCCESS]\033[0m")
 

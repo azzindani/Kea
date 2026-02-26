@@ -7,7 +7,7 @@ from kernel.noise_gate.engine import (
     check_retry_budget,
     filter_output
 )
-from kernel.ooda_loop.types import ActionResult as ToolOutput
+from kernel.noise_gate.types import ToolOutput, ToolOutput as NoiseGateOutput
 from kernel.hallucination_monitor.types import GroundingReport
 from kernel.confidence_calibrator.types import CalibratedConfidence
 from shared.config import get_settings
@@ -29,8 +29,8 @@ async def test_noise_gate_comprehensive(output_text, grounding_score, calibrated
     print(f"   Quality Passed: {passed_gate}")
     print(f" \033[92m[SUCCESS]\033[0m")
 
-    output = ToolOutput(node_id="test", outputs={"response": output_text})
-    grounding = GroundingReport(grounding_score=grounding_score, claim_grades=[])
+    output = ToolOutput(output_id="test-out", content=output_text)
+    grounding = GroundingReport(grounding_score=grounding_score, claim_grades=[], output_id="test-out")
     confidence = CalibratedConfidence(
         stated_confidence=calibrated_confidence_val,
         calibrated_confidence=calibrated_confidence_val
@@ -59,7 +59,7 @@ async def test_noise_gate_comprehensive(output_text, grounding_score, calibrated
     print(f"\n[Test]: filter_output")
     res = await filter_output(output, grounding, confidence)
     assert res.is_success
-    print(f" \033[92m[SUCCESS]\033[0m")
+    print(" \033[92m[SUCCESS]\033[0m")
 
 if __name__ == "__main__":
     import sys

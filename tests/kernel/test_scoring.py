@@ -7,7 +7,7 @@ from kernel.scoring.engine import (
     aggregate_scores,
     score
 )
-from kernel.scoring.types import NumericScore, ScoringMetadata, Constraint
+from kernel.scoring.types import ScoringMetadata, Constraint
 
 
 @pytest.mark.asyncio
@@ -39,9 +39,9 @@ async def test_scoring_comprehensive(task_desc):
     print("\n[Test]: aggregate_scores")
     metadata = ScoringMetadata(user_role="admin", task_type="technical")
     final_score = aggregate_scores(semantic=0.8, precision=0.9, reward=1.0, metadata=metadata)
-    assert isinstance(final_score, NumericScore)
-    assert final_score.score > 0.8
-    print(f"   Aggregated Score: {final_score.score:.2f}")
+    assert isinstance(final_score, float)
+    assert final_score > 0.8
+    print(f"   Aggregated Score: {final_score:.2f}")
     print(" \033[92m[SUCCESS]\033[0m")
 
     print("\n[Test]: score")
