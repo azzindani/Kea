@@ -22,7 +22,12 @@ async def test_short_term_memory_comprehensive(event_description, importance_lev
     stm = ShortTermMemory()
 
     print(f"\n[Test]: push_event")
-    event = ObservationEvent(content=event_description, importance=importance_level)
+    from kernel.short_term_memory.types import EventSource
+    event = ObservationEvent(
+        event_id="evt-test",
+        source=EventSource.SYSTEM,
+        description=event_description
+    )
     stm.push_event(event)
     assert len(stm.get_recent_events()) > 0
     print(f"   Event History Count: {len(stm.get_recent_events())}")

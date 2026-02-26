@@ -25,21 +25,23 @@ async def test_location_and_time_comprehensive(input_text):
     """REAL SIMULATION: Verify Location & Time Kernel functions with multiple spatiotemporal inputs."""
     print(f"\n--- Testing Location & Time: Text='{input_text}' ---")
 
+    from datetime import datetime
+    now = datetime.now()
+
     print(f"\n[Test]: extract_temporal_signals")
-    temporal_signals = await extract_temporal_signals(input_text)
+    temporal_signals = extract_temporal_signals(input_text, now)
     assert isinstance(temporal_signals, list)
     print(f"   Temporal Signals found: {len(temporal_signals)}")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: extract_spatial_signals")
-    spatial_signals = await extract_spatial_signals(input_text)
+    spatial_signals = extract_spatial_signals(input_text, None)
     assert isinstance(spatial_signals, list)
     print(f"   Spatial Signals found: {len(spatial_signals)}")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: resolve_temporal_hierarchy")
-    from datetime import datetime
-    temp_range = resolve_temporal_hierarchy(temporal_signals, datetime.now())
+    temp_range = resolve_temporal_hierarchy(temporal_signals, now)
     assert temp_range is not None
     print(f" \033[92m[SUCCESS]\033[0m")
 
@@ -55,7 +57,7 @@ async def test_location_and_time_comprehensive(input_text):
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: anchor_spatiotemporal")
-    res = await anchor_spatiotemporal(input_text, kit=None)
+    res = await anchor_spatiotemporal(input_text, now, kit=None)
     assert res.is_success
     print(f" \033[92m[SUCCESS]\033[0m")
 

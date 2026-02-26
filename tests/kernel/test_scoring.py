@@ -31,7 +31,8 @@ async def test_scoring_comprehensive(task_desc):
     print(" \033[92m[SUCCESS]\033[0m")
 
     print("\n[Test]: evaluate_reward_compliance")
-    reward_score = evaluate_reward_compliance("The fox jumped", [Constraint(id="c1", rule="must contain fox")])
+    from kernel.scoring.types import ConstraintType
+    reward_score = evaluate_reward_compliance("The fox jumped", [Constraint(constraint_type=ConstraintType.CONTAINS, value="fox")])
     assert reward_score == 1.0
     print(" \033[92m[SUCCESS]\033[0m")
 

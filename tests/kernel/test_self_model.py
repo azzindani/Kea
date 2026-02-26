@@ -46,7 +46,7 @@ async def test_self_model_comprehensive(input_signal, target_domain):
     print(f"\n[Test]: detect_capability_gap")
     gap = await detect_capability_gap(tags, identity, kit=None)
     if gap:
-        print(f"   Gap Detected: {gap.missing_knowledge_domains}")
+        print(f"   Gap Detected: {gap.missing_knowledge}")
     else:
         print("   No gap detected")
     print(f" \033[92m[SUCCESS]\033[0m")

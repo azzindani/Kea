@@ -31,9 +31,9 @@ async def test_activation_router_comprehensive(input_text):
         domain="general"
     )
     capability = CapabilityAssessment(
-        verdict=True,
+        can_handle=True,
         confidence=1.0,
-        available_tools=["web_search"]
+        partial_capabilities=["web_search"]
     )
 
     print(f"\n[Test]: classify_signal_complexity")

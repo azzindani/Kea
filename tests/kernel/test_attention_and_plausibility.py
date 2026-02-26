@@ -25,7 +25,7 @@ async def test_attention_and_plausibility_comprehensive(raw_input, conversation_
     )
 
     print("\n[Test]: filter_attention")
-    filtered_state = filter_attention(task_state)
+    filtered_state = await filter_attention(task_state)
     assert filtered_state is not None
     print(f"   Dropped Count: {filtered_state.dropped_count}")
     print(" \033[92m[SUCCESS]\033[0m")

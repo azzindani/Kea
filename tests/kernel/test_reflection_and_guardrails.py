@@ -21,7 +21,7 @@ async def test_reflection_and_guardrails_comprehensive(objective, execution_outp
     """REAL SIMULATION: Verify Reflection & Guardrails Kernel functions with multiple inputs."""
     print(f"\n--- Testing Reflection & Guardrails: Objective='{objective}' ---")
 
-    dag = ExecutableDAG(dag_id="dag-test", nodes=[], edges=[], objective=objective)
+    dag = ExecutableDAG(dag_id="dag-test", nodes=[], edges=[], description=objective)
 
     print(f"\n[Test]: run_pre_execution_check")
     pre_res = await run_pre_execution_check(dag, kit=None)

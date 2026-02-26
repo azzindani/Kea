@@ -25,7 +25,7 @@ async def test_async_multitasking_comprehensive(dag_id, reason, event_name):
     print(f"\n--- Testing Async Multitasking: DAG='{dag_id}' ---")
 
     stm = ShortTermMemory()
-    dag = ExecutableDAG(dag_id=dag_id, nodes=[], edges=[], objective="test")
+    dag = ExecutableDAG(dag_id=dag_id, nodes=[], edges=[], description="test")
     res = ToolOutput(node_id="node_1", outputs={"status": "pending", "job_id": "job_123"})
 
     print(f"\n[Test]: check_async_requirement")

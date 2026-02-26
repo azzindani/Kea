@@ -31,7 +31,10 @@ async def test_noise_gate_comprehensive(output_text, grounding_score, calibrated
 
     output = ToolOutput(node_id="test", outputs={"response": output_text})
     grounding = GroundingReport(grounding_score=grounding_score, claim_grades=[])
-    confidence = CalibratedConfidence(calibrated_confidence=calibrated_confidence_val)
+    confidence = CalibratedConfidence(
+        stated_confidence=calibrated_confidence_val,
+        calibrated_confidence=calibrated_confidence_val
+    )
 
     print(f"\n[Test]: annotate_output")
     if passed_gate:

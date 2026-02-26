@@ -32,7 +32,7 @@ async def test_lifecycle_controller_comprehensive(role, profile_id):
 
     print(f"\n[Test]: initialize_agent")
     identity = await initialize_agent(spawn_req)
-    assert identity.agent_id.startswith("agent")
+    assert identity.agent_id.startswith("agt_")
     assert identity.role == role
     print(f"   Agent ID: {identity.agent_id}")
     print(f" \033[92m[SUCCESS]\033[0m")

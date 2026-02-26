@@ -21,7 +21,7 @@ async def test_curiosity_engine_comprehensive(failed_val_data, macro_goal):
     """REAL SIMULATION: Verify Curiosity Engine Kernel functions with multiple scenarios."""
     print(f"\n--- Testing Curiosity Engine: Goal='{macro_goal}', Data={failed_val_data} ---")
 
-    world_state = WorldState(macro_goal=macro_goal)
+    world_state = WorldState(goal=macro_goal)
     error_resp = ErrorResponse(gate_name="test", failure_detail=failed_val_data.get("error", "none"), raw_data=failed_val_data)
 
     print("\n[Test]: detect_missing_variables")

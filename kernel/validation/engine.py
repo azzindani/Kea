@@ -328,16 +328,19 @@ def _validation_result(ref: ModuleRef, start: float, error_resp: ErrorResponse) 
     """Helper to create a Result from a validation error."""
     elapsed = (time.perf_counter() - start) * 1000
     metrics = Metrics(duration_ms=elapsed, module_ref=ref)
-    signal = create_data_signal(
-        data=error_resp.model_dump(),
-        schema="ErrorResponse",
-        origin=ref,
-        trace_id="",
-        tags={"gate": error_resp.gate.value},
+    
+    # Validation failures are INPUT errors in Standard I/O terms
+    from shared.standard_io import input_error
+    
+    err = input_error(
+        message=f"[{error_resp.gate.value}] {error_resp.message}",
+        source=ref,
+        detail=error_resp.model_dump(),
     )
+    
     log.warning(
         "Validation failed",
         gate=error_resp.gate.value,
         message=error_resp.message,
     )
-    return ok(signals=[signal], metrics=metrics)
+    return fail(error=err, metrics=metrics)

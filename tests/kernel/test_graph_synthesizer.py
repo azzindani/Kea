@@ -52,7 +52,7 @@ async def test_graph_synthesizer_comprehensive(subtasks_list, objective_text):
     print(f"\n[Test]: compile_dag")
     dag = compile_dag(nodes, edges, objective_text)
     assert dag is not None
-    assert dag.objective == objective_text
+    assert dag.description == objective_text
     print(f"   DAG ID: {dag.dag_id}")
     print(f" \033[92m[SUCCESS]\033[0m")
 

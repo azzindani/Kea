@@ -24,8 +24,8 @@ async def test_task_decomposition_comprehensive(high_level_goal):
     """REAL SIMULATION: Verify Task Decomposition Kernel functions with multiple goals."""
     print(f"\n--- Testing Task Decomposition: Goal='{high_level_goal}' ---")
 
-    ws = WorldState(macro_goal=high_level_goal)
-    intent = IntentLabel(category=IntentCategory.QUERY, confidence=1.0)
+    ws = WorldState(goal=high_level_goal)
+    intent = IntentLabel(primary=IntentCategory.QUERY, confidence=1.0)
 
     print(f"\n[Test]: analyze_goal_complexity")
     complexity_assessment = await analyze_goal_complexity(ws, intent, entities=[])

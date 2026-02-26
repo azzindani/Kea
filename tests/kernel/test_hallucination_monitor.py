@@ -48,7 +48,7 @@ async def test_hallucination_monitor_comprehensive(source_text, evidence_context
     print("\n[Test]: grade_claim")
     grades = []
     for claim in claims_list:
-        grade = grade_claim(claim, evidence, kit=None)
+        grade = await grade_claim(claim, evidence, kit=None)
         grades.append(grade)
         print(f"     - Claim: {claim.text[:20]}... -> Grade: {grade.grade.value}")
     print(" \033[92m[SUCCESS]\033[0m")
