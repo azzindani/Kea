@@ -21,10 +21,12 @@ async def test_what_if_scenario_comprehensive(action_description, context_data):
     """REAL SIMULATION: Verify What-If Scenario Kernel functions with multiple inputs."""
     print(f"\n--- Testing What-If Scenario: Action='{action_description}' ---")
 
+    from kernel.what_if_scenario.types import CompiledDAG, SimulationVerdict
+    action = CompiledDAG(description=action_description, nodes=["node_1", "node_2"])
     ws = WorldState(goal=action_description)
 
     print(f"\n[Test]: generate_outcome_branches")
-    branches = await generate_outcome_branches(action_description, ws, kit=None)
+    branches = generate_outcome_branches(action, ws)
     assert isinstance(branches, list)
     assert len(branches) > 0
     print(f"   Simulation Branches generated: {len(branches)}")
@@ -37,14 +39,14 @@ async def test_what_if_scenario_comprehensive(action_description, context_data):
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: calculate_risk_reward")
-    score_ratio = calculate_risk_reward(consequences)
-    assert isinstance(score_ratio, float)
-    assert score_ratio >= 0.0
-    print(f"   Calculated Risk/Reward Ratio: {score_ratio:.2f}")
+    verdict = calculate_risk_reward(consequences)
+    assert isinstance(verdict, SimulationVerdict)
+    assert verdict.risk_score >= 0.0
+    print(f"   Calculated Risk/Reward reasoning: {verdict.reasoning}")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: simulate_outcomes")
-    res = await simulate_outcomes(action_description, ws, kit=None)
+    res = await simulate_outcomes(action, ws, kit=None)
     assert res.is_success
     print(f" \033[92m[SUCCESS]\033[0m")
 

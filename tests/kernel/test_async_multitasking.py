@@ -34,17 +34,17 @@ async def test_async_multitasking_comprehensive(dag_id, reason, event_name):
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: park_dag_state")
-    ticket = park_dag_state(dag, stm, res)
+    ticket = await park_dag_state(dag, stm, res)
     assert ticket.dag_id == dag_id
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: register_wait_listener")
-    register_wait_listener(ticket, res)
+    await register_wait_listener(ticket, res)
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: switch_context")
     queue = DAGQueue()
-    next_dag = switch_context(queue)
+    next_dag = await switch_context(queue)
     # Since queue is empty, next_dag should likely be None or error handled
     print(f" \033[92m[SUCCESS]\033[0m")
 

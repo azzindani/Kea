@@ -59,7 +59,7 @@ async def test_short_term_memory_comprehensive(event_description, importance_lev
     print("\n[Test]: flush_to_summarizer")
     summary = stm.flush_to_summarizer()
     assert summary is not None
-    assert summary.epoch_id.startswith("epoch-")
+    assert summary.epoch_id.startswith("epoch_")
     print(f"   Epoch ID: {summary.epoch_id}")
     print("[SUCCESS]")
 

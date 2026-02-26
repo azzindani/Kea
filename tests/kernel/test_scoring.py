@@ -46,7 +46,8 @@ async def test_scoring_comprehensive(task_desc):
 
     print("\n[Test]: score")
     res = await score("Sample output", "Sample query")
-    assert res.score >= 0.0
+    assert res.is_success
+    assert res.signals[0].body["score"] >= 0.0
     print(" \033[92m[SUCCESS]\033[0m")
 
 if __name__ == "__main__":
