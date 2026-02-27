@@ -59,6 +59,7 @@ from kernel.ooda_loop.types import (
     AgentStatus,
     CycleAction,
     Decision,
+    DecisionAction,
     LoopResult,
     LoopTerminationReason,
     MacroObjective,
@@ -936,10 +937,23 @@ class ConsciousObserver:
                         recent_outputs.append(summary)
 
             # Recover last decision from state snapshot
-            last_decision_action = cycle_result.state_snapshot.get("status", "active")
+            agent_status = cycle_result.state_snapshot.get("status", "active")
+            
+            # Map AgentStatus to DecisionAction for CLM monitoring
+            if agent_status == AgentStatus.ACTIVE:
+                action = DecisionAction.CONTINUE
+            elif agent_status in (AgentStatus.BLOCKED, AgentStatus.PARKED):
+                action = DecisionAction.PARK
+            elif agent_status == AgentStatus.SLEEPING:
+                action = DecisionAction.SLEEP
+            elif agent_status == AgentStatus.TERMINATED:
+                action = DecisionAction.COMPLETE
+            else:
+                action = DecisionAction.CONTINUE
+
             recent_decisions.append(
                 Decision(
-                    action=type("DecisionAction", (), {"value": last_decision_action})(),
+                    action=action,
                     reasoning=f"cycle {cycle_num + 1}",
                 )
             )
