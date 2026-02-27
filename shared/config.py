@@ -628,7 +628,7 @@ class NormalizationSettings(BaseModel):
 
 
 class KernelSettings(BaseModel):
-    """Kernel Tier 1 through Tier 6 processing settings."""
+    """Kernel Tier 1 through Tier 7 processing settings."""
 
     # --- T1: Classification ---
     classification_confidence_threshold: float = 0.80
@@ -820,6 +820,11 @@ class KernelSettings(BaseModel):
     noise_gate_grounding_threshold: float = 0.6
     noise_gate_confidence_threshold: float = 0.5
     noise_gate_max_retries: int = 3
+
+    # --- T7: Conscious Observer (Human Kernel Apex) ---
+    conscious_observer_emergency_max_cycles: int = 3
+    conscious_observer_expected_cycle_ms: float = 2000.0
+    conscious_observer_simplify_max_steps: int = 2
 
 
 class HttpStatusSettings(BaseModel):
