@@ -45,7 +45,7 @@ async def test_task_decomposition_comprehensive(high_level_goal, inference_kit):
     print(f"   [INPUT]: {len(sub_goals)} sub-goals")
     dependency_graph = build_dependency_array(sub_goals)
     assert dependency_graph is not None
-    print(f"   [OUTPUT]: Dependency relations mapped (nodes={len(dependency_graph.nodes() if hasattr(dependency_graph, 'nodes') else 'N/A')})")
+    print(f"   [OUTPUT]: Dependency relations mapped (nodes={len(dependency_graph.nodes if hasattr(dependency_graph, 'nodes') else 'N/A')})")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: map_required_skills")
