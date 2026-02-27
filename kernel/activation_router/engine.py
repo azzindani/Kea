@@ -22,10 +22,11 @@ from shared.inference_kit import InferenceKit
 from shared.knowledge import load_system_knowledge
 from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
-from shared.standard_io.types import Result, Signal, ok, processing_error
 from shared.standard_io import (
     Metrics,
     ModuleRef,
+    Result,
+    Signal,
     create_data_signal,
     fail,
     ok,
