@@ -213,38 +213,7 @@ async def classify_signal_complexity(
         except Exception as e:
             log.warning("Embedding complexity check failed", text=text[:30], error=str(e))
 
-    # 2. LLM SECONDARY (Only if no high-confidence embedding match)
-    if kit and kit.has_llm:
-        try:
-            system_msg = LLMMessage(
-                role="system",
-                content=(
-                    "Classify the complexity of the task (TRIVIAL, SIMPLE, MODERATE, COMPLEX, CRITICAL). "
-                    "Respond EXACTLY with JSON: {\"level\": \"...\", \"reasoning\": \"...\"}"
-                )
-            )
-            context = f"Tags: {signal_tags}"
-            if text:
-                context += f"\nText: {text}"
-            user_msg = LLMMessage(role="user", content=context)
-            resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
-
-            content = resp.content.strip()
-            if content.startswith("```json"):
-                content = content[7:-3].strip()
-            elif content.startswith("```"):
-                content = content[3:-3].strip()
-            data = json.loads(content)
-
-            lvl_str = data.get("level", "SIMPLE")
-            for lvl in ComplexityLevel:
-                if lvl.value == lvl_str.lower():
-                    return lvl
-        except Exception as e:
-            log.warning("LLM complexity classification failed, falling back", error=str(e))
-            pass
-
-    # 3. HEURISTIC FALLBACK (Weighted scoring)
+    # 2. HEURISTIC FALLBACK (Weighted scoring — used if embedding is low confidence)
     urgency_scores = {"low": 0.1, "normal": 0.3, "high": 0.7, "critical": 1.0}
     urgency_score = urgency_scores.get(signal_tags.urgency, 0.3)
 

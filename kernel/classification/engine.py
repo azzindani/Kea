@@ -245,38 +245,39 @@ def merge_classification_layers(
             candidates=[],
         )
 
-    # Apply softmax for probability distribution
-    labels = list(merged.keys())
-    raw_scores = list(merged.values())
-    probabilities = softmax_transform(raw_scores)
-
-    ranked = sorted(
-        [LabelScore(label=label, score=prob) for label, prob in zip(labels, probabilities)],
-        key=lambda x: x.score,
+    # Sort by raw score
+    raw_ranked = sorted(
+        [(label, score) for label, score in merged.items()],
+        key=lambda x: x[1],
         reverse=True,
     )
+    
+    top_label, top_raw_score = raw_ranked[0]
+    second_raw_score = raw_ranked[1][1] if len(raw_ranked) > 1 else 0.0
+    lead_margin = top_raw_score - second_raw_score
 
-    top = ranked[0]
-    second_score = ranked[1].score if len(ranked) > 1 else 0.0
-    lead_margin = top.score - second_score
+    # Apply softmax ONLY for the labels list distribution
+    labels = [r[0] for r in raw_ranked]
+    probabilities = softmax_transform([r[1] for r in raw_ranked])
+    ranked_labels = [LabelScore(label=l, score=p) for l, p in zip(labels, probabilities)]
 
-    # Lead-margin rule: if the top candidate leads significantly, we trust it (Best Match)
-    threshold_met = top.score >= threshold
-    clear_leader = lead_margin >= 0.15  # Leads by 15% probability
+    # Decision Rule: Raw confidence or Clear Lead (Best Match)
+    threshold_met = top_raw_score >= threshold
+    clear_leader = lead_margin >= 0.10  # 10% lead in absolute cosine sim is a lot
 
     if threshold_met or clear_leader:
         return ClassificationResult(
-            labels=ranked,
-            top_label=top.label,
-            confidence=top.score,
+            labels=ranked_labels,
+            top_label=top_label,
+            confidence=top_raw_score,  # Trust the raw similarity
             linguistic_contribution=ling_weight,
             semantic_contribution=sem_weight,
         )
 
     return FallbackTrigger(
-        reason=f"Ambiguity detected: top '{top.label}' leads by only {lead_margin:.3f}",
-        best_guess=top,
-        candidates=ranked,
+        reason=f"Ambiguity: top '{top_label}' ({top_raw_score:.3f}) leads by only {lead_margin:.3f}",
+        best_guess=ranked_labels[0],
+        candidates=ranked_labels,
     )
 
 

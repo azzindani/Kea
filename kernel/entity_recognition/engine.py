@@ -274,45 +274,8 @@ async def extract_entities(
         tokens = tokenize_and_parse(raw_text)
         spans = generate_candidate_spans(tokens)
 
-        validated = None
-        if kit and kit.has_llm:
-            try:
-                schema_json = json.dumps(expected_schema.model_json_schema())
-                system_msg = LLMMessage(
-                    role="system",
-                    content=(
-                        f"Extract entities matching this JSON schema: {schema_json}. "
-                        "Respond EXACTLY with a JSON array of objects: [{\"field_name\": \"...\", \"value\": \"...\", \"original_span\": \"...\"}]"
-                    )
-                )
-                user_msg = LLMMessage(role="user", content=raw_text)
-                resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
-
-                content = resp.content.strip()
-                if content.startswith("```json"):
-                    content = content[7:-3].strip()
-                elif content.startswith("```"):
-                    content = content[3:-3].strip()
-                data = json.loads(content)
-
-                llm_validated = []
-                for item in data:
-                    llm_validated.append(ValidatedEntity(
-                        field_name=item["field_name"],
-                        value=str(item["value"]),
-                        original_span=item.get("original_span", ""),
-                        entity_type="LLM_EXTRACTED",
-                        start=0,
-                        end=0,
-                        confidence=0.95
-                    ))
-                if llm_validated:
-                    validated = llm_validated
-            except Exception as e:
-                log.warning("LLM entity extraction failed", error=str(e))
-
-        if not validated:
-            validated = match_spans_to_schema(spans, expected_schema)
+        # Syntactic + Schema matching path (No LLM)
+        validated = match_spans_to_schema(spans, expected_schema)
 
         elapsed = (time.perf_counter() - start) * 1000
         metrics = Metrics(duration_ms=elapsed, module_ref=ref)
