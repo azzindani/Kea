@@ -167,6 +167,7 @@ async def run_semantic_proximity(
                 try:
                     p_emb = await embedder.embed_single(anchor_text)
                     similarity = _cosine_similarity(text_embedding, p_emb)
+                    log.debug(f"Domain detection: {domain} similarity={similarity:.3f}")
                     if similarity > settings.perception_automatic_threshold:
                         candidates.append(LabelScore(label=domain, score=float(similarity)))
                 except Exception as e:
@@ -306,7 +307,14 @@ async def classify(
                         "{\"category\": \"<best_match>\", \"confidence\": 0.95}"
                     )
                 )
+                
+                # Dynamic options: result candidates OR global domain anchors
                 options = [c.label for c in result.candidates]
+                if not options:
+                    perception_data = load_system_knowledge("core_perception.yaml")
+                    global_anchors = perception_data.get("domain_anchors", {})
+                    options = list(global_anchors.keys())
+
                 user_msg = LLMMessage(role="user", content=f"Text: {text}\nOptions: {options}")
                 resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
 

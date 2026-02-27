@@ -191,6 +191,7 @@ async def classify_signal_complexity(
             for anchor_text, (weight, lvl) in anchors.items():
                 anchor_emb = await embedder.embed_single(anchor_text)
                 sim = np.dot(input_emb, anchor_emb) / (np.linalg.norm(input_emb) * np.linalg.norm(anchor_emb))
+                log.debug(f"Complexity anchor: similarity={sim:.3f} level={lvl.value} text='{anchor_text[:30]}'")
                 if sim > best_sim:
                     best_sim = sim
                     # High confidence match -> Shortcut return

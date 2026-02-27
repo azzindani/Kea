@@ -635,7 +635,7 @@ class KernelSettings(BaseModel):
     classification_linguistic_weight: float = 0.4
     classification_semantic_weight: float = 0.6
     classification_fallback_label: str = "UNCLASSIFIED"
-    perception_automatic_threshold: float = 0.7  # Similarity needed to auto-detect domain
+    perception_automatic_threshold: float = 0.55  # Similarity needed to auto-detect domain
 
     # --- T1: Intent / Sentiment / Urgency ---
     intent_labels: list[str] = [
@@ -789,7 +789,7 @@ class KernelSettings(BaseModel):
     activation_cache_ttl_seconds: int = 30
     activation_pressure_moderate: float = 0.6
     activation_pressure_high: float = 0.8
-    activation_embedding_threshold: float = 0.85 # Similarity needed for fast-path return
+    activation_embedding_threshold: float = 0.75 # Similarity needed for fast-path return
 
     # --- T6: Cognitive Load Monitor ---
     load_compute_weight: float = 0.40
