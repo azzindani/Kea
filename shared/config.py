@@ -746,7 +746,7 @@ class KernelSettings(BaseModel):
     reflection_min_score_gap: float = 0.2
 
     # --- T4: OODA Loop ---
-    ooda_max_cycles: int = 100
+    ooda_max_cycles: int = 10
     ooda_poll_timeout_ms: float = 1000.0
     ooda_tick_interval_ms: float = 50.0
     ooda_blocked_retry_limit: int = 3

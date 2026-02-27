@@ -22,7 +22,9 @@ from shared.llm.provider import (
 
 
 from shared.config import get_settings
-from shared.logging.main import record_llm_request, record_llm_tokens
+from shared.logging.main import record_llm_request, record_llm_tokens, get_logger
+
+log = get_logger(__name__)
 
 # Defaults (Used as fallback if config is missing, but get_settings handles them)
 def _get_default_model() -> str:
@@ -138,6 +140,8 @@ class OpenRouterProvider(LLMProvider):
             body = self._build_request_body(messages, config, stream=False)
             timeout = settings.timeouts.llm_completion
             
+            log.debug("LLM Request", messages=[{"role": m.role, "content": m.content} for m in messages], model=body.get("model"))
+            
             async with httpx.AsyncClient(timeout=timeout) as client:
                 response = await client.post(
                     f"{self.base_url}/chat/completions",
@@ -179,8 +183,11 @@ class OpenRouterProvider(LLMProvider):
         if "reasoning_tokens" in usage_data:
             reasoning_tokens = usage_data["reasoning_tokens"]
         
+        content = message.get("content", "")
+        log.debug("LLM Response", content=content, reasoning=reasoning, model=data.get("model", config.model))
+        
         return LLMResponse(
-            content=message.get("content", ""),
+            content=content,
             reasoning=reasoning,
             model=data.get("model", config.model),
             usage=LLMUsage(
@@ -214,6 +221,9 @@ class OpenRouterProvider(LLMProvider):
             ) as response:
                 response.raise_for_status()
                 
+                full_content = []
+                full_reasoning = []
+                
                 async for line in response.aiter_lines():
                     if not line or not line.startswith("data: "):
                         continue
@@ -228,17 +238,32 @@ class OpenRouterProvider(LLMProvider):
                         choice = data.get("choices", [{}])[0]
                         delta = choice.get("delta", {})
                         
+                        chunk_content = delta.get("content", "")
+                        chunk_reasoning = delta.get("reasoning", "")
+                        
+                        if chunk_content:
+                            full_content.append(chunk_content)
+                        if chunk_reasoning:
+                            full_reasoning.append(chunk_reasoning)
+                            
                         # Check if this is reasoning content
                         is_reasoning = "reasoning" in delta
                         
                         yield LLMStreamChunk(
-                            content=delta.get("content", ""),
-                            reasoning=delta.get("reasoning", ""),
+                            content=chunk_content,
+                            reasoning=chunk_reasoning,
                             is_reasoning=is_reasoning,
                             finish_reason=choice.get("finish_reason"),
                         )
                     except Exception:
                         continue
+                
+                log.debug(
+                    "LLM Stream Finished", 
+                    content="".join(full_content), 
+                    reasoning="".join(full_reasoning),
+                    model=config.model
+                )
     
     async def count_tokens(self, text: str, model: str) -> int:
         """
