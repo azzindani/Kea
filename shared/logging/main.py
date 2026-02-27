@@ -332,3 +332,62 @@ def log_mcp_message(source: str, level: LogLevel, data: Any, logger_name: Option
 
 def success(self, event, **kw): return self._proxy_to_logger("info", event, **{**kw, "level": "success"})
 structlog.stdlib.BoundLogger.success = success
+
+
+# ============================================================================
+# 🤖 LLM Interaction Helpers (Premium Test Mode Visibility)
+# ============================================================================
+
+def log_llm_request(logger: Any, messages: List[Union[Dict[str, Any], Any]], model: str):
+    """
+    Log an LLM request. In TEST_MODE, uses premium multi-line formatting.
+    Otherwise, uses standard structured logging.
+    """
+    if os.getenv("TEST_MODE") != "1":
+        logger.debug("LLM Request", messages=[
+            {"role": m.role.value if hasattr(m.role, "value") else str(m.role), "content": m.content} 
+            if hasattr(m, "role") else m for m in messages
+        ], model=model)
+        return
+
+    # Premium Test Mode View
+    lines = [f"\n[bold blue]LLM Request[/] [cyan]({model})[/]"]
+    lines.append("[dim]" + "-" * 80 + "[/]")
+    for m in messages:
+        role = "unknown"
+        content = ""
+        if hasattr(m, "role") and hasattr(m, "content"):
+            role = m.role.value if hasattr(m.role, "value") else str(m.role)
+            content = m.content
+        elif isinstance(m, dict):
+            role = str(m.get("role", "unknown"))
+            content = str(m.get("content", ""))
+        
+        role_style = "magenta" if role == "system" else "green" if role == "user" else "yellow"
+        # Escape content to prevent rich markup issues
+        escaped_content = str(content).replace("[", "[[").replace("]", "]]")
+        lines.append(f"[{role_style}]{role.upper():<9}[/] [white]{escaped_content}[/]")
+    lines.append("[dim]" + "-" * 80 + "[/]")
+    logger.debug("\n".join(lines))
+
+def log_llm_response(logger: Any, content: str, model: str, reasoning: Optional[str] = None, event_name: str = "LLM Response"):
+    """
+    Log an LLM response. In TEST_MODE, uses premium multi-line formatting.
+    Otherwise, uses standard structured logging.
+    """
+    if os.getenv("TEST_MODE") != "1":
+        logger.debug(event_name, content=content, reasoning=reasoning, model=model)
+        return
+
+    # Premium Test Mode View
+    lines = [f"\n[bold green]{event_name}[/] [cyan]({model})[/]"]
+    lines.append("[dim]" + "-" * 80 + "[/]")
+    # Escape content to prevent rich markup issues
+    escaped_content = str(content).replace("[", "[[").replace("]", "]]")
+    lines.append(escaped_content)
+    if reasoning:
+        lines.append("[dim]" + "-" * 30 + " Reasoning " + "-" * 30 + "[/]")
+        escaped_reasoning = str(reasoning).replace("[", "[[").replace("]", "]]")
+        lines.append(f"[dim]{escaped_reasoning}[/]")
+    lines.append("[dim]" + "-" * 80 + "[/]")
+    logger.debug("\n".join(lines))

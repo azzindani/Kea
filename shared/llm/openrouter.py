@@ -22,7 +22,13 @@ from shared.llm.provider import (
 
 
 from shared.config import get_settings
-from shared.logging.main import record_llm_request, record_llm_tokens, get_logger
+from shared.logging.main import (
+    record_llm_request, 
+    record_llm_tokens, 
+    get_logger,
+    log_llm_request,
+    log_llm_response,
+)
 
 log = get_logger(__name__)
 
@@ -140,7 +146,7 @@ class OpenRouterProvider(LLMProvider):
             body = self._build_request_body(messages, config, stream=False)
             timeout = settings.timeouts.llm_completion
             
-            log.debug("LLM Request", messages=[{"role": m.role, "content": m.content} for m in messages], model=body.get("model"))
+            log_llm_request(log, messages, model=body.get("model", "unknown"))
             
             async with httpx.AsyncClient(timeout=timeout) as client:
                 response = await client.post(
@@ -184,7 +190,7 @@ class OpenRouterProvider(LLMProvider):
             reasoning_tokens = usage_data["reasoning_tokens"]
         
         content = message.get("content", "")
-        log.debug("LLM Response", content=content, reasoning=reasoning, model=data.get("model", config.model))
+        log_llm_response(log, content, model=data.get("model", config.model), reasoning=reasoning)
         
         return LLMResponse(
             content=content,
@@ -258,11 +264,12 @@ class OpenRouterProvider(LLMProvider):
                     except Exception:
                         continue
                 
-                log.debug(
-                    "LLM Stream Finished", 
+                log_llm_response(
+                    log, 
                     content="".join(full_content), 
+                    model=config.model, 
                     reasoning="".join(full_reasoning),
-                    model=config.model
+                    event_name="LLM Stream Finished"
                 )
     
     async def count_tokens(self, text: str, model: str) -> int:
