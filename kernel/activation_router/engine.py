@@ -15,6 +15,7 @@ import hashlib
 import json
 import time
 
+import numpy as np
 from kernel.self_model.types import CapabilityAssessment, SignalTags
 from shared.config import get_settings
 from shared.inference_kit import InferenceKit
@@ -139,7 +140,11 @@ def _build_pipeline_templates() -> dict[ComplexityLevel, PipelineConfig]:
 # ============================================================================
 
 
-async def classify_signal_complexity(signal_tags: SignalTags, kit: InferenceKit | None = None) -> ComplexityLevel:
+async def classify_signal_complexity(
+    signal_tags: SignalTags,
+    text: str | None = None,
+    kit: InferenceKit | None = None,
+) -> ComplexityLevel:
     """Map signal tags into a ComplexityLevel.
 
     Scoring is weighted: urgency 30%, structural complexity 25%,
@@ -156,9 +161,16 @@ async def classify_signal_complexity(signal_tags: SignalTags, kit: InferenceKit 
         try:
             system_msg = LLMMessage(
                 role="system",
-                content="Classify the complexity of the task (TRIVIAL, SIMPLE, MODERATE, COMPLEX, CRITICAL). Respond EXACTLY with JSON: {\"level\": \"MODERATE\"}"
+                content=(
+                    "Classify the complexity of the task (TRIVIAL, SIMPLE, MODERATE, COMPLEX, CRITICAL) "
+                    "based on the provided signal tags and input text. "
+                    "Respond EXACTLY with JSON: {\"level\": \"...\", \"reasoning\": \"...\"}"
+                )
             )
-            user_msg = LLMMessage(role="user", content=f"Tags: {signal_tags}")
+            context = f"Tags: {signal_tags}"
+            if text:
+                context += f"\nText: {text}"
+            user_msg = LLMMessage(role="user", content=context)
             resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
 
             content = resp.content.strip()
@@ -175,6 +187,31 @@ async def classify_signal_complexity(signal_tags: SignalTags, kit: InferenceKit 
         except Exception as e:
             log.warning("LLM complexity classification failed, falling back", error=str(e))
             pass
+
+    # Embedding-based similarity check for "measured" complexity
+    embedding_bonus = 0.0
+    if text and kit and kit.has_embedder:
+        try:
+            # Anchors for complexity spectrum
+            anchors = {
+                "Hello, how are you?": 0.1,                          # Trivial
+                "What is the weather in Tokyo?": 0.3,                # Simple
+                "Draft a professional email for a client meeting.": 0.5, # Moderate
+                "Analyze the impact of interest rates on the housing market.": 0.8, # Complex
+            }
+            input_emb = await kit.embedder.embed(text)
+            
+            best_sim = -1.0
+            for anchor_text, weight in anchors.items():
+                anchor_emb = await kit.embedder.embed(anchor_text)
+                sim = np.dot(input_emb, anchor_emb) / (np.linalg.norm(input_emb) * np.linalg.norm(anchor_emb))
+                if sim > best_sim:
+                    best_sim = sim
+                    # Shift baseline complexity toward the matching anchor
+                    # This makes the scoring more "measured" via semantic similarity
+                    embedding_bonus = (weight - 0.3) * sim 
+        except Exception as e:
+            log.warning("Embedding complexity check failed", error=str(e))
 
     # Score each dimension (0.0 - 1.0)
     urgency_scores = {"low": 0.1, "normal": 0.3, "high": 0.7, "critical": 1.0}
@@ -203,6 +240,7 @@ async def classify_signal_complexity(signal_tags: SignalTags, kit: InferenceKit 
         + settings.activation_structural_weight * structural_score
         + settings.activation_domain_weight * domain_score
         + settings.activation_gap_weight * gap_score
+        + embedding_bonus
     )
 
     # Map aggregate to complexity level
@@ -317,6 +355,7 @@ def cache_decision(
 async def compute_activation_map(
     signal_tags: SignalTags,
     capability: CapabilityAssessment,
+    text: str | None = None,
     pressure: float = 0.0,
     kit: InferenceKit | None = None,
 ) -> Result:
@@ -348,7 +387,7 @@ async def compute_activation_map(
             return ok(signals=[signal], metrics=metrics)
 
         # Classify complexity
-        complexity = await classify_signal_complexity(signal_tags, kit)
+        complexity = await classify_signal_complexity(signal_tags, text, kit)
 
         # Select pipeline with pressure adaptation
         pipeline = select_pipeline(complexity, pressure)
