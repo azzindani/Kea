@@ -177,9 +177,10 @@ async def run_semantic_proximity(
                     
                     p_emb = _ANCHOR_CACHE[anchor_text]
                     similarity = _cosine_similarity(text_embedding, p_emb)
-                    log.debug(f"Domain detection: {domain} similarity={similarity:.3f}")
-                    if similarity > settings.perception_automatic_threshold:
-                        candidates.append(LabelScore(label=domain, score=float(similarity)))
+                    log.debug(f"Domain detection candidate: {domain} similarity={similarity:.3f}")
+                    
+                    # Capture every score for normalized comparison
+                    candidates.append(LabelScore(label=domain, score=float(similarity)))
                 except Exception as e:
                     log.warning("Anchor embedding failed", domain=domain, error=str(e))
 
@@ -256,8 +257,14 @@ def merge_classification_layers(
     )
 
     top = ranked[0]
+    second_score = ranked[1].score if len(ranked) > 1 else 0.0
+    lead_margin = top.score - second_score
 
-    if top.score >= threshold:
+    # Lead-margin rule: if the top candidate leads significantly, we trust it (Best Match)
+    threshold_met = top.score >= threshold
+    clear_leader = lead_margin >= 0.15  # Leads by 15% probability
+
+    if threshold_met or clear_leader:
         return ClassificationResult(
             labels=ranked,
             top_label=top.label,
@@ -267,7 +274,7 @@ def merge_classification_layers(
         )
 
     return FallbackTrigger(
-        reason=f"Top candidate '{top.label}' scored {top.score:.3f}, below threshold {threshold:.3f}",
+        reason=f"Ambiguity detected: top '{top.label}' leads by only {lead_margin:.3f}",
         best_guess=top,
         candidates=ranked,
     )
@@ -305,50 +312,6 @@ async def classify(
 
         # Merge via Layer C
         result = merge_classification_layers(linguistic, semantic, threshold)
-
-        # LLM Tie-breaker if FallbackTrigger
-        if isinstance(result, FallbackTrigger) and kit and kit.has_llm:
-            try:
-                system_msg = LLMMessage(
-                    role="system",
-                    content=(
-                        "You are an expert classifier. Select the best category for the user's text "
-                        "from the provided options. Respond EXACTLY with JSON: "
-                        "{\"category\": \"<best_match>\", \"confidence\": 0.95}"
-                    )
-                )
-                
-                # Dynamic options: result candidates OR global domain anchors
-                options = [c.label for c in result.candidates]
-                if not options:
-                    perception_data = load_system_knowledge("core_perception.yaml")
-                    global_anchors = perception_data.get("domain_anchors", {})
-                    options = list(global_anchors.keys())
-
-                user_msg = LLMMessage(role="user", content=f"Text: {text}\nOptions: {options}")
-                resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
-
-                content = resp.content.strip()
-                if content.startswith("```json"):
-                    content = content[7:-3].strip()
-                elif content.startswith("```"):
-                    content = content[3:-3].strip()
-                data = json.loads(content)
-
-                cat = data.get("category")
-                conf = float(data.get("confidence", 0.8))
-
-                if (not options or cat in options) and conf >= threshold:
-                    result = ClassificationResult(
-                        labels=result.candidates,
-                        top_label=cat,
-                        confidence=conf,
-                        linguistic_contribution=0.0,
-                        semantic_contribution=0.0,
-                    )
-            except Exception as e:
-                log.warning("LLM fallback classification failed", error=str(e))
-                pass
 
         elapsed = (time.perf_counter() - start) * 1000
         metrics = Metrics(duration_ms=elapsed, module_ref=ref)

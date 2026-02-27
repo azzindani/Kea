@@ -130,9 +130,13 @@ def detect_intent(text: str) -> IntentLabel:
     )
 
 async def detect_intent_async(text: str, kit: InferenceKit | None = None) -> IntentLabel:
-    """Async intent detector with embedding-first resilience."""
+    """Async intent detector — strict Lexical + Semantic only (No LLM)."""
     label = detect_intent(text)
     
+    # If lexical is high confidence, return immediately
+    if label.confidence >= 0.8:
+        return label
+
     # Resolve best available embedder
     embedder = None
     if kit and kit.has_embedder:
@@ -144,8 +148,8 @@ async def detect_intent_async(text: str, kit: InferenceKit | None = None) -> Int
         except:
             embedder = None
 
-    # Layer B: Embedding Proximity (if lexical confidence is low)
-    if embedder and label.confidence < 0.6:
+    # Layer B: Embedding Proximity (Best Match)
+    if embedder:
         try:
             text_emb = await embedder.embed_single(text)
             perception_data = load_system_knowledge("core_perception.yaml")
@@ -165,41 +169,13 @@ async def detect_intent_async(text: str, kit: InferenceKit | None = None) -> Int
                     best_sim = sim
                     best_cat = IntentCategory(cat_name.upper())
             
-            # If embedding is strong, override lexical
-            settings = get_settings().kernel
-            if best_sim > settings.perception_primitive_threshold:
-                label.primary = best_cat
-                label.confidence = float(best_sim)
-                log.debug(f"Intent determined via embedding intent={best_cat.value} similarity={round(best_sim, 3)}")
+            # Commit to Best Match
+            label.primary = best_cat
+            label.confidence = float(best_sim)
+            log.debug(f"Intent determined via semantic best-match intent={best_cat.value} similarity={round(best_sim, 3)}")
         except Exception as e:
             log.warning("Embedding intent check failed", error=str(e))
 
-    # Layer C: LLM Fallback (Only if still extremely uncertain)
-    if kit and kit.has_llm and label.confidence < 0.6:
-        try:
-            system_msg = LLMMessage(
-                role="system",
-                content=(
-                    "Classify intent. Options: CREATE, DELETE, QUERY, UPDATE, NAVIGATE, CONFIGURE, ANALYZE, COMMUNICATE, UNKNOWN. "
-                    "Respond exactly with JSON: {\"intent\": \"...\", \"confidence\": 0.95}"
-                )
-            )
-            user_msg = LLMMessage(role="user", content=text)
-            resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
-
-            content = resp.content.strip()
-            if content.startswith("```json"):
-                content = content[7:-3].strip()
-            elif content.startswith("```"):
-                content = content[3:-3].strip()
-            data = json.loads(content)
-
-            intent_val = data.get("intent", "UNKNOWN").upper()
-            if intent_val in [c.value for c in IntentCategory]:
-                label.primary = IntentCategory(intent_val)
-                label.confidence = float(data.get("confidence", label.confidence))
-        except Exception as e:
-            log.warning("LLM intent fallback failed", error=str(e))
     return label
 
 
@@ -271,7 +247,7 @@ def analyze_sentiment(text: str) -> SentimentLabel:
     )
 
 async def analyze_sentiment_async(text: str, kit: InferenceKit | None = None) -> SentimentLabel:
-    """Async sentiment analyzer with embedding-first resilience."""
+    """Async sentiment analyzer — strict Lexical + Semantic only (No LLM)."""
     label = analyze_sentiment(text)
     
     # Resolve best available embedder
@@ -285,9 +261,8 @@ async def analyze_sentiment_async(text: str, kit: InferenceKit | None = None) ->
         except:
             embedder = None
 
-    # Layer B: Embedding Proximity (if lexical confidence is low)
-    # Intensity (label.score) < 0.3 means neutral or no keywords found
-    if embedder and (label.score < 0.3 or label.primary == SentimentCategory.NEUTRAL):
+    # Layer B: Embedding Proximity (Best Match)
+    if embedder:
         try:
             text_emb = await embedder.embed_single(text)
             perception_data = load_system_knowledge("core_perception.yaml")
@@ -307,45 +282,20 @@ async def analyze_sentiment_async(text: str, kit: InferenceKit | None = None) ->
                     best_sim = sim
                     best_cat = SentimentCategory(cat_name.upper())
             
-            # If embedding is strong, override lexical
-            settings = get_settings().kernel
-            if best_sim > settings.perception_primitive_threshold:
-                label.primary = best_cat
-                label.score = float(best_sim)
-                # Map similarity to valence approximation
-                if best_cat == SentimentCategory.POSITIVE: label.valence = float(best_sim)
-                elif best_cat == SentimentCategory.NEGATIVE: label.valence = -float(best_sim)
-                elif best_cat == SentimentCategory.FRUSTRATED: label.valence = -float(best_sim * 1.2)
-                else: label.valence = 0.0
-                
-                log.debug(f"Sentiment determined via embedding category={best_cat.value} similarity={round(best_sim, 3)}")
+            # Commit to Best Match
+            label.primary = best_cat
+            label.score = float(best_sim)
+            
+            # Map similarity to valence approximation
+            if best_cat == SentimentCategory.POSITIVE: label.valence = float(best_sim)
+            elif best_cat == SentimentCategory.NEGATIVE: label.valence = -float(best_sim)
+            elif best_cat == SentimentCategory.FRUSTRATED: label.valence = -float(best_sim * 1.2)
+            else: label.valence = 0.0
+            
+            log.debug(f"Sentiment determined via semantic best-match category={best_cat.value} similarity={round(best_sim, 3)}")
         except Exception as e:
             log.warning("Embedding sentiment check failed", error=str(e))
 
-    # Layer C: LLM Fallback (Only if still extremely uncertain)
-    if kit and kit.has_llm and label.score < 0.4:
-        try:
-            system_msg = LLMMessage(
-                role="system",
-                content="Analyze sentiment. Respond EXACTLY in JSON: {\"primary\": \"POSITIVE|NEGATIVE|NEUTRAL|FRUSTRATED\", \"score\": 0.0-1.0, \"valence\": -1.0-1.0}"
-            )
-            user_msg = LLMMessage(role="user", content=text)
-            resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
-
-            content = resp.content.strip()
-            if content.startswith("```json"):
-                content = content[7:-3].strip()
-            elif content.startswith("```"):
-                content = content[3:-3].strip()
-            data = json.loads(content)
-
-            primary_val = data.get("primary", "NEUTRAL").upper()
-            if primary_val in [c.value for c in SentimentCategory]:
-                label.primary = SentimentCategory(primary_val)
-                label.score = float(data.get("score", label.score))
-                label.valence = float(data.get("valence", label.valence))
-        except Exception as e:
-            log.warning("LLM sentiment fallback failed", error=str(e))
     return label
 
 
@@ -410,7 +360,7 @@ def score_urgency(text: str) -> UrgencyLabel:
     )
 
 async def score_urgency_async(text: str, kit: InferenceKit | None = None) -> UrgencyLabel:
-    """Async urgency scorer with embedding-first resilience."""
+    """Async urgency scorer — strict Lexical + Semantic only (No LLM)."""
     label = score_urgency(text)
     
     # Resolve best available embedder
@@ -424,8 +374,8 @@ async def score_urgency_async(text: str, kit: InferenceKit | None = None) -> Urg
         except:
             embedder = None
 
-    # Layer B: Embedding Proximity (if lexical urgency is low/neutral)
-    if embedder and label.score < 0.4:
+    # Layer B: Embedding Proximity (Best Match)
+    if embedder:
         try:
             text_emb = await embedder.embed_single(text)
             perception_data = load_system_knowledge("core_perception.yaml")
@@ -445,40 +395,13 @@ async def score_urgency_async(text: str, kit: InferenceKit | None = None) -> Urg
                     best_sim = sim
                     best_band = UrgencyBand(band_name.upper())
             
-            # If embedding is strong, override lexical
-            settings = get_settings().kernel
-            if best_sim > settings.perception_primitive_threshold:
-                label.band = best_band
-                label.score = float(best_sim)
-                log.debug(f"Urgency determined via embedding band={best_band.value} similarity={round(best_sim, 3)}")
+            # Commit to Best Match
+            label.band = best_band
+            label.score = float(best_sim)
+            log.debug(f"Urgency determined via semantic best-match band={best_band.value} similarity={round(best_sim, 3)}")
         except Exception as e:
             log.warning("Embedding urgency check failed", error=str(e))
 
-    # Layer C: LLM Fallback (Only if still extremely uncertain)
-    if kit and kit.has_llm and label.score < 0.4:
-        try:
-            system_msg = LLMMessage(
-                role="system",
-                content="Evaluate urgency on a 0.0 to 1.0 scale. Respond EXACTLY with JSON: {\"score\": 0.0-1.0}"
-            )
-            user_msg = LLMMessage(role="user", content=text)
-            resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
-
-            content = resp.content.strip()
-            if content.startswith("```json"):
-                content = content[7:-3].strip()
-            elif content.startswith("```"):
-                content = content[3:-3].strip()
-            data = json.loads(content)
-
-            score = float(data.get("score", label.score))
-            label.score = score
-            if score >= 0.8: label.band = UrgencyBand.CRITICAL
-            elif score >= 0.5: label.band = UrgencyBand.HIGH
-            elif score <= 0.2: label.band = UrgencyBand.LOW
-            else: label.band = UrgencyBand.NORMAL
-        except Exception as e:
-            log.warning("LLM urgency fallback failed", error=str(e))
     return label
 
 
