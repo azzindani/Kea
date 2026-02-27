@@ -114,25 +114,25 @@ def _ref(fn: str) -> ModuleRef:
 def _extract_modality_output(result: Result) -> ModalityOutput:
     if result.error or not result.signals:
         raise RuntimeError(f"ingest failed: {result.error}")
-    return ModalityOutput(**result.signals[0].data)
+    return ModalityOutput(**result.signals[0].body["data"])
 
 
 def _extract_classification(result: Result) -> ClassificationResult:
     if result.error or not result.signals:
         raise RuntimeError(f"classify failed: {result.error}")
-    return ClassificationResult(**result.signals[0].data)
+    return ClassificationResult(**result.signals[0].body["data"])
 
 
 def _extract_cognitive_labels(result: Result) -> CognitiveLabels:
     if result.error or not result.signals:
         raise RuntimeError(f"run_primitive_scorers failed: {result.error}")
-    return CognitiveLabels(**result.signals[0].data)
+    return CognitiveLabels(**result.signals[0].body["data"])
 
 
 def _extract_entities(result: Result) -> list[ValidatedEntity]:
     if result.error or not result.signals:
         return []
-    raw = result.signals[0].data
+    raw = result.signals[0].body["data"]
     items = raw if isinstance(raw, list) else raw.get("entities", [])
     return [ValidatedEntity(**e) if isinstance(e, dict) else e for e in items]
 
@@ -140,31 +140,31 @@ def _extract_entities(result: Result) -> list[ValidatedEntity]:
 def _extract_activation_map(result: Result) -> ActivationMap:
     if result.error or not result.signals:
         raise RuntimeError(f"compute_activation_map failed: {result.error}")
-    return ActivationMap(**result.signals[0].data)
+    return ActivationMap(**result.signals[0].body["data"])
 
 
 def _extract_load_recommendation(result: Result) -> LoadRecommendation:
     if result.error or not result.signals:
         raise RuntimeError(f"monitor_cognitive_load failed: {result.error}")
-    return LoadRecommendation(**result.signals[0].data)
+    return LoadRecommendation(**result.signals[0].body["data"])
 
 
 def _extract_grounding_report(result: Result) -> GroundingReport:
     if result.error or not result.signals:
         raise RuntimeError(f"verify_grounding failed: {result.error}")
-    return GroundingReport(**result.signals[0].data)
+    return GroundingReport(**result.signals[0].body["data"])
 
 
 def _extract_calibrated_confidence(result: Result) -> CalibratedConfidence:
     if result.error or not result.signals:
         raise RuntimeError(f"run_confidence_calibration failed: {result.error}")
-    return CalibratedConfidence(**result.signals[0].data)
+    return CalibratedConfidence(**result.signals[0].body["data"])
 
 
 def _extract_filter_result(result: Result) -> FilteredOutput | RejectedOutput:
     if result.error or not result.signals:
         raise RuntimeError(f"filter_output failed: {result.error}")
-    data = result.signals[0].data
+    data = result.signals[0].body["data"]
     if data.get("passed", True):
         return FilteredOutput(**data)
     return RejectedOutput(**data)
@@ -173,7 +173,7 @@ def _extract_filter_result(result: Result) -> FilteredOutput | RejectedOutput:
 def _extract_subtasks(result: Result) -> list[SubTaskItem]:
     if result.error or not result.signals:
         return []
-    raw = result.signals[0].data
+    raw = result.signals[0].body["data"]
     items = raw if isinstance(raw, list) else raw.get("subtasks", [])
     return [SubTaskItem(**s) if isinstance(s, dict) else s for s in items]
 
@@ -181,7 +181,7 @@ def _extract_subtasks(result: Result) -> list[SubTaskItem]:
 def _extract_dag(result: Result) -> ExecutableDAG | None:
     if result.error or not result.signals:
         return None
-    return ExecutableDAG(**result.signals[0].data)
+    return ExecutableDAG(**result.signals[0].body["data"])
 
 
 # ============================================================================
