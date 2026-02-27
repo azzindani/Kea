@@ -573,8 +573,8 @@ class ConsciousObserver:
 
         # Track gate-in phase in self-model
         update_cognitive_state(
-            phase=ProcessingPhase.PRE_EXECUTION,
-            task_description=spawn_request.objective,
+            processing_phase=ProcessingPhase.PRE_EXECUTION,
+            current_task_description=spawn_request.objective,
         )
 
         # 4. T1: Ingest (any modality)
@@ -660,8 +660,8 @@ class ConsciousObserver:
     ) -> ObserverExecuteResult:
         """Dispatch to the correct pipeline branch based on ProcessingMode."""
         update_cognitive_state(
-            phase=ProcessingPhase.DURING_EXECUTION,
-            task_description=spawn_request.objective,
+            processing_phase=ProcessingPhase.DURING_EXECUTION,
+            current_task_description=spawn_request.objective,
         )
 
         if gate.mode == ProcessingMode.FAST:
@@ -1076,7 +1076,7 @@ class ConsciousObserver:
             3. T6 Confidence Calibrator — align confidence with accuracy history
             4. T6 Noise Gate — pass or reject; retry if budget allows
         """
-        update_cognitive_state(phase=ProcessingPhase.POST_EXECUTION)
+        update_cognitive_state(processing_phase=ProcessingPhase.POST_EXECUTION)
 
         settings = get_settings().kernel
         quality_bar = gate.identity_context.quality_bar
