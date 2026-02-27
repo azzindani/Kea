@@ -43,7 +43,7 @@ async def test_conscious_observer_comprehensive(objective, expected_mode, infere
     
     # Assertions
     assert result.is_success
-    obs_result = result.signals[0].data
+    obs_result = result.signals[0].body["data"]
     
     print(f"   [OUTPUT]: AgentID={obs_result['agent_id']}")
     print(f"   [OUTPUT]: Mode={obs_result['mode']}")
@@ -65,7 +65,7 @@ async def test_run_conscious_observer_shortcut(inference_kit):
     
     result = await run_conscious_observer(raw_input, spawn_request, kit=inference_kit)
     assert result.is_success
-    assert result.signals[0].data["final_phase"] == ObserverPhase.GATE_OUT
+    assert result.signals[0].body["data"]["final_phase"] == ObserverPhase.GATE_OUT
 
 if __name__ == "__main__":
     import sys
