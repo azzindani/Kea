@@ -382,7 +382,7 @@ async def anchor_spatiotemporal(
     into a rigid SpatiotemporalBlock for Tier 2 consumption.
     """
     ref = _ref("anchor_spatiotemporal")
-    start = time.perf_counter()
+    start_perf = time.perf_counter()
 
     try:
         # Step 1: Extract signals
@@ -447,7 +447,7 @@ async def anchor_spatiotemporal(
         # Step 5: Fusion
         block = fuse_spatiotemporal(temporal, spatial)
 
-        elapsed = (time.perf_counter() - start) * 1000
+        elapsed = (time.perf_counter() - start_perf) * 1000
         metrics = Metrics(duration_ms=elapsed, module_ref=ref)
 
         signal = create_data_signal(
@@ -473,7 +473,7 @@ async def anchor_spatiotemporal(
         return ok(signals=[signal], metrics=metrics)
 
     except Exception as exc:
-        elapsed = (time.perf_counter() - start) * 1000
+        elapsed = (time.perf_counter() - start_perf) * 1000
         metrics = Metrics(duration_ms=elapsed, module_ref=ref)
         error = processing_error(
             message=f"Spatiotemporal anchoring failed: {exc}",
