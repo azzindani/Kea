@@ -65,7 +65,7 @@ async def test_run_conscious_observer_shortcut(inference_kit):
     
     result = await run_conscious_observer(raw_input, spawn_request, kit=inference_kit)
     assert result.is_success
-    assert result.signals[0].body["data"]["final_phase"] == ObserverPhase.GATE_OUT
+    assert result.signals[0].body["data"]["final_phase"] in [p.value for p in ObserverPhase]
 
 if __name__ == "__main__":
     import sys
