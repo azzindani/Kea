@@ -5,6 +5,7 @@ Provides a standardized logger with consistent symbols, coloring, flag support, 
 Fully compliant with MCP JSON-RPC 2.0 and RFC 5424 severity levels.
 """
 
+import json
 import logging
 import os
 import sys
@@ -338,56 +339,80 @@ structlog.stdlib.BoundLogger.success = success
 # 🤖 LLM Interaction Helpers (Premium Test Mode Visibility)
 # ============================================================================
 
+def _get_rich_console():
+    """Get a shared rich console for test rendering."""
+    try:
+        from rich.console import Console
+        return Console(theme=_get_rich_theme(), stderr=True)
+    except ImportError:
+        return None
+
 def log_llm_request(logger: Any, messages: List[Union[Dict[str, Any], Any]], model: str):
     """
-    Log an LLM request. In TEST_MODE, uses premium multi-line formatting.
+    Log an LLM request. In TEST_MODE, uses premium multi-line formatting via direct console print.
     Otherwise, uses standard structured logging.
     """
-    if os.getenv("TEST_MODE") != "1":
-        logger.debug("LLM Request", messages=[
-            {"role": m.role.value if hasattr(m.role, "value") else str(m.role), "content": m.content} 
-            if hasattr(m, "role") else m for m in messages
-        ], model=model)
-        return
+    # Always log the structured data for telemetry
+    logger.debug("LLM Request", messages=[
+        {"role": m.role.value if hasattr(m.role, "value") else str(m.role), "content": m.content} 
+        if hasattr(m, "role") else m for m in messages
+    ], model=model)
 
-    # Premium Test Mode View
-    lines = [f"\n[bold blue]LLM Request[/] [cyan]({model})[/]"]
-    lines.append("[dim]" + "-" * 80 + "[/]")
-    for m in messages:
-        role = "unknown"
-        content = ""
-        if hasattr(m, "role") and hasattr(m, "content"):
-            role = m.role.value if hasattr(m.role, "value") else str(m.role)
-            content = m.content
-        elif isinstance(m, dict):
-            role = str(m.get("role", "unknown"))
-            content = str(m.get("content", ""))
-        
-        role_style = "magenta" if role == "system" else "green" if role == "user" else "yellow"
-        # Escape content to prevent rich markup issues
-        escaped_content = str(content).replace("[", "[[").replace("]", "]]")
-        lines.append(f"[{role_style}]{role.upper():<9}[/] [white]{escaped_content}[/]")
-    lines.append("[dim]" + "-" * 80 + "[/]")
-    logger.debug("\n".join(lines))
+    if os.getenv("TEST_MODE") == "1":
+        console = _get_rich_console()
+        if not console: return
+
+        # Premium Test Mode View
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        lines = [f"\n[log.timestamp]{timestamp}[/] [bold blue]LLM Request[/] [cyan]({model})[/]"]
+        lines.append("[dim]" + "-" * 88 + "[/]")
+        for m in messages:
+            role = "unknown"
+            content = ""
+            if hasattr(m, "role") and hasattr(m, "content"):
+                role = m.role.value if hasattr(m.role, "value") else str(m.role)
+                content = m.content
+            elif isinstance(m, dict):
+                role = str(m.get("role", "unknown"))
+                content = str(m.get("content", ""))
+            
+            role_style = "magenta" if role == "system" else "green" if role == "user" else "yellow"
+            # Escape content to prevent rich markup issues
+            escaped_content = str(content).replace("[", "[[").replace("]", "]]")
+            lines.append(f"[{role_style}]{role.upper():<9}[/] [white]{escaped_content}[/]")
+        lines.append("[dim]" + "-" * 88 + "[/]")
+        console.print("\n".join(lines))
 
 def log_llm_response(logger: Any, content: str, model: str, reasoning: Optional[str] = None, event_name: str = "LLM Response"):
     """
-    Log an LLM response. In TEST_MODE, uses premium multi-line formatting.
+    Log an LLM response. In TEST_MODE, uses premium multi-line formatting via direct console print.
     Otherwise, uses standard structured logging.
     """
-    if os.getenv("TEST_MODE") != "1":
-        logger.debug(event_name, content=content, reasoning=reasoning, model=model)
-        return
+    # Always log the structured data for telemetry
+    logger.debug(event_name, content=content, reasoning=reasoning, model=model)
 
-    # Premium Test Mode View
-    lines = [f"\n[bold green]{event_name}[/] [cyan]({model})[/]"]
-    lines.append("[dim]" + "-" * 80 + "[/]")
-    # Escape content to prevent rich markup issues
-    escaped_content = str(content).replace("[", "[[").replace("]", "]]")
-    lines.append(escaped_content)
-    if reasoning:
-        lines.append("[dim]" + "-" * 30 + " Reasoning " + "-" * 30 + "[/]")
-        escaped_reasoning = str(reasoning).replace("[", "[[").replace("]", "]]")
-        lines.append(f"[dim]{escaped_reasoning}[/]")
-    lines.append("[dim]" + "-" * 80 + "[/]")
-    logger.debug("\n".join(lines))
+    if os.getenv("TEST_MODE") == "1":
+        console = _get_rich_console()
+        if not console: return
+
+        # Premium Test Mode View
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        lines = [f"\n[log.timestamp]{timestamp}[/] [bold green]{event_name}[/] [cyan]({model})[/]"]
+        lines.append("[dim]" + "-" * 88 + "[/]")
+        
+        # Attempt to pretty-print JSON if possible
+        display_content = str(content)
+        try:
+            if display_content.strip().startswith(("{", "[")):
+                parsed = json.loads(display_content)
+                display_content = json.dumps(parsed, indent=2)
+        except Exception:
+            pass
+
+        # Escape content to prevent rich markup issues
+        escaped_content = display_content.replace("[", "[[").replace("]", "]]")
+        lines.append(escaped_content)
+        if reasoning:
+            lines.append(f"\n[dim][bold]Reasoning:[/][/] [dim]{str(reasoning).replace('[', '[[').replace(']', ']]')}[/]")
+        lines.append("[dim]" + "-" * 88 + "[/]")
+        console.print("\n".join(lines))
