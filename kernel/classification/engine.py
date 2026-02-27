@@ -137,13 +137,16 @@ async def run_semantic_proximity(
     If no intent vectors are provided, it performs 'Automatic Domain Detection'
     using global embedding anchors.
     """
+    # Resolve best available embedder
+    embedder = None
+    if kit and kit.has_embedder:
+        embedder = kit.embedder
+    else:
+        from shared.embedding.model_manager import get_model_manager
+        embedder = get_model_manager()
+
     try:
-        if kit and kit.has_embedder:
-            text_embedding = await kit.embedder.embed_single(text)
-        else:
-            from shared.embedding.model_manager import get_model_manager
-            manager = get_model_manager()
-            text_embedding = await manager.embed_single(text)
+        text_embedding = await embedder.embed_single(text)
 
         candidates: list[LabelScore] = []
 
@@ -162,11 +165,10 @@ async def run_semantic_proximity(
             
             for domain, anchor_text in global_anchors.items():
                 try:
-                    p_emb = await kit.embedder.embed_single(anchor_text) if kit and kit.has_embedder else text_embedding
-                    if kit and kit.has_embedder:
-                        similarity = _cosine_similarity(text_embedding, p_emb)
-                        if similarity > settings.perception_automatic_threshold:
-                            candidates.append(LabelScore(label=domain, score=float(similarity)))
+                    p_emb = await embedder.embed_single(anchor_text)
+                    similarity = _cosine_similarity(text_embedding, p_emb)
+                    if similarity > settings.perception_automatic_threshold:
+                        candidates.append(LabelScore(label=domain, score=float(similarity)))
                 except Exception as e:
                     log.warning("Anchor embedding failed", domain=domain, error=str(e))
 
