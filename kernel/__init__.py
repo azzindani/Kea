@@ -55,6 +55,11 @@ Tier 6 — Conscious Observer (Metacognitive Oversight):
     confidence_calibrator/      Domain-specific calibration curves, overconfidence detection
     noise_gate/                 Final quality checkpoint, rejection with retry guidance
 
+Tier 7 — Human Kernel Apex:
+    conscious_observer/         The sole top-level entry point. Orchestrates Tier 1–6 across
+                                three phases (Gate-In, Execute, Gate-Out), with CLM intercept
+                                after every OODA cycle. Mimics end-to-end human cognition.
+
 Integration Protocol:
     - All functions accept Signal(s) and return Result
     - All errors are KernelError (first-class data, not exceptions)
@@ -311,6 +316,19 @@ from kernel.scoring import (
     Constraint,
     NumericScore,
     score,
+)
+
+# ============================================================================
+# Tier 7: Human Kernel Apex (Conscious Observer Orchestrator)
+# ============================================================================
+from kernel.conscious_observer import (
+    ConsciousObserver,
+    ConsciousObserverResult,
+    GateInResult,
+    ObserverExecuteResult,
+    ObserverPhase,
+    ProcessingMode,
+    run_conscious_observer,
 )
 
 # ============================================================================
@@ -614,4 +632,13 @@ __all__ = [
     "RejectionDimension",
     "RetryGuidance",
     "RetryBudgetStatus",
+    # --- Tier 7: Human Kernel Apex ---
+    # Conscious Observer
+    "ConsciousObserver",
+    "run_conscious_observer",
+    "ConsciousObserverResult",
+    "GateInResult",
+    "ObserverExecuteResult",
+    "ObserverPhase",
+    "ProcessingMode",
 ]
