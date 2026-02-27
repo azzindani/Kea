@@ -124,6 +124,10 @@ _IMPERATIVE_VERBS = frozenset({
 # ============================================================================
 
 
+# Global cache to prevent redundant anchor embeddings
+_ANCHOR_CACHE: dict[str, list[float]] = {}
+
+
 async def run_semantic_proximity(
     text: str,
     profile_rules: ClassProfileRules,
@@ -137,6 +141,8 @@ async def run_semantic_proximity(
     If no intent vectors are provided, it performs 'Automatic Domain Detection'
     using global embedding anchors.
     """
+    global _ANCHOR_CACHE
+    
     # Resolve best available embedder
     embedder = None
     if kit and kit.has_embedder:
@@ -165,7 +171,11 @@ async def run_semantic_proximity(
             
             for domain, anchor_text in global_anchors.items():
                 try:
-                    p_emb = await embedder.embed_single(anchor_text)
+                    # Resolve from cache or embed fresh
+                    if anchor_text not in _ANCHOR_CACHE:
+                        _ANCHOR_CACHE[anchor_text] = await embedder.embed_single(anchor_text)
+                    
+                    p_emb = _ANCHOR_CACHE[anchor_text]
                     similarity = _cosine_similarity(text_embedding, p_emb)
                     log.debug(f"Domain detection: {domain} similarity={similarity:.3f}")
                     if similarity > settings.perception_automatic_threshold:

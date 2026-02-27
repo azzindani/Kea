@@ -3,13 +3,13 @@
 # for specialized anchor-based embedding matching.
 
 domain_anchors:
-  finance: "stock market price trading investment revenue asset portfolio balance sheet quarterly earnings"
-  security: "vulnerability exploit patch attack firewall encryption threat malware bypass pwned"
-  logistics: "shipping tracking delivery warehouse cargo transport supply chain inventory fulfillment"
-  communication: "email message chat greeting contact notify schedule meeting call"
-  development: "code programming software deploy refactor bug git merge pull request pipeline"
-  legal: "contract agreement clause litigation compliance regulation intellectual property"
-  general: "hello help who what where when why thanks"
+  finance: "financial analysis stock market prices and investment trading"
+  security: "cybersecurity system vulnerabilities and network threats"
+  logistics: "logistics shipping tracking and supply chain management"
+  communication: "human communication email messages and notifications"
+  development: "software development coding programming and deployment"
+  legal: "legal contracts compliance and regulatory documentation"
+  general: "general greetings help requests and common questions"
 
 complexity_anchors:
   - text: "Hello!"

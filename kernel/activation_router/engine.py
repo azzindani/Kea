@@ -142,6 +142,10 @@ def _build_pipeline_templates() -> dict[ComplexityLevel, PipelineConfig]:
 # ============================================================================
 
 
+# Global cache for router anchors
+_ROUTER_ANCHOR_CACHE: dict[str, list[float]] = {}
+
+
 async def classify_signal_complexity(
     signal_tags: SignalTags,
     text: str | None = None,
@@ -189,7 +193,10 @@ async def classify_signal_complexity(
             
             best_sim = -1.0
             for anchor_text, (weight, lvl) in anchors.items():
-                anchor_emb = await embedder.embed_single(anchor_text)
+                if anchor_text not in _ROUTER_ANCHOR_CACHE:
+                    _ROUTER_ANCHOR_CACHE[anchor_text] = await embedder.embed_single(anchor_text)
+                
+                anchor_emb = _ROUTER_ANCHOR_CACHE[anchor_text]
                 sim = np.dot(input_emb, anchor_emb) / (np.linalg.norm(input_emb) * np.linalg.norm(anchor_emb))
                 log.debug(f"Complexity anchor: similarity={sim:.3f} level={lvl.value} text='{anchor_text[:30]}'")
                 if sim > best_sim:
