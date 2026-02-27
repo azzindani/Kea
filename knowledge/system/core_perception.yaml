@@ -42,3 +42,23 @@ complexity_anchors:
   - text: "SECURITY BREACH: Unauthorized access detected in the vault!"
     weight: 1.0
     level: critical
+sentiment_anchors:
+  positive: "I am happy very pleased and satisfied with the result"
+  negative: "I am angry disappointed frustrated and unhappy"
+  frustrated: "I am extremely annoyed and tired of these persistent issues"
+  neutral: "this is a standard request or factual statement"
+
+urgency_anchors:
+  critical: "IMMEDIATE EMERGENCY ACTION REQUIRED RIGHT NOW"
+  high: "this is a high priority task that needs attention soon"
+  normal: "standard priority request with normal timelines"
+  low: "whenever you have time or no rush at all"
+intent_anchors:
+  create: "create a new document or generate a build or write a draft"
+  delete: "delete remove destroy drop or wipe the existing data"
+  query: "find information search for data or look up a specific fact"
+  update: "update modify change edit or fix the existing record"
+  navigate: "go to the dashboard open the page or visit the link"
+  configure: "configure settings setup parameters or install modules"
+  analyze: "analyze the data assess performance or review the audit log"
+  communicate: "send a message email notification or share the update"

@@ -636,6 +636,7 @@ class KernelSettings(BaseModel):
     classification_semantic_weight: float = 0.6
     classification_fallback_label: str = "UNCLASSIFIED"
     perception_automatic_threshold: float = 0.40  # Similarity needed to auto-detect domain
+    perception_primitive_threshold: float = 0.45  # Multi-intent/sentiment/urgency threshold
 
     # --- T1: Intent / Sentiment / Urgency ---
     intent_labels: list[str] = [

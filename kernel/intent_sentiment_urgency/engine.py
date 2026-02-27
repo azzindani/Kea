@@ -37,10 +37,16 @@ from .types import (
     UrgencyLabel,
 )
 
+import numpy as np
+from shared.knowledge.system_loader import load_system_knowledge
+
 log = get_logger(__name__)
 
 _MODULE = "intent_sentiment_urgency"
 _TIER = 1
+
+# Global cache to prevent redundant anchor embeddings
+_ANCHOR_CACHE: dict[str, list[float]] = {}
 
 
 def _ref(fn: str) -> ModuleRef:
@@ -124,7 +130,51 @@ def detect_intent(text: str) -> IntentLabel:
     )
 
 async def detect_intent_async(text: str, kit: InferenceKit | None = None) -> IntentLabel:
+    """Async intent detector with embedding-first resilience."""
     label = detect_intent(text)
+    
+    # Resolve best available embedder
+    embedder = None
+    if kit and kit.has_embedder:
+        embedder = kit.embedder
+    else:
+        try:
+            from shared.embedding.model_manager import get_model_manager
+            embedder = get_model_manager()
+        except:
+            embedder = None
+
+    # Layer B: Embedding Proximity (if lexical confidence is low)
+    if embedder and label.confidence < 0.6:
+        try:
+            text_emb = await embedder.embed_single(text)
+            perception_data = load_system_knowledge("core_perception.yaml")
+            anchors = perception_data.get("intent_anchors", {})
+            
+            best_sim = -1.0
+            best_cat = label.primary
+            
+            for cat_name, anchor_text in anchors.items():
+                if anchor_text not in _ANCHOR_CACHE:
+                    _ANCHOR_CACHE[anchor_text] = await embedder.embed_single(anchor_text)
+                
+                anchor_emb = _ANCHOR_CACHE[anchor_text]
+                sim = np.dot(text_emb, anchor_emb) / (np.linalg.norm(text_emb) * np.linalg.norm(anchor_emb))
+                
+                if sim > best_sim:
+                    best_sim = sim
+                    best_cat = IntentCategory(cat_name.upper())
+            
+            # If embedding is strong, override lexical
+            settings = get_settings().kernel
+            if best_sim > settings.perception_primitive_threshold:
+                label.primary = best_cat
+                label.confidence = float(best_sim)
+                log.debug(f"Intent determined via embedding intent={best_cat.value} similarity={round(best_sim, 3)}")
+        except Exception as e:
+            log.warning("Embedding intent check failed", error=str(e))
+
+    # Layer C: LLM Fallback (Only if still extremely uncertain)
     if kit and kit.has_llm and label.confidence < 0.6:
         try:
             system_msg = LLMMessage(
@@ -221,8 +271,59 @@ def analyze_sentiment(text: str) -> SentimentLabel:
     )
 
 async def analyze_sentiment_async(text: str, kit: InferenceKit | None = None) -> SentimentLabel:
+    """Async sentiment analyzer with embedding-first resilience."""
     label = analyze_sentiment(text)
-    if kit and kit.has_llm:
+    
+    # Resolve best available embedder
+    embedder = None
+    if kit and kit.has_embedder:
+        embedder = kit.embedder
+    else:
+        try:
+            from shared.embedding.model_manager import get_model_manager
+            embedder = get_model_manager()
+        except:
+            embedder = None
+
+    # Layer B: Embedding Proximity (if lexical confidence is low)
+    # Intensity (label.score) < 0.3 means neutral or no keywords found
+    if embedder and (label.score < 0.3 or label.primary == SentimentCategory.NEUTRAL):
+        try:
+            text_emb = await embedder.embed_single(text)
+            perception_data = load_system_knowledge("core_perception.yaml")
+            anchors = perception_data.get("sentiment_anchors", {})
+            
+            best_sim = -1.0
+            best_cat = label.primary
+            
+            for cat_name, anchor_text in anchors.items():
+                if anchor_text not in _ANCHOR_CACHE:
+                    _ANCHOR_CACHE[anchor_text] = await embedder.embed_single(anchor_text)
+                
+                anchor_emb = _ANCHOR_CACHE[anchor_text]
+                sim = np.dot(text_emb, anchor_emb) / (np.linalg.norm(text_emb) * np.linalg.norm(anchor_emb))
+                
+                if sim > best_sim:
+                    best_sim = sim
+                    best_cat = SentimentCategory(cat_name.upper())
+            
+            # If embedding is strong, override lexical
+            settings = get_settings().kernel
+            if best_sim > settings.perception_primitive_threshold:
+                label.primary = best_cat
+                label.score = float(best_sim)
+                # Map similarity to valence approximation
+                if best_cat == SentimentCategory.POSITIVE: label.valence = float(best_sim)
+                elif best_cat == SentimentCategory.NEGATIVE: label.valence = -float(best_sim)
+                elif best_cat == SentimentCategory.FRUSTRATED: label.valence = -float(best_sim * 1.2)
+                else: label.valence = 0.0
+                
+                log.debug(f"Sentiment determined via embedding category={best_cat.value} similarity={round(best_sim, 3)}")
+        except Exception as e:
+            log.warning("Embedding sentiment check failed", error=str(e))
+
+    # Layer C: LLM Fallback (Only if still extremely uncertain)
+    if kit and kit.has_llm and label.score < 0.4:
         try:
             system_msg = LLMMessage(
                 role="system",
@@ -309,8 +410,52 @@ def score_urgency(text: str) -> UrgencyLabel:
     )
 
 async def score_urgency_async(text: str, kit: InferenceKit | None = None) -> UrgencyLabel:
+    """Async urgency scorer with embedding-first resilience."""
     label = score_urgency(text)
-    if kit and kit.has_llm:
+    
+    # Resolve best available embedder
+    embedder = None
+    if kit and kit.has_embedder:
+        embedder = kit.embedder
+    else:
+        try:
+            from shared.embedding.model_manager import get_model_manager
+            embedder = get_model_manager()
+        except:
+            embedder = None
+
+    # Layer B: Embedding Proximity (if lexical urgency is low/neutral)
+    if embedder and label.score < 0.4:
+        try:
+            text_emb = await embedder.embed_single(text)
+            perception_data = load_system_knowledge("core_perception.yaml")
+            anchors = perception_data.get("urgency_anchors", {})
+            
+            best_sim = -1.0
+            best_band = label.band
+            
+            for band_name, anchor_text in anchors.items():
+                if anchor_text not in _ANCHOR_CACHE:
+                    _ANCHOR_CACHE[anchor_text] = await embedder.embed_single(anchor_text)
+                
+                anchor_emb = _ANCHOR_CACHE[anchor_text]
+                sim = np.dot(text_emb, anchor_emb) / (np.linalg.norm(text_emb) * np.linalg.norm(anchor_emb))
+                
+                if sim > best_sim:
+                    best_sim = sim
+                    best_band = UrgencyBand(band_name.upper())
+            
+            # If embedding is strong, override lexical
+            settings = get_settings().kernel
+            if best_sim > settings.perception_primitive_threshold:
+                label.band = best_band
+                label.score = float(best_sim)
+                log.debug(f"Urgency determined via embedding band={best_band.value} similarity={round(best_sim, 3)}")
+        except Exception as e:
+            log.warning("Embedding urgency check failed", error=str(e))
+
+    # Layer C: LLM Fallback (Only if still extremely uncertain)
+    if kit and kit.has_llm and label.score < 0.4:
         try:
             system_msg = LLMMessage(
                 role="system",
@@ -328,14 +473,10 @@ async def score_urgency_async(text: str, kit: InferenceKit | None = None) -> Urg
 
             score = float(data.get("score", label.score))
             label.score = score
-            if score >= 0.8:
-                label.band = UrgencyBand.CRITICAL
-            elif score >= 0.5:
-                label.band = UrgencyBand.HIGH
-            elif score <= 0.2:
-                label.band = UrgencyBand.LOW
-            else:
-                label.band = UrgencyBand.NORMAL
+            if score >= 0.8: label.band = UrgencyBand.CRITICAL
+            elif score >= 0.5: label.band = UrgencyBand.HIGH
+            elif score <= 0.2: label.band = UrgencyBand.LOW
+            else: label.band = UrgencyBand.NORMAL
         except Exception as e:
             log.warning("LLM urgency fallback failed", error=str(e))
     return label
