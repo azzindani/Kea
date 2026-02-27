@@ -30,7 +30,7 @@ from kernel.activation_router.types import ActivationMap, ComplexityLevel
 from kernel.advanced_planning.engine import plan_advanced
 from kernel.advanced_planning.types import PlanningConstraints
 from kernel.classification.engine import classify
-from kernel.classification.types import ClassificationResult
+from kernel.classification.types import ClassificationResult, ClassProfileRules
 from kernel.cognitive_load_monitor.engine import monitor_cognitive_load
 from kernel.cognitive_load_monitor.types import CycleTelemetry, LoadAction, LoadRecommendation
 from kernel.confidence_calibrator.engine import run_confidence_calibration
@@ -585,7 +585,7 @@ class ConsciousObserver:
         text = modality_output.cognitive_context or raw_input.content or ""
 
         # 5. T1: Classify signal
-        classification_result = await classify(text, [], self._kit)
+        classification_result = await classify(text, ClassProfileRules(), self._kit)
         classification = _extract_classification(classification_result)
 
         # 6. T1: Intent/Sentiment/Urgency
@@ -595,7 +595,7 @@ class ConsciousObserver:
         # 7. T1: Entity Recognition (config-driven enablement)
         entities: list[ValidatedEntity] = []
         if get_settings().kernel.conscious_observer_expected_cycle_ms > 0:
-            entities_result = await extract_entities(text, self._kit)
+            entities_result = await extract_entities(text, ValidatedEntity, self._kit)
             entities = _extract_entities(entities_result)
 
         # Build SignalTags from T1 outputs
