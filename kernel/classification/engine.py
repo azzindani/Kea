@@ -40,6 +40,7 @@ from .types import (
     LinguisticResult,
     SemanticResult,
 )
+from shared.knowledge import load_system_knowledge
 
 log = get_logger(__name__)
 
@@ -132,25 +133,42 @@ async def run_semantic_proximity(
 
     Converts text into a vector embedding and computes cosine similarity
     against pre-indexed intent vectors from the class profile.
-    Uses kit.embedder when available, falls back to global ModelManager.
+    
+    If no intent vectors are provided, it performs 'Automatic Domain Detection'
+    using global embedding anchors.
     """
-    if not profile_rules.intent_vectors:
-        return SemanticResult(candidates=[], embedding_used=False)
-
     try:
         if kit and kit.has_embedder:
-            text_embedding = await kit.embedder.embed_single(text)
+            text_embedding = await kit.embedder.embed(text)
         else:
             from shared.embedding.model_manager import get_model_manager
-
             manager = get_model_manager()
             text_embedding = await manager.embed_single(text)
 
         candidates: list[LabelScore] = []
-        for intent_vec in profile_rules.intent_vectors:
-            similarity = _cosine_similarity(text_embedding, intent_vec.embedding)
-            score = min_max_scale(similarity, 0.0, 1.0)
-            candidates.append(LabelScore(label=intent_vec.label, score=score))
+
+        # 1. Profile-based matching
+        if profile_rules.intent_vectors:
+            for intent_vec in profile_rules.intent_vectors:
+                similarity = _cosine_similarity(text_embedding, intent_vec.embedding)
+                candidates.append(LabelScore(label=intent_vec.label, score=float(similarity)))
+
+        # 2. AUTOMATIC DOMAIN DETECTION (if no results or weak matches)
+        # We load anchors ONLY from Knowledge YAML (core_perception.yaml).
+        settings = get_settings().kernel
+        if not candidates or max([c.score for c in candidates] or [0.0]) < settings.classification_confidence_threshold:
+            perception_data = load_system_knowledge("core_perception.yaml")
+            global_anchors = perception_data.get("domain_anchors", {})
+            
+            for domain, anchor_text in global_anchors.items():
+                try:
+                    p_emb = await kit.embedder.embed(anchor_text) if kit and kit.has_embedder else text_embedding
+                    if kit and kit.has_embedder:
+                        similarity = _cosine_similarity(text_embedding, p_emb)
+                        if similarity > settings.perception_automatic_threshold:
+                            candidates.append(LabelScore(label=domain, score=float(similarity)))
+                except Exception as e:
+                    log.warning("Anchor embedding failed", domain=domain, error=str(e))
 
         candidates.sort(key=lambda x: x.score, reverse=True)
         return SemanticResult(candidates=candidates, embedding_used=True)
@@ -159,6 +177,7 @@ async def run_semantic_proximity(
         log.warning(
             "Semantic proximity unavailable, falling back to linguistic only",
             error=str(exc),
+            text=text,
         )
         return SemanticResult(candidates=[], embedding_used=False)
 

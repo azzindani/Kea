@@ -15,7 +15,6 @@ from kernel.entity_recognition.types import ValidatedEntity
 from kernel.intent_sentiment_urgency.engine import run_primitive_scorers
 from kernel.intent_sentiment_urgency.types import CognitiveLabels
 from kernel.self_model.types import SignalTags, CapabilityAssessment
-from shared.standard_io.types import Signal
 from shared.config import get_settings
 
 
@@ -33,9 +32,10 @@ async def test_activation_router_comprehensive(input_text, inference_kit):
     print(f"\n--- Testing Activation Router with Input: '{input_text}' ---")
 
     # 1. Generate Tags Dynamically from Input (SIMULATING TIER 7 BEHAVIOR)
-    print(f"\n[Step]: Generating Dynamic Tags via T1")
+    # The system now AUTOMATICALLY detects domain via embeddings in T1.
+    print(f"\n[Step]: Generating Dynamic Tags via T1 (Automatic Detection)")
     
-    # Classify
+    # Classify (Performs Automatic Domain Detection via embeddings if rules are empty)
     class_res = await classify(input_text, ClassProfileRules(), inference_kit)
     classification: ClassificationResult = class_res.signals[0].body["data"]
     
@@ -94,7 +94,7 @@ async def test_activation_router_comprehensive(input_text, inference_kit):
 
     print(f"\n[Test]: cache_decision")
     print(f"   [INPUT]: tags_intent={tags.intent}")
-    activation_map = await compute_activation_map(tags, capability)
+    activation_map = await compute_activation_map(tags, capability, text=input_text)
     assert activation_map.is_success
     print(f"   [OUTPUT]: Decision cached successfully")
     print(f" \033[92m[SUCCESS]\033[0m")

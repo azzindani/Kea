@@ -19,12 +19,13 @@ import numpy as np
 from kernel.self_model.types import CapabilityAssessment, SignalTags
 from shared.config import get_settings
 from shared.inference_kit import InferenceKit
+from shared.knowledge import load_system_knowledge
 from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
+from shared.standard_io.types import Result, Signal, ok, processing_error
 from shared.standard_io import (
     Metrics,
     ModuleRef,
-    Result,
     create_data_signal,
     fail,
     ok,
@@ -157,13 +158,48 @@ async def classify_signal_complexity(
     if signal_tags.urgency in ("critical", "emergency", "panic"):
         return ComplexityLevel.CRITICAL
 
+    # 1. EMBEDDING-FIRST CHECK (Efficient CPU-friendly "Vibe Check")
+    embedding_bonus = 0.0
+    embedding_match: ComplexityLevel | None = None
+    
+    if text and kit and kit.has_embedder:
+        try:
+            perception_data = load_system_knowledge("core_perception.yaml")
+            anchors_list = perception_data.get("complexity_anchors", [])
+            
+            # Convert list of dicts to internal dict format
+            anchors = {
+                a["text"]: (a["weight"], ComplexityLevel(a["level"].lower())) 
+                for a in anchors_list
+            }
+            
+            input_emb = await kit.embedder.embed(text)
+            
+            best_sim = -1.0
+            for anchor_text, (weight, lvl) in anchors.items():
+                anchor_emb = await kit.embedder.embed(anchor_text)
+                sim = np.dot(input_emb, anchor_emb) / (np.linalg.norm(input_emb) * np.linalg.norm(anchor_emb))
+                if sim > best_sim:
+                    best_sim = sim
+                    # High confidence match -> Shortcut return
+                    if sim > settings.activation_embedding_threshold:
+                        embedding_match = lvl
+                    embedding_bonus = (weight - 0.3) * sim 
+            
+            if embedding_match:
+                log.info("Complexity determined via embedding anchor", complexity=embedding_match.value, confidence=round(best_sim, 3))
+                return embedding_match
+                
+        except Exception as e:
+            log.warning("Embedding complexity check failed", text=text[:30], error=str(e))
+
+    # 2. LLM SECONDARY (Only if no high-confidence embedding match)
     if kit and kit.has_llm:
         try:
             system_msg = LLMMessage(
                 role="system",
                 content=(
-                    "Classify the complexity of the task (TRIVIAL, SIMPLE, MODERATE, COMPLEX, CRITICAL) "
-                    "based on the provided signal tags and input text. "
+                    "Classify the complexity of the task (TRIVIAL, SIMPLE, MODERATE, COMPLEX, CRITICAL). "
                     "Respond EXACTLY with JSON: {\"level\": \"...\", \"reasoning\": \"...\"}"
                 )
             )
@@ -188,32 +224,7 @@ async def classify_signal_complexity(
             log.warning("LLM complexity classification failed, falling back", error=str(e))
             pass
 
-    # Embedding-based similarity check for "measured" complexity
-    embedding_bonus = 0.0
-    if text and kit and kit.has_embedder:
-        try:
-            # Anchors for complexity spectrum
-            anchors = {
-                "Hello, how are you?": 0.1,                          # Trivial
-                "What is the weather in Tokyo?": 0.3,                # Simple
-                "Draft a professional email for a client meeting.": 0.5, # Moderate
-                "Analyze the impact of interest rates on the housing market.": 0.8, # Complex
-            }
-            input_emb = await kit.embedder.embed(text)
-            
-            best_sim = -1.0
-            for anchor_text, weight in anchors.items():
-                anchor_emb = await kit.embedder.embed(anchor_text)
-                sim = np.dot(input_emb, anchor_emb) / (np.linalg.norm(input_emb) * np.linalg.norm(anchor_emb))
-                if sim > best_sim:
-                    best_sim = sim
-                    # Shift baseline complexity toward the matching anchor
-                    # This makes the scoring more "measured" via semantic similarity
-                    embedding_bonus = (weight - 0.3) * sim 
-        except Exception as e:
-            log.warning("Embedding complexity check failed", error=str(e))
-
-    # Score each dimension (0.0 - 1.0)
+    # 3. HEURISTIC FALLBACK (Weighted scoring)
     urgency_scores = {"low": 0.1, "normal": 0.3, "high": 0.7, "critical": 1.0}
     urgency_score = urgency_scores.get(signal_tags.urgency, 0.3)
 
@@ -223,18 +234,12 @@ async def classify_signal_complexity(
     }
     structural_score = complexity_scores.get(signal_tags.complexity, 0.3)
 
-    # Domain specificity: non-general domains score higher
     domain_score = 0.1 if signal_tags.domain == "general" else 0.6
     if len(signal_tags.required_skills) > 2:
         domain_score = min(1.0, domain_score + 0.3)
 
-    # Gap size from required resources
-    gap_score = min(
-        1.0,
-        (len(signal_tags.required_tools) + len(signal_tags.required_skills)) * 0.15,
-    )
+    gap_score = min(1.0, (len(signal_tags.required_tools) + len(signal_tags.required_skills)) * 0.15)
 
-    # Weighted aggregate
     aggregate = (
         settings.activation_urgency_weight * urgency_score
         + settings.activation_structural_weight * structural_score
@@ -243,7 +248,6 @@ async def classify_signal_complexity(
         + embedding_bonus
     )
 
-    # Map aggregate to complexity level
     if aggregate < 0.15:
         return ComplexityLevel.TRIVIAL
     elif aggregate < 0.35:

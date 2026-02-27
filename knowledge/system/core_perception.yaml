@@ -1,0 +1,44 @@
+# Core Perception Anchors
+# Used by Tier 1 (Classification) and Tier 6 (Activation Router)
+# for specialized anchor-based embedding matching.
+
+domain_anchors:
+  finance: "stock market price trading investment revenue asset portfolio balance sheet quarterly earnings"
+  security: "vulnerability exploit patch attack firewall encryption threat malware bypass pwned"
+  logistics: "shipping tracking delivery warehouse cargo transport supply chain inventory fulfillment"
+  communication: "email message chat greeting contact notify schedule meeting call"
+  development: "code programming software deploy refactor bug git merge pull request pipeline"
+  legal: "contract agreement clause litigation compliance regulation intellectual property"
+  general: "hello help who what where when why thanks"
+
+complexity_anchors:
+  - text: "Hello!"
+    weight: 0.1
+    level: trivial
+  - text: "What time is it?"
+    weight: 0.1
+    level: trivial
+  - text: "Search for the price of Bitcoin."
+    weight: 0.3
+    level: simple
+  - text: "Who is the CEO of Google?"
+    weight: 0.3
+    level: simple
+  - text: "Write a summary of the latest AI trends in 2024."
+    weight: 0.6
+    level: moderate
+  - text: "Calculate the total revenue for Q3 based on the attached spreadsheet."
+    weight: 0.7
+    level: moderate
+  - text: "Perform a security audit on the login module and fix SQL injection."
+    weight: 1.0
+    level: complex
+  - text: "Redesign the kernel architecture to support multi-tenant isolation."
+    weight: 1.0
+    level: complex
+  - text: "CRITICAL FAILURE: Production server is down, all transactions failing!"
+    weight: 1.0
+    level: critical
+  - text: "SECURITY BREACH: Unauthorized access detected in the vault!"
+    weight: 1.0
+    level: critical
