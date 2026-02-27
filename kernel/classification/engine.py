@@ -139,7 +139,7 @@ async def run_semantic_proximity(
     """
     try:
         if kit and kit.has_embedder:
-            text_embedding = await kit.embedder.embed(text)
+            text_embedding = await kit.embedder.embed_single(text)
         else:
             from shared.embedding.model_manager import get_model_manager
             manager = get_model_manager()
@@ -162,7 +162,7 @@ async def run_semantic_proximity(
             
             for domain, anchor_text in global_anchors.items():
                 try:
-                    p_emb = await kit.embedder.embed(anchor_text) if kit and kit.has_embedder else text_embedding
+                    p_emb = await kit.embedder.embed_single(anchor_text) if kit and kit.has_embedder else text_embedding
                     if kit and kit.has_embedder:
                         similarity = _cosine_similarity(text_embedding, p_emb)
                         if similarity > settings.perception_automatic_threshold:

@@ -174,11 +174,11 @@ async def classify_signal_complexity(
                 for a in anchors_list
             }
             
-            input_emb = await kit.embedder.embed(text)
+            input_emb = await kit.embedder.embed_single(text)
             
             best_sim = -1.0
             for anchor_text, (weight, lvl) in anchors.items():
-                anchor_emb = await kit.embedder.embed(anchor_text)
+                anchor_emb = await kit.embedder.embed_single(anchor_text)
                 sim = np.dot(input_emb, anchor_emb) / (np.linalg.norm(input_emb) * np.linalg.norm(anchor_emb))
                 if sim > best_sim:
                     best_sim = sim
