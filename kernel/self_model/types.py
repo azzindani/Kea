@@ -27,6 +27,7 @@ class SignalTags(BaseModel):
     entity_count: int = Field(default=0, ge=0)
     required_skills: list[str] = Field(default_factory=list)
     required_tools: list[str] = Field(default_factory=list)
+    content_keywords: set[str] = Field(default_factory=set, description="Key terms found in signal content")
 
 
 # ============================================================================

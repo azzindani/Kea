@@ -751,6 +751,10 @@ class KernelSettings(BaseModel):
         "privacy_violation", "resource_abuse",
     ]
     reflection_min_score_gap: float = 0.2
+    ethical_constraints: list[str] = [
+        "salary", "private_records", "board_members", "unauthorized_access",
+        "private_data", "credential_leak", "system_override"
+    ]
 
     # --- T4: OODA Loop ---
     ooda_max_cycles: int = 10
@@ -807,7 +811,7 @@ class KernelSettings(BaseModel):
     load_threshold_simplify: float = 0.6
     load_threshold_escalate: float = 0.8
     load_threshold_abort: float = 0.95
-    load_goal_drift_threshold: float = 0.2
+    load_goal_drift_threshold: float = 0.15
 
     # --- T6: Hallucination Monitor ---
     grounding_similarity_threshold: float = 0.65

@@ -237,3 +237,7 @@ class LoopResult(BaseModel):
         description="IDs of completed macro objectives",
     )
     artifacts_produced: list[str] = Field(default_factory=list)
+    action_outputs: list[str] = Field(
+        default_factory=list,
+        description="Text outputs collected from all actions in the loop"
+    )

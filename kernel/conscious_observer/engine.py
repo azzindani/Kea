@@ -227,6 +227,13 @@ def _build_signal_tags(
     if isinstance(classification, FallbackTrigger):
         complexity_hint = "complex"  # Fallback entries are inherently complex to resolve
 
+    # Collect keywords from context and entities for constraint/capability matching
+    text = modality_output.cognitive_context or ""
+    keywords = {w.lower().strip(",.?!()[]{}") for w in text.split() if len(w) > 2}
+    for e in entities:
+        keywords.add(e.text.lower())
+        keywords.add(e.label.lower())
+
     return SignalTags(
         urgency=urgency_str,
         domain=domain,
@@ -236,6 +243,7 @@ def _build_signal_tags(
         entity_count=len(entities),
         required_skills=[],
         required_tools=[],
+        content_keywords=keywords,
     )
 
 
@@ -360,11 +368,17 @@ def _synthesize_artifact(loop_result: LoopResult) -> str:
         parts.append(
             f"Produced artifacts: {', '.join(loop_result.artifacts_produced[:10])}"
         )
+    if loop_result.action_outputs:
+        # Include major content snippets
+        snippets = [o[:200] for o in loop_result.action_outputs if o]
+        if snippets:
+            parts.append(f"Action Outputs: {' | '.join(snippets[:5])}")
+
     if loop_result.final_state:
         context = loop_result.final_state.get("context", {})
         if context:
             summaries = [f"{k}={v}" for k, v in list(context.items())[:5]]
-            parts.append(f"Execution context: {'; '.join(summaries)}")
+            parts.append(f"Context: {'; '.join(summaries)}")
 
     if not parts:
         parts.append(
@@ -1092,6 +1106,7 @@ class ConsciousObserver:
             total_cost=state.total_cost,
             objectives_completed=completed_objectives,
             artifacts_produced=all_artifacts,
+            action_outputs=recent_outputs,
         )
 
         log.info(
