@@ -85,7 +85,8 @@ async def test_conscious_observer_with_evidence(inference_kit):
     
     # At least one claim should be grounded against the evidence
     report = obs_data["grounding_report"]
-    print(f"   [OUTPUT]: Grounding Points={len(report['claims'])}")
+    print(f"   [OUTPUT]: Grounding Points={report['total_claims']}")
+    assert report["grounded_count"] > 0
     print(" \033[92m[SUCCESS]\033[0m")
 
 @pytest.mark.asyncio
