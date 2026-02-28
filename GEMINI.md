@@ -52,10 +52,10 @@ The system is divided into 7 specialized microservices:
 
 ### 🚫 NO TESTING ACTIVITIES
 **Tests are strictly prohibited.** Do NOT:
-
+- Write unit tests, integration tests, or any test files
 - Run `pytest` or any testing commands
-
-
+- Suggest adding tests or test coverage
+- Create test fixtures or mocks
 - Modify files in the `tests/` directory
 - Execute `uv run` commands
 - Execute `python` commands

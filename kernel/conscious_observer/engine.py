@@ -372,13 +372,17 @@ def _synthesize_artifact(loop_result: LoopResult) -> str:
         for out in valid_outputs:
             # Clean up 'key=value' noise if it's a generic field
             clean_out = out
-            for noise_key in ("answer=", "output=", "content=", "text=", "result="):
+            for noise_key in ("answer=", "output=", "content=", "text=", "result=", "instruction="):
                 if clean_out.lower().startswith(noise_key):
                     clean_out = clean_out[len(noise_key):].strip()
                     break
 
+            # Skip entries that are clearly just echoed questions/instructions
+            if clean_out.rstrip(".!?").endswith("?"):
+                continue
+
             suffix = "." if not clean_out.endswith((".", "!", "?")) else ""
-            parts.append(f"Result: {clean_out}{suffix}")
+            parts.append(clean_out + suffix)
 
     # 2. META CONTEXT (Secondary)
     if not parts:
@@ -1025,8 +1029,21 @@ class ConsciousObserver:
             if cycle_result.action_results:
                 for ar in cycle_result.action_results:
                     if ar.outputs:
-                        for k, v in list(ar.outputs.items())[:3]:
-                             recent_outputs.append(f"{k}={v}")
+                        # Prioritize actual answer content over meta keys
+                        # 'instruction' is just the task description echo — skip it.
+                        _answer_keys = ("answer", "content", "text", "output", "result")
+                        _skip_keys = frozenset({"instruction"})
+                        prioritised: list[tuple[str, Any]] = []
+                        rest: list[tuple[str, Any]] = []
+                        for k, v in ar.outputs.items():
+                            if k in _skip_keys:
+                                continue
+                            if k in _answer_keys:
+                                prioritised.append((k, v))
+                            else:
+                                rest.append((k, v))
+                        for k, v in (prioritised + rest)[:3]:
+                            recent_outputs.append(f"{k}={v}")
 
             # Recover last decision from state snapshot
             agent_status = cycle_result.state_snapshot.get("status", "active")

@@ -47,6 +47,47 @@ _MODULE = "hallucination_monitor"
 _TIER = 6
 
 
+def _extract_json(raw: str) -> Any:
+    """Robustly extract JSON from an LLM response.
+
+    Handles markdown code blocks, stray prose around JSON,
+    and common formatting inconsistencies.
+    """
+    text = raw.strip()
+
+    # 1. Strip markdown code fences (```json ... ``` or ``` ... ```)
+    fence_match = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", text, re.DOTALL)
+    if fence_match:
+        text = fence_match.group(1).strip()
+
+    # 2. Try direct parse
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # 3. Find first JSON object or array in the text
+    for start_char, end_char in (("{", "}"), ("[", "]")):
+        start_idx = text.find(start_char)
+        if start_idx == -1:
+            continue
+        # Find the matching closing bracket
+        depth = 0
+        for i in range(start_idx, len(text)):
+            if text[i] == start_char:
+                depth += 1
+            elif text[i] == end_char:
+                depth -= 1
+                if depth == 0:
+                    candidate = text[start_idx : i + 1]
+                    try:
+                        return json.loads(candidate)
+                    except json.JSONDecodeError:
+                        break
+
+    raise json.JSONDecodeError("No valid JSON found", text, 0)
+
+
 def _ref(fn: str) -> ModuleRef:
     return ModuleRef(tier=_TIER, module=_MODULE, function=fn)
 
@@ -90,12 +131,7 @@ async def classify_claims(output_text: str, kit: InferenceKit | None = None) -> 
             )
             user_msg = LLMMessage(role="user", content=output_text)
             resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
-            content = resp.content.strip()
-            if content.startswith("```json"):
-                content = content[7:-3].strip()
-            elif content.startswith("```"):
-                content = content[3:-3].strip()
-            data = json.loads(content)
+            data = _extract_json(resp.content)
 
             claims = []
             for i, item in enumerate(data):
@@ -186,13 +222,7 @@ async def grade_claim(
                 )
                 user_msg = LLMMessage(role="user", content=f"Claim: {claim.text}\nEvidence List:\n{ev_text_block}")
                 resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
-
-                content = resp.content.strip()
-                if content.startswith("```json"):
-                    content = content[7:-3].strip()
-                elif content.startswith("```"):
-                    content = content[3:-3].strip()
-                data = json.loads(content)
+                data = _extract_json(resp.content)
 
                 grade_str = data.get("grade", "FABRICATED")
                 if grade_str == "GROUNDED":
