@@ -301,13 +301,18 @@ async def detect_capability_gap(
     if identity is not None:
         constraints = list(set(constraints) | set(identity.ethical_constraints))
 
+    import re
     for rule in constraints:
         rule_lower = rule.lower()
+        # Extract individual words from the rule if it uses underscores/hyphens
+        rule_words = set(re.split(r'[_ -]', rule_lower))
+        
         # Check domain, intent, AND content keywords against constraint keywords
         if (
             rule_lower in signal_tags.domain.lower() 
             or rule_lower in signal_tags.intent.lower()
             or any(rule_lower in k for k in signal_tags.content_keywords)
+            or (rule_words and rule_words.issubset(signal_tags.content_keywords))
         ):
             constraint_violations.append(f"ethical_constraint:{rule}")
 
@@ -323,9 +328,7 @@ async def detect_capability_gap(
         + (1 if signal_tags.domain != "general" else 0),
     )
     total_missing = len(missing_tools) + len(missing_knowledge)
-    constraint_penalty = len(constraint_violations) * 0.3
-
-    severity = min(1.0, (total_missing / total_requirements) + constraint_penalty)
+    severity = min(1.0, (total_missing / total_requirements) + (len(constraint_violations) * 0.6))
 
     return CapabilityGap(
         missing_tools=missing_tools,

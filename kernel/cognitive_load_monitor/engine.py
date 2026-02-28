@@ -99,8 +99,8 @@ def measure_load(
     # Breadth dimension: active modules vs capacity
     active_count = 0
     for v in activation_map.module_states.values():
-        val = getattr(v, "value", str(v))
-        if val == "active" or str(v).endswith("active"):
+        val = getattr(v, "value", str(v)).lower()
+        if val == "active" or val.endswith("active"):
             active_count += 1
     max_modules = max(1, telemetry.active_module_count or active_count)
     breadth_load = min(1.0, active_count / max(1, max_modules * 2))

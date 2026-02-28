@@ -231,8 +231,10 @@ def _build_signal_tags(
     text = modality_output.cognitive_context or ""
     keywords = {w.lower().strip(",.?!()[]{}") for w in text.split() if len(w) > 2}
     for e in entities:
-        keywords.add(e.text.lower())
-        keywords.add(e.label.lower())
+        keywords.add(e.value.lower())
+        if e.original_span:
+            keywords.add(e.original_span.lower())
+        keywords.add(e.entity_type.lower())
 
     return SignalTags(
         urgency=urgency_str,
@@ -1020,8 +1022,8 @@ class ConsciousObserver:
             # T6: Cognitive Load Monitor after every cycle
             active_module_count = 0
             for v in current_activation_map.module_states.values():
-                val = getattr(v, "value", str(v))
-                if val == "active" or str(v).endswith("active"):
+                val = getattr(v, "value", str(v)).lower()
+                if val == "active" or val.endswith("active"):
                     active_module_count += 1
             telemetry = CycleTelemetry(
                 cycle_number=cycle_num,
