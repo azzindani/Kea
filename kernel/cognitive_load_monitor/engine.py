@@ -268,10 +268,10 @@ async def detect_goal_drift(
 
     if kit and kit.has_embedder:
         try:
-            obj_emb = await kit.embedder.embed(original_objective)
+            obj_emb = await kit.embedder.embed_single(original_objective)
             similarities = []
             for out in recent_outputs:
-                out_emb = await kit.embedder.embed(out)
+                out_emb = await kit.embedder.embed_single(out)
                 score = np.dot(obj_emb, out_emb) / (np.linalg.norm(obj_emb) * np.linalg.norm(out_emb))
                 similarities.append(round(float(score), 4))
 
