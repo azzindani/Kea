@@ -8,6 +8,7 @@ from kernel.reflection_and_guardrails.engine import (
 )
 from kernel.graph_synthesizer.types import ExecutableDAG, ExecutableNode, ActionInstruction
 from kernel.task_decomposition.types import SubTaskItem
+from kernel.advanced_planning.types import ExpectedOutcome
 from kernel.reflection_and_guardrails.types import (
     ExecutionResult, 
     ApprovalDecision, 
@@ -98,7 +99,13 @@ async def test_reflection_and_guardrails_comprehensive(objective, execution_outp
     )
     
     # Expectation: The output should contain specific success markers
-    expectations = [HypothesisEvaluation(task_id="node-1", hypothesis_description="Data must be non-empty", met=True)]
+    expectations = [
+        ExpectedOutcome(
+            task_id="node-1", 
+            description="Data must be non-empty", 
+            success_criteria={"success": True}
+        )
+    ]
     
     print(f"   [INPUT]: outputs={list(execution_outputs.keys())}, duration={exec_res.total_duration_ms}ms")
     post_res = await run_post_execution_reflection(exec_res, expected=expectations, kit=inference_kit)
