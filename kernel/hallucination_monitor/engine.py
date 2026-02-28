@@ -136,10 +136,12 @@ async def classify_claims(output_text: str, kit: InferenceKit | None = None) -> 
             claims = []
             for i, item in enumerate(data):
                 ctype = ClaimType.FACTUAL
-                if item.get("claim_type") == "OPINION":
+                ctype_str = str(item.get("claim_type", "")).upper()
+                if ctype_str == "OPINION":
                     ctype = ClaimType.OPINION
-                elif item.get("claim_type") == "REASONING":
+                elif ctype_str == "REASONING":
                     ctype = ClaimType.REASONING
+                
                 claims.append(Claim(
                     claim_id=generate_id("claim"),
                     text=item["text"],
@@ -211,6 +213,7 @@ async def grade_claim(
             reasoning="Opinion claims are grounded by declaration",
         )
 
+    llm_grade = None
     if kit and kit.has_llm and evidence:
         try:
             ev_texts = [o.content for o in evidence if o.content]
@@ -224,25 +227,26 @@ async def grade_claim(
                 resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
                 data = _extract_json(resp.content)
 
-                grade_str = data.get("grade", "FABRICATED")
+                grade_str = str(data.get("grade", "")).upper()
                 if grade_str == "GROUNDED":
-                    grade = ClaimGradeLevel.GROUNDED
+                    llm_grade = ClaimGradeLevel.GROUNDED
                 elif grade_str == "INFERRED":
-                    grade = ClaimGradeLevel.INFERRED
+                    llm_grade = ClaimGradeLevel.INFERRED
                 else:
-                    grade = ClaimGradeLevel.FABRICATED
+                    llm_grade = ClaimGradeLevel.FABRICATED
 
-                return ClaimGrade(
-                    claim_id=claim.claim_id,
-                    grade=grade,
-                    evidence_links=[],
-                    best_similarity=float(data.get("similarity", 0.0)),
-                    reasoning=data.get("reasoning", "LLM graded"),
-                )
+                # If LLM confirms grounding, return immediately
+                if llm_grade == ClaimGradeLevel.GROUNDED:
+                    return ClaimGrade(
+                        claim_id=claim.claim_id,
+                        grade=llm_grade,
+                        evidence_links=[],
+                        best_similarity=float(data.get("similarity", 1.0)),
+                        reasoning=data.get("reasoning", "LLM grounded"),
+                    )
         except Exception as e:
             log.warning("LLM claim grading failed, falling back", error=str(e))
             pass
-
     # For FACTUAL and REASONING claims: compare against evidence
     best_similarity = 0.0
     best_links: list[EvidenceLink] = []

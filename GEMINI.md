@@ -31,7 +31,7 @@ At the heart of every agent is the **Kea Kernel** (`KernelCell`) - a universal r
 - **Pure Logic**: Runs the standard **Cognitive Cycle** (Perceive → Frame → Plan → Execute → Monitor → Package).
 - **Universal Code**: Every level of the hierarchy (Intern to CEO) runs the *exact same* logic in `kernel/`.
 - **Config-Driven**: Behavior is dictated strictly by **Cognitive Profiles** in `knowledge/` and settings in `shared/config.py`.
-- **Status**: The Kernel is currently being standardized as part of the `orchestrator` redesign.
+- **Status**: Standardized and integrated into the Conscious Observer.
 
 ### ⚡ Core Architecture (Microservices)
 **CRITICAL**: This is a strict **Microservices Architecture**. Services communicate **ONLY** via HTTP APIs.
@@ -142,55 +142,44 @@ Project/
 
 ---
 
-## 🎯 Human Kernel: Pyramid Architecture
+## 🎯 Multi-Tier Fractal Architecture
 
-**CRITICAL**: Kea is a fractal corporation, and at the center of this corporation is the **Human Kernel**. To maximize modularity and enable system-wide improvements, the Human Kernel is being redesigned around a **Layered Pyramid Architecture**, initially prototyped in the `redesign/` directory.
+**CRITICAL**: Kea is a fractal corporation. The intelligence is organized into distinct tiers of consciousness and orchestration.
 
-In this architecture, lower tiers represent the most fundamental, generalized building blocks. Modifying a lower tier cascades improvements to all upper tiers automatically (provided API contracts remain stable). Higher tiers coordinate and combine lower-tier functions to achieve complex behavior.
+### 🧠 The Consciousness Tiers
 
-```text
-                        ▲
-                       / \
-                      /   \
-                     /     \
-                    /Tier 5 \   <-- The Autonomous Ego (The Lifecycle Controller)
-                   /---------\
-                  /  Tier 4   \  <-- Execution Engine (The OODA Loop)
-                 /-------------\
-                /    Tier 3     \ <-- Complex Orchestration (Calls T2, T1, T0)
-               /-----------------\
-              /      Tier 2       \ <-- Intermediate Logic (Calls T1, T0)
-             /---------------------\
-            /        Tier 1         \ <-- Core Kernel (`kernel/`) (Calls T0)
-           /-------------------------\
-          /          Tier 0           \ <-- Base Standards (`shared/`)
-         /-----------------------------\
+| Tier | Component | Description |
+| :--- | :--- | :--- |
+| **Tier 8+** | **Corporate Kernel** | Macro-orchestration. Spawns, assigns, and scales human kernels. Future development focus. |
+| **Tier 7** | **Conscious Observer** | The Human Kernel entry point. Seat of agent identity and goal persistence. |
+| **Tier 0-5** | **Kea Base Kernel** | Standardized `KernelCell` primitives (Vault, OODA, Planner, Core logic). |
+
+```mermaid
+graph TD
+    T8[Tier 8+: Corporate Kernel] --> T7[Tier 7: Conscious Observer]
+    T7 --> T0_5[Tier 0-5: Kea Base Kernel]
+    
+    subgraph "Human Kernel (The Employee)"
+        T7
+        T0_5
+    end
+    
+    subgraph "Corporate Layer"
+        T8
+    end
 ```
 
-### The Human Kernel Tiers
+### 🏢 Architectural Analogies
 
-| Tier | Area | Component Scope | Description |
-| :--- | :--- | :--- | :--- |
-| **Tier 5** | **The Autonomous Ego** | Lifecycle Controller | Governs single-agent lifecycle, identity, and high-level goal persistence. |
-| **Tier 4** | **Execution Engine** | The OODA Loop | Manages rapid Observe-Orient-Decide-Act cycles and environment interaction. |
-| **Tier 3** | **Complex Orchestration** | Planner & Workflow Builder | Graph/Workflow building (like n8n), node assembly, parallel/sequential task scheduling. |
-| **Tier 2** | **Cognitive Engines** | Curiosity & Exploration | Task decomposition, what-if scenarios, and exploration/curiosity engines. |
-| **Tier 1** | **Core Processing** | `kernel/` primitives | Classification, intention detection, and urgency measurement. |
-| **Tier 0** | **Base Foundation** | `shared/` | The bedrock. Most general functions, basic abstractions, and system standards. |
-
-### 🏢 Corporate Kernel & Architectural Analogies
-
-The Human Kernel operates as an "employee" within the broader Kea corporate infrastructure. To execute tasks, the Kernel must be equipped with knowledge and tools from its environment:
+The Human Kernel (Tier 7) operates as an "employee" within the broader Kea corporate infrastructure, utilizing the Tier 0-5 primitives to interact with the world:
 
 - **Orchestrator (The Office)**: Where the Human Kernel runs and processes its cognitive cycles.
-- **RAG Service (The Library/Knowledge)**: Provides the agent with necessary context, rules, skills, roles, and procedures to enhance context engineering.
-- **MCP Host (The Factory/Desk)**: The agent's workstation, loaded with tools (APIs, IDEs, local system commands) to manipulate the world.
+- **RAG Service (The Library/Knowledge)**: Provides the agent with necessary context, rules, skills, roles, and procedures.
+- **MCP Host (The Factory/Desk)**: The agent's workstation, loaded with tools to manipulate the world.
 - **Vault (The Data Center)**: System memory and context history database.
 
-**The Corporate Kernel (Tier 6+)**:
-The Kea "fractal corporation" scales recursively. Sitting above Tier 5 (the individual agent) is the **Corporate Kernel**. It handles macro-orchestration, dynamically spawning, assigning, and scaling multiple Human Kernels as needed based on task requirements and hardware availability.
-
-**Redesign Phase Focus**: Code implementations will first be prototyped in the `redesign/` directory. No production code changes will be made during this pure architecture phase. Additionally, all architectural designs, flows, and structures within the `redesign/` directory MUST be documented visually using Mermaid diagrams (````mermaid`).
+**The Corporate Kernel (Tier 8+)**:
+Governs the fractal corporation. It handles the dynamic allocation of resources and Human Kernels based on organizational demands.
 
 ---
 
