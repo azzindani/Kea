@@ -27,10 +27,34 @@ from shared.config import get_settings
         SubTaskItem(id="t3", description="Notify user", domain="comm", required_skills=[], required_tools=["email"], depends_on=["t2"], inputs=["clean"], outputs=["done"], parallelizable=True)
     ],
     # Scenario 3: Empty (Edge case)
-    []
+    [],
+    # Scenario 4: DYNAMIC SYSTEM SIMULATION (Plain Query -> Decomposition -> Planning)
+    "Get the stock price of Tesla, analyze the trend, and draft a summary report."
 ])
 async def test_advanced_planning_comprehensive(subtasks_data, inference_kit):
     """REAL SIMULATION: Verify Advanced Planning Kernel functions with multiple inputs."""
+    
+    # Handle Dynamic Case (Scenario 4) where input is a string, not a list
+    if isinstance(subtasks_data, str):
+        from kernel.task_decomposition.engine import decompose_goal
+        from kernel.task_decomposition.types import WorldState
+        
+        print(f"\n--- [DYNAMIC SYSTEM SIMULATION] ---")
+        print(f"Goal: '{subtasks_data}'")
+        
+        # 0. DECOMPOSE PLAIN QUERY (Tier 2)
+        ws = WorldState(goal=subtasks_data)
+        decomp_res = await decompose_goal(ws, kit=inference_kit)
+        assert decomp_res.is_success
+        
+        # Extract the list of SubTaskItems from the Result signal
+        subtasks_data = decomp_res.signals[0].body["data"]
+        # Convert dicts back to Pydantic if necessary (though plan_advanced handles raw dicts/models usually)
+        from kernel.task_decomposition.types import SubTaskItem
+        subtasks_data = [SubTaskItem(**t) if isinstance(t, dict) else t for t in subtasks_data]
+        
+        print(f"   [T2 SUCCESS]: Decomposed into {len(subtasks_data)} subtasks.")
+
     print(f"\n--- Testing Advanced Planning with {len(subtasks_data)} Subtasks ---")
 
     constraints = PlanningConstraints(priority_mode=PriorityMode.BALANCED)
