@@ -811,7 +811,32 @@ class ConsciousObserver:
 
         # T3: Pre-execution conscience gate
         if active_dag:
-            await run_pre_execution_check(active_dag, gate.identity_context, self._kit)
+            pre_exec_result = await run_pre_execution_check(active_dag, self._kit)
+            if not pre_exec_result.error and pre_exec_result.signals:
+                approval = pre_exec_result.signals[0].body["data"]
+                if approval.get("decision") == "rejected":
+                    # Guardrails blocked execution
+                    return ObserverExecuteResult(
+                        loop_result=LoopResult(
+                            agent_id=gate.identity_context.agent_id,
+                            total_cycles=0,
+                            termination_reason=LoopTerminationReason.LIFECYCLE_SIGNAL,
+                            final_state=_build_agent_state(gate.identity_context, spawn_request).model_dump(),
+                            total_duration_ms=0.0,
+                            total_cost=0.0,
+                            objectives_completed=[],
+                            artifacts_produced=["Execution blocked by pre-execution guardrails"],
+                        ),
+                        raw_artifact=approval.get("reasoning", "Rejected by guardrails"),
+                        recent_decisions=[],
+                        recent_outputs=[],
+                        objective=spawn_request.objective,
+                        total_cycles=0,
+                        was_simplified=False,
+                        was_escalated=True,
+                        was_aborted=False,
+                        execute_duration_ms=(time.perf_counter() - start) * 1000,
+                    )
 
         # T4: OODA loop with CLM monitoring
         agent_state = _build_agent_state(gate.identity_context, spawn_request)
@@ -1112,6 +1137,27 @@ class ConsciousObserver:
         """
         update_cognitive_state(processing_phase=ProcessingPhase.POST_EXECUTION)
 
+        elapsed_total = (time.perf_counter() - start_total) * 1000
+
+        # Short-circuit if execution was escalated or aborted
+        if exec_res.was_escalated or exec_res.was_aborted:
+            phase = ObserverPhase.ABORTED if exec_res.was_aborted else ObserverPhase.ESCALATED
+            return ConsciousObserverResult(
+                trace_id=trace_id,
+                agent_id=exec_res.loop_result.agent_id,
+                mode=gate.mode,
+                final_phase=phase,
+                partial_output=exec_res.raw_artifact,
+                total_duration_ms=elapsed_total,
+                total_cycles=exec_res.total_cycles,
+                gate_in_ms=gate_in_ms,
+                execute_ms=execute_ms,
+                gate_out_ms=0.0,
+                was_simplified=exec_res.was_simplified,
+                was_escalated=exec_res.was_escalated,
+                was_aborted=exec_res.was_aborted,
+            )
+
         settings = get_settings().kernel
         quality_bar = gate.identity_context.quality_bar
 
@@ -1119,10 +1165,11 @@ class ConsciousObserver:
         tool_output = _build_tool_output(exec_res.loop_result, trace_id)
 
         # T6: Hallucination Monitor
-        grounding_result = await verify_grounding(tool_output, evidence, self._kit)
         grounding: GroundingReport | None = None
-        if not grounding_result.error and grounding_result.signals:
-            grounding = _extract_grounding_report(grounding_result)
+        if evidence:
+            grounding_result = await verify_grounding(tool_output, evidence, self._kit)
+            if not grounding_result.error and grounding_result.signals:
+                grounding = _extract_grounding_report(grounding_result)
 
         grounding_score = grounding.grounding_score if grounding else 0.8
 
