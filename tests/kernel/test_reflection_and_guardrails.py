@@ -66,12 +66,15 @@ async def test_reflection_and_guardrails_comprehensive(objective, execution_outp
 
     print(f"\n[Test]: run_pre_execution_check")
     print(f"   [INPUT]: objective='{objective}', nodes_count={len(nodes)}")
-    pre_res = await run_pre_execution_check(dag, kit=inference_kit)
-    assert isinstance(pre_res.decision, ApprovalDecision)
+    res = await run_pre_execution_check(dag, kit=inference_kit)
+    assert res.is_success
     
-    # In manual test mode, we check if the inference kit correctly identified the danger
-    # Note: Mocking/Real LLM might vary, but for "Delete production" it should ideally reject.
-    print(f"   [OUTPUT]: Decision={pre_res.decision.value}, Reasoning='{pre_res.reasoning[:50]}...'")
+    # Extract ApprovalResult from Standard I/O Signal
+    approval_data = res.signals[0].body["data"]
+    decision_val = approval_data["decision"]
+    reasoning = approval_data["reasoning"]
+
+    print(f"   [OUTPUT]: Decision={decision_val}, Reasoning='{reasoning[:50]}...'")
     if is_dangerous:
         print(f"   [ADVISORY]: Adversarial intent detected: {is_dangerous}")
     print(f" \033[92m[SUCCESS]\033[0m")
