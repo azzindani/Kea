@@ -77,12 +77,13 @@ async def run_diagnostics():
             print(f"   [DB DISCOVERY]: Found tables: {', '.join(table_names)}")
 
             # Check all potential Knowledge tables
-            for k_table in [settings.knowledge.registry_table, "knowledge_store", "knowledge_registry"]:
+            for k_table in [settings.knowledge.registry_table, "knowledge_registry"]:
                 if k_table in table_names:
                     try:
                         k_data = await conn.fetchrow(f"SELECT COUNT(*) as total FROM {k_table}")
                         print(f"   [DB KNOWLEDGE ({k_table})]: {k_data['total']} rows")
-                    except: pass
+                    except Exception as e:
+                        print(f"   [DB KNOWLEDGE ({k_table})]: ❌ COUNT FAILED ({e})")
             
             # Check Tool Table
             t_table = "tool_registry"
@@ -90,7 +91,8 @@ async def run_diagnostics():
                 try:
                     t_data = await conn.fetchrow(f"SELECT COUNT(*) as total FROM {t_table}")
                     print(f"   [DB TOOLS]: {t_data['total']} rows")
-                except: pass
+                except Exception as e:
+                    print(f"   [DB TOOLS]: ❌ COUNT FAILED ({e})")
             else:
                 print(f"   [DB TOOLS]: ❌ Table '{t_table}' MISSING from DB")
             
@@ -104,20 +106,38 @@ async def run_diagnostics():
 
 
 async def trigger_knowledge_sync():
-    """Trigger the RAG Service to sync knowledge files from disk."""
+    """Trigger the RAG Service to sync knowledge files from disk (Blocking)."""
     settings = get_settings()
     rag_url = ServiceRegistry.get_url(ServiceName.RAG_SERVICE)
-    print(f"\n   [SYSTEM]: Triggering Knowledge Sync at {rag_url}...")
+    print(f"\n   [SYSTEM]: Triggering FORCED Knowledge Sync at {rag_url}...")
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.post(f"{rag_url}/knowledge/sync", json={})
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            # Call with background=False to block until done
+            resp = await client.post(f"{rag_url}/knowledge/sync?background=False")
             if resp.status_code == 200:
-                print("   [SYSTEM]: Knowledge sync started (Background Indexer active).")
-                print("   [SYSTEM]: Waiting 8s for base indexing...")
-                await asyncio.sleep(8)
+                print("   [SYSTEM]: Knowledge sync COMPLETED successfully.")
                 return True
+            else:
+                print(f"   [ERROR]: Sync failed with status {resp.status_code}: {resp.text}")
     except Exception as e:
         print(f"   [ERROR]: Failed to trigger knowledge sync: {e}")
+    return False
+
+
+async def trigger_tool_sync():
+    """Trigger the MCP Host to discvocer and sync tools to RAG (Blocking)."""
+    mcp_url = ServiceRegistry.get_url(ServiceName.MCP_HOST)
+    print(f"\n   [SYSTEM]: Triggering FORCED Tool Sync at {mcp_url}...")
+    try:
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            resp = await client.post(f"{mcp_url}/tools/sync?background=False")
+            if resp.status_code == 200:
+                print("   [SYSTEM]: Tool sync COMPLETED successfully.")
+                return True
+            else:
+                print(f"   [ERROR]: Tool sync failed with status {resp.status_code}: {resp.text}")
+    except Exception as e:
+        print(f"   [ERROR]: Failed to trigger tool sync: {e}")
     return False
 
 
@@ -181,8 +201,13 @@ async def test_tools_rag():
     
     try:
         registry = await get_tool_registry()
+        # Verify if we have tools indexed
+        tools = await registry.search_tools(query="", limit=1, min_similarity=0.0)
+        if not tools:
+             print("   [WARNING]: Tool registry reports 0 indexable items. Syncing...")
+             await trigger_tool_sync()
     except Exception as e:
-        print(f"   [STATUS]: ❌ Tool Registry UNREACHABLE")
+        print(f"   [STATUS]: ❌ Tool Registry UNREACHABLE ({e})")
         pytest.skip("Tool Registry missing")
 
     total_matches = 0

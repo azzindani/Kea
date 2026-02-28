@@ -1,12 +1,11 @@
-"""
-RAG Service Main.
-
-FastAPI service for fact storage and semantic search.
-"""
-
 from __future__ import annotations
 
+import asyncio
+import os
+import json
 from contextlib import asynccontextmanager
+from datetime import datetime, UTC
+from typing import List, Dict, Any, Optional
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from prometheus_client import make_asgi_app
@@ -432,56 +431,75 @@ async def get_knowledge(knowledge_id: str):
     )
 
 
+# Global lock to prevent concurrent knowledge sync jobs
+_sync_lock = asyncio.Lock()
+
 @app.post("/knowledge/sync")
-async def sync_knowledge(
-    request: KnowledgeSyncRequest,
-    background_tasks: BackgroundTasks,
-):
-    """Trigger background indexing of knowledge files from the knowledge/ directory."""
+async def sync_knowledge(background: bool = True):
+    """
+    Triggers a full synchronization of knowledge files from disk to the database.
+    
+    Args:
+        background: If True, returns immediately. If False, waits for sync to finish.
+    """
     if not knowledge_store:
         raise HTTPException(
             status_code=get_settings().status_codes.service_unavailable, 
             detail="Knowledge store not initialized"
         )
 
-    background_tasks.add_task(_sync_knowledge_job, request.domain, request.category)
-    return {"message": "Knowledge sync started"}
+    if background:
+        asyncio.create_task(_sync_knowledge_job())
+        return {"status": "sync_started", "detail": "Indexing in background"}
+    else:
+        await _sync_knowledge_job()
+        count = 0
+        if knowledge_store:
+            count = await knowledge_store.count()
+        return {"status": "sync_complete", "items_indexed": count}
 
 
-async def _sync_knowledge_job(
-    domain: str | None = None,
-    category: str | None = None,
-) -> None:
-    """Background job to index knowledge files."""
-    try:
-        from pathlib import Path
-        from knowledge.index_knowledge import scan_knowledge_files
-        
-        settings = get_settings()
-        # Resolve project root relative to this file
-        root_dir = Path(__file__).resolve().parents[2]
-        knowledge_dir = root_dir / settings.app.knowledge_dir
-        
-        logger.info(f"Knowledge Sync: Scanning directory {knowledge_dir}")
-        
-        if not knowledge_dir.exists():
-            logger.error(f"Knowledge Sync: Directory NOT FOUND at {knowledge_dir}")
-            return
+async def _sync_knowledge_job(domain: str | None = None, category: str | None = None):
+    """Background job to sync knowledge files from the library directory."""
+    if _sync_lock.locked():
+        logger.info("Knowledge sync already in progress, skipping duplicate request.")
+        return
 
-        items = scan_knowledge_files(knowledge_dir, domain_filter=domain, category_filter=category)
-        
-        logger.info(f"Knowledge Sync: Found {len(items)} items to index")
+    async with _sync_lock:
+        logger.info("🚀 Starting Knowledge Library Sync...")
+        try:
+            from pathlib import Path
+            from knowledge.index_knowledge import scan_knowledge_files
+            
+            settings = get_settings()
+            
+            # Resolve project root relative to this file
+            # services/rag_service/main.py -> Kea/
+            root_dir = Path(__file__).resolve().parents[2]
+            knowledge_dir = root_dir / settings.app.knowledge_dir
+            
+            logger.info(f"Scanning directory: {knowledge_dir}")
+            if not knowledge_dir.exists():
+                logger.error(f"Knowledge directory does not exist: {knowledge_dir}")
+                return
 
-        if items and knowledge_store:
-            updated = await knowledge_store.sync(items)
-            logger.info(f"Knowledge Sync: Success. {updated} items updated in DB.")
-        else:
-            if not items:
-                logger.warning("Knowledge Sync: No valid items found (check frontmatter 'name' fields).")
-            if not knowledge_store:
-                logger.error("Knowledge Sync: Knowledge store not initialized.")
-    except Exception as e:
-        logger.error(f"Knowledge sync failed: {e}", exc_info=True)
+            items = scan_knowledge_files(knowledge_dir, domain_filter=domain, category_filter=category)
+            
+            logger.info(f"Sync: Found {len(items)} items to process in library.")
+
+            if items and knowledge_store:
+                try:
+                    updated = await knowledge_store.sync(items)
+                    logger.info(f"✅ Sync Complete: {updated} items updated in database.")
+                except Exception as e:
+                    logger.error(f"❌ Sync Failed during database update: {e}", exc_info=True)
+            else:
+                if not items:
+                    logger.warning("Sync: No indexable items found in directory (check frontmatter 'name' fields).")
+                if not knowledge_store:
+                    logger.error("Sync: Knowledge store not initialized.")
+        except Exception as e:
+            logger.error(f"❌ Knowledge sync failed: {e}", exc_info=True)
 
 
 @app.get("/knowledge/stats/summary")

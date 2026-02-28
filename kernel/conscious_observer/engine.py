@@ -1267,6 +1267,12 @@ class ConsciousObserver:
         if isinstance(verdict, FilteredOutput):
             # PASS — clean up retry counter and return success
             clear_retry_budget(tool_output.output_id)
+            log.info(
+                "Gate-Out complete: PASS",
+                output_id=tool_output.output_id,
+                confidence=calibrated_confidence.calibrated_confidence if calibrated_confidence else 0.0,
+                content_preview=(verdict.content[:100] + "...") if len(verdict.content) > 100 else verdict.content,
+            )
             return ConsciousObserverResult(
                 trace_id=trace_id,
                 agent_id=exec_res.loop_result.agent_id,

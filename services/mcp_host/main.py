@@ -106,6 +106,22 @@ async def search_tools(request: ToolSearchRequest):
     return {"tools": tools}
 
 
+@app.post("/tools/sync")
+async def sync_tools(background: bool = True):
+    """
+    Triggers a full discovery and RAG registration of all MCP tools.
+    """
+    from services.mcp_host.core.session_registry import get_session_registry
+    registry = get_session_registry()
+    
+    if background:
+        asyncio.create_task(registry.register_discovered_tools())
+        return {"status": "sync_started", "detail": "Indexing in background"}
+    else:
+        await registry.register_discovered_tools()
+        return {"status": "sync_complete"}
+
+
 @app.post("/server/{server_name}/stop")
 async def stop_server(server_name: str):
     """Stop a specific server to free resources."""

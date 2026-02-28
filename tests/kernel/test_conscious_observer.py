@@ -47,8 +47,10 @@ async def test_conscious_observer_comprehensive(query, inference_kit):
         assert obs_res['final_phase'] == ObserverPhase.GATE_OUT
         assert obs_res['filtered_output'] is not None
         assert obs_res['calibrated_confidence'] is not None
-        conf_score = obs_res['calibrated_confidence'].get('score', 0.0)
+        conf_score = obs_res['calibrated_confidence'].get('calibrated_confidence', 0.0)
+        output_content = obs_res['filtered_output'].get('content', '')
         print(f"   [QUALITY]: Gated successfully? YES. Confidence: {conf_score:.2f}")
+        print(f"   [RESULT]: {output_content}")
 
     print(" \033[92m[SIMULATION STABLE]\033[0m")
 
