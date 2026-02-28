@@ -231,8 +231,7 @@ async def grade_claim(
     stop_words = frozenset({
         "the", "is", "a", "an", "are", "of", "to", "in", "and", "with", "some", "very",
         "today", "now", "here", "there", "this", "that", "these", "those",
-        "result", "context", "completed", "objectives", "artifacts", "produced",
-        "source", "evidence", "projections", "macroeconomic"
+        "result", "context", "completed", "objectives", "artifacts", "produced"
     })
     
     claim_tokens = tokenize(claim.text) - stop_words

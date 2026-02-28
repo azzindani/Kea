@@ -42,7 +42,7 @@ from kernel.confidence_calibrator.types import CalibratedConfidence
 from kernel.entity_recognition.engine import extract_entities
 from kernel.entity_recognition.types import ValidatedEntity
 from kernel.graph_synthesizer.engine import synthesize_plan
-from kernel.graph_synthesizer.types import ExecutableDAG
+from kernel.graph_synthesizer.types import ActionInstruction, DAGState, ExecutableDAG, ExecutableNode, NodeStatus
 from kernel.hallucination_monitor.engine import verify_grounding
 from kernel.hallucination_monitor.types import GroundingReport, Origin
 from kernel.intent_sentiment_urgency.engine import run_primitive_scorers
@@ -359,42 +359,57 @@ def _build_tool_output(loop_result: LoopResult, trace_id: str) -> ToolOutput:
 
 
 def _synthesize_artifact(loop_result: LoopResult) -> str:
-    """Produce a human-readable summary of what the OODA loop accomplished."""
+    """Produce a human-readable summary of what the OODA loop accomplished.
+
+    Prioritizes ACTUAL results from the world (action_outputs) over
+    metacognition about the loop process.
+    """
     parts: list[str] = []
 
     # 1. ACTUAL CONTENT (Primary)
     if loop_result.action_outputs:
-        # Include major content snippets as the main body
-        # We end with a period so they are extracted as separate claims
         valid_outputs = [o.strip() for o in loop_result.action_outputs if o]
         for out in valid_outputs:
-            suffix = "." if not out.endswith((".", "!", "?")) else ""
-            parts.append(f"Result: {out}{suffix}")
+            # Clean up 'key=value' noise if it's a generic field
+            clean_out = out
+            for noise_key in ("answer=", "output=", "content=", "text=", "result="):
+                if clean_out.lower().startswith(noise_key):
+                    clean_out = clean_out[len(noise_key):].strip()
+                    break
 
-    # 2. OBJECTIVES & ARTIFACTS (Secondary)
-    if loop_result.objectives_completed:
-        parts.append(
-            f"Completed objectives: {', '.join(loop_result.objectives_completed)}."
-        )
-    if loop_result.artifacts_produced:
-        parts.append(
-            f"Produced artifacts: {', '.join(loop_result.artifacts_produced[:10])}."
-        )
+            suffix = "." if not clean_out.endswith((".", "!", "?")) else ""
+            parts.append(f"Result: {clean_out}{suffix}")
 
-    # 3. CONTEXT (Metadata)
-    if loop_result.final_state:
-        context = loop_result.final_state.get("context", {})
-        if context:
-            summaries = [f"{k}={v}" for k, v in list(context.items())[:5]]
-            parts.append(f"Context: {'; '.join(summaries)}.")
-
+    # 2. META CONTEXT (Secondary)
     if not parts:
         parts.append(
-            f"Loop completed after {loop_result.total_cycles} cycles "
-            f"({loop_result.termination_reason.value})."
+            f"Objective reached in {loop_result.total_cycles} cycles."
         )
 
     return " ".join(parts)
+
+
+def _build_shortcut_dag(objective: str) -> ExecutableDAG:
+    """Manual construction of a trivial 1-node DAG for FAST mode."""
+    node_id = generate_id("node")
+    node = ExecutableNode(
+        node_id=node_id,
+        instruction=ActionInstruction(
+            task_id="shortcut",
+            description=objective,
+            action_type="llm_inference",
+        ),
+        status=NodeStatus.PENDING,
+    )
+    return ExecutableDAG(
+        dag_id=generate_id("dag"),
+        description=objective,
+        nodes=[node],
+        entry_node_ids=[node_id],
+        terminal_node_ids=[node_id],
+        execution_order=[node_id],
+        state=DAGState(pending_nodes=[node_id]),
+    )
 
 
 # ============================================================================
@@ -735,11 +750,14 @@ class ConsciousObserver:
         agent_state = _build_agent_state(gate.identity_context, spawn_request)
         stm = ShortTermMemory()
 
+        # T1 + T4: Shortcut OODA execution without synthesis overhead
+        active_dag = _build_shortcut_dag(spawn_request.objective)
+
         loop_result, decisions, outputs, simplified, escalated, aborted = (
             await self._run_ooda_with_clm(
                 agent_state=agent_state,
                 stm=stm,
-                active_dag=None,
+                active_dag=active_dag,
                 objective=spawn_request.objective,
                 activation_map=gate.activation_map,
                 rag_context=rag_context,
