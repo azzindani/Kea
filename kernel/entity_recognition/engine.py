@@ -265,13 +265,18 @@ async def extract_entities(
         fallback_model = entity_settings.get("fallback_nlp_model", "en_core_web_sm")
 
         try:
-            import spacy
-            # Try preferred, then fallback
-            try:
-                nlp = spacy.load(preferred_model)
-            except (OSError, ImportError):
-                log.info(f"Preferred model '{preferred_model}' not found, trying fallback '{fallback_model}'")
-                nlp = spacy.load(fallback_model)
+            import warnings
+            with warnings.catch_warnings():
+                # Silence spaCy's environment/GPU warnings in the kernel
+                warnings.filterwarnings("ignore", category=UserWarning, module="spacy")
+                import spacy
+                
+                # Try preferred, then fallback
+                try:
+                    nlp = spacy.load(preferred_model)
+                except (OSError, ImportError):
+                    log.info(f"Preferred model '{preferred_model}' not found, trying fallback '{fallback_model}'")
+                    nlp = spacy.load(fallback_model)
 
             doc = nlp(raw_text)
             for ent in doc.ents:
