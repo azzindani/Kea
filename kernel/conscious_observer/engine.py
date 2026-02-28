@@ -1004,10 +1004,11 @@ class ConsciousObserver:
             )
 
             # T6: Cognitive Load Monitor after every cycle
-            active_module_count = len(
-                [v for v in current_activation_map.module_states.values()
-                 if str(v).endswith("active")]
-            )
+            active_module_count = 0
+            for v in current_activation_map.module_states.values():
+                val = getattr(v, "value", str(v))
+                if val == "active" or str(v).endswith("active"):
+                    active_module_count += 1
             telemetry = CycleTelemetry(
                 cycle_number=cycle_num,
                 tokens_consumed=0,

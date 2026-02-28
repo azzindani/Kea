@@ -807,7 +807,7 @@ class KernelSettings(BaseModel):
     load_threshold_simplify: float = 0.6
     load_threshold_escalate: float = 0.8
     load_threshold_abort: float = 0.95
-    load_goal_drift_threshold: float = 0.4
+    load_goal_drift_threshold: float = 0.2
 
     # --- T6: Hallucination Monitor ---
     grounding_similarity_threshold: float = 0.65

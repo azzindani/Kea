@@ -294,6 +294,21 @@ async def detect_capability_gap(
         if "general" not in domains:
             missing_knowledge.append(f"domain:{signal_tags.domain}")
 
+    # Check ethical constraints (direct keyword matching on signal intent/domain)
+    # This ensures sensitive topics trigger escalation even if basic skills are present.
+    constraints = _constraint_boundaries
+    if identity is not None:
+        constraints = list(set(constraints) | set(identity.ethical_constraints))
+
+    for rule in constraints:
+        rule_lower = rule.lower()
+        # Check domain and intent against constraint keywords
+        if (
+            rule_lower in signal_tags.domain.lower() 
+            or rule_lower in signal_tags.intent.lower()
+        ):
+            constraint_violations.append(f"ethical_constraint:{rule}")
+
     # No gaps found
     if not missing_tools and not missing_knowledge and not constraint_violations:
         return None

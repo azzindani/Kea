@@ -97,10 +97,11 @@ def measure_load(
         )
 
     # Breadth dimension: active modules vs capacity
-    active_count = len([
-        v for v in activation_map.module_states.values()
-        if v.value == "active"
-    ])
+    active_count = 0
+    for v in activation_map.module_states.values():
+        val = getattr(v, "value", str(v))
+        if val == "active" or str(v).endswith("active"):
+            active_count += 1
     max_modules = max(1, telemetry.active_module_count or active_count)
     breadth_load = min(1.0, active_count / max(1, max_modules * 2))
 
@@ -290,11 +291,29 @@ async def detect_goal_drift(
 
     # Kernel-level heuristic: keyword overlap as similarity proxy.
     # The orchestrator service layer replaces this with embedding similarity.
-    objective_tokens = set(original_objective.lower().split())
+    stop_words = {
+        "a", "an", "the", "and", "or", "but", "if", "then", "else", "when",
+        "where", "why", "how", "what", "which", "who", "whom", "this",
+        "that", "these", "those", "am", "is", "are", "was", "were", "be",
+        "been", "being", "have", "has", "had", "do", "does", "did", "will",
+        "would", "shall", "should", "can", "could", "may", "might", "must",
+        "to", "of", "in", "for", "on", "with", "at", "by", "from", "up",
+        "down", "over", "under", "again", "further", "once", "here",
+        "there", "all", "any", "both", "each", "few", "more", "most",
+        "other", "some", "such", "no", "nor", "not", "only", "own",
+        "same", "so", "than", "too", "very", "s", "t", "just", "now",
+    }
+    objective_tokens = {
+        t for t in original_objective.lower().split()
+        if t.isalnum() and t not in stop_words
+    }
 
     similarities: list[float] = []
     for output_text in recent_outputs:
-        output_tokens = set(output_text.lower().split())
+        output_tokens = {
+            t for t in output_text.lower().split()
+            if t.isalnum() and t not in stop_words
+        }
         if not objective_tokens:
             similarities.append(0.0)
             continue
