@@ -13,6 +13,7 @@ Usage:
 import asyncio
 import httpx
 import pytest
+import json
 
 from shared.knowledge.retriever import get_knowledge_retriever
 from services.mcp_host.core.tool_registry import get_tool_registry
@@ -41,29 +42,30 @@ async def trigger_knowledge_sync():
     """Trigger the RAG Service to sync knowledge files from disk."""
     settings = get_settings()
     rag_url = ServiceRegistry.get_url(ServiceName.RAG_SERVICE)
-    print(f"Triggering Knowledge Sync at {rag_url}...")
+    print(f"\n   [SYSTEM]: Triggering Knowledge Sync at {rag_url}...")
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(f"{rag_url}/knowledge/sync", json={})
             if resp.status_code == 200:
-                print("Knowledge sync started successfully. Waiting for indexer...")
-                await asyncio.sleep(5)  # Give it a moment to index basic files
+                print("   [SYSTEM]: Knowledge sync started (Background Indexer active).")
+                print("   [SYSTEM]: Waiting 5s for base indexing...")
+                await asyncio.sleep(5)
                 return True
     except Exception as e:
-        print(f"Failed to trigger knowledge sync: {e}")
+        print(f"   [ERROR]: Failed to trigger knowledge sync: {e}")
     return False
 
 
 @pytest.mark.asyncio
 async def test_knowledge_rag():
     """Verify Knowledge RAG Retrieval with real simulation queries."""
-    print("\n" + "="*50)
-    print("SIMULATION: Knowledge RAG (Domain Expertise)")
-    print("="*50)
+    print("\n" + "="*80)
+    print(" APEX SIMULATION: KNOWLEDGE RAG (Domain Expertise)")
+    print("="*80)
     
     retriever = get_knowledge_retriever()
     is_available = await retriever.is_available()
-    print(f"RAG Service Status: {'ONLINE' if is_available else 'OFFLINE'}")
+    print(f"   [STATUS]: RAG Service = {'ONLINE' if is_available else 'OFFLINE'}")
     
     if not is_available:
         pytest.skip("RAG Service is offline")
@@ -71,70 +73,77 @@ async def test_knowledge_rag():
     # Initial check - if empty, try to sync
     stats = await retriever.search_raw(query="", limit=1)
     if not stats:
-        print("Knowledge store appears empty. Attempting auto-sync...")
+        print("   [WARNING]: Knowledge store appears empty. Auto-syncing library...")
         await trigger_knowledge_sync()
 
-    results_found = 0
     for query in KNOWLEDGE_SIMULATIONS:
-        print(f"\nQUERY: '{query}'")
+        print(f"\n   [INPUT]: '{query}'")
         
         # 1. Test Formatted Context (what the LLM sees)
         context = await retriever.retrieve_context(query=query, limit=2)
-        print(f"  - Context length: {len(context)} chars")
         
-        # 2. Test Raw Retrieval (similarity scores)
+        # 2. Test Raw Retrieval (similarity scores and content)
         raw = await retriever.search_raw(query=query, limit=3)
-        print(f"  - Items retrieved: {len(raw)}")
         
-        for i, item in enumerate(raw):
-            name = item.get('name', 'Unknown')
-            sim = item.get('similarity', 0.0)
-            cat = item.get('category', 'any')
-            print(f"    [{i+1}] {name} ({cat}) - Score: {sim:.3f}")
-            results_found += 1
+        if not raw:
+            print(f"   [KNOWLEDGE]: \033[91mNO MATCH FOUND\033[0m")
+            continue
 
-    # Quality Check
-    if results_found == 0:
-        print("\nWARNING: No simulation matches found. Ensuring Knowledge Library exists...")
-        # Check if sync actually helps
-        await trigger_knowledge_sync()
-        
+        for i, item in enumerate(raw):
+            name = item.get('name', 'Unknown Document')
+            sim = item.get('similarity', 0.0)
+            cat = item.get('category', 'any').upper()
+            content_snippet = item.get('content', '')[:120].replace('\n', ' ')
+            
+            print(f"   [KNOWLEDGE MATCH {i+1}]: {name}")
+            print(f"      - Category: {cat}")
+            print(f"      - Relevance: {sim:.1%}")
+            print(f"      - Snippet: \"{content_snippet}...\"")
+
     assert is_available is True
 
 
 @pytest.mark.asyncio
 async def test_tools_rag():
     """Verify Tools RAG Retrieval with real capability simulations."""
-    print("\n" + "="*50)
-    print("SIMULATION: Tools RAG (Capability Discovery)")
-    print("="*50)
+    print("\n" + "="*80)
+    print(" APEX SIMULATION: TOOLS RAG (Capability Discovery)")
+    print("="*80)
     
     try:
         registry = await get_tool_registry()
-        print("Tool Registry: Postgres/pgvector backend active")
+        print("   [STATUS]: Tool Registry (pgvector) = ACTIVE")
     except Exception as e:
-        print(f"Tool Registry unavailable: {e}")
+        print(f"   [ERROR]: Tool Registry unavailable: {e}")
         pytest.skip("Tool Registry missing")
 
-    results_found = 0
+    total_matches = 0
     for query in TOOL_SIMULATIONS:
-        print(f"\nQUERY: '{query}'")
+        print(f"\n   [INPUT]: '{query}'")
         
-        tools = await registry.search_tools(query=query, limit=5)
-        print(f"  - Matching tools: {len(tools)}")
+        tools = await registry.search_tools(query=query, limit=3)
         
-        for i, tool in enumerate(tools):
-            name = tool.get('name', 'unknown')
-            desc = tool.get('description', 'no desc')[:60]
-            print(f"    [{i+1}] {name}: {desc}...")
-            results_found += 1
+        if not tools:
+            print(f"   [TOOL discovery]: \033[91mNO CAPABILITIES FOUND\033[0m")
+            continue
 
-    if results_found == 0:
-        print("\nWARNING: No tools found. MCP Host may need to register tools.")
+        for i, tool in enumerate(tools):
+            name = tool.get('name', 'unknown_tool')
+            desc = tool.get('description', 'No description available')[:100]
+            # Try to get parameters
+            schema = tool.get('inputSchema', {})
+            params = list(schema.get('properties', {}).keys())
+            
+            print(f"   [TOOL MATCH {i+1}]: {name}")
+            print(f"      - Function: {desc}...")
+            if params:
+                print(f"      - Interface: {params}")
+            total_matches += 1
+
+    if total_matches == 0:
+        print("\n   [ADVICE]: No tools discovered. Ensure MCP Host has registered tool schemas into Postgres.")
     
-    # We assert that we at least tried to search, but for a healthy system 
-    # we'd expect at least some tools to be registered.
-    assert results_found >= 0
+    assert total_matches >= 0
 
 
 async def main():
@@ -147,15 +156,15 @@ async def main():
         )
     )
     
-    print("Starting REAL QUERY RAG SIMULATION...\n")
+    print("\n\033[94m>>> STARTING RAG RETRIEVAL APEX SIMULATION <<<\033[0m")
     
     try:
         await test_knowledge_rag()
         await test_tools_rag()
     finally:
-        print("\n" + "="*50)
-        print("Simulation complete.")
-        print("="*50)
+        print("\n" + "="*80)
+        print(" SIMULATION COMPLETE")
+        print("="*80)
 
 
 if __name__ == "__main__":

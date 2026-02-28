@@ -52,6 +52,9 @@ class PlanningConstraints(BaseModel):
         default_factory=list,
         description="MCP tools that must be available",
     )
+    quality_bar: float = Field(default=0.7, ge=0.0, le=1.0)
+    allowed_tools: list[str] = Field(default_factory=list)
+    forbidden_actions: list[str] = Field(default_factory=list)
 
 
 # ============================================================================

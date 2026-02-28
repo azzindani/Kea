@@ -856,7 +856,7 @@ class ConsciousObserver:
                 forbidden_actions=list(settings.guardrail_forbidden_actions),
             )
             # Hypotheses generation (tracked plan)
-            plan_result = await plan_advanced(subtasks, constraints, self._kit)
+            plan_result = await plan_advanced(subtasks, constraints, kit=self._kit)
             # In a full production implementation, hypotheses from plan_result 
             # would be injected into active_dag.state for OODA reflection.
 
