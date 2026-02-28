@@ -15,7 +15,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from kernel.activation_router.types import ActivationMap
-from kernel.classification.types import ClassificationResult
+from kernel.classification.types import ClassificationResult, FallbackTrigger
 from kernel.confidence_calibrator.types import CalibratedConfidence
 from kernel.entity_recognition.types import ValidatedEntity
 from kernel.hallucination_monitor.types import GroundingReport, Origin
@@ -93,7 +93,7 @@ class GateInResult(BaseModel):
     identity_context: IdentityContext
     signal_tags: SignalTags
     modality_output: ModalityOutput
-    classification: ClassificationResult
+    classification: ClassificationResult | FallbackTrigger
     cognitive_labels: CognitiveLabels
     entities: list[ValidatedEntity] = Field(default_factory=list)
     activation_map: ActivationMap

@@ -60,6 +60,7 @@ async def test_conscious_observer_with_evidence(inference_kit):
     objective = "What is the official GDP growth forecast for the Eurozone in 2024?"
     evidence = [
         Origin(
+            origin_id="ev-001",
             source="ECB Forecast Data", 
             content="The Eurosystem staff macroeconomic projections for the euro area see annual GDP growth at 0.6% in 2024.",
             trust_score=0.98

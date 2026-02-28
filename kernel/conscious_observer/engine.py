@@ -30,7 +30,11 @@ from kernel.activation_router.types import ActivationMap, ComplexityLevel
 from kernel.advanced_planning.engine import plan_advanced
 from kernel.advanced_planning.types import PlanningConstraints
 from kernel.classification.engine import classify
-from kernel.classification.types import ClassificationResult, ClassProfileRules
+from kernel.classification.types import (
+    ClassificationResult,
+    ClassProfileRules,
+    FallbackTrigger,
+)
 from kernel.cognitive_load_monitor.engine import monitor_cognitive_load
 from kernel.cognitive_load_monitor.types import CycleTelemetry, LoadAction, LoadRecommendation
 from kernel.confidence_calibrator.engine import run_confidence_calibration
@@ -118,10 +122,13 @@ def _extract_modality_output(result: Result) -> ModalityOutput:
     return ModalityOutput(**result.signals[0].body["data"])
 
 
-def _extract_classification(result: Result) -> ClassificationResult:
+def _extract_classification(result: Result) -> ClassificationResult | FallbackTrigger:
     if result.error or not result.signals:
         raise RuntimeError(f"classify failed: {result.error}")
-    return ClassificationResult(**result.signals[0].body["data"])
+    data = result.signals[0].body["data"]
+    if "reason" in data:
+        return FallbackTrigger(**data)
+    return ClassificationResult(**data)
 
 
 def _extract_cognitive_labels(result: Result) -> CognitiveLabels:
@@ -191,7 +198,7 @@ def _extract_dag(result: Result) -> ExecutableDAG | None:
 
 
 def _build_signal_tags(
-    classification: ClassificationResult,
+    classification: ClassificationResult | FallbackTrigger,
     labels: CognitiveLabels,
     entities: list[ValidatedEntity],
     modality_output: ModalityOutput,
@@ -209,6 +216,9 @@ def _build_signal_tags(
         complexity_hint = "moderate"
     else:
         complexity_hint = "complex"
+    
+    if isinstance(classification, FallbackTrigger):
+        complexity_hint = "complex"  # Fallback entries are inherently complex to resolve
 
     return SignalTags(
         urgency=urgency_str,
