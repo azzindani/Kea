@@ -386,8 +386,10 @@ def _synthesize_artifact(loop_result: LoopResult) -> str:
 
     # 2. META CONTEXT (Secondary)
     if not parts:
+        reason = loop_result.termination_reason.value
         parts.append(
-            f"Objective reached in {loop_result.total_cycles} cycles."
+            f"Execution completed in {loop_result.total_cycles} cycles. "
+            f"Status: {reason.replace('_', ' ').capitalize()}."
         )
 
     return " ".join(parts)
@@ -1301,39 +1303,7 @@ class ConsciousObserver:
                 reason=guidance.rejection_reason,
             )
 
-        # Budget exhausted or escalation
-        # 3. Construct the ToolOutput for Tier 6 (Noise Gate)
-        # If the OODA loop produced a specific artifact content, use it.
-        # Otherwise, provide a context-aware summary of the execution outcome.
-        # Note: 'objective' and 'uuid7_str' are not defined in this scope.
-        # Assuming 'objective' can be derived from 'gate.identity_context.objective'
-        # and 'uuid7_str' is imported or defined elsewhere.
-        # For now, using placeholders or assuming they are available.
-        # Also, 'exec_res.loop_result.reason' is not a direct attribute.
-        # Using 'exec_res.loop_result.termination_reason.value' instead.
-        from uuid_extensions import uuid7
-        from kernel.core.domain.tool_output import ToolOutput
 
-        objective = gate.identity_context.objective.objective_id if gate.identity_context.objective else "unknown"
-        final_content = exec_res.loop_result.final_state.get("content") # Assuming content might be in final_state
-        if not final_content or "Objective reached" in final_content:
-            final_content = (
-                f"Execution for objective '{objective}' completed "
-                f"after {exec_res.total_cycles} cycles. "
-                f"Refinement: {exec_res.loop_result.termination_reason.value}"
-            )
-
-        tool_output = ToolOutput(
-            output_id=f"out_{uuid7()}",
-            content=final_content,
-            metadata={
-                "objective": objective,
-                "cycles": exec_res.total_cycles,
-                "aborted": exec_res.was_aborted,
-                "escalated": exec_res.was_escalated,
-                "mode": gate.mode.value if gate.mode else "unknown"
-            }
-        )
         # Budget exhausted or escalation — return partial output with guidance
         return ConsciousObserverResult(
             trace_id=trace_id,

@@ -112,7 +112,7 @@ async def trigger_knowledge_sync():
     rag_url = ServiceRegistry.get_url(ServiceName.RAG_SERVICE)
     print(f"\n   [SYSTEM]: Triggering FORCED Knowledge Sync at {rag_url}...")
     try:
-        async with httpx.AsyncClient(timeout=300.0) as client:
+        async with httpx.AsyncClient(timeout=900.0) as client:
             # Call with background=False to block until done
             resp = await client.post(f"{rag_url}/knowledge/sync?background=False")
             if resp.status_code == 200:
@@ -130,7 +130,7 @@ async def trigger_tool_sync():
     mcp_url = ServiceRegistry.get_url(ServiceName.MCP_HOST)
     print(f"\n   [SYSTEM]: Triggering FORCED Tool Sync at {mcp_url}...")
     try:
-        async with httpx.AsyncClient(timeout=300.0) as client:
+        async with httpx.AsyncClient(timeout=900.0) as client:
             resp = await client.post(f"{mcp_url}/tools/sync?background=False")
             if resp.status_code == 200:
                 print("   [SYSTEM]: Tool sync COMPLETED successfully.")

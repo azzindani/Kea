@@ -25,6 +25,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+import sys
 
 from shared.config import get_settings
 
@@ -123,21 +124,29 @@ def _scan_markdown_files(
 
 
     settings = get_settings().knowledge
+    print(f"DEBUG: Scanning knowledge directory: {knowledge_dir.absolute()}", file=sys.stderr)
 
-    for md_file in knowledge_dir.rglob("*.md"):
+    all_md_files = list(knowledge_dir.rglob("*.md"))
+    print(f"DEBUG: Found {len(all_md_files)} total .md files in {knowledge_dir}", file=sys.stderr)
+
+    for md_file in all_md_files:
         # Skip README / documentation files
         if md_file.name.upper() in [f.upper() for f in settings.excluded_filenames]:
             continue
 
         try:
-            text = md_file.read_text(encoding="utf-8")
+            text = md_file.read_text(encoding="utf-8-sig")
         except Exception:
             continue
 
         meta, body = _parse_frontmatter(text)
 
-        # Skip files without a name (not knowledge items)
+        # Diagnostic: Skip files without a name or if they look like internal docs
         if not meta.get("name"):
+            if md_file.name.startswith("_") or "internal" in str(md_file).lower():
+                continue
+            # logger is not available globally here unless we import it, use stderr for raw debug
+            print(f"DEBUG: Skipping {md_file.name} - No 'name' field in frontmatter", file=sys.stderr)
             continue
 
         name: str = meta.get("name", md_file.stem.replace("_", " ").title())
