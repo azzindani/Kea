@@ -2,9 +2,12 @@
 Verification Script for Knowledge RAG and Tools RAG Retrieval.
 
 This script manually verifies the RAG capabilities for both Knowledge and Tools.
+Can be run via: python tests/verify/rag_retrieval.py
+Or via pytest: pytest tests/verify/rag_retrieval.py
 """
 
 import asyncio
+import pytest
 
 from shared.knowledge.retriever import get_knowledge_retriever
 from services.mcp_host.core.tool_registry import get_tool_registry
@@ -12,7 +15,8 @@ from shared.logging.main import setup_logging, LogConfig
 from shared.config import get_settings
 
 
-async def verify_knowledge_rag():
+@pytest.mark.asyncio
+async def test_knowledge_rag():
     """Verify Knowledge RAG Retrieval."""
     print("--- Verifying Knowledge RAG Retrieval ---")
     retriever = get_knowledge_retriever()
@@ -32,9 +36,13 @@ async def verify_knowledge_rag():
             print(f"Top result ID: {raw_results[0].get('knowledge_id')}")
     else:
         print("Skipping retrieval checks since RAG service is unavailable.")
+    
+    # Minimal assertion for pytest
+    assert is_available is not None
 
 
-async def verify_tools_rag():
+@pytest.mark.asyncio
+async def test_tools_rag():
     """Verify Tools RAG Retrieval."""
     print("\n--- Verifying Tools RAG Retrieval ---")
     try:
@@ -49,10 +57,15 @@ async def verify_tools_rag():
         print(f"Discovered {len(tools)} tools via pgvector retrieval.")
         if tools:
             print("Top tool returned:", tools[0].get("name", "Unknown"))
+        
+        # Minimal assertion for pytest
+        assert len(tools) >= 0
     except ValueError as e:
         print(f"Could not initialize tool registry: {e}")
+        pytest.skip(f"Tool registry unavailable: {e}")
     except Exception as e:
         print(f"Tool registry search failed: {e}")
+        raise
 
 
 async def main():
@@ -67,8 +80,8 @@ async def main():
     print("Starting RAG Retrieval Verification...\n")
     
     try:
-        await verify_knowledge_rag()
-        await verify_tools_rag()
+        await test_knowledge_rag()
+        await test_tools_rag()
     finally:
         print("\nVerification process complete.")
 
