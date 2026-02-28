@@ -218,10 +218,12 @@ async def grade_claim(
 
     # Basic keyword overlap as similarity proxy at kernel tier
     def tokenize(text: str) -> set[str]:
-        # Strip all common punctuation and convert to lowercase
+        # Split by whitespace AND common separators like slashes/dashes
+        raw_tokens = re.split(r'[\s\-/]+', text.lower())
         tokens = set()
-        for word in text.lower().split():
-            clean = word.strip(".,!?;:()[]{}'\"")
+        for t in raw_tokens:
+            # Strip remaining edge punctuation
+            clean = t.strip(".,!?;:()[]{}'\"")
             if clean:
                 tokens.add(clean)
         return tokens
@@ -229,7 +231,8 @@ async def grade_claim(
     stop_words = frozenset({
         "the", "is", "a", "an", "are", "of", "to", "in", "and", "with", "some", "very",
         "today", "now", "here", "there", "this", "that", "these", "those",
-        "result", "context", "completed", "objectives", "artifacts", "produced"
+        "result", "context", "completed", "objectives", "artifacts", "produced",
+        "source", "evidence", "projections", "macroeconomic"
     })
     
     claim_tokens = tokenize(claim.text) - stop_words

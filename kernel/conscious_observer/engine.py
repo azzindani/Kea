@@ -459,6 +459,13 @@ class ConsciousObserver:
         bound_log.info("ConsciousObserver.process started")
 
         try:
+            # If evidence is provided but no context, bridge them so the agent
+            # can actually see the data it needs to ground against later.
+            if evidence and not rag_context:
+                rag_context = {
+                    "source_evidence": [f"[{e.origin_id}] {e.content}" for e in evidence if e.content]
+                }
+
             # ─── PHASE 1: GATE-IN ────────────────────────────────────────
             gate_in_start = time.perf_counter()
             gate_in = await self._phase_gate_in(raw_input, spawn_request, trace_id)
