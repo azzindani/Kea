@@ -1025,8 +1025,8 @@ class ConsciousObserver:
             if cycle_result.action_results:
                 for ar in cycle_result.action_results:
                     if ar.outputs:
-                        summary = "; ".join(f"{k}={v}" for k, v in list(ar.outputs.items())[:3])
-                        recent_outputs.append(summary)
+                        for k, v in list(ar.outputs.items())[:3]:
+                             recent_outputs.append(f"{k}={v}")
 
             # Recover last decision from state snapshot
             agent_status = cycle_result.state_snapshot.get("status", "active")

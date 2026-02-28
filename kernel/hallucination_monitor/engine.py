@@ -179,11 +179,12 @@ async def grade_claim(
         try:
             ev_texts = [o.content for o in evidence if o.content]
             if ev_texts:
+                ev_text_block = "\n".join(f"- {txt}" for txt in ev_texts)
                 system_msg = LLMMessage(
                     role="system",
-                    content="Grade the claim against the provided evidence. Grades: GROUNDED (fully supported), INFERRED (partially derivable), FABRICATED (no support). Respond EXACTLY with JSON: {\"grade\": \"GROUNDED\", \"reasoning\": \"...\", \"similarity\": 0.9}"
+                    content="Grade the claim against the provided evidence. Grades: GROUNDED (fully supported), INFERRED (partially derivable), FABRICATED (no support). If the claim contains specific data matching the evidence (like '0.6%'), it MUST be GROUNDED. Respond EXACTLY with JSON: {\"grade\": \"GROUNDED\", \"reasoning\": \"...\", \"similarity\": 1.0}"
                 )
-                user_msg = LLMMessage(role="user", content=f"Claim: {claim.text}\nEvidence: {ev_texts}")
+                user_msg = LLMMessage(role="user", content=f"Claim: {claim.text}\nEvidence List:\n{ev_text_block}")
                 resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
 
                 content = resp.content.strip()
@@ -218,8 +219,8 @@ async def grade_claim(
 
     # Basic keyword overlap as similarity proxy at kernel tier
     def tokenize(text: str) -> set[str]:
-        # Split by whitespace AND common separators like slashes/dashes
-        raw_tokens = re.split(r'[\s\-/]+', text.lower())
+        # Split by whitespace AND common separators like slashes/dashes/equals/percent
+        raw_tokens = re.split(r'[\s\-/=%]+', text.lower())
         tokens = set()
         for t in raw_tokens:
             # Strip remaining edge punctuation

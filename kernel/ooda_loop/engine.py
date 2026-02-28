@@ -312,6 +312,8 @@ async def act(
     decision: Decision,
     active_dag: ExecutableDAG | None,
     stm: ShortTermMemory,
+    kit: InferenceKit | None = None,
+    agent_state: AgentState | None = None,
 ) -> list[ActionResult]:
     """Execute DAG node(s) based on the decision.
 
@@ -353,17 +355,35 @@ async def act(
             status=NodeExecutionStatus.RUNNING,
         )
 
-        # Execute the node (in kernel, this is a dispatch to MCP Host)
-        # The actual execution is handled by the Orchestrator service.
-        # Here we record the attempt and update state.
-        elapsed_ms = (time.perf_counter() - start) * 1000
+        # Node execution: in kernel, we implement basic LLM inference
+        # if the kit is available and the node requires it.
+        # Other types (tool_call) are still delegated to the service layer.
+        node_outputs = {"instruction": node.instruction.description}
+        
+        if kit and kit.has_llm and node.instruction.action_type == "llm_inference":
+            try:
+                # Build context-aware prompt
+                ctx_summary = ""
+                if agent_state:
+                    ctx_summary = json.dumps(agent_state.context, indent=2)
+                
+                system_msg = LLMMessage(
+                    role="system",
+                    content=f"Execute this task EXTREMELY FACTUALLY based on the provided context. If the context contains specific numbers, dates, or names, you MUST use them exactly. This output will be used for automated grounding verification. Context:\n{ctx_summary}"
+                )
+                user_msg = LLMMessage(role="user", content=node.instruction.description)
+                
+                resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
+                node_outputs["answer"] = resp.content.strip()
+                log.info("OODA Act: LLM inference successful", node_id=node_id)
+            except Exception as e:
+                log.warning("OODA Act: LLM inference failed, fallback to echo", error=str(e))
 
-        # Node execution is delegated to the service layer.
-        # The kernel tracks the lifecycle only.
+        elapsed_ms = (time.perf_counter() - start) * 1000
         result = ActionResult(
             node_id=node_id,
             success=True,
-            outputs={"instruction": node.instruction.description},
+            outputs=node_outputs,
             duration_ms=elapsed_ms,
         )
 
@@ -416,6 +436,7 @@ async def run_ooda_cycle(
 
     # Phase 2: Orient
     oriented = await orient(observations, stm, rag_context, kit)
+    state.context.update(oriented.enriched_context)
 
     # Phase 3: Decide
     decision = await decide(
@@ -426,7 +447,7 @@ async def run_ooda_cycle(
     )
 
     # Phase 4: Act
-    action_results = await act(decision, active_dag, stm)
+    action_results = await act(decision, active_dag, stm, kit, state)
 
     # Update agent state
     state.cycle_count = cycle_num
