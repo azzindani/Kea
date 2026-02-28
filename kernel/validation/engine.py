@@ -335,7 +335,7 @@ def _validation_result(ref: ModuleRef, start: float, error_resp: ErrorResponse) 
         detail=error_resp.model_dump(),
     )
     
-    log.warning(
+    log.info(
         "Validation failed",
         gate=error_resp.gate.value,
         message=error_resp.message,

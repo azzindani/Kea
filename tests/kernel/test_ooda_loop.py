@@ -7,7 +7,7 @@ from kernel.ooda_loop.engine import (
     act,
     run_ooda_loop
 )
-from kernel.ooda_loop.types import AgentState, EventStream, MacroObjective
+from kernel.ooda_loop.types import AgentState, EventStream, MacroObjective, DecisionAction, LoopTerminationReason
 from kernel.short_term_memory.engine import ShortTermMemory
 from shared.config import get_settings
 

@@ -6,8 +6,13 @@ from kernel.reflection_and_guardrails.engine import (
     evaluate_consensus,
     check_value_guardrails
 )
-from kernel.graph_synthesizer.types import ExecutableDAG
-from kernel.reflection_and_guardrails.types import ExecutionResult, ApprovalDecision
+from kernel.graph_synthesizer.types import ExecutableDAG, ExecutableNode, ActionInstruction
+from kernel.task_decomposition.types import SubTaskItem
+from kernel.reflection_and_guardrails.types import (
+    ExecutionResult, 
+    ApprovalDecision, 
+    HypothesisEvaluation
+)
 
 
 @pytest.mark.asyncio
@@ -41,12 +46,22 @@ async def test_reflection_and_guardrails_comprehensive(objective, execution_outp
     """REAL SIMULATION: Verify Reflection & Guardrails Kernel with adversarial security scenarios."""
     print(f"\n--- Testing Reflection & Guardrails: Objective='{objective}' ---")
 
-    from kernel.graph_synthesizer.types import ExecutableDAG, SubTaskItem
     # Create a more realistic DAG with nodes
-    nodes = [
-        SubTaskItem(id=f"node-{i}", description=f"Phase {i} of {objective}", domain="security" if "security" in objective.lower() else "general")
-        for i in range(1, 3)
-    ]
+    nodes = []
+    for i in range(1, 3):
+        task_id = f"node-{i}"
+        desc = f"Phase {i} of {objective}"
+        instruction = ActionInstruction(
+            task_id=task_id,
+            description=desc,
+            action_type="tool_call" if is_dangerous else "llm_inference",
+            required_tools=["sql_admin"] if "table" in objective.lower() else []
+        )
+        nodes.append(ExecutableNode(
+            node_id=task_id,
+            instruction=instruction
+        ))
+    
     dag = ExecutableDAG(dag_id="dag-audit-001", nodes=nodes, edges=[], description=objective)
 
     print(f"\n[Test]: run_pre_execution_check")
@@ -72,10 +87,9 @@ async def test_reflection_and_guardrails_comprehensive(objective, execution_outp
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: run_post_execution_reflection (Audit Loop)")
-    from kernel.reflection_and_guardrails.types import ExecutionResult, HypothesisEvaluation
     exec_res = ExecutionResult(
         dag_id=dag.dag_id, 
-        completed_nodes=[n.id for n in nodes], 
+        completed_nodes=[n.node_id for n in nodes], 
         outputs=execution_outputs,
         total_duration_ms=150.5
     )
