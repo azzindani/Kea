@@ -140,6 +140,8 @@ class SessionRegistry:
                 logger.info(f"Checking {dir_path.name} -> {server_script} (Exists: {server_script.exists()})")
                 if server_script.exists():
                     self._register_script(dir_path.name, server_script)
+        
+        logger.info(f"✅ Scanning COMPLETE: Found {len(self.server_configs)} servers and {len(self.discovered_tools)} tools.")
 
     def _register_script(self, server_name: str, script_path: Path):
         """Register a server script configuration."""

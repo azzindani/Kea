@@ -171,6 +171,7 @@ class PostgresToolRegistry:
                                     """, tool.name, new_hash, json.dumps(schema), embeddings[j])
                                     
                         logger.info(f"Registry: Committed batch {i//batch_size + 1} ({len(batch)} tools)")
+                        await asyncio.sleep(0.1)
                         break 
                     except Exception as e:
                         if attempt < settings.database.max_retries - 1:

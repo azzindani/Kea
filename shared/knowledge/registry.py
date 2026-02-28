@@ -202,8 +202,8 @@ class PostgresKnowledgeRegistry:
         logger.info(f"Knowledge Registry: Embedding {len(updates_needed)} new/modified items in batches...")
 
         # Senior Architect Fix: Chunked Batching to prevent OOM/Timeout on large libraries
-        logger.info(f"Registry: Syncing {len(updates_needed)} items to table '{self.table_name}' in batches of {batch_size}...")
         batch_size = 50
+        logger.info(f"Registry: Syncing {len(updates_needed)} items to table '{self.table_name}' in batches of {batch_size}...")
         total_updated = 0
         
         for i in range(0, len(updates_needed), batch_size):

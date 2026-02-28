@@ -76,8 +76,9 @@ async def run_diagnostics():
             table_names = [t['table_name'] for t in all_tables]
             print(f"   [DB DISCOVERY]: Found tables: {', '.join(table_names)}")
 
-            # Check all potential Knowledge tables
-            for k_table in [settings.knowledge.registry_table, "knowledge_registry"]:
+            # Check unique potential Knowledge tables
+            pot_tables = {settings.knowledge.registry_table, "knowledge_registry"}
+            for k_table in pot_tables:
                 if k_table in table_names:
                     try:
                         k_data = await conn.fetchrow(f"SELECT COUNT(*) as total FROM {k_table}")
