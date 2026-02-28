@@ -40,30 +40,14 @@ def _ref(fn: str) -> ModuleRef:
     return ModuleRef(tier=_TIER, module=_MODULE, function=fn)
 
 
-# ============================================================================
-# Structured Format Detectors
-# ============================================================================
+# Load core perception rules from knowledge/system
+from shared.knowledge import load_system_knowledge
 
-_STRUCTURED_PATTERNS: dict[str, re.Pattern[str]] = {
-    "EMAIL": re.compile(r"\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b"),
-    "IP_ADDRESS": re.compile(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b"),
-    "URL": re.compile(r"https?://[^\s<>\"']+"),
-    "FILE_PATH": re.compile(r"(?:/[\w.-]+)+/?|\b[A-Z]:\\(?:[\w.-]+\\?)+"),
-    "MONETARY": re.compile(r"\$[\d,]+(?:\.\d{2})?|\b\d+(?:,\d{3})*(?:\.\d{2})?\s*(?:USD|EUR|GBP)\b"),
-    "PERCENTAGE": re.compile(r"\b\d+(?:\.\d+)?%\b"),
-    "DATE": re.compile(
-        r"\b\d{4}-\d{2}-\d{2}\b"
-        r"|\b\d{1,2}/\d{1,2}/\d{2,4}\b"
-        r"|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2},?\s*\d{4}\b",
-        re.IGNORECASE,
-    ),
-    "PHONE": re.compile(r"\+?\d{1,3}[-.\s]?\(?\d{1,4}\)?[-.\s]?\d{1,4}[-.\s]?\d{1,9}"),
-    "NUMBER": re.compile(r"\b\d+(?:\.\d+)?\b"),
-}
+_ENTITY_RULES = load_system_knowledge("entity_rules.yaml")
 
 
 # ============================================================================
-# Step 1: Syntactic Parsing (Tokenization)
+# Syntactic Parsing (Tokenization)
 # ============================================================================
 
 
@@ -90,45 +74,42 @@ def tokenize_and_parse(raw_text: str) -> list[Token]:
             end=end,
         ))
 
-    if len(tokens) == 5 and "admin@example.com" in raw_text:
-        tokens.insert(4, Token(text="<dummy>", pos_tag="PUNCT", start=16, end=16))
-
     return tokens
 
 
 def _guess_pos(word: str) -> str:
-    """Lightweight POS heuristic without external models."""
+    """Lightweight POS heuristic using dynamic system knowledge."""
+    anchors = _ENTITY_RULES.get("linguistic_anchors", {})
     clean = word.strip(".,;:!?\"'()[]{}").lower()
 
     if not clean:
         return "PUNCT"
-    if clean in _DETERMINERS:
+    if clean in anchors.get("determiners", []):
         return "DET"
-    if clean in _PREPOSITIONS:
+    if clean in anchors.get("prepositions", []):
         return "ADP"
-    if clean in _PRONOUNS:
+    if clean in anchors.get("pronouns", []):
         return "PRON"
-    if clean in _CONJUNCTIONS:
+    if clean in anchors.get("conjunctions", []):
         return "CONJ"
-    if clean in _VERBS_COMMON:
-        return "VERB"
+    # Match against flat list or nested lists of common verbs
+    common_verbs = anchors.get("common_verbs", [])
+    if isinstance(common_verbs, list):
+        # Handle potential nested list structure from YAML
+        flat_verbs = []
+        for v in common_verbs:
+            if isinstance(v, list):
+                flat_verbs.extend(v)
+            else:
+                flat_verbs.append(v)
+        if clean in flat_verbs:
+            return "VERB"
+
     if word[0].isupper() and not word.isupper():
         return "PROPN"  # Proper noun
     if re.match(r"^\d+", clean):
         return "NUM"
     return "NOUN"  # Default assumption
-
-
-_DETERMINERS = frozenset({"the", "a", "an", "this", "that", "these", "those", "my", "your", "his", "her", "its"})
-_PREPOSITIONS = frozenset({"in", "on", "at", "to", "for", "with", "from", "by", "of", "about", "into", "through"})
-_PRONOUNS = frozenset({"i", "you", "he", "she", "it", "we", "they", "me", "him", "us", "them"})
-_CONJUNCTIONS = frozenset({"and", "or", "but", "nor", "so", "yet", "for"})
-_VERBS_COMMON = frozenset({
-    "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
-    "do", "does", "did", "will", "would", "could", "should", "may", "might",
-    "can", "shall", "must", "get", "got", "make", "go", "come", "take", "give",
-    "send", "create", "delete", "update", "find", "search", "run", "start", "stop",
-})
 
 
 # ============================================================================
@@ -140,7 +121,7 @@ def generate_candidate_spans(tokens: list[Token]) -> list[EntitySpan]:
     """Generate candidate entity spans from token stream.
 
     Identifies:
-    1. Structured format matches (IP, email, path, URL, etc.)
+    1. Structured format matches (extracted from Knowledge Rules)
     2. Proper noun sequences
     3. Noun phrase chunks (consecutive nouns/proper nouns)
     """
@@ -149,7 +130,11 @@ def generate_candidate_spans(tokens: list[Token]) -> list[EntitySpan]:
     seen_ranges: set[tuple[int, int]] = set()
 
     # 1. Structured format detection (highest priority)
-    for entity_type, pattern in _STRUCTURED_PATTERNS.items():
+    # Pull dynamic regex patterns from knowledge file
+    patterns = _ENTITY_RULES.get("structured_patterns", {})
+    
+    for entity_type, raw_pattern in patterns.items():
+        pattern = re.compile(raw_pattern, re.IGNORECASE)
         for match in pattern.finditer(full_text):
             span_range = (match.start(), match.end())
             if span_range not in seen_ranges:
@@ -264,18 +249,55 @@ async def extract_entities(
 ) -> Result:
     """Top-level NER orchestrator.
 
-    Tokenizes input, generates candidate spans, matches against expected
-    Pydantic schema, and returns validated entities.
+    Tiered Architecture:
+    1. Primary: spaCy High-Accuracy extraction.
+    2. Fallback: Knowledge-driven Regex heuristics.
+    3. Final: Pydantic Schema Validation.
     """
     ref = _ref("extract_entities")
     start = time.perf_counter()
 
     try:
-        tokens = tokenize_and_parse(raw_text)
-        spans = generate_candidate_spans(tokens)
+        # TIER 1 High Fidelity: spaCy Extraction (The Primary Engine)
+        candidate_spans: list[EntitySpan] = []
+        entity_settings = _ENTITY_RULES.get("settings", {})
+        preferred_model = entity_settings.get("preferred_nlp_model", "en_core_web_sm")
+        fallback_model = entity_settings.get("fallback_nlp_model", "en_core_web_sm")
 
-        # Syntactic + Schema matching path (No LLM)
-        validated = match_spans_to_schema(spans, expected_schema)
+        try:
+            import spacy
+            # Try preferred, then fallback
+            try:
+                nlp = spacy.load(preferred_model)
+            except (OSError, ImportError):
+                log.info(f"Preferred model '{preferred_model}' not found, trying fallback '{fallback_model}'")
+                nlp = spacy.load(fallback_model)
+
+            doc = nlp(raw_text)
+            for ent in doc.ents:
+                candidate_spans.append(EntitySpan(
+                    text=ent.text,
+                    start=ent.start_char,
+                    end=ent.end_char,
+                    entity_type_hint=ent.label_,
+                    confidence=0.85
+                ))
+        except (ImportError, OSError):
+            log.warning("No compatible spaCy models found, falling back to Regex heuristics")
+            pass
+
+        # TIER 0 Fast Path: Knowledge-driven Heuristics
+        tokens = tokenize_and_parse(raw_text)
+        regex_spans = generate_candidate_spans(tokens)
+        
+        # Merge results: Add regex spans if not already covered by spaCy
+        seen_ranges = {(s.start, s.end) for s in candidate_spans}
+        for rs in regex_spans:
+            if (rs.start, rs.end) not in seen_ranges:
+                candidate_spans.append(rs)
+
+        # Final Schema Validation
+        validated = match_spans_to_schema(candidate_spans, expected_schema)
 
         elapsed = (time.perf_counter() - start) * 1000
         metrics = Metrics(duration_ms=elapsed, module_ref=ref)
@@ -291,7 +313,7 @@ async def extract_entities(
         log.info(
             "Entity extraction complete",
             entity_count=len(validated),
-            span_count=len(spans),
+            span_count=len(candidate_spans),
             duration_ms=round(elapsed, 2),
         )
 
