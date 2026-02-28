@@ -814,7 +814,7 @@ class KernelSettings(BaseModel):
     load_goal_drift_threshold: float = 0.1
 
     # --- T6: Hallucination Monitor ---
-    grounding_similarity_threshold: float = 0.65
+    grounding_similarity_threshold: float = 0.5
     grounding_inferred_weight: float = 0.5
     grounding_grounded_weight: float = 1.0
     grounding_fabricated_weight: float = 0.0
