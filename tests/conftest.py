@@ -16,12 +16,21 @@ from shared.config import get_settings
 # ============================================================================
 
 def pytest_configure(config):
-    """Configure pytest markers."""
+    """Configure pytest markers and silence noisy library warnings."""
     config.addinivalue_line("markers", "unit: Unit tests (no API required)")
     config.addinivalue_line("markers", "integration: Integration tests (API required)")
     config.addinivalue_line("markers", "mcp: MCP tool tests (API required)")
     config.addinivalue_line("markers", "stress: Stress/load tests")
     config.addinivalue_line("markers", "slow: Slow-running tests")
+
+    # Silence noisy 3rd-party library warnings project-wide via pytest API
+    # This is more robust than the standard 'warnings' module for import-time noise.
+    config.addinivalue_line("filterwarnings", "ignore::SyntaxWarning:sqlalchemy.*")
+    config.addinivalue_line("filterwarnings", "ignore::UserWarning:spacy.*")
+    config.addinivalue_line("filterwarnings", "ignore:.*Jupyter notebook detected.*:UserWarning:spacy.*")
+    config.addinivalue_line("filterwarnings", "ignore::DeprecationWarning:httpx.*")
+    config.addinivalue_line("filterwarnings", "ignore::DeprecationWarning:asyncio.*")
+    config.addinivalue_line("filterwarnings", "ignore::DeprecationWarning:pydantic.*")
 
 
 # ============================================================================
