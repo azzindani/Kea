@@ -102,5 +102,7 @@ class FallbackTrigger(BaseModel):
     """
 
     reason: str = Field(..., description="Why the fallback was triggered")
+    top_label: str | None = Field(default=None, description="The best-guess label even if below threshold")
     best_guess: LabelScore | None = Field(default=None, description="Best candidate below threshold")
     candidates: list[LabelScore] = Field(default_factory=list, description="All candidates considered")
+    confidence: float = Field(default=0.0, description="Confidence of the best guess")

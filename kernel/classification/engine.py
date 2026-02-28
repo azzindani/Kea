@@ -245,7 +245,9 @@ def merge_classification_layers(
     if not merged:
         return FallbackTrigger(
             reason="No candidates produced by either classification layer",
+            top_label=None,
             candidates=[],
+            confidence=0.0,
         )
 
     # Sort by raw score
@@ -279,8 +281,10 @@ def merge_classification_layers(
 
     return FallbackTrigger(
         reason=f"Ambiguity: top '{top_label}' ({top_raw_score:.3f}) leads by only {lead_margin:.3f}",
+        top_label=top_label,
         best_guess=ranked_labels[0],
         candidates=ranked_labels,
+        confidence=top_raw_score,
     )
 
 

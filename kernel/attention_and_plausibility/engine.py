@@ -188,7 +188,6 @@ async def check_plausibility(
 
         except Exception as e:
             log.warning("LLM plausibility check failed", error=str(e))
-            pass
 
     # Determine verdict
     if issues:
