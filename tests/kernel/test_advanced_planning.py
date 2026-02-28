@@ -29,7 +29,7 @@ from shared.config import get_settings
     # Scenario 3: Empty (Edge case)
     [],
     # Scenario 4: DYNAMIC SYSTEM SIMULATION (Plain Query -> Decomposition -> Planning)
-    "Get the stock price of Tesla, analyze the trend, and draft a summary report."
+    "Compare the stock prices of Tesla, Apple, and Microsoft. Analyze the relative trends and draft a consolidated investment report."
 ])
 async def test_advanced_planning_comprehensive(subtasks_data, inference_kit):
     """REAL SIMULATION: Verify Advanced Planning Kernel functions with multiple inputs."""
@@ -37,7 +37,7 @@ async def test_advanced_planning_comprehensive(subtasks_data, inference_kit):
     # Handle Dynamic Case (Scenario 4) where input is a string, not a list
     if isinstance(subtasks_data, str):
         from kernel.task_decomposition.engine import decompose_goal
-        from kernel.task_decomposition.types import WorldState
+        from kernel.task_decomposition.types import WorldState, SubTaskItem as STItem
         
         print(f"\n--- [DYNAMIC SYSTEM SIMULATION] ---")
         print(f"Goal: '{subtasks_data}'")
@@ -48,12 +48,17 @@ async def test_advanced_planning_comprehensive(subtasks_data, inference_kit):
         assert decomp_res.is_success
         
         # Extract the list of SubTaskItems from the Result signal
-        subtasks_data = decomp_res.signals[0].body["data"]
-        # Convert dicts back to Pydantic if necessary (though plan_advanced handles raw dicts/models usually)
-        from kernel.task_decomposition.types import SubTaskItem
-        subtasks_data = [SubTaskItem(**t) if isinstance(t, dict) else t for t in subtasks_data]
+        raw_tasks = decomp_res.signals[0].body["data"]
+        subtasks_data = [STItem(**t) if isinstance(t, dict) else t for t in raw_tasks]
         
         print(f"   [T2 SUCCESS]: Decomposed into {len(subtasks_data)} subtasks.")
+        for i, task in enumerate(subtasks_data):
+            print(f"     - [SubTask {i+1}]: ID={task.id}")
+            print(f"       Description: {task.description}")
+            print(f"       Domain: {task.domain}")
+            print(f"       Tools: {task.required_tools}")
+            print(f"       Skills: {task.required_skills}")
+            print(f"       Depends On: {task.depends_on}")
 
     print(f"\n--- Testing Advanced Planning with {len(subtasks_data)} Subtasks ---")
 
