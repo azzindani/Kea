@@ -145,7 +145,7 @@ async def detect_intent_async(text: str, kit: InferenceKit | None = None) -> Int
         try:
             from shared.embedding.model_manager import get_model_manager
             embedder = get_model_manager()
-        except:
+        except Exception:
             embedder = None
 
     # Layer B: Embedding Proximity (Best Match)
@@ -258,7 +258,7 @@ async def analyze_sentiment_async(text: str, kit: InferenceKit | None = None) ->
         try:
             from shared.embedding.model_manager import get_model_manager
             embedder = get_model_manager()
-        except:
+        except Exception:
             embedder = None
 
     # Layer B: Embedding Proximity (Best Match)
@@ -371,7 +371,7 @@ async def score_urgency_async(text: str, kit: InferenceKit | None = None) -> Urg
         try:
             from shared.embedding.model_manager import get_model_manager
             embedder = get_model_manager()
-        except:
+        except Exception:
             embedder = None
 
     # Layer B: Embedding Proximity (Best Match)

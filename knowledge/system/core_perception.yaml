@@ -9,6 +9,7 @@ domain_anchors:
   communication: "human communication email messages and notifications"
   development: "software development coding programming and deployment"
   legal: "legal contracts compliance and regulatory documentation"
+  system: "system administration infrastructure control and technical management"
   general: "general greetings help requests and common questions"
 
 complexity_anchors:

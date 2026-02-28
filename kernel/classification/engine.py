@@ -227,10 +227,13 @@ def merge_classification_layers(
     ling_weight = settings.classification_linguistic_weight
     sem_weight = settings.classification_semantic_weight
 
-    # If semantic is unavailable, linguistic takes full weight
+    # Dynamic weight distribution based on layer availability
     if not semantic.candidates:
         ling_weight = 1.0
         sem_weight = 0.0
+    elif not linguistic.candidates:
+        ling_weight = 0.0
+        sem_weight = 1.0
 
     # Merge scores by label
     merged: dict[str, float] = {}
@@ -263,7 +266,7 @@ def merge_classification_layers(
 
     # Decision Rule: Raw confidence or Clear Lead (Best Match)
     threshold_met = top_raw_score >= threshold
-    clear_leader = lead_margin >= 0.10  # 10% lead in absolute cosine sim is a lot
+    clear_leader = lead_margin >= 0.05  # Lowered to 5% lead for CPU embedding resolution
 
     if threshold_met or clear_leader:
         return ClassificationResult(

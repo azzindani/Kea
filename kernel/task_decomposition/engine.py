@@ -375,8 +375,8 @@ async def decompose_goal(context: WorldState, kit: InferenceKit | None = None) -
         # Step 4: Map skills
         tasks = map_required_skills(sub_goals, dep_graph)
 
-        # Step 5: LLM Advanced Decomposition
-        if kit and kit.has_llm:
+        # Step 5: LLM Advanced Decomposition (Only for Non-Atomic goals)
+        if kit and kit.has_llm and assessment.level != ComplexityLevel.ATOMIC:
             try:
                 system_msg = LLMMessage(
                     role="system",

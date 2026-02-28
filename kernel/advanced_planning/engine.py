@@ -107,7 +107,7 @@ async def sequence_and_prioritize(
 
                 est_cost = float(data.get("cost", est_cost))
                 est_duration = float(data.get("duration_ms", est_duration))
-            except Exception:
+            except (ValueError, TypeError, KeyError, json.JSONDecodeError):
                 pass
 
         # Priority score: lower = execute first
