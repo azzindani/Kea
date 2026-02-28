@@ -81,13 +81,13 @@ def detect_missing_variables(
                     context="Required by schema but missing from world state",
                 ))
 
-    # If no specific fields found, create a general gap
+        # If no specific fields found, create a general gap
     if not gaps:
         gaps.append(KnowledgeGap(
-            field_name="unknown",
+            field_name="unresolved_context",
             expected_type="unknown",
             importance=0.5,
-            context=f"Validation failed: {message}",
+            context=f"The system encountered a validation error: '{message}'. Investigate the root cause and missing information.",
         ))
 
     return gaps
@@ -115,22 +115,24 @@ async def formulate_questions(
 
         # Format query based on strategy
         if strategy == ExplorationStrategy.RAG:
-            query_text = f"What is the value for '{gap.field_name}'? Context: {gap.context}"
+            query_text = f"What is the required value or configuration for '{gap.field_name}'? Context: {gap.context}"
         elif strategy == ExplorationStrategy.WEB:
             query_text = f"{gap.field_name} {gap.context}"
         else:  # SCAN
-            query_text = f"Discover tool or parameter: {gap.field_name}"
+            query_text = f"Investigate missing tool or parameter: {gap.field_name} related to {gap.context}"
 
         if kit and kit.has_llm:
             try:
                 system_msg = LLMMessage(
                     role="system",
                     content=(
-                        "Refine this query for better search results. Maintain its core intent. "
-                        "Respond EXACTLY with a JSON string: {\"query\": \"<refined_query>\"}"
+                        "You are the Kea Curiosity Engine. Your goal is to formulate a precise investigation query "
+                        "to resolve a system knowledge gap. Translate the provided technical gap into a natural language "
+                        "question or search term optimized for finding the missing information. "
+                        "Respond EXACTLY with a JSON string: {\"query\": \"<investigation_question>\"}"
                     )
                 )
-                user_msg = LLMMessage(role="user", content=f"Query: {query_text}")
+                user_msg = LLMMessage(role="user", content=f"Technical Gap: {gap.field_name}\nContext: {gap.context}")
                 resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
 
                 content = resp.content.strip()
