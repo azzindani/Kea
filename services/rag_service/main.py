@@ -58,17 +58,16 @@ async def lifespan(_app: FastAPI):
     # Initialize knowledge store (graceful fallback if DATABASE_URL not set)
     try:
         knowledge_store = create_knowledge_store()
-        logger.info("Knowledge store initialized")
+        # Explicitly trigger initialization (table creation) on startup
+        await knowledge_store._registry._get_pool()
+        logger.info("Knowledge store initialized and table verified")
 
         # Auto-sync knowledge files from the knowledge/ library on startup.
-        # This ensures domain expertise (skills, rules, procedures) is always
-        # available for retrieval without a manual POST /knowledge/sync call.
         import asyncio
-
         asyncio.create_task(_sync_knowledge_job())
         logger.info("Knowledge auto-sync scheduled (background)")
     except Exception as e:
-        logger.warning(f"Knowledge store unavailable: {e}")
+        logger.error(f"Knowledge store failed to start: {e}", exc_info=True)
         knowledge_store = None
 
     logger.info("RAG Service initialized")

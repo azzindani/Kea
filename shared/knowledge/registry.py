@@ -29,16 +29,27 @@ class PostgresKnowledgeRegistry:
 
     _init_lock: asyncio.Lock | None = None
 
-    def __init__(self, table_name: str | None = None) -> None:
+    def __init__(
+        self, 
+        table_name: str | None = None,
+        embedding_model: str | None = None,
+        dimension: int | None = None
+    ) -> None:
         """
         Initializes the PostgresKnowledgeRegistry.
 
         Args:
-            table_name: The name of the PostgreSQL table to use for knowledge storage (defaults to config).
+            table_name: The name of the PostgreSQL table to use for knowledge storage.
+            embedding_model: The name of the embedding model to use.
+            dimension: The dimension of the vector column.
         """
         settings = get_settings()
         self.table_name = table_name or settings.knowledge.registry_table
-        self.embedder = create_embedding_provider(use_local=settings.embedding.use_local)
+        self.embedder = create_embedding_provider(
+            model_name=embedding_model or settings.embedding.model_name,
+            use_local=settings.embedding.use_local
+        )
+        self.dimension = dimension or settings.embedding.dimension
         self._reranker = None
         self._rerank_lock = asyncio.Lock()
         self._pool: asyncpg.Pool | None = None
@@ -77,7 +88,7 @@ class PostgresKnowledgeRegistry:
                             content TEXT NOT NULL,
                             content_hash TEXT NOT NULL,
                             metadata JSONB DEFAULT '{{}}'::jsonb,
-                            embedding vector({settings.embedding.dimension}),
+                            embedding vector({self.dimension}),
                             version TEXT DEFAULT '{settings.knowledge.default_version}',
                             parent_id TEXT,
                             last_seen TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP

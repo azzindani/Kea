@@ -122,7 +122,7 @@ def split_into_sub_goals(assessment: ComplexityAssessment) -> list[SubGoal]:
     if assessment.level == ComplexityLevel.ATOMIC:
         sub_goals.append(SubGoal(
             id=generate_id("task"),
-            description=f"Execute {assessment.primary_intent} operation",
+            description=assessment.goal_description,
             domain=assessment.domains_involved[0] if assessment.domains_involved else "general",
             inputs=["goal_context"],
             outputs=["execution_result"],

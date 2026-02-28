@@ -353,12 +353,13 @@ async def synthesize_plan(
     objective: str,
     context: WorldState | None = None,
     kit: InferenceKit | None = None,
+    subtasks: list[SubTaskItem] | None = None,
 ) -> Result:
     """Top-level DAG synthesis orchestrator.
 
-    Takes a high-level objective, delegates decomposition to Tier 2,
-    maps sub-tasks to executable nodes, calculates edges, compiles
-    the DAG, and validates via What-If simulation.
+    Takes a high-level objective, delegates decomposition to Tier 2 (unless
+    already provided), maps sub-tasks to executable nodes, calculates edges,
+    compiles the DAG, and validates via What-If simulation.
     """
     ref = _ref("synthesize_plan")
     start = time.perf_counter()
@@ -368,24 +369,25 @@ async def synthesize_plan(
         context = WorldState(goal=objective)
 
     try:
-        # Step 0: Decompose via Tier 2
-        decomp_result = await decompose_goal(context, kit)
-        if not decomp_result.signals:
-            elapsed = (time.perf_counter() - start) * 1000
-            return fail(
-                error=processing_error(
-                    message="Goal decomposition produced no sub-tasks",
-                    source=ref,
-                ),
-                metrics=Metrics(duration_ms=elapsed, module_ref=ref),
-            )
+        # Step 0: Decompose via Tier 2 (only if not provided)
+        if subtasks is None:
+            decomp_result = await decompose_goal(context, kit)
+            if not decomp_result.signals:
+                elapsed = (time.perf_counter() - start) * 1000
+                return fail(
+                    error=processing_error(
+                        message="Goal decomposition produced no sub-tasks",
+                        source=ref,
+                    ),
+                    metrics=Metrics(duration_ms=elapsed, module_ref=ref),
+                )
 
-        # Extract SubTaskItems from decomposition signal
-        decomp_data = decomp_result.signals[0].body.get("data", [])
-        subtasks = [
-            SubTaskItem(**item) if isinstance(item, dict) else item
-            for item in decomp_data
-        ]
+            # Extract SubTaskItems from decomposition signal
+            decomp_data = decomp_result.signals[0].body.get("data", [])
+            subtasks = [
+                SubTaskItem(**item) if isinstance(item, dict) else item
+                for item in decomp_data
+            ]
 
         if not subtasks:
             elapsed = (time.perf_counter() - start) * 1000

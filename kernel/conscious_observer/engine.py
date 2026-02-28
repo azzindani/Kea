@@ -845,6 +845,7 @@ class ConsciousObserver:
                 objective=spawn_request.objective,
                 context=world_state,
                 kit=self._kit,
+                subtasks=subtasks,
             )
             active_dag = _extract_dag(plan_result)
 
