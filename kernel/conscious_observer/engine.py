@@ -192,7 +192,11 @@ def _extract_subtasks(result: Result) -> list[SubTaskItem]:
 def _extract_dag(result: Result) -> ExecutableDAG | None:
     if result.error or not result.signals:
         return None
-    return ExecutableDAG(**result.signals[0].body["data"])
+    data = result.signals[0].body["data"]
+    if isinstance(data, dict) and "dag" in data:
+        # From synthesize_plan nesting
+        return ExecutableDAG(**data["dag"])
+    return ExecutableDAG(**data)
 
 
 # ============================================================================
@@ -780,18 +784,18 @@ class ConsciousObserver:
 
         # T2: Decompose goal
         world_state = _build_world_state(spawn_request, gate.identity_context, rag_context)
-        subtasks_result = await decompose_goal(world_state, self._kit)
-        subtasks = _extract_subtasks(subtasks_result)
+        decomp_result = await decompose_goal(world_state, self._kit)
+        subtasks = _extract_subtasks(decomp_result)
 
-        # T2: What-if simulation for high-risk sub-tasks
-        if settings.conscious_observer_expected_cycle_ms > 0 and subtasks:
-            await simulate_outcomes(world_state, self._kit)
-
-        # T3: Synthesize DAG
+        # T3: Synthesize DAG (delegates to Tier 2 What-If simulation internally)
         active_dag: ExecutableDAG | None = None
         if subtasks:
-            dag_result = await synthesize_plan(subtasks, self._kit)
-            active_dag = _extract_dag(dag_result)
+            plan_result = await synthesize_plan(
+                objective=spawn_request.objective,
+                context=world_state,
+                kit=self._kit,
+            )
+            active_dag = _extract_dag(plan_result)
 
         # T3: Advanced planning (constraints from identity context)
         if active_dag and subtasks:
@@ -800,7 +804,10 @@ class ConsciousObserver:
                 allowed_tools=list(gate.identity_context.tools_allowed),
                 forbidden_actions=list(settings.guardrail_forbidden_actions),
             )
-            await plan_advanced(subtasks, constraints, self._kit)
+            # Hypotheses generation (tracked plan)
+            plan_result = await plan_advanced(subtasks, constraints, self._kit)
+            # In a full production implementation, hypotheses from plan_result 
+            # would be injected into active_dag.state for OODA reflection.
 
         # T3: Pre-execution conscience gate
         if active_dag:
