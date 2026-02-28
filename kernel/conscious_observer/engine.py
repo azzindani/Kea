@@ -362,33 +362,39 @@ def _synthesize_artifact(loop_result: LoopResult) -> str:
     """Produce a human-readable summary of what the OODA loop accomplished."""
     parts: list[str] = []
 
+    # 1. ACTUAL CONTENT (Primary)
+    if loop_result.action_outputs:
+        # Include major content snippets as the main body
+        # We end with a period so they are extracted as separate claims
+        valid_outputs = [o.strip() for o in loop_result.action_outputs if o]
+        for out in valid_outputs:
+            suffix = "." if not out.endswith((".", "!", "?")) else ""
+            parts.append(f"Result: {out}{suffix}")
+
+    # 2. OBJECTIVES & ARTIFACTS (Secondary)
     if loop_result.objectives_completed:
         parts.append(
-            f"Completed objectives: {', '.join(loop_result.objectives_completed)}"
+            f"Completed objectives: {', '.join(loop_result.objectives_completed)}."
         )
     if loop_result.artifacts_produced:
         parts.append(
-            f"Produced artifacts: {', '.join(loop_result.artifacts_produced[:10])}"
+            f"Produced artifacts: {', '.join(loop_result.artifacts_produced[:10])}."
         )
-    if loop_result.action_outputs:
-        # Include major content snippets
-        snippets = [o[:200] for o in loop_result.action_outputs if o]
-        if snippets:
-            parts.append(f"Action Outputs: {' | '.join(snippets[:5])}")
 
+    # 3. CONTEXT (Metadata)
     if loop_result.final_state:
         context = loop_result.final_state.get("context", {})
         if context:
             summaries = [f"{k}={v}" for k, v in list(context.items())[:5]]
-            parts.append(f"Context: {'; '.join(summaries)}")
+            parts.append(f"Context: {'; '.join(summaries)}.")
 
     if not parts:
         parts.append(
             f"Loop completed after {loop_result.total_cycles} cycles "
-            f"({loop_result.termination_reason.value})"
+            f"({loop_result.termination_reason.value})."
         )
 
-    return " | ".join(parts)
+    return " ".join(parts)
 
 
 # ============================================================================
