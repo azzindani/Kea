@@ -71,40 +71,28 @@ async def run_diagnostics():
     try:
         pool = await get_database_pool()
         async with pool.acquire() as conn:
-            # Check Knowledge Table
-            k_table = settings.knowledge.registry_table
-            try:
-                k_data = await conn.fetchrow(f"""
-                    SELECT COUNT(*) as total, 
-                           COUNT(embedding) as with_embedding,
-                           COUNT(CASE WHEN embedding is NULL THEN 1 END) as without_embedding
-                    FROM {k_table}
-                """)
-                print(f"   [DB KNOWLEDGE]: {k_data['total']} rows total ({k_data['with_embedding']} embedded, {k_data['without_embedding']} missing)")
-                
-                if k_data['total'] > 0:
-                    sample = await conn.fetch(f"SELECT knowledge_id, domain, category FROM {k_table} LIMIT 3")
-                    print(f"   [DB KNOWLEDGE SAMPLE]:")
-                    for s in sample:
-                        print(f"      - {s['knowledge_id']} | Domain: {s['domain']} | Cat: {s['category']}")
-            except Exception as e:
-                print(f"   [DB KNOWLEDGE ERROR]: {e}")
+            # Table Discovery - Find what's actually in this DB
+            all_tables = await conn.fetch("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")
+            table_names = [t['table_name'] for t in all_tables]
+            print(f"   [DB DISCOVERY]: Found tables: {', '.join(table_names)}")
+
+            # Check all potential Knowledge tables
+            for k_table in [settings.knowledge.registry_table, "knowledge_store", "knowledge_registry"]:
+                if k_table in table_names:
+                    try:
+                        k_data = await conn.fetchrow(f"SELECT COUNT(*) as total FROM {k_table}")
+                        print(f"   [DB KNOWLEDGE ({k_table})]: {k_data['total']} rows")
+                    except: pass
             
             # Check Tool Table
             t_table = "tool_registry"
-            try:
-                t_data = await conn.fetchrow(f"""
-                    SELECT COUNT(*) as total,
-                           COUNT(embedding) as with_embedding
-                    FROM {t_table}
-                """)
-                print(f"   [DB TOOLS]: {t_data['total']} rows total ({t_data['with_embedding']} embedded)")
-                
-                if t_data['total'] > 0:
-                    sample = await conn.fetch(f"SELECT tool_name FROM {t_table} LIMIT 3")
-                    print(f"   [DB TOOLS SAMPLE]: {[s['tool_name'] for s in sample]}")
-            except Exception as e:
-                print(f"   [DB TOOLS ERROR]: {e}")
+            if t_table in table_names:
+                try:
+                    t_data = await conn.fetchrow(f"SELECT COUNT(*) as total FROM {t_table}")
+                    print(f"   [DB TOOLS]: {t_data['total']} rows")
+                except: pass
+            else:
+                print(f"   [DB TOOLS]: ❌ Table '{t_table}' MISSING from DB")
             
             # Check Vector Extension
             ext_count = await conn.fetchval("SELECT COUNT(*) FROM pg_extension WHERE extname = 'vector'")

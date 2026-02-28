@@ -24,7 +24,12 @@ class KnowledgeStore:
     """
 
     def __init__(self) -> None:
-        self._registry = PostgresKnowledgeRegistry()
+        from shared.config import get_settings
+        settings = get_settings()
+        self._registry = PostgresKnowledgeRegistry(
+            table_name=settings.knowledge.registry_table,
+            embedding_model=settings.embedding.model_name
+        )
 
     async def search(
         self,
