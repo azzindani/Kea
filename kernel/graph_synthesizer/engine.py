@@ -369,7 +369,7 @@ async def synthesize_plan(
 
     try:
         # Step 0: Decompose via Tier 2
-        decomp_result = await decompose_goal(context)
+        decomp_result = await decompose_goal(context, kit)
         if not decomp_result.signals:
             elapsed = (time.perf_counter() - start) * 1000
             return fail(

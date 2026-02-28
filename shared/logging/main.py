@@ -301,7 +301,17 @@ except ImportError:
 
 def bind_contextvars(**kwargs): structlog.contextvars.bind_contextvars(**kwargs)
 def clear_contextvars(): structlog.contextvars.clear_contextvars()
-def get_logger(name: str) -> structlog.stdlib.BoundLogger: return structlog.get_logger(name).bind(**DEFAULT_FLAGS)
+def get_logger(name: str) -> structlog.stdlib.BoundLogger: 
+    # Lazy sync of default flags if they are still unknown
+    if DEFAULT_FLAGS["env"] == "unknown":
+        try:
+            from shared.config import get_settings
+            settings = get_settings()
+            DEFAULT_FLAGS["env"] = settings.app.environment
+            DEFAULT_FLAGS["version"] = settings.app.version
+        except Exception:
+            pass
+    return structlog.get_logger(name).bind(**DEFAULT_FLAGS)
 
 def log_input(source: str, data: Any, **kw):
     env = IOEnvelope(type=IOType.INPUT, source=source, data=data, **kw)

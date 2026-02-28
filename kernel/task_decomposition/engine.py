@@ -15,7 +15,7 @@ import time
 
 from kernel.entity_recognition import extract_entities
 from kernel.entity_recognition.types import ValidatedEntity as ValidatedEntityType
-from kernel.intent_sentiment_urgency import IntentLabel, detect_intent
+from kernel.intent_sentiment_urgency import IntentLabel, detect_intent, detect_intent_async
 from shared.config import get_settings
 from shared.id_and_hash import generate_id
 from shared.inference_kit import InferenceKit
@@ -98,6 +98,7 @@ async def analyze_goal_complexity(
         level=level,
         estimated_sub_tasks=est_tasks,
         primary_intent=intent.primary.value,
+        goal_description=context.goal,
         entity_count=entity_count,
         domains_involved=domains,
         reasoning=reasoning,
@@ -131,7 +132,7 @@ def split_into_sub_goals(assessment: ComplexityAssessment) -> list[SubGoal]:
         for i in range(assessment.estimated_sub_tasks):
             sub_goals.append(SubGoal(
                 id=generate_id("task"),
-                description=f"Sub-task {i + 1} of {assessment.primary_intent}",
+                description=f"Sub-task {i + 1} of {assessment.goal_description or assessment.primary_intent}",
                 domain=assessment.domains_involved[0] if assessment.domains_involved else "general",
                 inputs=[f"input_{i}"] if i == 0 else [f"output_{i - 1}"],
                 outputs=[f"output_{i}"],
@@ -141,7 +142,7 @@ def split_into_sub_goals(assessment: ComplexityAssessment) -> list[SubGoal]:
         for i, domain in enumerate(assessment.domains_involved):
             sub_goals.append(SubGoal(
                 id=generate_id("task"),
-                description=f"{domain} domain task for {assessment.primary_intent}",
+                description=f"{domain} domain task for {assessment.goal_description or assessment.primary_intent}",
                 domain=domain,
                 inputs=["goal_context"],
                 outputs=[f"domain_result_{domain}"],
@@ -346,7 +347,7 @@ async def decompose_goal(context: WorldState, kit: InferenceKit | None = None) -
 
     try:
         # Use T1 primitives for analysis
-        intent = detect_intent(context.goal)
+        intent = await detect_intent_async(context.goal, kit)
 
         # Simple entity extraction using a generic schema
         from pydantic import BaseModel as GenericSchema

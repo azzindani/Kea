@@ -456,21 +456,33 @@ async def _sync_knowledge_job(
     """Background job to index knowledge files."""
     try:
         from pathlib import Path
-
         from knowledge.index_knowledge import scan_knowledge_files
-
         
         settings = get_settings()
+        # Resolve project root relative to this file
         root_dir = Path(__file__).resolve().parents[2]
         knowledge_dir = root_dir / settings.app.knowledge_dir
         
+        logger.info(f"Knowledge Sync: Scanning directory {knowledge_dir}")
+        
+        if not knowledge_dir.exists():
+            logger.error(f"Knowledge Sync: Directory NOT FOUND at {knowledge_dir}")
+            return
+
         items = scan_knowledge_files(knowledge_dir, domain_filter=domain, category_filter=category)
+        
+        logger.info(f"Knowledge Sync: Found {len(items)} items to index")
 
         if items and knowledge_store:
             updated = await knowledge_store.sync(items)
-            logger.info(f"Knowledge sync complete: {updated} items updated")
+            logger.info(f"Knowledge Sync: Success. {updated} items updated in DB.")
+        else:
+            if not items:
+                logger.warning("Knowledge Sync: No valid items found (check frontmatter 'name' fields).")
+            if not knowledge_store:
+                logger.error("Knowledge Sync: Knowledge store not initialized.")
     except Exception as e:
-        logger.error(f"Knowledge sync failed: {e}")
+        logger.error(f"Knowledge sync failed: {e}", exc_info=True)
 
 
 @app.get("/knowledge/stats/summary")

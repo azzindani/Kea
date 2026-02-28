@@ -65,6 +65,7 @@ class ComplexityAssessment(BaseModel):
         default_factory=list,
         description="Knowledge domains needed",
     )
+    goal_description: str = Field(default="", description="The original natural language goal")
     reasoning: str = Field(default="", description="Why this complexity level was chosen")
 
 
