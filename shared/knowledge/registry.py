@@ -188,83 +188,89 @@ class PostgresKnowledgeRegistry:
             logger.info("Knowledge Registry: All items up to date.")
             return 0
 
-        logger.info(f"Knowledge Registry: Embedding {len(updates_needed)} new/modified items...")
+        logger.info(f"Knowledge Registry: Embedding {len(updates_needed)} new/modified items in batches...")
 
-        texts = []
-        for item, _ in updates_needed:
-            embed_text = (
-                f"Knowledge: {item['name']}\n"
-                f"Description: {item['description']}\n"
-                f"Domain: {item['domain']}\n"
-                f"Tags: {', '.join(item.get('tags', []))}\n"
-                f"Content:\n{item['content'][:get_settings().knowledge.embedding_content_limit]}"
-            )
-            texts.append(embed_text)
+        # Senior Architect Fix: Chunked Batching to prevent OOM/Timeout on large libraries
+        batch_size = 50
+        total_updated = 0
+        
+        for i in range(0, len(updates_needed), batch_size):
+            batch = updates_needed[i : i + batch_size]
+            batch_texts = []
+            for item, _ in batch:
+                embed_text = (
+                    f"Knowledge: {item['name']}\n"
+                    f"Description: {item['description']}\n"
+                    f"Domain: {item['domain']}\n"
+                    f"Tags: {', '.join(item.get('tags', []))}\n"
+                    f"Content:\n{item['content'][:get_settings().knowledge.embedding_content_limit]}"
+                )
+                batch_texts.append(embed_text)
 
-        settings = get_settings()
-        max_retries = settings.database.max_retries
-        retry_delay = settings.database.retry_delay
+            settings = get_settings()
+            max_retries = settings.database.max_retries
+            retry_delay = settings.database.retry_delay
 
-        for attempt in range(max_retries):
-            try:
-                embeddings = await self.embedder.embed(texts)
+            batch_success = False
+            for attempt in range(max_retries):
+                try:
+                    # 1. Generate embeddings for the batch
+                    embeddings = await self.embedder.embed(batch_texts)
 
-                async with pool.acquire() as conn:
-                    await register_vector(conn)
+                    # 2. Bulk Insert/Upsert in a single transaction
+                    async with pool.acquire() as conn:
+                        async with conn.transaction():
+                            await register_vector(conn)
+                            for j, (item, content_hash) in enumerate(batch):
+                                tags = item.get("tags", [])
+                                metadata = json.dumps(item.get("metadata", {}))
 
-                    for i, (item, content_hash) in enumerate(updates_needed):
-                        tags = item.get("tags", [])
-                        metadata = json.dumps(item.get("metadata", {}))
+                                await conn.execute(
+                                    f"""
+                                    INSERT INTO {self.table_name}
+                                        (knowledge_id, name, description, domain, category,
+                                         tags, content, content_hash, metadata, embedding, version, parent_id)
+                                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12)
+                                    ON CONFLICT (knowledge_id) DO UPDATE SET
+                                        name = EXCLUDED.name,
+                                        description = EXCLUDED.description,
+                                        domain = EXCLUDED.domain,
+                                        category = EXCLUDED.category,
+                                        tags = EXCLUDED.tags,
+                                        content = EXCLUDED.content,
+                                        content_hash = EXCLUDED.content_hash,
+                                        metadata = EXCLUDED.metadata,
+                                        embedding = EXCLUDED.embedding,
+                                        version = EXCLUDED.version,
+                                        last_seen = CURRENT_TIMESTAMP
+                                    """,
+                                    item["knowledge_id"],
+                                    item["name"],
+                                    item["description"],
+                                    item["domain"],
+                                    item.get("category", settings.knowledge.default_category),
+                                    tags,
+                                    item["content"],
+                                    content_hash,
+                                    metadata,
+                                    embeddings[j],
+                                    item.get("version", settings.knowledge.default_version),
+                                    item.get("parent_id"),
+                                )
+                    
+                    total_updated += len(batch)
+                    logger.info(f"Knowledge Registry: Committed batch {i//batch_size + 1} ({len(batch)} items)")
+                    batch_success = True
+                    break
 
-                        await conn.execute(
-                            f"""
-                            INSERT INTO {self.table_name}
-                                (knowledge_id, name, description, domain, category,
-                                 tags, content, content_hash, metadata, embedding, version, parent_id)
-                            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12)
-                            ON CONFLICT (knowledge_id) DO UPDATE SET
-                                name = EXCLUDED.name,
-                                description = EXCLUDED.description,
-                                domain = EXCLUDED.domain,
-                                category = EXCLUDED.category,
-                                tags = EXCLUDED.tags,
-                                content = EXCLUDED.content,
-                                content_hash = EXCLUDED.content_hash,
-                                metadata = EXCLUDED.metadata,
-                                embedding = EXCLUDED.embedding,
-                                version = EXCLUDED.version,
-                                parent_id = EXCLUDED.parent_id,
-                                last_seen = CURRENT_TIMESTAMP
-                            """,
-                            item["knowledge_id"],
-                            item["name"],
-                            item["description"],
-                            item["domain"],
-                            item.get("category", settings.knowledge.default_category),
-                            tags,
-                            item["content"],
-                            content_hash,
-                            metadata,
-                            embeddings[i],
-                            item.get("version", settings.knowledge.default_version),
-                            item.get("parent_id"),
-                        )
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"Batch sync failed (attempt {attempt+1}/{max_retries}): {e}. Retrying...")
+                        await asyncio.sleep(retry_delay)
+                    else:
+                        logger.error(f"Batch sync permanently failed at offset {i}: {e}")
 
-                logger.info(f"Knowledge Registry: Updated {len(updates_needed)} items.")
-                return len(updates_needed)
-
-            except Exception as e:
-                if attempt < max_retries - 1:
-                    logger.warning(
-                        f"Knowledge embedding failed (attempt {attempt + 1}/{max_retries}): "
-                        f"{e}. Retrying in {retry_delay}s..."
-                    )
-                    await asyncio.sleep(retry_delay)
-                    retry_delay *= 2
-                else:
-                    logger.error(f"Knowledge embedding failed after {max_retries} attempts: {e}")
-
-        return 0
+        return total_updated
 
     async def _get_reranker(self):
         """Lazy load reranker (mirrors Vault's postgres_store pattern)."""
