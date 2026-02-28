@@ -125,6 +125,7 @@ filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::PendingDeprecationWarning",
     "ignore::SyntaxWarning:sqlalchemy.*",
+    "ignore:\"is not\" with 'tuple' literal:SyntaxWarning",
     "ignore::UserWarning:spacy.*",
     "ignore:.*Jupyter notebook detected.*:UserWarning:spacy.*",
     "ignore::DeprecationWarning:httpx.*",
