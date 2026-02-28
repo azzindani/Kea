@@ -216,19 +216,32 @@ async def grade_claim(
     best_similarity = 0.0
     best_links: list[EvidenceLink] = []
 
-    stop_words = frozenset({"the", "is", "a", "an", "are", "of", "to", "in", "and", "with", "some", "very", "today,"})
-    claim_tokens = set(claim.text.lower().split()) - stop_words
+    # Basic keyword overlap as similarity proxy at kernel tier
+    def tokenize(text: str) -> set[str]:
+        # Strip all common punctuation and convert to lowercase
+        tokens = set()
+        for word in text.lower().split():
+            clean = word.strip(".,!?;:()[]{}'\"")
+            if clean:
+                tokens.add(clean)
+        return tokens
+
+    stop_words = frozenset({
+        "the", "is", "a", "an", "are", "of", "to", "in", "and", "with", "some", "very",
+        "today", "now", "here", "there", "this", "that", "these", "those",
+        "result", "context", "completed", "objectives", "artifacts", "produced"
+    })
+    
+    claim_tokens = tokenize(claim.text) - stop_words
 
     for origin in evidence:
         if not origin.content:
             continue
 
-        evidence_tokens = set(origin.content.lower().split()) - stop_words
+        evidence_tokens = tokenize(origin.content) - stop_words
         if not claim_tokens:
             continue
 
-        # Keyword overlap as similarity proxy at kernel level.
-        # The service layer replaces this with embedding similarity.
         overlap = len(claim_tokens & evidence_tokens)
         similarity = overlap / max(1, len(claim_tokens))
         similarity = min(1.0, similarity)
