@@ -106,3 +106,28 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s [%(levelname)s] %(message)s"
+addopts = "-v --tb=short --strict-markers"
+markers = [
+    "unit: Unit tests (fast, no external deps)",
+    "integration: Integration tests (require running services)",
+    "mcp: MCP tool tests (require API)",
+    "stress: Stress/load tests",
+    "slow: Slow tests",
+    "simulation: Simulation tests with real API calls",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+    "ignore::SyntaxWarning:sqlalchemy.*",
+    "ignore::UserWarning:spacy.*",
+    "ignore:.*Jupyter notebook detected.*:UserWarning:spacy.*",
+    "ignore::DeprecationWarning:httpx.*",
+    "ignore::DeprecationWarning:asyncio.*",
+    "ignore::DeprecationWarning:pydantic.*",
+]

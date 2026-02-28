@@ -7,7 +7,7 @@ from kernel.reflection_and_guardrails.engine import (
     check_value_guardrails
 )
 from kernel.graph_synthesizer.types import ExecutableDAG
-from kernel.reflection_and_guardrails.types import ExecutionResult
+from kernel.reflection_and_guardrails.types import ExecutionResult, ApprovalDecision
 
 
 @pytest.mark.asyncio

@@ -11,7 +11,7 @@ import json
 import time
 from typing import Any
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, TypeAdapter
 
 from shared.config import get_settings
 from shared.inference_kit import InferenceKit
@@ -126,7 +126,11 @@ def check_types(
     parsed_data: dict[str, Any],
     expected_schema: type[BaseModel],
 ) -> TypeResult:
-    """Confirm that each value matches its expected type annotation."""
+    """Confirm that each value matches its expected type annotation.
+    
+    Uses TypeAdapter to perform pure type validation, ignoring constraints
+    on the Field itself (which are handled in Gate 4: Bounds).
+    """
     schema_fields = expected_schema.model_fields
     mismatches: list[TypeMismatch] = []
 
@@ -139,23 +143,16 @@ def check_types(
         if annotation is None:
             continue
 
-        # Use Pydantic's own validation for accurate type checking
         try:
-            # Construct a minimal model for this field
-            expected_schema.model_validate(
-                {**{k: parsed_data.get(k) for k in schema_fields if k in parsed_data}},
-            )
-        except ValidationError as exc:
-            for error in exc.errors():
-                if error["loc"] and str(error["loc"][0]) == field_name:
-                    mismatches.append(TypeMismatch(
-                        field=field_name,
-                        expected_type=str(annotation),
-                        actual_type=type(value).__name__,
-                        value=str(value)[:200],
-                    ))
-            if mismatches:
-                break
+            # Use TypeAdapter for isolated type validation
+            TypeAdapter(annotation).validate_python(value)
+        except ValidationError:
+            mismatches.append(TypeMismatch(
+                field=field_name,
+                expected_type=str(annotation),
+                actual_type=type(value).__name__,
+                value=str(value)[:200],
+            ))
 
     return TypeResult(passed=not mismatches, mismatches=mismatches)
 
