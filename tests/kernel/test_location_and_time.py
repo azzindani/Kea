@@ -16,8 +16,11 @@ from shared.config import get_settings
 @pytest.mark.asyncio
 @pytest.mark.parametrize("input_text", [
     "Find sales in London yesterday.",
-    "Schedule a recurring check for inventory in Tokyo every Monday morning.",
-    "Search for historical documents in Rome from the 1st century.",
+    "Performance for the last 5 years.",
+    "I want macro economy data for APAC region.",
+    "Compare BRICS countries' GDP for the last decade.",
+    "Coordinate for Tokyo.",
+    "Summarize the Q1 results.",
     "Identify current weather in New York City.",
     ""
 ])
@@ -26,7 +29,8 @@ async def test_location_and_time_comprehensive(input_text, inference_kit):
     print(f"\n--- Testing Location & Time: Text='{input_text}' ---")
 
     from datetime import datetime
-    now = datetime.now()
+    # Fix the reference time to 2026-02-28 for consistent testing
+    now = datetime(2026, 2, 28, 17, 47, 0)
 
     print(f"\n[Test]: extract_temporal_signals")
     print(f"   [INPUT]: text='{input_text}', now='{now}'")
@@ -47,21 +51,28 @@ async def test_location_and_time_comprehensive(input_text, inference_kit):
     temp_range = resolve_temporal_hierarchy(temporal_signals, now)
     assert temp_range is not None
     print(f"   [OUTPUT]: Temporal range resolved")
+    print(f"     - [DATA]: Start={temp_range.start}, End={temp_range.end}")
+    print(f"     - [DATA]: Granularity={temp_range.granularity}")
+    print(f"     - [DATA]: Labels={temp_range.granular_labels}")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: resolve_spatial_hierarchy")
     print(f"   [INPUT]: {len(spatial_signals)} signals")
     from kernel.location_and_time.types import GeoAnchor
-    bounds = resolve_spatial_hierarchy(spatial_signals, GeoAnchor(latitude=0, longitude=0))
+    bounds = await resolve_spatial_hierarchy(spatial_signals, GeoAnchor(latitude=0, longitude=0))
     assert bounds is not None
     print(f"   [OUTPUT]: Spatial hierarchy resolved")
+    print(f"     - [DATA]: Label='{bounds.label}', Scope={bounds.scope}")
+    print(f"     - [DATA]: Constituents Count={len(bounds.constituent_labels)}")
+    if bounds.constituent_labels:
+        print(f"     - [DATA]: Sample Constituents={bounds.constituent_labels[:5]}...")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: fuse_spatiotemporal")
     print(f"   [INPUT]: Temporal range, Spatial bounds")
     st_block = fuse_spatiotemporal(temp_range, bounds)
     assert st_block is not None
-    print(f"   [OUTPUT]: Spatiotemporal fusion complete")
+    print(f"   [OUTPUT]: Spatiotemporal fusion complete (Confidence={st_block.fusion_confidence:.2f})")
     print(f" \033[92m[SUCCESS]\033[0m")
 
     print(f"\n[Test]: anchor_spatiotemporal")

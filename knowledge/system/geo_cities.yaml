@@ -1,0 +1,52 @@
+# Global Business Hubs - High Precision Cache
+# Used for instant offline geocoding and timezone resolution.
+
+cities:
+  Tokyo:
+    lat: 35.6895
+    lon: 139.6917
+    tz: "Asia/Tokyo"
+    country: "Japan"
+    region: "APAC"
+  London:
+    lat: 51.5074
+    lon: -0.1278
+    tz: "Europe/London"
+    country: "UK"
+    region: "EMEA"
+  New York:
+    lat: 40.7128
+    lon: -74.0060
+    tz: "America/New_York"
+    country: "USA"
+    region: "AMER"
+  Singapore:
+    lat: 1.3521
+    lon: 103.8198
+    tz: "Asia/Singapore"
+    country: "Singapore"
+    region: "APAC"
+  San Francisco:
+    lat: 37.7749
+    lon: -122.4194
+    tz: "America/Los_Angeles"
+    country: "USA"
+    region: "AMER"
+  Dubai:
+    lat: 25.2048
+    lon: 55.2708
+    tz: "Asia/Dubai"
+    country: "UAE"
+    region: "EMEA"
+  Mumbai:
+    lat: 19.0760
+    lon: 72.8777
+    tz: "Asia/Kolkata"
+    country: "India"
+    region: "APAC"
+  Berlin:
+    lat: 52.5200
+    lon: 13.4050
+    tz: "Europe/Berlin"
+    country: "Germany"
+    region: "EMEA"

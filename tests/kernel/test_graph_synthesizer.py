@@ -11,28 +11,95 @@ from kernel.task_decomposition.types import SubTaskItem, WorldState
 from shared.config import get_settings
 
 
+# --- Mock Asset Pools for Real Simulation ---
+SKILLS_POOL = [
+    "python_tier_3", "data_analysis", "sql_optimization", "web_scraping", 
+    "natural_language_understanding", "cloud_architecture", "api_integration", 
+    "security_auditing", "technical_writing", "latency_optimization"
+]
+
+TOOLS_POOL = [
+    "pandas", "numpy", "scikit_learn", "beautiful_soup", "selenium", 
+    "postgresql_client", "docker_engine", "kubernetes_cli", "aws_sdk", "azure_cli", 
+    "git_vCS", "jenkins_api", "slack_notifier", "google_workspace_api", "stripe_gateway", 
+    "openai_sdk", "anthropic_sdk", "pytorch", "tensorflow_serving", "redis_cache"
+]
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("subtasks_list, objective_text", [
-    # Scenario 1: Linear dependency
+    # Scenario 1: Linear dependency (Data Analysis Pipeline)
     (
         [
-            SubTaskItem(id="t1", description="Init", domain="core", required_skills=[], required_tools=[], depends_on=[], inputs=[], outputs=["state"], parallelizable=True),
-            SubTaskItem(id="t2", description="Work", domain="core", required_skills=[], required_tools=[], depends_on=["t1"], inputs=["state"], outputs=["done"], parallelizable=False)
+            SubTaskItem(
+                id="t1", 
+                description="Fetch raw sales data", 
+                domain="data", 
+                required_skills=[SKILLS_POOL[3], SKILLS_POOL[6]], # web_scraping, api_integration
+                required_tools=[TOOLS_POOL[3], TOOLS_POOL[12]], # beautiful_soup, slack_notifier
+                depends_on=[], 
+                inputs=[], 
+                outputs=["raw_data"], 
+                parallelizable=True
+            ),
+            SubTaskItem(
+                id="t2", 
+                description="Process and optimize data", 
+                domain="analytics", 
+                required_skills=[SKILLS_POOL[1], SKILLS_POOL[2]], # data_analysis, sql_optimization
+                required_tools=[TOOLS_POOL[0], TOOLS_POOL[5]], # pandas, postgresql_client
+                depends_on=["t1"], 
+                inputs=["raw_data"], 
+                outputs=["analytics_ready"], 
+                parallelizable=False
+            )
         ],
-        "Standard multi-step task"
+        "End-to-end Sales Analytics Pipeline"
     ),
-    # Scenario 2: Parallel tasks
+    # Scenario 2: Parallel tasks (Cloud Infrastructure Setup)
     (
         [
-            SubTaskItem(id="t1", description="Part A", domain="gen", required_skills=[], required_tools=[], depends_on=[], inputs=[], outputs=["a"], parallelizable=True),
-            SubTaskItem(id="t2", description="Part B", domain="gen", required_skills=[], required_tools=[], depends_on=[], inputs=[], outputs=["b"], parallelizable=True)
+            SubTaskItem(
+                id="t1", 
+                description="Provision AWS VPC", 
+                domain="infra", 
+                required_skills=[SKILLS_POOL[5]], # cloud_architecture
+                required_tools=[TOOLS_POOL[8]], # aws_sdk
+                depends_on=[], 
+                inputs=[], 
+                outputs=["vpc_id"], 
+                parallelizable=True
+            ),
+            SubTaskItem(
+                id="t2", 
+                description="Initialize Kubernetes Cluster", 
+                domain="infra", 
+                required_skills=[SKILLS_POOL[5], SKILLS_POOL[9]], # cloud_architecture, latency_optimization
+                required_tools=[TOOLS_POOL[7], TOOLS_POOL[18]], # kubernetes_cli, tensorflow_serving
+                depends_on=[], 
+                inputs=[], 
+                outputs=["cluster_endpoint"], 
+                parallelizable=True
+            )
         ],
-        "Parallel data gathering"
+        "Parallel Hybrid Cloud Provisioning"
     ),
-    # Scenario 3: Single task
+    # Scenario 3: Single task (Security Compliance Check)
     (
-        [SubTaskItem(id="t1", description="Only task", domain="simple", required_skills=[], required_tools=[], depends_on=[], inputs=[], outputs=[], parallelizable=True)],
-        "Single action goal"
+        [
+            SubTaskItem(
+                id="t1", 
+                description="Run SOC2 compliance scan", 
+                domain="security", 
+                required_skills=[SKILLS_POOL[7], SKILLS_POOL[8]], # security_auditing, technical_writing
+                required_tools=[TOOLS_POOL[6], TOOLS_POOL[10]], # docker_engine, git_vCS
+                depends_on=[], 
+                inputs=[], 
+                outputs=["audit_report"], 
+                parallelizable=True
+            )
+        ],
+        "Automated Security Compliance Audit"
     )
 ])
 async def test_graph_synthesizer_comprehensive(subtasks_list, objective_text, inference_kit):

@@ -700,6 +700,11 @@ class KernelSettings(BaseModel):
         "default": 0.1,        # ~10km
     }
 
+    # --- Geocoding & Mapping ---
+    geocoding_provider: str = "nominatim"  # options: nominatim, google, bing, mapbox
+    geocoding_api_key: str = ""           # required for Google/Bing/Mapbox
+    geocoding_user_agent: str = "Kea-OS/0.4.0"
+
     # --- T2: What-If / Simulation ---
     risk_threshold_approve: float = 0.3
     risk_threshold_reject: float = 0.7

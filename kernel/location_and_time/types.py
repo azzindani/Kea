@@ -21,8 +21,21 @@ class TemporalSignalType(StrEnum):
     """Type of temporal reference extracted from text."""
 
     ABSOLUTE = "absolute"     # "March 15th, 2024"
-    RELATIVE = "relative"     # "yesterday", "last week"
+    RELATIVE = "relative"     # "yesterday", "last week", "last 3 years"
     RANGE = "range"          # "between Q1 and Q2"
+
+
+class TimeGranularity(StrEnum):
+    """Temporal granularity for data slicing."""
+
+    DAY = "day"
+    WEEK = "week"
+    MONTH = "month"
+    QUARTER = "quarter"
+    SEMESTER = "semester"
+    YEAR = "year"
+    DECADE = "decade"
+    UNDEFINED = "undefined"
 
 
 class TemporalSignal(BaseModel):
@@ -40,6 +53,11 @@ class TemporalRange(BaseModel):
 
     start: datetime = Field(..., description="Range start (UTC)")
     end: datetime = Field(..., description="Range end (UTC)")
+    granularity: TimeGranularity = Field(default=TimeGranularity.UNDEFINED)
+    granular_labels: list[str] = Field(
+        default_factory=list,
+        description="Labels for the granules (e.g. ['2023', '2024', '2025'])"
+    )
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
     source_signals: list[str] = Field(
         default_factory=list,
@@ -50,6 +68,19 @@ class TemporalRange(BaseModel):
 # ============================================================================
 # Spatial Types
 # ============================================================================
+
+
+class GeographicScope(StrEnum):
+    """Geographic scope level."""
+
+    POINT = "point"
+    CITY = "city"
+    STATE = "state"
+    COUNTRY = "country"
+    REGION = "region"          # Macro-regions like APAC, EMEA
+    ORGANIZATION = "org"       # Groups like G20, BRICS
+    GLOBAL = "global"
+    UNDEFINED = "undefined"
 
 
 class SpatialSignalType(StrEnum):
@@ -84,6 +115,11 @@ class SpatialBounds(BaseModel):
     max_lat: float = Field(default=90.0, ge=-90.0, le=90.0)
     min_lon: float = Field(default=-180.0, ge=-180.0, le=180.0)
     max_lon: float = Field(default=180.0, ge=-180.0, le=180.0)
+    scope: GeographicScope = Field(default=GeographicScope.UNDEFINED)
+    constituent_labels: list[str] = Field(
+        default_factory=list,
+        description="List of constituent entities (e.g. ['Brazil', 'Russia', ...])"
+    )
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
     label: str = Field(default="", description="Resolved location name")
 

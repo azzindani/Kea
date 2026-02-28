@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 
 from shared.config import get_settings
 from shared.inference_kit import InferenceKit
+from shared.knowledge import load_system_knowledge
 from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
 from shared.standard_io import (
@@ -31,6 +32,7 @@ from shared.standard_io import (
 
 from .types import (
     GeoAnchor,
+    GeographicScope,
     SpatialBounds,
     SpatialSignal,
     SpatialSignalType,
@@ -38,7 +40,11 @@ from .types import (
     TemporalRange,
     TemporalSignal,
     TemporalSignalType,
+    TimeGranularity,
 )
+
+_GEO_REGIONS = load_system_knowledge("geo_regions.yaml")
+_GEO_CITIES = load_system_knowledge("geo_cities.yaml")
 
 log = get_logger(__name__)
 
@@ -66,6 +72,15 @@ _RELATIVE_PATTERNS: dict[str, re.Pattern[str]] = {
     "recently": re.compile(r"\brecently\b", re.IGNORECASE),
     "now": re.compile(r"\bright?\s*now\b", re.IGNORECASE),
     "last_hour": re.compile(r"\blast\s+hour\b", re.IGNORECASE),
+    # Complex relative patterns
+    "last_x_days": re.compile(r"\blast\s+(\d+)\s+days?\b", re.IGNORECASE),
+    "last_x_weeks": re.compile(r"\blast\s+(\d+)\s+weeks?\b", re.IGNORECASE),
+    "last_x_months": re.compile(r"\blast\s+(\d+)\s+months?\b", re.IGNORECASE),
+    "last_x_years": re.compile(r"\blast\s+(\d+)\s+years?\b", re.IGNORECASE),
+    "last_x_decades": re.compile(r"\blast\s+(\d+)\s+decades?\b", re.IGNORECASE),
+    "last_decade": re.compile(r"\blast\s+decade\b", re.IGNORECASE),
+    "last_semester": re.compile(r"\blast\s+semester\b", re.IGNORECASE),
+    "quarterly": re.compile(r"\b(q[1-4])\b\s*(?:\d{4})?", re.IGNORECASE),
 }
 
 _ABSOLUTE_DATE_PATTERN = re.compile(
@@ -91,7 +106,7 @@ def extract_temporal_signals(
                 raw_text=match.group(),
                 start_offset=match.start(),
                 end_offset=match.end(),
-                parsed_value=key,
+                parsed_value=f"{key}:{match.group(1)}" if "x" in key or key == "quarterly" else key,
             ))
 
     # Absolute date patterns
@@ -132,7 +147,7 @@ def extract_spatial_signals(
             end_offset=match.end(),
         ))
 
-    # Named places: look for capitalized multi-word sequences
+    # 2. Named places: look for capitalized multi-word sequences
     place_pattern = re.compile(r"\b(?:in|at|near|from|to)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b")
     for match in place_pattern.finditer(text):
         place_name = match.group(1)
@@ -142,6 +157,21 @@ def extract_spatial_signals(
             start_offset=match.start(1),
             end_offset=match.end(1),
         ))
+
+    # 3. Macro-regions from knowledge
+    regions_map = _GEO_REGIONS.get("regions", {})
+    orgs_map = _GEO_REGIONS.get("organizations", {})
+    all_macro = {**regions_map, **orgs_map}
+    
+    for key, info in all_macro.items():
+        pattern = re.compile(rf"\b{key}\b", re.IGNORECASE)
+        for match in pattern.finditer(text):
+            signals.append(SpatialSignal(
+                signal_type=SpatialSignalType.EXPLICIT,
+                raw_text=match.group(),
+                start_offset=match.start(),
+                end_offset=match.end(),
+            ))
 
     return signals
 
@@ -216,6 +246,86 @@ def _resolve_single_temporal(
             source_signals=[signal.raw_text],
         )
 
+    # Complex relative logic
+    if ":" in key:
+        base_key, value_str = key.split(":", 1)
+        try:
+            val = int(value_str)
+        except ValueError:
+            val = 1 # Fallback for non-numeric groups if any
+
+        start = system_time
+        end = system_time
+        granularity = TimeGranularity.UNDEFINED
+        labels = []
+
+        if base_key == "last_x_days":
+            start = system_time - timedelta(days=val)
+            granularity = TimeGranularity.DAY
+            labels = [(system_time - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(val)]
+        elif base_key == "last_x_weeks":
+            start = system_time - timedelta(weeks=val)
+            granularity = TimeGranularity.WEEK
+            labels = [f"Week {(system_time - timedelta(weeks=i)).isocalendar()[1]}" for i in range(val)]
+        elif base_key == "last_x_months":
+            # Rough approximation: 30 days per month
+            start = system_time - timedelta(days=30 * val)
+            granularity = TimeGranularity.MONTH
+            # Generate Month-Year labels
+            curr = system_time
+            for _ in range(val):
+                labels.append(curr.strftime("%b %Y"))
+                # Go back 1 month
+                if curr.month == 1:
+                    curr = curr.replace(year=curr.year-1, month=12)
+                else:
+                    curr = curr.replace(month=curr.month-1)
+        elif base_key == "last_x_years":
+            start = system_time.replace(year=system_time.year - val)
+            granularity = TimeGranularity.YEAR
+            labels = [str(system_time.year - i) for i in range(val)]
+        elif base_key == "last_x_decades":
+            start = system_time.replace(year=system_time.year - 10 * val)
+            granularity = TimeGranularity.DECADE
+            labels = [f"{system_time.year - 10*i - 10}-{system_time.year - 10*i}" for i in range(val)]
+        elif base_key == "quarterly":
+            q_num = int(value_str.lower().strip("q"))
+            curr_year = system_time.year
+            # Q1: Jan-Mar, Q2: Apr-Jun, Q3: Jul-Sep, Q4: Oct-Dec
+            q_starts = {1: 1, 2: 4, 3: 7, 4: 10}
+            start = datetime(curr_year, q_starts[q_num], 1)
+            end = (start + timedelta(days=92)).replace(day=1) # Roughly 3 months
+            granularity = TimeGranularity.QUARTER
+            labels = [f"Q{q_num} {curr_year}"]
+
+        return TemporalRange(
+            start=start,
+            end=end,
+            granularity=granularity,
+            granular_labels=labels,
+            confidence=0.9,
+            source_signals=[signal.raw_text],
+        )
+    
+    # Static but semantic relative keys
+    if key == "last_decade":
+        return TemporalRange(
+            start=system_time.replace(year=system_time.year - 10),
+            end=system_time,
+            granularity=TimeGranularity.DECADE,
+            granular_labels=[f"{system_time.year-10}-{system_time.year}"],
+            confidence=0.9,
+            source_signals=[signal.raw_text]
+        )
+    if key == "last_semester":
+        return TemporalRange(
+            start=system_time - timedelta(days=182),
+            end=system_time,
+            granularity=TimeGranularity.SEMESTER,
+            granular_labels=["Last 6 Months"],
+            confidence=0.8,
+            source_signals=[signal.raw_text]
+        )
     # Absolute date parsing
     if signal.signal_type == TemporalSignalType.ABSOLUTE:
         try:
@@ -241,11 +351,17 @@ def _resolve_single_temporal(
 # ============================================================================
 
 
-def resolve_spatial_hierarchy(
+async def resolve_spatial_hierarchy(
     signals: list[SpatialSignal],
     geo_anchor: GeoAnchor | None,
 ) -> SpatialBounds:
-    """Map spatial signals to geographic bounding boxes."""
+    """Map spatial signals to geographic bounding boxes.
+    
+    Resolution Tiers:
+    0. Knowledge Base (High speed cache)
+    1. External Map Provider (Google/Nominatim)
+    2. LLM Reasoning (Estimation)
+    """
     if not signals and not geo_anchor:
         # Global scope
         return SpatialBounds(confidence=0.1, label="global")
@@ -259,9 +375,50 @@ def resolve_spatial_hierarchy(
             max_lat=geo_anchor.latitude + default_scope,
             min_lon=geo_anchor.longitude - default_scope,
             max_lon=geo_anchor.longitude + default_scope,
+            scope=GeographicScope.POINT,
             confidence=0.5,
             label=geo_anchor.label or "anchor",
         )
+
+    # Resolution Tier 0: City Knowledge (High Precision Cache)
+    cities_map = _GEO_CITIES.get("cities", {})
+    for signal in signals:
+        name = signal.raw_text.strip()
+        if name in cities_map:
+            info = cities_map[name]
+            return SpatialBounds(
+                min_lat=info["lat"] - 0.05,
+                max_lat=info["lat"] + 0.05,
+                min_lon=info["lon"] - 0.05,
+                max_lon=info["lon"] + 0.05,
+                scope=GeographicScope.CITY,
+                label=f"{name}, {info['country']}",
+                confidence=0.95
+            )
+
+    # Resolution Tier 1: External Map Provider (e.g., Google, Nominatim)
+    # We try to resolve using the configured provider for addresses not in cache
+    for signal in signals:
+        if signal.signal_type == SpatialSignalType.EXPLICIT:
+            external_res = await _resolve_spatial_external(signal.raw_text)
+            if external_res:
+                return external_res
+
+    # Resolution Tier 2: Macro-regions
+    regions_map = _GEO_REGIONS.get("regions", {})
+    orgs_map = _GEO_REGIONS.get("organizations", {})
+    all_macro = {**regions_map, **orgs_map}
+
+    for signal in signals:
+        key = signal.raw_text.upper()
+        if key in all_macro:
+            info = all_macro[key]
+            return SpatialBounds(
+                scope=GeographicScope(info.get("scope", "region")),
+                constituent_labels=info.get("constituents", []),
+                confidence=0.9,
+                label=info.get("label", key)
+            )
 
     # Use the most explicit signal
     best_signal = None
@@ -284,11 +441,60 @@ def resolve_spatial_hierarchy(
             label=best_signal.raw_text,
         )
 
-    # Named place: return a wide approximation
+    # Named place: return a wide approximation (LLM will usually refine this later)
     return SpatialBounds(
         confidence=0.4,
         label=best_signal.raw_text,
     )
+
+
+async def _resolve_spatial_external(query: str) -> SpatialBounds | None:
+    """Resolve a location using the configured external map provider."""
+    settings = get_settings().kernel
+    provider = settings.geocoding_provider
+    api_key = settings.geocoding_api_key
+    user_agent = settings.geocoding_user_agent
+
+    try:
+        from geopy.geocoders import Nominatim, GoogleV3, Bing, MapBox
+        
+        geocoder = None
+        if provider == "nominatim":
+            geocoder = Nominatim(user_agent=user_agent)
+        elif provider == "google" and api_key:
+            geocoder = GoogleV3(api_key=api_key)
+        elif provider == "bing" and api_key:
+            geocoder = Bing(api_key=api_key)
+        elif provider == "mapbox" and api_key:
+            geocoder = MapBox(api_key=api_key)
+
+        if not geocoder:
+            return None
+
+        # Perform the actual lookup
+        # Wrap in a thread pool since geopy is usually synchronous
+        import asyncio
+        loop = asyncio.get_event_loop()
+        location = await loop.run_in_executor(None, lambda: geocoder.geocode(query, timeout=5))
+
+        if location:
+            # Determine scope based on location raw geometry or type if available
+            # For simplicity, we assume explicit map matches are TOWN/CITY level or better
+            return SpatialBounds(
+                min_lat=location.latitude - 0.01,
+                max_lat=location.latitude + 0.01,
+                min_lon=location.longitude - 0.01,
+                max_lon=location.longitude + 0.01,
+                scope=GeographicScope.POINT,
+                label=location.address,
+                confidence=0.92
+            )
+
+    except (ImportError, Exception) as e:
+        log.warning("External geocoding failed", provider=provider, query=query, error=str(e))
+        return None
+
+    return None
 
 
 # ============================================================================
@@ -391,57 +597,73 @@ async def anchor_spatiotemporal(
 
         # Step 2: Resolve hierarchies
         temporal = resolve_temporal_hierarchy(temporal_signals, system_time)
-        spatial = resolve_spatial_hierarchy(spatial_signals, geo_anchor)
+        spatial = await resolve_spatial_hierarchy(spatial_signals, geo_anchor)
 
         # Step 3: Adaptive adjustment
         if task_context:
             temporal = adapt_temporal_ambiguity(temporal, task_context)
             spatial = adapt_spatial_scope(spatial, task_context)
 
-        # Step 4: LLM refinement
+        # Step 4: Semantic Bridge (LLM Reasoning)
+        # This connects Time & Location (e.g., local seasons, holidays, events)
         if kit and kit.has_llm:
             try:
-                system_msg = LLMMessage(
-                    role="system",
-                    content=(
-                        "Extract precise temporal ranges or spatial locations. If no precise info exists, return blank fields. "
-                        "Respond EXACTLY with JSON: {\"temporal\": {\"start\": \"YYYY-MM-DDTHH:MM:SSZ\", \"end\": \"...\"}, \"spatial\": {\"min_lat\": float, \"max_lat\": float, \"min_lon\": float, \"max_lon\": float}}"
-                    )
+                system_prompt = (
+                    "You are the Kea Spatiotemporal Reasoning Engine. "
+                    "Your goal is to connect Location and Time to resolve semantic ambiguities. "
+                    "Consider:\n"
+                    "1. Local Seasons: (e.g., Winter in Southern Hemisphere vs Northern).\n"
+                    "2. Business Logic: (e.g., Weekends in Dubai vs NYC, local holidays).\n"
+                    "3. Events: (e.g., 'During the last G20', 'After the Olympics').\n\n"
+                    "Respond ONLY with a JSON block:\n"
+                    "{\n"
+                    "  \"reasoning\": \"string explaining the connection\",\n"
+                    "  \"temporal\": {\"start\": \"ISO8601\", \"end\": \"ISO8601\", \"granularity\": \"day|week|month|year\", \"labels\": []},\n"
+                    "  \"spatial\": {\"label\": \"string\", \"scope\": \"city|country|region\", \"constituents\": []}\n"
+                    "}"
                 )
-                user_msg = LLMMessage(role="user", content=f"Text: {text}\nCurrent Time: {system_time.isoformat()}\nContext: {task_context}")
-                resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
+                
+                user_content = (
+                    f"Query: '{text}'\n"
+                    f"System Time: {system_time.isoformat()}\n"
+                    f"Initial Resolution: Location={spatial.label}, Time={temporal.start} to {temporal.end}\n"
+                    f"Context: {task_context}"
+                )
 
-                content = resp.content.strip()
-                if content.startswith("```json"):
-                    content = content[7:-3].strip()
-                elif content.startswith("```"):
-                    content = content[3:-3].strip()
-                data = json.loads(content)
+                resp = await kit.llm.complete(
+                    [LLMMessage(role="system", content=system_prompt),
+                     LLMMessage(role="user", content=user_content)],
+                    kit.llm_config
+                )
 
-                temp_data = data.get("temporal")
-                if temp_data and "start" in temp_data and "end" in temp_data:
-                    try:
-                        start = datetime.fromisoformat(temp_data["start"].replace("Z", "+00:00"))
-                        end = datetime.fromisoformat(temp_data["end"].replace("Z", "+00:00"))
-                        temporal = TemporalRange(start=start, end=end, confidence=0.9, source_signals=["LLM Extracted"])
-                    except Exception:
-                        pass
-
-                spat_data = data.get("spatial")
-                if spat_data and all(k in spat_data for k in ["min_lat", "max_lat", "min_lon", "max_lon"]):
-                    try:
-                        spatial = SpatialBounds(
-                            min_lat=float(spat_data["min_lat"]),
-                            max_lat=float(spat_data["max_lat"]),
-                            min_lon=float(spat_data["min_lon"]),
-                            max_lon=float(spat_data["max_lon"]),
-                            confidence=0.9,
-                            label="LLM Extracted"
+                data = json.loads(resp.content.strip().strip("`").replace("json", ""))
+                
+                # Apply LLM Refinements if confidence is higher or rules were vague
+                if "temporal" in data:
+                    t = data["temporal"]
+                    if t.get("start") and t.get("end"):
+                        temporal = TemporalRange(
+                            start=datetime.fromisoformat(t["start"].replace("Z", "+00:00")),
+                            end=datetime.fromisoformat(t["end"].replace("Z", "+00:00")),
+                            granularity=TimeGranularity(t.get("granularity", "undefined")),
+                            granular_labels=t.get("labels", []),
+                            confidence=0.95,
+                            source_signals=[text, "LLM Reasoning"]
                         )
-                    except Exception:
-                        pass
+                
+                if "spatial" in data:
+                    s = data["spatial"]
+                    if s.get("label"):
+                        spatial.label = s["label"]
+                        spatial.scope = GeographicScope(s.get("scope", "undefined"))
+                        if s.get("constituents"):
+                            spatial.constituent_labels = s["constituents"]
+                        spatial.confidence = 0.95
+
+                log.info("Semantic reasoning complete", reasoning=data.get("reasoning"))
+
             except Exception as e:
-                log.warning("LLM spatiotemporal extraction failed", error=str(e))
+                log.warning("Semantic spatiotemporal reasoning failed", error=str(e))
                 pass
 
         # Step 5: Fusion
