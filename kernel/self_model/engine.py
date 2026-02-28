@@ -289,7 +289,10 @@ async def detect_capability_gap(
         domains = domains | set(identity.knowledge_domains)
 
     if signal_tags.domain != "general" and signal_tags.domain not in domains:
-        missing_knowledge.append(f"domain:{signal_tags.domain}")
+        # If the agent has the 'general' domain, it is considered capable of handling 
+        # specific domains without a hard gap (though with potentially lower performance).
+        if "general" not in domains:
+            missing_knowledge.append(f"domain:{signal_tags.domain}")
 
     # No gaps found
     if not missing_tools and not missing_knowledge and not constraint_violations:

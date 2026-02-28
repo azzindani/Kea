@@ -61,9 +61,9 @@ async def test_conscious_observer_with_evidence(inference_kit):
     evidence = [
         Origin(
             origin_id="ev-001",
-            source="ECB Forecast Data", 
+            source_type="rag",
             content="The Eurosystem staff macroeconomic projections for the euro area see annual GDP growth at 0.6% in 2024.",
-            trust_score=0.98
+            metadata={"source": "ECB Forecast Data", "trust_score": 0.98}
         )
     ]
     

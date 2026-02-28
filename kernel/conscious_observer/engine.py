@@ -125,8 +125,11 @@ def _extract_modality_output(result: Result) -> ModalityOutput:
 def _extract_classification(result: Result) -> ClassificationResult | FallbackTrigger:
     if result.error or not result.signals:
         raise RuntimeError(f"classify failed: {result.error}")
-    data = result.signals[0].body["data"]
-    if "reason" in data:
+    
+    signal = result.signals[0]
+    data = signal.body["data"]
+    
+    if signal.schema == "FallbackTrigger" or "reason" in data:
         return FallbackTrigger(**data)
     return ClassificationResult(**data)
 
