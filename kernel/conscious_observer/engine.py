@@ -735,6 +735,33 @@ class ConsciousObserver:
     # Phase 2: Execute (pipeline dispatcher)
     # ------------------------------------------------------------------
 
+    async def _phase_plan(
+        self,
+        gate: GateInResult,
+        spawn_request: SpawnRequest,
+        rag_context: dict[str, Any] | None,
+    ) -> Result:
+        """T2 Decompose → T3 Synthesize plan."""
+        world_state = _build_world_state(spawn_request, gate.identity_context, rag_context)
+        decomp_result = await decompose_goal(world_state, self._kit)
+        subtasks = _extract_subtasks(decomp_result)
+
+        if subtasks:
+            return await synthesize_plan(
+                objective=spawn_request.objective,
+                context=world_state,
+                kit=self._kit,
+                subtasks=subtasks,
+            )
+        
+        # Shortcut fallback
+        dag = _build_shortcut_dag(spawn_request.objective)
+        return ok(signals=[create_data_signal(
+            data=dag.model_dump(),
+            schema="ExecutableDAG",
+            origin=_ref("_phase_plan")
+        )])
+
     async def _phase_execute(
         self,
         gate: GateInResult,
@@ -777,6 +804,8 @@ class ConsciousObserver:
 
         loop_result, decisions, outputs, simplified, escalated, aborted = (
             await self._run_ooda_with_clm(
+                gate=gate,
+                spawn_request=spawn_request,
                 agent_state=agent_state,
                 stm=stm,
                 active_dag=active_dag,
@@ -818,6 +847,8 @@ class ConsciousObserver:
 
         loop_result, decisions, outputs, simplified, escalated, aborted = (
             await self._run_ooda_with_clm(
+                gate=gate,
+                spawn_request=spawn_request,
                 agent_state=agent_state,
                 stm=stm,
                 active_dag=None,
