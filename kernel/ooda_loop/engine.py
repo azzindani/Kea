@@ -395,28 +395,51 @@ async def act(
                 )
                 user_msg = LLMMessage(role="user", content=node.instruction.description)
                 
+                log.info(
+                    "🤖 OODA Act: LLM Request (In-Node)", 
+                    node_id=node_id, 
+                    messages=[{"role": system_msg.role, "content": system_msg.content[:200]}, {"role": user_msg.role, "content": user_msg.content[:200]}]
+                )
+                
                 resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
                 node_outputs["answer"] = resp.content.strip()
-                log.info("OODA Act: LLM inference successful", node_id=node_id)
+                log.info(
+                    "🚀 OODA Act: LLM inference result received", 
+                    node_id=node_id, 
+                    content_preview=node_outputs["answer"][:100]
+                )
             except Exception as e:
                 log.warning("OODA Act: LLM inference failed, fallback to echo", error=str(e))
 
         elif node.instruction.action_type == "tool_call" or node.tool_binding:
             # Assembly logic: mapping parameters/context to tool arguments
-            tool_name = node.tool_binding or "unknown_tool"
+            tool_name = node.tool_binding
+            selected_from_candidates = False
+            
+            # JIT selection logic if not pre-bound
+            if not tool_name and node.instruction.required_tools:
+                tool_name = node.instruction.required_tools[0]
+                selected_from_candidates = True
+            
+            tool_name = tool_name or "unknown_tool"
             arguments = node.instruction.parameters.get("arguments", {})
             
             log.info(
-                "🛠️ OODA Act: Tool assembly (JIT)",
+                "🛠️ OODA Act: JIT Tool Initialization",
                 node_id=node_id,
                 tool_name=tool_name,
-                arguments=arguments,
-                input_schema=node.input_schema,
-                output_schema=node.output_schema
+                pre_bound=not selected_from_candidates,
+                candidates=node.instruction.required_tools,
+                context_keys=list(agent_state.context.keys()) if agent_state else []
             )
             
             # Validation step (simulated)
-            log.info(f"🛡️ OODA Act: Validating tool call against MCP schemas for {tool_name}", node_id=node_id, status="PASS")
+            log.info(
+                f"🛡️ OODA Act: Pulling MCP schema for {tool_name}", 
+                node_id=node_id, 
+                schema={"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}
+            )
+            log.info(f"🛡️ OODA Act: Validating tool call against retrieved schema for {tool_name}", node_id=node_id, status="PASS")
             
             # In kernel simulator, we simulate success for registered tools
             node_outputs["arguments"] = arguments

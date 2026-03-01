@@ -107,10 +107,21 @@ async def map_subtasks_to_nodes(subtasks: list[SubTaskItem], kit: InferenceKit |
             parallelizable=task.parallelizable,
             status=NodeStatus.PENDING,
         )
+        
+        # Log the mapping details for JIT transparency
+        log.info(
+            "📍 JIT Mapping: Task to Node established",
+            task_id=task.id,
+            node_id=node.node_id,
+            type=instruction.action_type,
+            tools=instruction.required_tools,
+            input_schema=node.input_schema,
+            output_schema=node.output_schema
+        )
 
         nodes.append(node)
 
-    log.info("Mapped sub-tasks to nodes", task_count=len(subtasks), node_count=len(nodes))
+    log.info("📊 Graph Synthesis: Mapped sub-tasks to nodes", task_count=len(subtasks), node_count=len(nodes))
     return nodes
 
 
