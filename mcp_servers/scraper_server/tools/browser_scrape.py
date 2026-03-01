@@ -1,6 +1,6 @@
 from __future__ import annotations
 import asyncio
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 import json
 import os
 import uuid

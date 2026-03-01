@@ -2,7 +2,7 @@
 import httpx
 import sys
 from shared.mcp.protocol import ToolResult, TextContent
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 logger = get_logger(__name__)
 
@@ -139,9 +139,9 @@ async def check_compatibility(package_name: str, check_deps: bool = True) -> Too
     
     return ToolResult(content=[TextContent(text=result)])
 
-async def suggest_tools(research_domain: str, task_type: str = "") -> ToolResult:
-    """Suggest tools for research domain."""
-    domain = research_domain.lower()
+async def suggest_tools(task_domain: str, task_type: str = "") -> ToolResult:
+    """Suggest tools for a task domain."""
+    domain = task_domain.lower()
     
     result = f"# 💡 Tool Suggestions\n\n"
     result += f"**Domain**: {domain}\n"

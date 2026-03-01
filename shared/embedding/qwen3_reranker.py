@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 from dataclasses import dataclass
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 
 logger = get_logger(__name__)
@@ -60,20 +60,27 @@ class LocalReranker(RerankerProvider):
     _shared_token_false_id = None
     _shared_prefix_tokens = None
     _shared_suffix_tokens = None
+    _shared_execution_lock = None # Asyncio lock for inference
     
     def __init__(
         self,
-        model_name: str = "Qwen/Qwen3-Reranker-0.6B",
+        model_name: str | None = None,
         device: str | None = None,
-        max_length: int = 32768,
+        max_length: int | None = None,
         use_flash_attention: bool = False,
     ) -> None:
-        self.model_name = model_name
+        from shared.config import get_settings
+        settings = get_settings()
+        self.model_name = model_name or settings.reranker.model_name
         self.device = device or ("cuda" if self._has_cuda() else "cpu")
         if self.device == "cuda":
             self.device = "cuda:0"
-        self.max_length = max_length
+        self.max_length = max_length or settings.reranker.max_length
         self.use_flash_attention = use_flash_attention
+        
+        if LocalReranker._shared_execution_lock is None:
+            import asyncio
+            LocalReranker._shared_execution_lock = asyncio.Lock()
     
     def _has_cuda(self) -> bool:
         try:
@@ -160,7 +167,8 @@ class LocalReranker(RerankerProvider):
     ) -> str:
         """Format input for reranker."""
         if instruction is None:
-            instruction = "Given a web search query, retrieve relevant passages that answer the query"
+            from shared.config import get_settings
+            instruction = get_settings().reranker.instruction
         
         return f"<Instruct>: {instruction}\n<Query>: {query}\n<Document>: {doc}"
     
@@ -213,10 +221,14 @@ class LocalReranker(RerankerProvider):
         if not documents:
             return []
         
-        model, _ = self._load_model()
+        async with LocalReranker._shared_execution_lock:
+            model, _ = self._load_model()
+            
+            from shared.config import get_settings
+        settings = get_settings()
         
         # Batching configuration (to prevent OOM)
-        BATCH_SIZE = 16 
+        BATCH_SIZE = settings.reranker.batch_size 
         
         # Check VRAM pressure and adjust batch size
         try:
@@ -225,16 +237,17 @@ class LocalReranker(RerankerProvider):
             if hw.cuda_available:
                 hw.refresh_vram()
                 pressure = hw.vram_pressure()
-                if pressure > 0.8:
-                    BATCH_SIZE = 2
+                if pressure > settings.hardware.critical_pressure_threshold:
+                    BATCH_SIZE = settings.reranker.high_pressure_batch_size
                     logger.warning(f"Reranker: VRAM pressure high ({pressure*100:.1f}%), reducing batch to {BATCH_SIZE}")
-                elif pressure > 0.6:
-                    BATCH_SIZE = 4
+                elif pressure > settings.hardware.high_pressure_threshold:
+                    BATCH_SIZE = settings.reranker.med_pressure_batch_size
                     logger.info(f"Reranker: VRAM pressure moderate ({pressure*100:.1f}%), reducing batch to {BATCH_SIZE}")
                 else:
-                    BATCH_SIZE = 8 # Conservative default
+                    BATCH_SIZE = settings.reranker.low_pressure_batch_size
         except Exception:
             pass 
+        BATCH_SIZE = BATCH_SIZE or settings.reranker.batch_size
         
         all_scores = []
         

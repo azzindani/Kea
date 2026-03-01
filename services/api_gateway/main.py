@@ -18,13 +18,11 @@ from fastapi.responses import JSONResponse
 from prometheus_client import make_asgi_app
 
 from shared.config import get_settings
-from shared.logging import setup_logging, get_logger, LogConfig
-from shared.logging.middleware import RequestLoggingMiddleware
-from shared.logging.metrics import set_system_info
+from shared.logging.main import setup_logging, get_logger, LogConfig, RequestLoggingMiddleware, set_system_info
 from shared.environment import get_environment_config
 
 from services.api_gateway.routes import (
-    jobs, memory, mcp, system, artifacts, interventions, llm, graph,
+    jobs, memory, mcp, system, artifacts, interventions, llm,
     auth, users, conversations,
 )
 from services.api_gateway.middleware.auth import create_auth_middleware
@@ -41,24 +39,25 @@ logger = get_logger(__name__)
 
 def validate_config():
     """Validate required configuration at startup."""
-    env_config = get_environment_config()
+    settings = get_settings()
     
-    if env_config.is_production:
-        required = ["DATABASE_URL", "JWT_SECRET"]
-        missing = [k for k in required if not os.getenv(k)]
+    if settings.app.environment == "production":
+        # Check database
+        if not settings.database.url:
+            raise RuntimeError("Missing database.url in settings for production")
+            
+        # Check JWT Secret
+        if not settings.auth.jwt_secret:
+            raise RuntimeError("Missing auth.jwt_secret in settings for production")
         
-        if missing:
-            raise RuntimeError(f"Missing required env vars for production: {missing}")
-        
-        jwt_secret = os.getenv("JWT_SECRET", "")
-        if len(jwt_secret) < 32:
-            raise RuntimeError("JWT_SECRET must be at least 32 characters")
+        if len(settings.auth.jwt_secret) < 32:
+            raise RuntimeError("JWT_SECRET must be at least 32 characters for production security")
     
-    logger.info(f"Configuration validated for {env_config.mode.value}")
+    logger.info(f"Configuration validated for {settings.app.environment}")
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
     """Application lifespan manager."""
     settings = get_settings()
     env_config = get_environment_config()
@@ -68,13 +67,13 @@ async def lifespan(app: FastAPI):
     
     # Setup logging
     setup_logging(LogConfig(
-        level=env_config.log_level,
-        format=settings.log_format,
+        level=settings.logging.level,
+        format=settings.logging.format,
         service_name="api_gateway",
     ))
     
     # Set system info metrics
-    set_system_info(version="0.3.0", environment=env_config.mode.value)
+    set_system_info(version=settings.app.version, environment=env_config.mode.value)
     
     # Initialize database
     from shared.database import get_database_pool
@@ -88,7 +87,7 @@ async def lifespan(app: FastAPI):
     await get_api_key_manager()
     await get_conversation_manager()
     
-    logger.info(f"API Gateway v0.4.0 started [{env_config.mode.value}]")
+    logger.info(f"API Gateway {settings.app.version} started [{env_config.mode.value}]")
     
     yield
     
@@ -99,11 +98,15 @@ async def lifespan(app: FastAPI):
     logger.info("API Gateway stopped")
 
 
+# Load settings
+settings = get_settings()
+
+
 # Create FastAPI app
 app = FastAPI(
-    title="Kea Research Engine API",
-    description="API Gateway for the Kea Distributed Autonomous Research Engine",
-    version="0.3.0",
+    title=settings.app.name,
+    description="API Gateway for the Project Distributed Autonomous Engine",
+    version=settings.app.version,
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -115,13 +118,12 @@ app = FastAPI(
 # ============================================================================
 
 # 1. CORS (innermost - runs last)
-env_config = get_environment_config()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_cors_origins(),
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
+    allow_methods=settings.security.cors_methods,
+    allow_headers=settings.security.cors_headers,
 )
 
 # 2. Logging
@@ -199,7 +201,6 @@ app.include_router(system.router, prefix="/api/v1/system", tags=["System"])
 app.include_router(artifacts.router, prefix="/api/v1/artifacts", tags=["Artifacts"])
 app.include_router(interventions.router, prefix="/api/v1/interventions", tags=["HITL"])
 app.include_router(llm.router, prefix="/api/v1/llm", tags=["LLM"])
-app.include_router(graph.router, prefix="/api/v1/graph", tags=["Graph"])
 
 
 # ============================================================================
@@ -209,10 +210,12 @@ app.include_router(graph.router, prefix="/api/v1/graph", tags=["Graph"])
 @app.get("/")
 async def root():
     """API root."""
+    from shared.config import get_settings
+    settings = get_settings()
     env_config = get_environment_config()
     return {
-        "name": "Kea Research Engine",
-        "version": "0.3.0",
+        "name": settings.app.name,
+        "version": settings.app.version,
         "environment": env_config.mode.value,
         "docs": "/docs",
     }
@@ -232,7 +235,7 @@ async def full_health_check():
     """
     Comprehensive health check.
     
-    Checks: database, redis, qdrant, memory.
+    Checks: database, Vault, RAG Service.
     """
     from shared.database.health import get_health_checker
     
@@ -256,14 +259,14 @@ def main():
     import uvicorn
     
     settings = get_settings()
-    env_config = get_environment_config()
     
+    from shared.service_registry import ServiceRegistry, ServiceName
     uvicorn.run(
         "services.api_gateway.main:app",
-        host=settings.api_host,
-        port=settings.api_port,
-        reload=env_config.is_development,
-        workers=1 if env_config.is_development else 4,
+        host=settings.api.host,
+        port=ServiceRegistry.get_port(ServiceName.GATEWAY),
+        reload=settings.is_development,
+        workers=settings.api.workers_dev if settings.is_development else settings.api.workers_prod,
     )
 
 

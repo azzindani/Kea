@@ -1,5 +1,5 @@
 """
-Swarm Manager Service — Governance, Compliance & Resource Gating (Port 8005).
+Swarm Manager Service — Governance, Compliance & Resource Gating.
 
 Routes:
   GET  /health
@@ -22,22 +22,39 @@ from typing import Any
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
+from prometheus_client import make_asgi_app
 from pydantic import BaseModel
 
 from services.swarm_manager.core.compliance import ComplianceStandard, get_compliance_engine
 from services.swarm_manager.core.guards import get_resource_guard
 from services.swarm_manager.core.kill_switch import get_kill_switch
 from services.swarm_manager.core.supervisor import get_supervisor
-from shared.logging import get_logger
+from shared.logging.main import get_logger, setup_logging, LogConfig, RequestLoggingMiddleware
+# Load settings
+from shared.config import get_settings
+settings = get_settings()
+
+# Initialize standardized logging
+setup_logging(LogConfig(
+    level=settings.logging.level,
+    service_name="swarm_manager",
+))
 
 logger = get_logger(__name__)
 
-app = FastAPI(title="Swarm Manager")
+app = FastAPI(
+    title=f"{settings.app.name} - Swarm Manager",
+    description="Governance, Compliance & Resource Gating Service",
+    version=settings.app.version,
+)
+app.add_middleware(RequestLoggingMiddleware)
+app.mount("/metrics", make_asgi_app())
 
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok", "service": "swarm_manager"}
+    from datetime import datetime
+    return {"status": "ok", "service": "swarm_manager", "timestamp": datetime.utcnow().isoformat()}
 
 
 # ============================================================================
@@ -55,22 +72,12 @@ class ComplianceCheckRequest(BaseModel):
 async def check_compliance(request: ComplianceCheckRequest) -> dict:
     """Check operation against compliance standards."""
     engine = get_compliance_engine()
-    standards = None
-    if request.standards:
-        standards = []
-        for s in request.standards:
-            try:
-                standards.append(ComplianceStandard(s))
-            except ValueError:
-                try:
-                    standards.append(ComplianceStandard(s.lower()))
-                except ValueError:
-                    continue
-
+    
+    # Standards are now dynamic strings, no Enum validation needed here
     report = await engine.check_operation(
         operation=request.operation,
         context=request.context,
-        standards=standards,
+        standards=request.standards,
     )
     return {
         "passed": report.passed,
@@ -101,10 +108,10 @@ class EmergencyStopRequest(BaseModel):
 
 class BlacklistRequest(BaseModel):
     reason: str = "Manual blacklist"
-    duration_minutes: int = 30
+    duration_minutes: int = settings.swarm.default_blacklist_duration_minutes
 
 
-@app.post("/kill-switch/activate", status_code=200)
+@app.post("/kill-switch/activate", status_code=get_settings().status_codes.ok)
 async def activate_kill_switch(request: EmergencyStopRequest) -> dict:
     """Trigger an emergency stop of all agents."""
     switch = get_kill_switch()
@@ -113,7 +120,7 @@ async def activate_kill_switch(request: EmergencyStopRequest) -> dict:
     return {"activated": True, "reason": request.reason}
 
 
-@app.delete("/kill-switch", status_code=200)
+@app.delete("/kill-switch", status_code=get_settings().status_codes.ok)
 async def resume_from_emergency() -> dict:
     """Resume operations after an emergency stop."""
     switch = get_kill_switch()
@@ -133,7 +140,7 @@ async def kill_switch_status() -> dict:
     }
 
 
-@app.post("/kill-switch/blacklist/{tool_name}", status_code=201)
+@app.post("/kill-switch/blacklist/{tool_name}", status_code=get_settings().status_codes.created)
 async def blacklist_tool(tool_name: str, request: BlacklistRequest) -> dict:
     """Temporarily blacklist a tool."""
     switch = get_kill_switch()
@@ -143,7 +150,7 @@ async def blacklist_tool(tool_name: str, request: BlacklistRequest) -> dict:
     return {"tool": tool_name, "blacklisted": True, "duration_minutes": request.duration_minutes}
 
 
-@app.delete("/kill-switch/blacklist/{tool_name}", status_code=200)
+@app.delete("/kill-switch/blacklist/{tool_name}", status_code=get_settings().status_codes.ok)
 async def unblacklist_tool(tool_name: str) -> dict:
     """Remove a tool from the blacklist."""
     switch = get_kill_switch()
@@ -157,7 +164,7 @@ async def unblacklist_tool(tool_name: str) -> dict:
 
 
 class EscalateRequest(BaseModel):
-    escalation_type: str = "error"
+    escalation_type: str = settings.swarm.default_escalation_type
     context: dict[str, Any] = {}
 
 
@@ -184,7 +191,7 @@ async def list_agent_escalations() -> dict:
     }
 
 
-@app.post("/agents/{work_id}/resolve", status_code=200)
+@app.post("/agents/{work_id}/resolve", status_code=get_settings().status_codes.ok)
 async def resolve_agent_escalation(work_id: str, resolution: str = "resolved") -> dict:
     """Resolve a pending escalation for a work item."""
     supervisor = get_supervisor()
@@ -192,7 +199,10 @@ async def resolve_agent_escalation(work_id: str, resolution: str = "resolved") -
         await supervisor.resolve_escalation(work_id, resolution)
         return {"work_id": work_id, "resolved": True, "resolution": resolution}
     except Exception as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(
+            status_code=get_settings().status_codes.not_found, 
+            detail=str(e)
+        ) from e
 
 
 # ============================================================================
@@ -228,4 +238,9 @@ async def resource_status() -> dict:
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8005)
+    from shared.service_registry import ServiceRegistry, ServiceName
+    uvicorn.run(
+        app, 
+        host=settings.api.host, 
+        port=ServiceRegistry.get_port(ServiceName.SWARM_MANAGER)
+    )

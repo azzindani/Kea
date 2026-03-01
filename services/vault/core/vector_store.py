@@ -13,7 +13,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 
 logger = get_logger(__name__)
@@ -149,13 +149,15 @@ def create_vector_store(use_memory: bool = False) -> VectorStore:
     Returns:
         VectorStore instance
     """
+    from shared.config import get_settings
+    settings = get_settings()
+    
     if use_memory:
         logger.info("Using in-memory vector store (requested)")
         return InMemoryVectorStore()
         
     # Check for Postgres (The Only Database)
-    db_url = os.getenv("DATABASE_URL")
-    if db_url:
+    if settings.database.url:
         try:
             from services.vault.core.postgres_store import PostgresVectorStore
             logger.info("Using PostgreSQL vector store (pgvector)")
@@ -168,6 +170,6 @@ def create_vector_store(use_memory: bool = False) -> VectorStore:
             raise
             
     # Default fallback if no DB configured
-    logger.warning("DATABASE_URL not set. Falling back to in-memory store (Data will be lost on restart)")
+    logger.warning("DATABASE_URL not set in centralized settings. Falling back to in-memory store (Data will be lost on restart)")
     return InMemoryVectorStore()
 

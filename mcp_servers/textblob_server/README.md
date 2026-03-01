@@ -1,7 +1,7 @@
 # 🔌 Textblob Server
 
 The `textblob_server` is an MCP server providing tools for **Textblob Server** functionality.
-It is designed to be used within the Kea ecosystem.
+It is designed to be used within the Project ecosystem.
 
 ## 🧰 Tools
 

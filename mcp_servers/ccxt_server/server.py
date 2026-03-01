@@ -7,15 +7,15 @@ sys.path.append(str(Path(__file__).parents[2]))
 from mcp_servers.ccxt_server.tools import (
     public, metadata, aggregator, derivatives, historical, account, private, trading, exchange_manager
 )
+from typing import List, Dict, Any, Optional
+from shared.logging.main import setup_logging, get_logger
 import ccxt.async_support as ccxt
-import structlog
 import asyncio
 
-logger = structlog.get_logger()
+setup_logging(force_stderr=True)
+logger = get_logger(__name__)
 
 # Create the FastMCP server
-from shared.logging.structured import setup_logging
-setup_logging()
 
 mcp = FastMCP("ccxt_server", dependencies=["ccxt", "pandas"])
 
@@ -306,3 +306,4 @@ class CcxtServer:
         if hasattr(self.mcp, '_tool_manager') and hasattr(self.mcp._tool_manager, '_tools'):
             return list(self.mcp._tool_manager._tools.values())
         return []
+

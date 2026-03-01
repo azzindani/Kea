@@ -2,7 +2,7 @@
 from mcp_servers.finta_server.tools.core import process_ohlcv, df_to_json
 from finta import TA
 import pandas as pd
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 logger = get_logger(__name__)
 

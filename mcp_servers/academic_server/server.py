@@ -24,12 +24,9 @@ from typing import List, Optional
 logger = structlog.get_logger()
 
 # Create the FastMCP server
-from shared.logging import setup_logging
-setup_logging()
-# Direct stdout to stderr for the server instance to avoid breaking protocol
-import sys
-# sys.stdout = sys.stderr # This might be too aggressive if we want to reply, but for libraries it is good.
-# Better to rely on FastMCP handling, but ensure our logs go to stderr.
+from shared.logging.main import setup_logging
+# Ensure logs go to stderr to avoid breaking MCP protocol on stdout
+setup_logging(force_stderr=True)
 
 mcp = FastMCP("academic_server")
 
@@ -110,3 +107,6 @@ class AcademicServer:
         if hasattr(self.mcp, '_tool_manager') and hasattr(self.mcp._tool_manager, '_tools'):
              return list(self.mcp._tool_manager._tools.values())
         return []
+    async def run(self):
+        """Run the server."""
+        self.mcp.run()

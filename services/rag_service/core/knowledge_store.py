@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 from shared.knowledge.registry import PostgresKnowledgeRegistry
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 logger = get_logger(__name__)
 
@@ -24,18 +24,27 @@ class KnowledgeStore:
     """
 
     def __init__(self) -> None:
-        self._registry = PostgresKnowledgeRegistry()
+        from shared.config import get_settings
+        settings = get_settings()
+        self._registry = PostgresKnowledgeRegistry(
+            table_name=settings.knowledge.registry_table,
+            embedding_model=settings.embedding.model_name
+        )
 
     async def search(
         self,
         query: str,
-        limit: int = 5,
+        limit: int | None = None,
         domain: str | None = None,
         category: str | None = None,
         tags: list[str] | None = None,
         enable_reranking: bool = True,
     ) -> list[dict[str, Any]]:
         """Semantic search for knowledge items with optional reranking."""
+        from shared.config import get_settings
+        settings = get_settings()
+        limit = limit or settings.rag.knowledge_limit
+        
         return await self._registry.search(
             query=query,
             limit=limit,

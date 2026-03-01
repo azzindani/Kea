@@ -1,0 +1,65 @@
+# Core Perception Anchors
+# Used by Tier 1 (Classification) and Tier 6 (Activation Router)
+# for specialized anchor-based embedding matching.
+
+domain_anchors:
+  finance: "financial analysis stock market prices and investment trading"
+  security: "cybersecurity system vulnerabilities and network threats"
+  logistics: "logistics shipping tracking and supply chain management"
+  communication: "human communication email messages and notifications"
+  development: "software development coding programming and deployment"
+  legal: "legal contracts compliance and regulatory documentation"
+  system: "system administration infrastructure control and technical management"
+  general: "general greetings help requests and common questions"
+
+complexity_anchors:
+  - text: "Hello!"
+    weight: 0.1
+    level: trivial
+  - text: "What time is it?"
+    weight: 0.1
+    level: trivial
+  - text: "Search for the price of Bitcoin."
+    weight: 0.3
+    level: simple
+  - text: "Who is the CEO of Google?"
+    weight: 0.3
+    level: simple
+  - text: "Write a summary of the latest AI trends in 2024."
+    weight: 0.6
+    level: moderate
+  - text: "Calculate the total revenue for Q3 based on the attached spreadsheet."
+    weight: 0.7
+    level: moderate
+  - text: "Perform a security audit on the login module and fix SQL injection."
+    weight: 1.0
+    level: complex
+  - text: "Redesign the kernel architecture to support multi-tenant isolation."
+    weight: 1.0
+    level: complex
+  - text: "CRITICAL FAILURE: Production server is down, all transactions failing!"
+    weight: 1.0
+    level: critical
+  - text: "SECURITY BREACH: Unauthorized access detected in the vault!"
+    weight: 1.0
+    level: critical
+sentiment_anchors:
+  positive: "I am happy very pleased and satisfied with the result"
+  negative: "I am angry disappointed frustrated and unhappy"
+  frustrated: "I am extremely annoyed and tired of these persistent issues"
+  neutral: "this is a standard request or factual statement"
+
+urgency_anchors:
+  critical: "IMMEDIATE EMERGENCY ACTION REQUIRED RIGHT NOW"
+  high: "this is a high priority task that needs attention soon"
+  normal: "standard priority request with normal timelines"
+  low: "whenever you have time or no rush at all"
+intent_anchors:
+  create: "create a new document or generate a build or write a draft"
+  delete: "delete remove destroy drop or wipe the existing data"
+  query: "find information search for data or look up a specific fact"
+  update: "update modify change edit or fix the existing record"
+  navigate: "go to the dashboard open the page or visit the link"
+  configure: "configure settings setup parameters or install modules"
+  analyze: "analyze the data assess performance or review the audit log"
+  communicate: "send a message email notification or share the update"

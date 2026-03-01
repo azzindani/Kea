@@ -1,6 +1,6 @@
 # 🛡️ Security MCP Server
 
-The **Security Server** provides a critical safety layer for the Kea environment. It implements tools for URL scanning, content sanitization, domain reputation monitoring, and code safety auditing to protect the system from malicious actors and insecure research results.
+The **Security Server** provides a critical safety layer for the Project environment. It implements tools for URL scanning, content sanitization, domain reputation monitoring, and code safety auditing to protect the system from malicious actors and insecure research results.
 
 ## 🏗️ Architecture
 

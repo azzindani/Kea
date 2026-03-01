@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 from typing import Any, List, Dict
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from services.mcp_host.core.postgres_registry import PostgresToolRegistry
 
 logger = get_logger(__name__)
@@ -21,7 +21,11 @@ async def get_tool_registry() -> PostgresToolRegistry:
     global _registry_instance
     
     if _registry_instance is None:
-        if not os.getenv("DATABASE_URL"):
+        from shared.config import get_settings
+        settings = get_settings()
+        
+        if not settings.database.url:
+            logger.warning("DATABASE_URL not set in centralized settings. Tool Registry will be unavailable.")
             raise ValueError("DATABASE_URL is required for Tool Registry")
             
         try:

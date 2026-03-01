@@ -1,7 +1,7 @@
 # 🔌 Portfolio Server
 
 The `portfolio_server` is an MCP server providing tools for **Portfolio Server** functionality.
-It is designed to be used within the Kea ecosystem.
+It is designed to be used within the Project ecosystem.
 
 ## 🧰 Tools
 

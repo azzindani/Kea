@@ -1,6 +1,6 @@
 # 🐍 Python Server (MCP)
 
-The **Python Server** is a computational workbench for Kea. it provides a secure, sandboxed environment for executing arbitrary Python code, performing complex data manipulations with Pandas, and running high-performance SQL queries over in-memory datasets using DuckDB.
+The **Python Server** is a computational workbench for Project. it provides a secure, sandboxed environment for executing arbitrary Python code, performing complex data manipulations with Pandas, and running high-performance SQL queries over in-memory datasets using DuckDB.
 
 ## 🛠️ Tools
 

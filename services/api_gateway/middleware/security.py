@@ -12,8 +12,8 @@ from typing import Callable
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from shared.logging import get_logger
-from shared.environment import get_environment_config
+from shared.logging.main import get_logger
+from shared.config import get_settings
 
 
 logger = get_logger(__name__)
@@ -34,7 +34,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         response = await call_next(request)
         
-        env_config = get_environment_config()
+        settings = get_settings()
+        sec = settings.security
         
         # Always add these
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -42,10 +43,13 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         
-        # Production only
-        if env_config.is_production:
-            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-            response.headers["Content-Security-Policy"] = "default-src 'self'"
+        # Production only (or via config)
+        if settings.app.environment == "production":
+            hsts = f"max-age={sec.hsts_max_age}"
+            if sec.hsts_include_subdomains:
+                hsts += "; includeSubDomains"
+            response.headers["Strict-Transport-Security"] = hsts
+            response.headers["Content-Security-Policy"] = sec.csp_policy
         
         return response
 
@@ -158,12 +162,14 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
     - Log security events
     """
     
-    def __init__(self, app, max_body_size_mb: int = 10):
+    def __init__(self, app, max_body_size_mb: int | None = None):
         super().__init__(app)
-        self.max_body_size = max_body_size_mb * 1024 * 1024
+        settings = get_settings()
+        limit = max_body_size_mb or settings.security.max_body_size_mb
+        self.max_body_size = limit * 1024 * 1024
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        env_config = get_environment_config()
+        settings = get_settings()
         
         # Check content length
         content_length = request.headers.get("content-length")
@@ -180,7 +186,7 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                 pass
         
         # Check query parameters in production
-        if env_config.is_production:
+        if settings.app.environment == "production":
             for key, value in request.query_params.items():
                 is_safe, reason = InputSanitizer.is_safe_input(value)
                 if not is_safe:
@@ -197,19 +203,11 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
 # CORS configuration for production
 def get_cors_origins() -> list[str]:
     """Get allowed CORS origins based on environment."""
-    import os
+    from shared.config import get_settings
+    settings = get_settings()
     
-    env_config = get_environment_config()
-    
-    if env_config.is_development:
-        return ["*"]  # Allow all in dev
-    
-    # Production: whitelist only
-    origins = os.getenv("CORS_ORIGINS", "").split(",")
-    origins = [o.strip() for o in origins if o.strip()]
-    
-    if not origins:
-        logger.warning("No CORS_ORIGINS configured, defaulting to none")
-        return []
-    
-    return origins
+    # Development: Allow all (unless specific origins provided)
+    if settings.app.environment == "development" and settings.security.cors_origins == ["*"]:
+        return ["*"]
+        
+    return settings.security.cors_origins

@@ -3,7 +3,7 @@ from openpyxl import load_workbook
 from openpyxl.drawing.image import Image
 from openpyxl.comments import Comment
 from shared.mcp.protocol import ToolResult, TextContent
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 import os
 import json
 
@@ -44,7 +44,7 @@ async def add_comment(arguments: dict) -> ToolResult:
         path = arguments['file_path']
         cell = arguments['cell']
         text = arguments['text']
-        author = arguments.get('author', 'Kea Agent')
+        author = arguments.get('author', 'Project Agent')
         sheet_name = arguments.get('sheet_name')
         
         wb = _get_wb(path)

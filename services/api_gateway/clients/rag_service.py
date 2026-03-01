@@ -6,10 +6,10 @@ HTTP client for calling the RAG service.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 import httpx
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.config import get_settings
 from shared.service_registry import ServiceRegistry, ServiceName
 
@@ -32,8 +32,13 @@ class RAGServiceClient:
     """
     
     def __init__(self, base_url: str | None = None) -> None:
+        settings = get_settings()
         self.base_url = base_url or ServiceRegistry.get_url(ServiceName.RAG_SERVICE)
-        self.timeout = httpx.Timeout(60.0, connect=10.0)
+        # Use centralized timeouts
+        self.timeout = httpx.Timeout(
+            settings.timeouts.default,
+            connect=settings.timeouts.auth_token,
+        )
     
     async def health_check(self) -> dict[str, Any]:
         """Check RAG service health."""
@@ -45,8 +50,8 @@ class RAGServiceClient:
     async def search(
         self,
         query: str,
-        limit: int = 100000,
-        min_score: float = 0.5,
+        limit: int | None = None,
+        min_score: float | None = None,
     ) -> list[dict[str, Any]]:
         """
         Semantic search for facts.
@@ -59,6 +64,10 @@ class RAGServiceClient:
         Returns:
             List of matching facts
         """
+        settings = get_settings()
+        limit = limit or settings.rag.default_limit
+        min_score = min_score if min_score is not None else settings.rag.default_min_score
+        
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(
                 f"{self.base_url}/search",
@@ -93,7 +102,7 @@ class RAGServiceClient:
         """Get a fact by ID."""
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.get(f"{self.base_url}/facts/{fact_id}")
-            if response.status_code == 404:
+            if response.status_code == get_settings().status_codes.not_found:
                 return None
             response.raise_for_status()
             return response.json()
@@ -127,7 +136,7 @@ class RAGServiceClient:
         """Get artifact content by ID."""
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.get(f"{self.base_url}/artifacts/{artifact_id}")
-            if response.status_code == 404:
+            if response.status_code == get_settings().status_codes.not_found:
                 return None
             response.raise_for_status()
             return response.content
@@ -149,3 +158,14 @@ class RAGServiceClient:
             )
             response.raise_for_status()
             return response.json()
+
+
+# Singleton
+_client: Optional[RAGServiceClient] = None
+
+async def get_rag_client() -> RAGServiceClient:
+    """Get singleton client."""
+    global _client
+    if _client is None:
+        _client = RAGServiceClient()
+    return _client

@@ -1,6 +1,6 @@
 # 🗄️ Shared Database Component
 
-The `shared/database` module provides a production-grade, asynchronous PostgreSQL connection pooling system for the Kea microservices architecture. Exclusively uses `asyncpg` for high-performance I/O.
+The `shared/database` module provides a production-grade, asynchronous PostgreSQL connection pooling system for the Project microservices architecture. Exclusively uses `asyncpg` for high-performance I/O.
 
 ## 🏗️ Architecture
 

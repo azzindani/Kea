@@ -1,76 +1,46 @@
 # 🧠 Orchestrator Service ("The Nervous System")
 
-The **Orchestrator Service** is the cognitive core of the Kea system. It acts as the **General Manager**, wrapping the isolated Kea Kernel in a resilient, stateful service layer. It is responsible for high-level reasoning, planning, and the execution of complex research missions.
+The **Orchestrator Service** is the cognitive core of the Kea system. It acts as the **General Manager**, wrapping the isolated Kea Kernel in a resilient, stateful service layer.
+
+> 🛠️ **Status: UNDER REDESIGN**  
+> The Orchestrator is currently undergoing a structural simplification to move towards a more robust, "Logic-First" architecture centered around the universal `KernelCell`.
 
 ## 📐 Architecture
 
-The Orchestrator follows a **Graph-Based Reasoning Architecture**. It uses **LangGraph** to manage global state transitions and **DAGs** for local tool execution.
+The Orchestrator manages the lifecycle of system jobs, coordinating between the **Gateway**, **Vault**, and **MCP Host**.
 
 ```mermaid
 graph TD
     subgraph Orchestrator [Orchestrator Service]
         direction TB
-        Main[FastAPI: /research] --> State[LangGraph State Manager]
-        State --> Loop{Cognitive Loop}
-        
-        Loop --> Planner[Planner Node]
-        Loop --> Researcher[Researcher Node]
-        Loop --> Keeper[Keeper Node]
-        Loop --> Synth[Synthesizer Node]
-        
-        Researcher --> Swarm[Phased Fractal Swarm]
+        Main[FastAPI: /execute] --> JobMgr[Job Lifecycle Manager]
+        JobMgr --> Kernel[Kea Kernel]
     end
 
-    Swarm -->|Execute| MCP[MCP Host]
-    Planner -->|Find| RAG[RAG Service]
-    State -->|Checkpoint| Vault[Vault Service]
+    Kernel -->|Execute| MCP[MCP Host]
+    Kernel -->|Search| RAG[RAG Service]
+    JobMgr -->|Persist| Vault[Vault Service]
 ```
-
-### Component Overview
-
-| Component | Responsibility | Cognitive Role |
-| :--- | :--- | :--- |
-| **Planner Node** | Decomposes queries into blueprints. | Frontal Lobe |
-| **Researcher Node**| Orchestrates parallel tool swarms. | Motor Control |
-| **Keeper Node** | Perceptual filter; prunes noise/bias. | Amygdala |
-| **Synthesizer** | Assembles final cited reports. | Broca's Area |
-| **State Manager** | Manages job persistence and recovery. | Cerebellum |
 
 ---
 
-## ✨ Key Features
+## ✨ Features (Core Roadmap)
 
-### 1. LangGraph State Machine
-Unlike linear pipelines, the Orchestrator can loop, backtrack, and iterate. If the **Synthesizer** detects a gap in the report, it can signal the **Planner** to generate a new sub-query, effectively enabling "Self-Correction" at the architectural level.
+### 1. Unified Cognitive Cycle
+The Orchestrator will implement the universal **Perceive → Frame → Plan → Execute → Monitor → Package** cycle across all hierarchical levels.
 
-### 2. Phased Fractal Swarming
-The Researcher node implements **DAG-based micro-orchestration**. It breaks a plan into phases where:
-- **Phase 1**: Independent data gathering (Parallel).
-- **Phase 2**: Calculative analysis based on Phase 1 (Sequential).
-This maximizes throughput while ensuring strict data dependency integrity.
+### 2. High-Fidelity Persistence
+The service coordinates with the **Vault** to ensure that every step of the reasoning process is auditable and recoverable, utilizing the new session-based persistence model.
 
-### 3. Asynchronous Resilience (Checkpoints)
-The Orchestrator utilizes the **Vault**'s checkpointer. Every state transition is saved to PostgreSQL. If the service crashes, it can reload the exact state from the checkpoint and resume research without repeating expensive LLM or tool calls.
+### 3. JIT Workflow Generation
+Workflows are no longer static DAGs; they are generated Just-In-Time by the Kernel based on the specific domain and depth of the user's request.
 
 ---
 
 ## 📁 Codebase Structure
 
-- **`main.py`**: Entrypoint for the service. Manages the `/research` and `/chat` pipelines and streams progress via SSE.
-- **`kernel/` Dependency**: The Orchestrator is a wrapper around the **Kea Kernel**. It imports its core logic from:
-    - `kernel.nodes`: Logic for Planner, Keeper, Synthesizer.
-    - `kernel.agents`: Specialized Personas (Generator, Critic, Judge).
-    - `kernel.flow`: The LangGraph definitions and compilation logic.
+- **`main.py`**: Entrypoint for the service. Currently serving as a stub in **REDESIGN** mode.
+- **`core/`**: (Future) House for the new reasoning and orchestration logic.
 
 ---
-
-## 🧠 Deep Dive
-
-### 1. The "Re-planning" Loop
-When the **Consensus Engine** (shared via the Judge Agent) determines a finding is "Incomplete," the Orchestrator doesn't just fail. It updates the `ResearchState` with specific gap metadata and loops back to the **Planner Node**. This creates an autonomous "Search-and-Verify" loop until the Quality Bar is met.
-
-### 2. Shadow Lab Pivot
-If a task requires logical derivation that no tool supports (e.g., "Calculate the projected CAGR based on these 10 PDFs"), the Orchestrator pivots to the **Shadow Lab**. It spawns a specialized `CodeGeneratorAgent` to write custom analysis scripts, which are executed in a governed sandbox.
-
----
-*The Orchestrator is the conductor of the corporate symphony, ensuring that every agent and tool plays its part in unison.*
+*The Orchestrator is the conductor of the corporate symphony, currently being tuned for enterprise-scale performance.*

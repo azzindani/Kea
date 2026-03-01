@@ -1,6 +1,6 @@
 # 🗄️ Database Migrations
 
-This directory contains the database migration scripts and configuration for Kea's PostgreSQL database, managed by **Alembic**.
+This directory contains the database migration scripts and configuration for Project's PostgreSQL database, managed by **Alembic**.
 
 ## 🚀 Usage
 

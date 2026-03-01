@@ -12,8 +12,9 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, AsyncIterator
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.environment import get_environment_config
+from shared.config import get_settings
 
 
 logger = get_logger(__name__)
@@ -23,35 +24,29 @@ logger = get_logger(__name__)
 class DatabaseConfig:
     """Database configuration."""
     url: str
-    min_connections: int = 5
-    max_connections: int = 20
-    connection_timeout: float = 30.0
-    idle_timeout: float = 300.0
+    min_connections: int = 0
+    max_connections: int = 0
+    connection_timeout: float = 0.0
+    idle_timeout: float = 0.0
     
     @classmethod
     def from_environment(cls) -> "DatabaseConfig":
-        """Create config from environment."""
-        env_config = get_environment_config()
+        """Create config from centralized settings."""
+        from shared.config import get_settings
+        settings = get_settings()
+        db_settings = settings.database
         
-        url = os.getenv("DATABASE_URL")
+        url = db_settings.url
+        
         if not url:
-            # Fallback for local dev if not set, but must be Postgres
-            # raise ValueError("DATABASE_URL environment variable is required")
-            # Actually, let's allow it to be None and fail at init if strictly required, 
-            # or just default to a local postgres url if commonly used?
-            # User requirement: "exclusively use PostgreSQL". 
-            # Better to be explicit.
-             pass 
-
-        if not url:
-             logger.warning("DATABASE_URL not set. Database features will fail.")
+            logger.warning("DATABASE_URL not set in centralized settings. Database features will be unavailable.")
         
         return cls(
             url=url or "",
-            min_connections=int(os.getenv("DATABASE_MIN_CONNECTIONS", "5")),
-            max_connections=int(os.getenv("DATABASE_MAX_CONNECTIONS", "20")),
-            connection_timeout=10.0 if env_config.is_production else 30.0,
-            idle_timeout=600.0,
+            min_connections=db_settings.min_connections,
+            max_connections=db_settings.max_connections,
+            connection_timeout=db_settings.connection_timeout,
+            idle_timeout=db_settings.idle_timeout,
         )
 
 
@@ -84,12 +79,13 @@ class DatabasePool:
         try:
             import asyncpg
             
+            settings = get_settings()
             self._pool = await asyncpg.create_pool(
                 self.config.url,
                 min_size=self.config.min_connections,
                 max_size=self.config.max_connections,
                 timeout=self.config.connection_timeout,
-                command_timeout=60.0,
+                command_timeout=settings.database.command_timeout,
             )
             
             logger.info(f"PostgreSQL pool initialized: {self.config.min_connections}-{self.config.max_connections} connections")

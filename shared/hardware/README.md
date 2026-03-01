@@ -22,7 +22,7 @@ graph TD
 - **Adaptive Scaling**: Calculates `optimal_workers()` to prevent system crashes by balancing CPU threads and RAM availability.
 - **Environment Awareness**: Detects specialized AI environments like Google Colab and Kaggle to enable specific optimizations.
 - **GPU Acceleration**: Built-in support for detecting NVIDIA GPUs, VRAM availability, and CUDA capabilities via `torch`.
-- **Memory Pressure Monitoring**: Provides real-time OOM (Out-of-Memory) risk assessment for high-load research tasks.
+- **Memory Pressure Monitoring**: Provides real-time OOM (Out-of-Memory) risk assessment for high-load system tasks.
 - **Auto-Refreshing**: Stats can be refreshed before critical operations to ensure the latest data is used.
 
 ## 📁 Component Structure

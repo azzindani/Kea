@@ -1,0 +1,46 @@
+# Geographic Macro-Regions and Organizations Knowledge
+# Used for expanding broad geographical terms into constituent entities.
+
+regions:
+  APAC:
+    label: "Asia-Pacific"
+    scope: "region"
+    timezone: "UTC+8" # Weighted average for the region
+    business_days: [1, 2, 3, 4, 5]
+    constituents: ["China", "Japan", "India", "Australia", "South Korea", "Singapore", "Vietnam", "Indonesia", "Malaysia", "Thailand", "Philippines", "New Zealand"]
+  EMEA:
+    label: "Europe, Middle East and Africa"
+    scope: "region"
+    timezone: "UTC+1"
+    business_days: [1, 2, 3, 4, 5]
+    constituents: ["United Kingdom", "Germany", "France", "Italy", "Spain", "Saudi Arabia", "UAE", "South Africa", "Nigeria", "Egypt", "Turkey", "Israel"]
+  AMER:
+    label: "Americas"
+    scope: "region"
+    constituents: ["USA", "Canada", "Brazil", "Mexico", "Argentina", "Chile", "Colombia", "Peru"]
+  LATAM:
+    label: "Latin America"
+    scope: "region"
+    constituents: ["Brazil", "Mexico", "Argentina", "Chile", "Colombia", "Peru", "Venezuela"]
+  ASEAN:
+    label: "Association of Southeast Asian Nations"
+    scope: "org"
+    constituents: ["Brunei", "Cambodia", "Indonesia", "Laos", "Malaysia", "Myanmar", "Philippines", "Singapore", "Thailand", "Vietnam"]
+
+organizations:
+  BRICS:
+    label: "BRICS"
+    scope: "org"
+    constituents: ["Brazil", "Russia", "India", "China", "South Africa", "Egypt", "Ethiopia", "Iran", "Saudi Arabia", "UAE"]
+  G20:
+    label: "Group of Twenty"
+    scope: "org"
+    constituents: ["Argentina", "Australia", "Brazil", "Canada", "China", "France", "Germany", "India", "Indonesia", "Italy", "Japan", "Mexico", "Russia", "Saudi Arabia", "South Africa", "South Korea", "Turkey", "UK", "USA", "European Union", "African Union"]
+  EU:
+    label: "European Union"
+    scope: "org"
+    constituents: ["Austria", "Belgium", "Bulgaria", "Croatia", "Cyprus", "Czech Republic", "Denmark", "Estonia", "Finland", "France", "Germany", "Greece", "Hungary", "Ireland", "Italy", "Latvia", "Lithuania", "Luxembourg", "Malta", "Netherlands", "Poland", "Portugal", "Romania", "Slovakia", "Slovenia", "Spain", "Sweden"]
+  NATO:
+    label: "North Atlantic Treaty Organization"
+    scope: "org"
+    constituents: ["USA", "Canada", "UK", "France", "Germany", "Italy", "Spain", "Poland", "Turkey", "Norway", "Belgium", "Netherlands"]

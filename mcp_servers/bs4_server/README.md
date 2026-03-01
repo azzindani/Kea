@@ -1,7 +1,7 @@
 # 🔌 Bs4 Server
 
 The `bs4_server` is an MCP server providing tools for **Bs4 Server** functionality.
-It is designed to be used within the Kea ecosystem.
+It is designed to be used within the Project ecosystem.
 
 ## 🧰 Tools
 

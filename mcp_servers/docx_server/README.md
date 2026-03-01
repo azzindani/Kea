@@ -1,7 +1,7 @@
 # 🔌 Docx Server
 
 The `docx_server` is an MCP server providing tools for **Docx Server** functionality.
-It is designed to be used within the Kea ecosystem.
+It is designed to be used within the Project ecosystem.
 
 ## 🧰 Tools
 

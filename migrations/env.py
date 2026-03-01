@@ -33,7 +33,7 @@ def get_url() -> str:
     
     if not url:
         # Fallback for development using host 'localhost' and default DB
-        url = "postgresql+asyncpg://postgres:postgres@localhost:5432/research_engine"
+        url = "postgresql+asyncpg://postgres:postgres@localhost:5432/system_db"
     
     # Convert postgres:// to postgresql+asyncpg://
     if url.startswith("postgres://"):

@@ -18,7 +18,7 @@ from functools import wraps
 from typing import Any, Callable
 from uuid import uuid4
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 
 logger = get_logger(__name__)
@@ -28,44 +28,7 @@ logger = get_logger(__name__)
 # Audit Event Types
 # ============================================================================
 
-class AuditEventType(Enum):
-    """Types of auditable events."""
-    # Query lifecycle
-    QUERY_RECEIVED = "query_received"
-    QUERY_CLASSIFIED = "query_classified"
-    QUERY_COMPLETED = "query_completed"
-    
-    # Tool operations
-    TOOL_CALLED = "tool_called"
-    TOOL_RESULT = "tool_result"
-    TOOL_ERROR = "tool_error"
-    
-    # Data operations
-    DATA_ACCESSED = "data_accessed"
-    DATA_MODIFIED = "data_modified"
-    DATA_DELETED = "data_deleted"
-    
-    # Decisions
-    DECISION_MADE = "decision_made"
-    DECISION_OVERRIDDEN = "decision_overridden"
-    
-    # Human in the loop
-    ESCALATION_CREATED = "escalation_created"
-    ESCALATION_RESOLVED = "escalation_resolved"
-    APPROVAL_REQUESTED = "approval_requested"
-    APPROVAL_GRANTED = "approval_granted"
-    APPROVAL_DENIED = "approval_denied"
-    
-    # Security
-    SECURITY_CHECK = "security_check"
-    SECURITY_VIOLATION = "security_violation"
-    ACCESS_DENIED = "access_denied"
-    
-    # System
-    SYSTEM_START = "system_start"
-    SYSTEM_STOP = "system_stop"
-    CONFIG_CHANGED = "config_changed"
-    ERROR = "error"
+from shared.schemas import AuditEventType
 
 
 @dataclass
@@ -251,7 +214,7 @@ class AuditTrail:
         # Log an event
         await audit.log(
             AuditEventType.QUERY_RECEIVED,
-            action="User submitted research query",
+            action="User submitted autonomous query",
             actor="user_123",
             details={"query": "Tesla financials"},
             session_id="session_456",
@@ -272,8 +235,11 @@ class AuditTrail:
             backend: Storage backend (defaults to Postgres -> Memory)
         """
         if backend is None:
+            from shared.config import get_settings
+            settings = get_settings()
+            
             # 1. Try Postgres (Primary)
-            if os.getenv("DATABASE_URL"):
+            if settings.database.url:
                 try:
                     from services.vault.core.postgres_audit import PostgresBackend
                     backend = PostgresBackend()

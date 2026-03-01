@@ -1,12 +1,13 @@
-import pytest
-import asyncio
 import base64
-import os
-from PIL import Image, ImageDraw
 from io import BytesIO
+
+import pytest
 from mcp import ClientSession
 from mcp.client.stdio import stdio_client
+from PIL import Image, ImageDraw
+
 from tests.mcp.client_utils import get_server_params
+
 
 def create_base64_image(text="Vision Test"):
     """Creates a simple base64 image."""
@@ -23,22 +24,22 @@ async def test_vision_real_simulation():
     REAL SIMULATION: Verify Vision Server (Screenshot/Chart).
     """
     params = get_server_params("vision_server", extra_dependencies=["httpx"])
-    
+
     b64_img = create_base64_image()
-    
-    print(f"\n--- Starting Real-World Simulation: Vision Server ---")
-    
+
+    print("\n--- Starting Real-World Simulation: Vision Server ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. Screenshot Extract (using base64)
             # Requires an actual OCR backend (like ChatGPT or Tesseract) configured in the server?
             # Or does it use a remote API? Server deps says 'httpx', likely remote (OpenAI/Claude?).
             # If so, it might fail without keys. We check for graceful handling.
             print("1. Extracting from Base64 Image...")
             res = await session.call_tool("screenshot_extract", arguments={"image_base64": b64_img, "extraction_type": "text"})
-            
+
             if not res.isError:
                  print(f" \033[92m[PASS]\033[0m Extracted: {res.content[0].text}")
             else:

@@ -4,7 +4,7 @@ import json
 import asyncio
 import asyncpg
 from pathlib import Path
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 logger = get_logger(__name__)
 
@@ -98,7 +98,7 @@ async def make_directory(path: str) -> str:
 
 async def write_file(path: str, content: str, description: str = "") -> str:
     """Write content to a file (Virtual & Physical)."""
-    # 1. Save Physical Artifact (Mocking via File System for now, should use KeaClient)
+    # 1. Save Physical Artifact (Mocking via File System for now, should use ProjectClient)
     # We will write to ./artifacts locally to be compatible with existing setup
     
     local_artifacts_dir = Path("artifacts")

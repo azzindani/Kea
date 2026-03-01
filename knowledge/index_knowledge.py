@@ -1,8 +1,8 @@
 """
 Knowledge File Indexer.
 
-Scans the knowledge/ and configs/knowledge/ directories and converts
-Markdown skill/rule files plus YAML domain configs into registry-ready items.
+Scans the knowledge/ directory and converts Markdown skill/rule files 
+into registry-ready items for the Knowledge Vault.
 
 Expected item format (for PostgresKnowledgeRegistry.sync_knowledge):
     {
@@ -25,8 +25,11 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+import sys
 
-# Optional YAML support
+from shared.config import get_settings
+
+# Optional YAML support for frontmatter
 try:
     import yaml as _yaml
 
@@ -47,15 +50,18 @@ def _parse_frontmatter(text: str) -> tuple[dict[str, Any], str]:
     Returns (metadata_dict, body_text).  If no frontmatter is found,
     metadata is empty and body is the full text.
     """
-    if not text.startswith("---"):
+
+    delimiter = get_settings().knowledge.frontmatter_delimiter
+
+    if not text.startswith(delimiter):
         return {}, text
 
-    end = text.find("\n---", 3)
+    end = text.find(f"\n{delimiter}", 3)
     if end == -1:
         return {}, text
 
     fm_block = text[3:end].strip()
-    body = text[end + 4 :].lstrip("\n")
+    body = text[end + len(delimiter) + 1 :].lstrip("\n")
 
     if not _HAS_YAML:
         # Simple fallback: parse key: value pairs
@@ -92,7 +98,8 @@ def _infer_category(path: Path, meta: dict[str, Any]) -> str:
     if "procedures" in parts:
         return "procedure"
 
-    return "skill"  # default
+
+    return get_settings().knowledge.default_category
 
 
 def _path_to_id(knowledge_dir: Path, filepath: Path) -> str:
@@ -115,25 +122,36 @@ def _scan_markdown_files(
     """Scan knowledge/ Markdown files with YAML frontmatter."""
     items: list[dict[str, Any]] = []
 
-    for md_file in knowledge_dir.rglob("*.md"):
+
+    settings = get_settings().knowledge
+    print(f"DEBUG: Scanning knowledge directory: {knowledge_dir.absolute()}", file=sys.stderr)
+
+    all_md_files = list(knowledge_dir.rglob("*.md"))
+    print(f"DEBUG: Found {len(all_md_files)} total .md files in {knowledge_dir}", file=sys.stderr)
+
+    for md_file in all_md_files:
         # Skip README / documentation files
-        if md_file.name.upper() in ("README.MD", "LIBRARY_MANIFEST.MD"):
+        if md_file.name.upper() in [f.upper() for f in settings.excluded_filenames]:
             continue
 
         try:
-            text = md_file.read_text(encoding="utf-8")
+            text = md_file.read_text(encoding="utf-8-sig")
         except Exception:
             continue
 
         meta, body = _parse_frontmatter(text)
 
-        # Skip files without a name (not knowledge items)
+        # Diagnostic: Skip files without a name or if they look like internal docs
         if not meta.get("name"):
+            if md_file.name.startswith("_") or "internal" in str(md_file).lower():
+                continue
+            # logger is not available globally here unless we import it, use stderr for raw debug
+            print(f"DEBUG: Skipping {md_file.name} - No 'name' field in frontmatter", file=sys.stderr)
             continue
 
         name: str = meta.get("name", md_file.stem.replace("_", " ").title())
         description: str = meta.get("description", name)
-        domain: str = str(meta.get("domain", "general")).lower()
+        domain: str = str(meta.get("domain", settings.default_domain)).lower()
         category: str = _infer_category(md_file, meta)
 
         raw_tags = meta.get("tags", [])
@@ -163,123 +181,10 @@ def _scan_markdown_files(
                 "content": body.strip() or text.strip(),
                 "metadata": {
                     "source_file": str(md_file.relative_to(knowledge_dir)),
-                    "version": str(meta.get("version", "1.0")),
+                    "version": str(meta.get("version", settings.default_version)),
                 },
             }
         )
-
-    return items
-
-
-# ---------------------------------------------------------------------------
-# YAML domain config scanner (configs/knowledge/)
-# ---------------------------------------------------------------------------
-
-
-def _format_steps(steps: list | str) -> str:
-    if isinstance(steps, str):
-        return steps
-    return "\n".join(f"{i + 1}. {step}" for i, step in enumerate(steps))
-
-
-def _scan_yaml_knowledge_dir(
-    configs_knowledge_dir: Path,
-    domain_filter: str | None = None,
-    category_filter: str | None = None,
-) -> list[dict[str, Any]]:
-    """
-    Scan configs/knowledge/ YAML files and convert each procedure/rule/skill
-    entry to an individual knowledge item.
-    """
-    if not _HAS_YAML:
-        return []
-
-    items: list[dict[str, Any]] = []
-
-    for yaml_file in configs_knowledge_dir.glob("*.yaml"):
-        try:
-            data = _yaml.safe_load(yaml_file.read_text(encoding="utf-8")) or {}
-        except Exception:
-            continue
-
-        domain: str = str(data.get("domain", yaml_file.stem)).lower()
-
-        if domain_filter and domain != domain_filter.lower():
-            continue
-
-        # ── Procedures ──────────────────────────────────────────────────────
-        if not category_filter or category_filter == "procedure":
-            for proc_key, proc in (data.get("procedures") or {}).items():
-                desc: str = proc.get("description", proc_key.replace("_", " ").title())
-                steps_raw = proc.get("steps", [])
-                content_lines = [f"## {desc}\n", _format_steps(steps_raw)]
-                if proc.get("output"):
-                    content_lines.append(f"\n### Output\n{proc['output']}")
-                if proc.get("when_to_use"):
-                    content_lines.append(f"\n### When to Use\n{proc['when_to_use']}")
-
-                items.append(
-                    {
-                        "knowledge_id": f"domain_config/{domain}/procedures/{proc_key}",
-                        "name": desc,
-                        "description": desc,
-                        "domain": domain,
-                        "category": "procedure",
-                        "tags": [domain, "procedure", proc_key],
-                        "content": "\n".join(content_lines),
-                        "metadata": {"source_file": str(yaml_file.name)},
-                    }
-                )
-
-        # ── Rules ────────────────────────────────────────────────────────────
-        if not category_filter or category_filter == "rule":
-            for rule_key, rule_val in (data.get("rules") or {}).items():
-                if isinstance(rule_val, list):
-                    rule_content = "\n".join(f"- {item}" for item in rule_val)
-                    rule_desc = rule_key.replace("_", " ").title()
-                elif isinstance(rule_val, dict):
-                    rule_content = "\n".join(f"- **{k}**: {v}" for k, v in rule_val.items())
-                    rule_desc = rule_val.get("description", rule_key.replace("_", " ").title())
-                else:
-                    rule_content = str(rule_val)
-                    rule_desc = rule_key.replace("_", " ").title()
-
-                items.append(
-                    {
-                        "knowledge_id": f"domain_config/{domain}/rules/{rule_key}",
-                        "name": f"{domain.title()} Rule: {rule_desc}",
-                        "description": f"Rule for {domain} domain: {rule_desc}",
-                        "domain": domain,
-                        "category": "rule",
-                        "tags": [domain, "rule", rule_key],
-                        "content": f"## {rule_desc}\n\n{rule_content}",
-                        "metadata": {"source_file": str(yaml_file.name)},
-                    }
-                )
-
-        # ── Skills ───────────────────────────────────────────────────────────
-        if not category_filter or category_filter == "skill":
-            for skill_key, skill_val in (data.get("skills") or {}).items():
-                if isinstance(skill_val, dict):
-                    skill_desc = skill_val.get("description", skill_key.replace("_", " ").title())
-                    steps_raw = skill_val.get("steps", [])
-                    content = f"## {skill_desc}\n\n{_format_steps(steps_raw)}"
-                else:
-                    skill_desc = skill_key.replace("_", " ").title()
-                    content = str(skill_val)
-
-                items.append(
-                    {
-                        "knowledge_id": f"domain_config/{domain}/skills/{skill_key}",
-                        "name": skill_desc,
-                        "description": skill_desc,
-                        "domain": domain,
-                        "category": "skill",
-                        "tags": [domain, "skill", skill_key],
-                        "content": content,
-                        "metadata": {"source_file": str(yaml_file.name)},
-                    }
-                )
 
     return items
 
@@ -299,10 +204,9 @@ def scan_knowledge_files(
 
     Sources:
     1. {knowledge_dir}/**/*.md  — Markdown skill/rule files with YAML frontmatter
-    2. {knowledge_dir}/../configs/knowledge/*.yaml  — Domain YAML configs
 
     Args:
-        knowledge_dir: Path to the knowledge/ directory (contains skills/, rules/)
+        knowledge_dir: Path to the knowledge/ directory (contains skills/, rules/, procedures/)
         domain_filter: If set, only include items matching this domain
         category_filter: If set, only include items matching this category
 
@@ -311,16 +215,9 @@ def scan_knowledge_files(
     """
     items: list[dict[str, Any]] = []
 
-    # 1. Markdown files
+    # Scan all Markdown files in the knowledge directory
     if knowledge_dir.exists():
         items.extend(_scan_markdown_files(knowledge_dir, domain_filter, category_filter))
-
-    # 2. YAML domain configs (sibling configs/knowledge/ directory)
-    configs_knowledge_dir = knowledge_dir.parent / "configs" / "knowledge"
-    if configs_knowledge_dir.exists():
-        items.extend(
-            _scan_yaml_knowledge_dir(configs_knowledge_dir, domain_filter, category_filter)
-        )
 
     return items
 

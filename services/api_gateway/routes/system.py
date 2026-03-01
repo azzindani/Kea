@@ -12,7 +12,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from shared.config import get_settings
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 logger = get_logger(__name__)
 
@@ -37,7 +37,7 @@ class SystemCapabilities(BaseModel):
     """System capabilities response."""
 
     mcp_servers: list[str]
-    research_paths: list[str]
+    available_job_types: list[str]
     llm_providers: list[str]
     max_parallel_tools: int
 
@@ -57,8 +57,8 @@ async def system_health():
 
     return SystemHealth(
         status="healthy",
-        version="0.1.0",
-        environment=settings.environment.value,
+        version=settings.app.version,
+        environment=settings.app.environment.value,
         uptime_seconds=uptime,
     )
 
@@ -69,10 +69,10 @@ async def system_capabilities():
     settings = get_settings()
 
     return SystemCapabilities(
-        mcp_servers=[s.name for s in settings.mcp.servers if s.enabled],
-        research_paths=["memory_fork", "shadow_lab", "grand_synthesis", "deep_research"],
-        llm_providers=["openrouter"],
-        max_parallel_tools=settings.research.parallel_tools,
+        mcp_servers=[],  # Dynamic list via MCP Host tools/search
+        available_job_types=["autonomous"],
+        llm_providers=[p.name for p in settings.llm.providers if p.enabled],
+        max_parallel_tools=settings.mcp.max_concurrent_tools,
     )
 
 
@@ -82,16 +82,11 @@ async def get_config():
     settings = get_settings()
 
     return {
-        "environment": settings.environment.value,
+        "environment": settings.app.environment.value,
         "llm": {
             "provider": settings.llm.default_provider,
             "model": settings.llm.default_model,
             "temperature": settings.llm.temperature,
-        },
-        "research": {
-            "max_depth": settings.research.max_depth,
-            "max_sources": settings.research.max_sources,
-            "parallel_tools": settings.research.parallel_tools,
         },
         "logging": {
             "level": settings.logging.level,
@@ -107,13 +102,13 @@ async def metrics_summary() -> dict:
         from shared.database.connection import get_database_pool
 
         pool = await get_database_pool()
-        total_jobs = await pool.fetchval("SELECT COUNT(*) FROM research_jobs") or 0
-        total_tool_calls = await pool.fetchval("SELECT COUNT(*) FROM micro_tasks") or 0
+        total_jobs = await pool.fetchval("SELECT COUNT(*) FROM system_jobs") or 0
+        total_tool_calls = 0  # To be implemented with new telemetry standard
         avg_duration = await pool.fetchval(
             """
-            SELECT AVG(EXTRACT(EPOCH FROM (completed_at - created_at)))
-            FROM research_jobs
-            WHERE status = 'completed' AND completed_at IS NOT NULL
+            SELECT AVG(EXTRACT(EPOCH FROM (updated_at - created_at)))
+            FROM system_jobs
+            WHERE status = 'completed' AND updated_at IS NOT NULL
             """
         )
         return {

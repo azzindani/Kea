@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Dict, List, Any
 import dataclasses
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.mcp.client import MCPClient
 from shared.mcp.protocol import Tool
 from shared.mcp.transport import SubprocessTransport
@@ -34,6 +34,7 @@ class SessionRegistry:
     _shared_discovered_tools: List[Tool] | None = None
     _discovery_lock = None  # Will be created on first use
     _discovery_done = False
+    _sync_lock = asyncio.Lock()
     
     def __init__(self):
         # Active sessions (server_name -> client object) - per-instance
@@ -94,17 +95,13 @@ class SessionRegistry:
         Syncs statically discovered tools to the Postgres RAG backend.
         Should be called as a background task after initialization.
         """
-        if self.pg_registry and self.discovered_tools:
-            logger.info(f"🔄 Syncing {len(self.discovered_tools)} statically discovered tools to RAG...")
-            try:
-                await self.pg_registry.sync_tools(self.discovered_tools)
-                # Clear buffer to free memory, or keep if we want to query them locally later?
-                # RAG is persistent, so we can clear. but keep for debugging if needed.
-                # Clear buffer to free memory, or keep if we want to query them locally later?
-                # KEEPING for static listing (fix for "No tools found" error)
-                # self.discovered_tools.clear() 
-            except Exception as e:
-                logger.error(f"❌ Failed to sync discovered tools to RAG: {e}")
+        async with SessionRegistry._sync_lock:
+            if self.pg_registry and self.discovered_tools:
+                logger.info(f"🔄 Syncing {len(self.discovered_tools)} statically discovered tools to RAG...")
+                try:
+                    await self.pg_registry.sync_tools(self.discovered_tools)
+                except Exception as e:
+                    logger.error(f"❌ Failed to sync discovered tools to RAG: {e}")
 
     def _discover_local_servers(self):
         """
@@ -112,7 +109,7 @@ class SessionRegistry:
         Treats every .py file (excluding __init__) as an MCP Server.
         """
         # Determine path relative to this file:
-        # services/mcp_host/core/session_registry.py -> ... -> Kea/mcp_servers
+        # services/mcp_host/core/session_registry.py -> ... -> Project/mcp_servers
         try:
             # Go up 4 levels from core/session_registry.py to root
             root_path = Path(__file__).resolve().parents[3]
@@ -140,13 +137,15 @@ class SessionRegistry:
                 logger.info(f"Checking {dir_path.name} -> {server_script} (Exists: {server_script.exists()})")
                 if server_script.exists():
                     self._register_script(dir_path.name, server_script)
+        
+        logger.info(f"✅ Scanning COMPLETE: Found {len(self.server_configs)} servers and {len(self.discovered_tools)} tools.")
 
     def _register_script(self, server_name: str, script_path: Path):
         """Register a server script configuration."""
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"
-        env["KEA_SERVER_NAME"] = server_name
-        env["PYTHONPATH"] = str(Path(__file__).resolve().parents[3]) # Add Kea root to pythonpath
+        env["PROJECT_SERVER_NAME"] = server_name
+        env["PYTHONPATH"] = str(Path(__file__).resolve().parents[3]) # Add Project root to pythonpath
         
         SessionRegistry._shared_server_configs[server_name] = ServerConfig(
             name=server_name,
@@ -318,15 +317,15 @@ class SessionRegistry:
             
             # Fallback for Windows Conda environment if not found in PATH
             if not uv_path and os.name == 'nt':
-                 user_home = os.path.expanduser("~")
-                 common_paths = [
-                     os.path.join(user_home, "miniconda3", "Scripts", "uv.exe"),
-                     os.path.join(user_home, "anaconda3", "Scripts", "uv.exe"),
-                 ]
-                 for potential_path in common_paths:
-                     if os.path.exists(potential_path):
-                         uv_path = potential_path
-                         break
+                user_home = os.path.expanduser("~")
+                common_paths = [
+                    os.path.join(user_home, "miniconda3", "Scripts", "uv.exe"),
+                    os.path.join(user_home, "anaconda3", "Scripts", "uv.exe"),
+                ]
+                for potential_path in common_paths:
+                    if os.path.exists(potential_path):
+                        uv_path = potential_path
+                        break
 
             # Check for explicit disable
             # Check config for UV settings
@@ -336,27 +335,16 @@ class SessionRegistry:
             if not jit_config.uv_enabled:
                 uv_path = None
             elif jit_config.uv_path:
-                 # Use explicit path if configured
-                 uv_path = jit_config.uv_path
+                # Use explicit path if configured
+                uv_path = jit_config.uv_path
             
             # Determine CWD and if we are isolated
             server_dir = config.script_path.parent
             has_pyproject = (server_dir / "pyproject.toml").exists()
-            cwd = None # Default to inheriting current process CWD (Kea Root)
+            cwd = None # Default to inheriting current process CWD (Project Root)
             
-            # Check if we have a pre-configured command in settings.yaml
-            configured_cmd = None
-            if settings.mcp and settings.mcp.servers:
-                for srv in settings.mcp.servers:
-                    if srv.name == server_name and srv.enabled and srv.command:
-                        import shlex
-                        configured_cmd = shlex.split(srv.command)
-                        logger.info(f"⚡ Using configured command for {server_name}")
-                        break
-
-            if configured_cmd:
-                cmd = configured_cmd
-            elif uv_path:
+            # Determine command (UV or standard python)
+            if uv_path:
                 logger.info(f"⚡ Using UV for {server_name}")
                 
                 if has_pyproject:
@@ -385,11 +373,11 @@ class SessionRegistry:
             
             # Create Transport
             transport = SubprocessTransport(process)
-            client = MCPClient(timeout=300.0)
+            client = MCPClient(timeout=settings.timeouts.tool_execution)
             
             # Connect with timeout to prevent indefinite hangs
             # FastMCP servers with dependencies may take time to start (UV install)
-            connect_timeout = getattr(jit_config, 'connect_timeout', 120)  # 120s default for dep install
+            connect_timeout = jit_config.connect_timeout
             try:
                 await asyncio.wait_for(client.connect(transport), timeout=connect_timeout)
             except asyncio.TimeoutError:
@@ -543,16 +531,19 @@ class SessionRegistry:
         """Get the server name that provides a tool."""
         return self.tool_to_server.get(tool_name)
 
-    async def search_tools(self, query: str, limit: int = 1000, min_similarity: float = 0.0) -> List[dict]:
+    async def search_tools(self, query: str, limit: int | None = None, min_similarity: float | None = None) -> List[dict]:
         """
         Semantic search for tools using Postgres Vector DB.
         Enables scaling to 10k+ tools.
         
         Args:
             query: Search query for tool discovery
-            limit: Max results (default 1000 for large tool registries)
+            limit: Max results
             min_similarity: Minimum cosine similarity (0.0 to 1.0)
         """
+        settings = get_settings()
+        limit = limit or settings.mcp.search_limit
+        min_similarity = min_similarity if min_similarity is not None else settings.mcp.min_similarity
         if not self.pg_registry:
             logger.warning("Search unavailable: Postgres Registry not initialized.")
             return []

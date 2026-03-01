@@ -1,8 +1,8 @@
-# 🧠 Kea 'Liquid Intelligence' Skill Standard (v1.0)
+# 🧠 Project 'Liquid Intelligence' Skill Standard (v1.0)
 
 > **"Skills are to the Orchestrator what software is to hardware: the instructions for complex reasoning."**
 
-In the Kea ecosystem, a **Skill** is a 'Pure Context' module. Unlike MCP Servers (which provide tools), Skills provide **Mental Models**, **Reasoning Frameworks**, and **Expert Personas**. They are injected into the LLM's system prompt at runtime to transform a general-purpose model into a specialized enterprise agent.
+In the Project ecosystem, a **Skill** is a 'Pure Context' module. Unlike MCP Servers (which provide tools), Skills provide **Mental Models**, **Reasoning Frameworks**, and **Expert Personas**. They are injected into the LLM's system prompt at runtime to transform a general-purpose model into a specialized enterprise agent.
 
 ---
 
@@ -67,7 +67,7 @@ Large prompts waste tokens and dilute attention. Every sentence in a skill must 
 **You MUST browse online before generating a new skill.**
 *   **Search**: Identify industry-standard certifications, frameworks, and job descriptions related to the skill.
 *   **Extract**: Distill core concepts and reasoning steps from real-world expert documentation.
-*   **Synthesize**: Do not copy-paste. Transform findings into the strict Kea Reasoning Framework format.
+*   **Synthesize**: Do not copy-paste. Transform findings into the strict Project Reasoning Framework format.
 *   **Cite**: Mention the foundational frameworks in the `description` or `tags` (e.g., "Based on NIST 800-53").
 
 ---
@@ -82,7 +82,7 @@ Large prompts waste tokens and dilute attention. Every sentence in a skill must 
 
 ## 🔗 Synergy & Recursion
 
-Skills are not meant to operate in a vacuum. The **Kea Orchestrator** can retrieve and inject multiple skills simultaneously.
+Skills are not meant to operate in a vacuum. The **Project Orchestrator** can retrieve and inject multiple skills simultaneously.
 
 1.  **Cross-Skill Interaction**: Design skills to be compatible. If a task requires both `Forensic Accountant` and `Legal Researcher`, the Orchestrator will merge their frameworks. Avoid conflicting "Roles".
 2.  **Recursive Spawning**: If a skill's `Reasoning Framework` identifies a sub-problem that requires another domain, it should explicitly suggest: "Handoff to [Skill Name] for deep analysis of [Complex Sub-Problem]."

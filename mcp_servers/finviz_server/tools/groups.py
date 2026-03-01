@@ -3,7 +3,7 @@ from finvizfinance.group.overview import Overview
 from finvizfinance.group.valuation import Valuation
 from finvizfinance.group.performance import Performance
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 logger = get_logger(__name__)
 

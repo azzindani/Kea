@@ -2,7 +2,7 @@ from __future__ import annotations
 import os
 from datetime import datetime
 import httpx
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 logger = get_logger(__name__)
 

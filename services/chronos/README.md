@@ -1,6 +1,6 @@
 # ⏳ Chronos Service ("The Clock")
 
-**Chronos** is the temporal orchestration and job scheduling layer of Kea. It acts as the system's **Timekeeper**, managing the execution of recurring tasks, long-running research jobs, and system-wide timeouts.
+**Chronos** is the temporal orchestration and job scheduling layer of Kea. It acts as the system's **Timekeeper**, managing the execution of recurring tasks, long-running system jobs, and system-wide timeouts.
 
 ## 📐 Architecture
 
@@ -35,7 +35,7 @@ graph TD
 ## ✨ Key Features
 
 ### 1. Atomic State Transitions
-Chronos ensures that no research job is "lost" in deep recursion. By utilizing PostgreSQL's ACID properties, it wraps every state change (`STARTING`, `COMPLETED`, `FAILED`) in a transaction, providing a 100% reliable audit trail for job execution.
+Chronos ensures that no system job is "lost" in deep recursion. By utilizing PostgreSQL's ACID properties, it wraps every state change (`STARTING`, `COMPLETED`, `FAILED`) in a transaction, providing a 100% reliable audit trail for job execution.
 
 ### 2. Temporal Governance (Watchdogs)
 If a node in the **Orchestrator** hangs or a tool call in the **MCP Host** never returns, the **Watchdog** detects the discrepancy. It automatically terminates the zombie process and signals the **Vault** to mark the job as `TIMED_OUT`, preventing resource leaks.
@@ -58,7 +58,7 @@ Chronos provides a real-time progress scalar (0.0 to 1.0) for every active job. 
 ## 🧠 Deep Dive
 
 ### 1. The "Deferred Execution" Pattern
-When a user requests a "Deep Research" task, the Gateway doesn't block. It hands the intent to Chronos. Chronos enqueues the job and immediately returns. The user can then "Follow" the job's progress asynchronously, while Chronos takes over the responsibility of ensuring the **Orchestrator** finishes the mission.
+When a user requests an "Autonomous" task, the Gateway doesn't block. It hands the intent to Chronos. Chronos enqueues the job and immediately returns. The user can then "Follow" the job's progress asynchronously, while Chronos takes over the responsibility of ensuring the **Orchestrator** finishes the mission.
 
 ### 2. Distributed Backpressure
 Chronos acts as a traffic controller. By monitoring the total number of `RUNNING` jobs across all **Workers**, it can implement backpressure—delaying the start of new missions until the system has cooled down, ensuring that no request "fails" due to transient system load.

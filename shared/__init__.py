@@ -12,37 +12,27 @@ _DIR = Path(__file__).parent
 _discovered: dict = {}
 
 
-def _discover() -> dict:
-    global _discovered
-    if _discovered:
-        return _discovered
-    exports = {}
-    for item in _DIR.iterdir():
-        if item.is_file() and item.suffix == ".py" and item.name != "__init__.py":
-            module_path = f"shared.{item.stem}"
-            try:
-                module = importlib.import_module(module_path)
-                for name in dir(module):
-                    if not name.startswith("_"):
-                        obj = getattr(module, name, None)
-                        if isinstance(obj, type) or callable(obj):
-                            exports[name] = module_path
-            except ImportError:
-                continue
-    _discovered = exports
-    return exports
-
-
 def __getattr__(name: str) -> Any:
-    exports = _discover()
-    if name in exports:
-        module = importlib.import_module(exports[name])
-        return getattr(module, name)
+    """Generic Lazy Discovery: Automatically find modules/packages on disk."""
+    # 1. Check if it's a python file (e.g., shared/config.py)
+    if (_DIR / f"{name}.py").is_file():
+        return importlib.import_module(f"shared.{name}")
+    
+    # 2. Check if it's a subdirectory package (e.g., shared/database/)
+    if (_DIR / name).is_dir():
+        return importlib.import_module(f"shared.{name}")
+        
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def __dir__():
-    return list(_discover().keys())
+    """Dynamically list available modules based on filesystem."""
+    items = []
+    for item in _DIR.iterdir():
+        if (item.is_file() and item.suffix == ".py" and item.name != "__init__.py") or item.is_dir():
+            if not item.name.startswith(("_", ".")):
+                items.append(item.stem if item.is_file() else item.name)
+    return sorted(list(set(items)))
 
 
-__all__ = list(_discover())
+__all__ = ["config", "logging", "environment", "schemas", "database", "service_registry"]

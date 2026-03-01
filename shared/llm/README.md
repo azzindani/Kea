@@ -21,7 +21,7 @@ graph TD
 - **Reasoning Support**: Native handling of "Thinking" or "Reasoning" tokens for models like Nemotron-3.
 - **Streaming by Default**: Robust server-sent events (SSE) compatible streaming.
 - **Usage Tracking**: Standardized token usage reporting (prompt, completion, total, reasoning).
-- **Environment Aware**: Automatically loads API keys and default models from the Kea settings system.
+- **Environment Aware**: Automatically loads API keys and default models from the Project settings system.
 
 ## 📁 Component Structure
 

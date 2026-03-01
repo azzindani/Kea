@@ -14,18 +14,12 @@ if root_path not in sys.path:
 # ///
 
 from shared.mcp.fastmcp import FastMCP
-import sys
-from pathlib import Path
-sys.path.append(str(Path(__file__).parent))
+from typing import List, Dict, Any, Union, Optional
+from shared.logging.main import setup_logging, get_logger
+setup_logging(force_stderr=True)
+logger = get_logger(__name__)
+
 from mcp_servers.analysis_server.tools import stats_ops
-import structlog
-from typing import List, Dict, Any, Union
-
-logger = structlog.get_logger()
-
-# Create the FastMCP server
-from shared.logging.structured import setup_logging
-setup_logging()
 
 
 
@@ -160,9 +154,6 @@ def plot_confusion_matrix(file_path: str, y_true: str, y_pred: str, output_path:
     """
     from mcp_servers.analysis_server.tools import plot_ops
     return plot_ops.plot_confusion_matrix(file_path, y_true, y_pred, output_path)
-
-if __name__ == "__main__":
-    mcp.run()
 
 
 # ==========================================
@@ -380,6 +371,9 @@ def signal_resample(file_path: str, column: str, num_samples: int) -> str:
     from mcp_servers.analysis_server.tools import signal_ops
     return signal_ops.signal_resample(file_path, column, num_samples)
 
+if __name__ == "__main__":
+    mcp.run()
+
 class AnalysisServer:
 
     def __init__(self):
@@ -392,3 +386,4 @@ class AnalysisServer:
         if hasattr(self.mcp, '_tool_manager') and hasattr(self.mcp._tool_manager, '_tools'):
             return list(self.mcp._tool_manager._tools.values())
         return []
+

@@ -1,9 +1,10 @@
+
 import pytest
-import asyncio
-import os
 from mcp import ClientSession
 from mcp.client.stdio import stdio_client
+
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 @pytest.mark.timeout(300)
@@ -12,24 +13,24 @@ async def test_web3_full_coverage():
     REAL SIMULATION: Verify Web3 Server (100% Tool Coverage).
     """
     params = get_server_params("web3_server", extra_dependencies=["web3"])
-    
+
     # Public RPC (Mainnet) - Use a reliable one
-    rpc_url = "https://ethereum-rpc.publicnode.com" 
-    
+    rpc_url = "https://ethereum-rpc.publicnode.com"
+
     # Famous Addresses
     vitalik = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
     usdt = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
     weth = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
-    
+
     # Dummy Key for write ops (will fail on chain but verify tool logic)
     dummy_key = "0x0000000000000000000000000000000000000000000000000000000000000001"
-    
-    print(f"\n--- Starting 100% Coverage Simulation: Web3 Server ---")
-    
+
+    print("\n--- Starting 100% Coverage Simulation: Web3 Server ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # --- 1. CORE RPC ---
             print("\n[1. Core RPC]")
             await session.call_tool("get_block_number", arguments={"rpc_url": rpc_url})
@@ -67,7 +68,7 @@ async def test_web3_full_coverage():
             await session.call_tool("resolve_ens", arguments={"name": "vitalik.eth", "rpc_url": rpc_url})
             # Reverse lookup (might fail if not set, but call it)
             await session.call_tool("get_ens_reverse_record", arguments={"address": vitalik, "rpc_url": rpc_url})
-            
+
             await session.call_tool("to_wei", arguments={"amount": 1, "unit": "ether"})
             await session.call_tool("from_wei", arguments={"amount": 1000000000000000000, "unit": "ether"})
             print(" \033[92m[PASS]\033[0m Utils/ENS tools")
@@ -78,13 +79,13 @@ async def test_web3_full_coverage():
             # Events (Transfer)
             transfer_topic = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
             await session.call_tool("get_contract_events", arguments={"address": usdt, "from_block": "latest", "topics": [transfer_topic], "rpc_url": rpc_url})
-            
+
             # Write Actions (Simulated/Fail Expected)
             await session.call_tool("send_eth", arguments={"to_address": vitalik, "amount": 0.0001, "private_key": dummy_key, "rpc_url": rpc_url})
             await session.call_tool("approve_token", arguments={"token_address": usdt, "spender_address": vitalik, "amount": 100, "private_key": dummy_key, "rpc_url": rpc_url})
             await session.call_tool("generate_wallet", arguments={})
             await session.call_tool("estimate_gas", arguments={"to_address": vitalik, "data": "0x", "value": 0.0001, "rpc_url": rpc_url})
-            
+
             await session.call_tool("wrap_eth", arguments={"amount": 0.001, "private_key": dummy_key, "rpc_url": rpc_url})
             await session.call_tool("unwrap_eth", arguments={"amount": 0.001, "private_key": dummy_key, "rpc_url": rpc_url})
             print(" \033[92m[PASS]\033[0m DeFi/Action tools")
@@ -94,11 +95,11 @@ async def test_web3_full_coverage():
             # Aave (WETH)
             await session.call_tool("get_aave_reserve_data", arguments={"asset": weth, "rpc_url": rpc_url})
             await session.call_tool("get_aave_user_account_data", arguments={"user_address": vitalik, "rpc_url": rpc_url})
-            
+
             # Chainlink (ETH/USD)
             eth_feed = "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
             await session.call_tool("get_chainlink_price", arguments={"feed_address": eth_feed, "rpc_url": rpc_url})
-            
+
             # Chainlink Shortcuts
             await session.call_tool("get_chainlink_eth_usd", arguments={})
             await session.call_tool("get_chainlink_btc_usd", arguments={})
@@ -108,10 +109,10 @@ async def test_web3_full_coverage():
             # --- 7. UNIVERSAL ---
             print("\n[7. Universal]")
             await session.call_tool("read_contract", arguments={
-                "address": usdt, 
-                "function_signature": "balanceOf(address)", 
-                "args": [vitalik], 
-                "arg_types": ["address"], 
+                "address": usdt,
+                "function_signature": "balanceOf(address)",
+                "args": [vitalik],
+                "arg_types": ["address"],
                 "return_types": ["uint256"],
                 "rpc_url": rpc_url
             })
@@ -129,7 +130,7 @@ async def test_web3_full_coverage():
             # --- 9. DYNAMIC SHORTCUTS ---
             print("\n[9. Dynamic Shortcuts]")
             tokens = ["usdt", "usdc", "weth", "dai", "shib", "pepe", "wbtc", "link", "uni", "matic", "steth", "fet", "rndr", "aave"]
-            
+
             # We call ALL of them. 100% means 100%.
             for t in tokens:
                 print(f" Testing {t}...")

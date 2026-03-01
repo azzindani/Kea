@@ -12,7 +12,8 @@ from pathlib import Path
 from typing import Any
 
 from services.rag_service.core.artifact_store import ArtifactStore, Artifact, LocalArtifactStore
-from shared.logging import get_logger
+from shared.logging.main import get_logger
+from shared.database.connection import get_database_pool
 
 import asyncpg
 
@@ -28,21 +29,12 @@ class PostgresArtifactStore(ArtifactStore):
     def __init__(self, blob_store: ArtifactStore, table_name: str = "artifacts"):
         self.blob_store = blob_store
         self.table_name = table_name
-        self._pool: asyncpg.Pool | None = None
-        self._db_url = os.getenv("DATABASE_URL")
-        
-        if not self._db_url:
-            raise ValueError("DATABASE_URL environment variable is required for PostgresArtifactStore")
+        self._pool = None
 
-    async def _get_pool(self) -> asyncpg.Pool:
+    async def _get_pool(self):
         """Get or create connection pool."""
         if self._pool is None:
-            # Limit pool size to prevent connection exhaustion
-            self._pool = await asyncpg.create_pool(
-                self._db_url,
-                min_size=1,
-                max_size=5,  # Artifacts are low-frequency
-            )
+            self._pool = await get_database_pool()
             
             async with self._pool.acquire() as conn:
                 # Create table

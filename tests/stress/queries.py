@@ -1,7 +1,7 @@
 """
 Stress Test Queries.
 
-20 massive-scale research queries designed to push Kea to its limits.
+20 massive-scale research queries designed to push Project to its limits.
 """
 
 from dataclasses import dataclass
@@ -55,7 +55,7 @@ QUERIES: list[StressQuery] = [
         expected_llm_calls=50,
         builds_database=True,
     ),
-    
+
     # =========================================================================
     # Legal & Regulatory
     # =========================================================================
@@ -91,7 +91,7 @@ QUERIES: list[StressQuery] = [
         expected_llm_calls=50,
         builds_database=True,
     ),
-    
+
     # =========================================================================
     # Investigation & Verification
     # =========================================================================
@@ -111,7 +111,7 @@ QUERIES: list[StressQuery] = [
         expected_llm_calls=80,
         builds_database=True,
     ),
-    
+
     # =========================================================================
     # Scientific & Academic
     # =========================================================================
@@ -139,7 +139,7 @@ QUERIES: list[StressQuery] = [
         expected_llm_calls=50,
         builds_database=True,
     ),
-    
+
     # =========================================================================
     # Strategic Intelligence
     # =========================================================================

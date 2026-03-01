@@ -14,7 +14,7 @@ import psutil
 from dataclasses import dataclass
 from typing import Literal
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.database.connection import get_db_pool
 
 logger = get_logger(__name__)
@@ -37,9 +37,13 @@ class ResourceGovernor:
     
     def __init__(self):
         # Limits
-        self.MAX_CPU = float(os.getenv("MAX_CPU_PERCENT", "80.0"))
-        self.MAX_RAM = float(os.getenv("MAX_RAM_PERCENT", "80.0"))
-        self.MAX_AGENTS = int(os.getenv("MAX_CONCURRENT_AGENTS", "50"))
+        from shared.config import get_settings
+        settings = get_settings()
+        gov = settings.governance
+        
+        self.MAX_CPU = gov.max_cpu_percent
+        self.MAX_RAM = gov.max_ram_percent
+        self.MAX_AGENTS = gov.max_agents
         
         # State
         self._last_state: SystemState | None = None
@@ -74,12 +78,11 @@ class ResourceGovernor:
         
         try:
             async with pool.acquire() as conn:
-                # Approximate active agents by counting processing jobs in micro_tasks (v4 Core)
-                # Fallback to 0 if table doesn't exist yet
+                # Approximate active agents by counting running system jobs
                 try:
                     active_agents = await conn.fetchval("""
-                        SELECT COUNT(*) FROM micro_tasks 
-                        WHERE status = 'processing'
+                        SELECT COUNT(*) FROM system_jobs 
+                        WHERE status = 'running'
                     """) or 0
                 except Exception:
                     # Table might not be created yet if no tasks have run

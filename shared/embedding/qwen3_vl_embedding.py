@@ -13,7 +13,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 from dataclasses import dataclass
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 
 logger = get_logger(__name__)
@@ -54,11 +54,13 @@ class LocalVLEmbedding(VLEmbeddingProvider):
     
     def __init__(
         self,
-        model_name: str = "Qwen/Qwen3-VL-Embedding-2B",
+        model_name: str | None = None,
         device: str | None = None,
         use_flash_attention: bool = False,
     ) -> None:
-        self.model_name = model_name
+        from shared.config import get_settings
+        settings = get_settings()
+        self.model_name = model_name or settings.vl_embedding.model_name
         self.device = device or ("cuda" if self._has_cuda() else "cpu")
         if self.device == "cuda":
             self.device = "cuda:0"
@@ -153,7 +155,9 @@ class LocalVLEmbedding(VLEmbeddingProvider):
                         
                         if not content:
                             # Empty input, return zero embedding
-                            embeddings_list.append(torch.zeros(1024))
+                            from shared.config import get_settings
+                            dim = get_settings().vl_embedding.dimension
+                            embeddings_list.append(torch.zeros(dim))
                             continue
                         
                         messages = [{"role": "user", "content": content}]
@@ -175,7 +179,9 @@ class LocalVLEmbedding(VLEmbeddingProvider):
                             embeddings_list.append(emb.cpu())
                         except Exception as e:
                             logger.warning(f"VL embedding failed for input: {e}")
-                            embeddings_list.append(torch.zeros(1024))
+                            from shared.config import get_settings
+                            dim = get_settings().vl_embedding.dimension
+                            embeddings_list.append(torch.zeros(dim))
                 
                 return torch.stack(embeddings_list)
         
@@ -208,7 +214,8 @@ class LocalVLEmbedding(VLEmbeddingProvider):
     async def embed_query(self, query: str, task: str | None = None) -> list[float]:
         """Generate embedding for a text query."""
         if task is None:
-            task = "Given a web search query, retrieve relevant passages that answer the query"
+            from shared.config import get_settings
+            task = get_settings().vl_embedding.instruction
         
         formatted_query = f"Instruct: {task}\nQuery: {query}"
         result = await self.embed([VLInput(text=formatted_query)])

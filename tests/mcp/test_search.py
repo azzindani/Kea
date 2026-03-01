@@ -1,8 +1,10 @@
+
 import pytest
-import asyncio
 from mcp import ClientSession
 from mcp.client.stdio import stdio_client
+
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_search_real_simulation():
@@ -10,15 +12,15 @@ async def test_search_real_simulation():
     REAL SIMULATION: Verify Search Server (Web/News).
     """
     params = get_server_params("search_server", extra_dependencies=[])
-    
+
     query = "latest advancements in AI agents"
-    
-    print(f"\n--- Starting Real-World Simulation: Search Server ---")
-    
+
+    print("\n--- Starting Real-World Simulation: Search Server ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. Web Search
             print(f"1. Web Search: '{query}'...")
             res = await session.call_tool("web_search", arguments={"query": query, "max_results": 2})

@@ -11,7 +11,8 @@ import os
 from datetime import datetime
 from typing import Any
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
+from shared.database.connection import get_database_pool
 from shared.conversations.models import (
     Conversation, Message, MessageRole,
     CONVERSATIONS_TABLE_SQL, MESSAGES_TABLE_SQL,
@@ -30,7 +31,7 @@ class ConversationManager:
         await manager.initialize()
         
         # Create conversation
-        conv = await manager.create_conversation(user_id, "Research Topic")
+        conv = await manager.create_conversation(user_id, "System Topic")
         
         # Add messages
         await manager.add_message(conv.conversation_id, "user", "Tell me about AI")
@@ -40,43 +41,19 @@ class ConversationManager:
         conversations = await manager.list_conversations(user_id)
     """
     
-    def __init__(self, database_url: str = None):
-        self.database_url = database_url or os.getenv("DATABASE_URL")
-        
-        if not self.database_url:
-            raise ValueError("DATABASE_URL environment variable is required for ConversationManager")
-            
+    def __init__(self):
         self._pool = None
     
     async def initialize(self):
         """Initialize database tables."""
-        await self._init_postgres()
-    
-    async def _init_postgres(self):
-        """Initialize PostgreSQL."""
-        try:
-            import asyncpg
+        if self._pool is None:
+            self._pool = await get_database_pool()
             
-            # Get pool configuration from environment or use defaults
-            min_connections = int(os.getenv("DATABASE_MIN_CONNECTIONS", "5"))
-            max_connections = int(os.getenv("DATABASE_MAX_CONNECTIONS", "20"))
-            
-            self._pool = await asyncpg.create_pool(
-                self.database_url,
-                min_size=min_connections,
-                max_size=max_connections,
-                command_timeout=60.0,
-            )
-            
+        if self._pool:
             async with self._pool.acquire() as conn:
                 await conn.execute(CONVERSATIONS_TABLE_SQL)
                 await conn.execute(MESSAGES_TABLE_SQL)
-            
-            logger.info(f"PostgreSQL initialized for conversations (pool: {min_connections}-{max_connections})")
-            
-        except Exception as e:
-            logger.error(f"PostgreSQL init failed: {e}")
-            raise
+            logger.info("PostgreSQL tables initialized for conversations")
     
     # =========================================================================
     # Conversation CRUD
@@ -86,10 +63,19 @@ class ConversationManager:
         self,
         user_id: str,
         title: str = None,
-        tenant_id: str = "default",
+        tenant_id: str = None,
         metadata: dict = None,
     ) -> Conversation:
         """Create new conversation."""
+        from shared.config import get_settings
+        settings = get_settings()
+        tenant_id = tenant_id or settings.app.default_tenant
+        title = title or settings.app.default_conversation_title
+        
+        # Enforce max length
+        if title:
+            title = title[:settings.conversations.title_max_length]
+        
         conv = Conversation.create(user_id, title, tenant_id)
         if metadata:
             conv.metadata = metadata
@@ -121,10 +107,13 @@ class ConversationManager:
         user_id: str,
         tenant_id: str = None,
         include_archived: bool = False,
-        limit: int = 50,
+        limit: int = None,
         offset: int = 0,
     ) -> list[Conversation]:
         """List user's conversations."""
+        from shared.config import get_settings
+        settings = get_settings()
+        limit = min(limit or settings.conversations.default_limit, settings.conversations.max_limit)
         conversations = []
         
         async with self._pool.acquire() as conn:
@@ -219,12 +208,12 @@ class ConversationManager:
             await conn.execute("""
                 INSERT INTO messages 
                 (message_id, conversation_id, role, content, created_at,
-                    intent, attachments, tool_calls, sources, confidence, is_complete)
+                    intent, attachments, tool_calls, origins, confidence, is_complete)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             """, msg.message_id, msg.conversation_id, msg.role.value,
                 msg.content, msg.created_at, msg.intent,
                 json.dumps(msg.attachments), json.dumps(msg.tool_calls),
-                json.dumps(msg.sources), msg.confidence, msg.is_complete)
+                json.dumps(msg.origins), msg.confidence, msg.is_complete)
             
             # Update conversation
             await conn.execute("""
@@ -238,10 +227,13 @@ class ConversationManager:
     async def get_messages(
         self,
         conversation_id: str,
-        limit: int = 100,
+        limit: int = None,
         before: datetime = None,
     ) -> list[Message]:
         """Get messages from conversation."""
+        from shared.config import get_settings
+        settings = get_settings()
+        limit = min(limit or settings.conversations.message_limit, settings.conversations.message_max_limit)
         messages = []
         
         async with self._pool.acquire() as conn:
@@ -264,9 +256,12 @@ class ConversationManager:
         self,
         user_id: str,
         query: str,
-        limit: int = 20,
+        limit: int = None,
     ) -> list[Conversation]:
         """Search conversations by title or content."""
+        from shared.config import get_settings
+        settings = get_settings()
+        limit = min(limit or settings.conversations.search_limit, settings.conversations.max_limit)
         conversations = []
         search_pattern = f"%{query}%"
         
@@ -289,6 +284,9 @@ class ConversationManager:
     
     def _row_to_conversation(self, row: dict) -> Conversation:
         """Convert row to Conversation."""
+        from shared.config import get_settings
+        settings = get_settings()
+        
         metadata = row.get("metadata", "{}")
         if isinstance(metadata, str):
             metadata = json.loads(metadata) if metadata else {}
@@ -296,8 +294,8 @@ class ConversationManager:
         return Conversation(
             conversation_id=row["conversation_id"],
             user_id=row["user_id"],
-            tenant_id=row.get("tenant_id", "default"),
-            title=row.get("title", "New Conversation"),
+            tenant_id=row.get("tenant_id", settings.app.default_tenant),
+            title=row.get("title", settings.app.default_conversation_title),
             summary=row.get("summary", ""),
             created_at=self._parse_dt(row.get("created_at")),
             updated_at=self._parse_dt(row.get("updated_at")),
@@ -318,7 +316,7 @@ class ConversationManager:
             intent=row.get("intent", ""),
             attachments=self._parse_json(row.get("attachments", "[]")),
             tool_calls=self._parse_json(row.get("tool_calls", "[]")),
-            sources=self._parse_json(row.get("sources", "[]")),
+            origins=self._parse_json(row.get("origins", "[]")),
             confidence=row.get("confidence"),
             is_complete=bool(row.get("is_complete", True)),
         )

@@ -30,8 +30,8 @@ from typing import Dict, Any, Optional, List
 logger = structlog.get_logger()
 
 # Create the FastMCP server
-from shared.logging import setup_logging
-setup_logging()
+from shared.logging.main import setup_logging
+setup_logging(force_stderr=True)
 
 mcp = FastMCP("duckdb_server", dependencies=["pandas", "duckdb", "pyarrow"])
 
@@ -42,7 +42,7 @@ mcp = FastMCP("duckdb_server", dependencies=["pandas", "duckdb", "pyarrow"])
 # 1. Core
 # ==========================================
 @mcp.tool()
-def connect_db(path: str = "kea_data.duckdb") -> str: 
+def connect_db(path: str = "project_data.duckdb") -> str: 
     """CONNECTS to database. [ACTION]
     
     [RAG Context]
@@ -973,3 +973,4 @@ class DuckdbServer:
         if hasattr(self.mcp, '_tool_manager') and hasattr(self.mcp._tool_manager, '_tools'):
              return list(self.mcp._tool_manager._tools.values())
         return []
+

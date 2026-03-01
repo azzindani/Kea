@@ -1,10 +1,13 @@
-import pytest
 import os
-import pandas as pd
+
 import numpy as np
-from tests.mcp.client_utils import SafeClientSession as ClientSession
+import pandas as pd
+import pytest
 from mcp.client.stdio import stdio_client
+
+from tests.mcp.client_utils import SafeClientSession as ClientSession
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_portfolio_real_simulation():
@@ -12,20 +15,20 @@ async def test_portfolio_real_simulation():
     REAL SIMULATION: Verify Portfolio Server (Optimization).
     """
     params = get_server_params("portfolio_server", extra_dependencies=["pyportfolioopt", "pandas", "numpy", "matplotlib", "scipy"])
-    
+
     # Create Dummy Prices CSV
     csv_file = "test_prices.csv"
     dates = pd.date_range(start="2023-01-01", periods=100)
     data = np.random.randn(100, 3).cumsum(axis=0) + 100
     df = pd.DataFrame(data, index=dates, columns=["AAPL", "GOOG", "MSFT"])
     df.to_csv(csv_file)
-    
+
     print("\n--- Starting Real-World Simulation: Portfolio Server ---")
-    
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. Load Prices
             print("1. Loading Prices...")
             res = await session.call_tool("load_prices_csv", arguments={"file_path": csv_file})
@@ -37,7 +40,7 @@ async def test_portfolio_real_simulation():
             # Store prices_input (usually just the path or JSON string)
             # The tool `load_prices_csv` returns JSON string, which is `prices_input` for other tools?
             prices_input = res.content[0].text
-            
+
             # 2. Expected Returns (Mean)
             print("2. Calculating Expected Returns...")
             res = await session.call_tool("mean_historical_return", arguments={"prices_input": prices_input})
@@ -60,7 +63,7 @@ async def test_portfolio_real_simulation():
             res = await session.call_tool("ef_max_sharpe", arguments={"prices_input": prices_input})
             if not res.isError:
                 print(f" \033[92m[PASS]\033[0m Weights: {res.content[0].text}")
-            
+
             # 4. Generate Report
             # Needs weights from step 3
             if not res.isError:

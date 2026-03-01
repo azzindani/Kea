@@ -1,6 +1,6 @@
 # ☸️ Kubernetes Manifests
 
-This directory contains the Kubernetes (K8s) configuration files for deploying the Kea ecosystem to a cluster (e.g., GKE, EKS, or Minikube).
+This directory contains the Kubernetes (K8s) configuration files for deploying the Project ecosystem to a cluster (e.g., GKE, EKS, or Minikube).
 
 ## 🚀 Deployment
 
@@ -20,16 +20,20 @@ kubectl apply -f deployments.yaml
 ## 📁 Codebase Structure
 
 - **`config.yaml`**: Contains `ConfigMaps` and `Secrets`.
-    - `kea-config`: Environment variables like `DB_HOST`, `REDIS_URL`.
-    - `kea-secrets`: Sensitive keys (API tokens) - *Note: Use SealedSecrets or Vault in production*.
+    - `project-config`: Environment variables like `DB_HOST`, `REDIS_URL`.
+    - `project-secrets`: Sensitive keys (API tokens) - *Note: Use SealedSecrets or Vault in production*.
 - **`services.yaml`**: Defines the K8s `Service` objects (ClusterIP, LoadBalancer) that expose the pods to the internal network.
     - `gateway-service`: Exposes port 8000.
     - `orchestrator-service`: Exposes port 8001.
     - etc.
 - **`deployments.yaml`**: Defines the `Deployment` objects (replicas, containers, images).
-    - `kea-gateway`: running `services.api_gateway.main:app`
-    - `kea-orchestrator`: running `services.orchestrator.main:app`
-    - `kea-worker`: running `workers.research_worker` (background scalers)
+    - `api-gateway`: Security and routing.
+    - `orchestrator`: LangGraph reasoning engine.
+    - `mcp-host`: JIT tool execution and server management.
+    - `rag-service`: Semantic context retrieval.
+    - `vault`: Research persistence.
+    - `swarm-manager`: Governance and compliance.
+    - `chronos`: Task scheduling.
 
 ## 🏗️ Architecture
 

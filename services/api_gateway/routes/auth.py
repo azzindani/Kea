@@ -11,11 +11,12 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from pydantic import BaseModel, EmailStr, Field
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.users import User
 from shared.users.manager import get_user_manager
 from shared.sessions import get_session_manager, get_jwt_manager
 from services.api_gateway.middleware.auth import get_current_user_required
+from shared.config import get_settings
 
 
 logger = get_logger(__name__)
@@ -36,7 +37,7 @@ class RegisterRequest(BaseModel):
     """Registration request."""
     email: EmailStr
     name: str = Field(..., min_length=1, max_length=255)
-    password: str = Field(..., min_length=6)
+    password: str = Field(..., min_length=get_settings().auth.password_min_length)
 
 
 class TokenResponse(BaseModel):
@@ -75,7 +76,7 @@ async def register(request: RegisterRequest):
     existing = await user_manager.get_by_email(request.email)
     if existing:
         raise HTTPException(
-            status_code=400,
+            status_code=get_settings().status_codes.bad_request,
             detail="Email already registered",
         )
     
@@ -119,13 +120,13 @@ async def login(request: LoginRequest, response: Response):
     
     if not user:
         raise HTTPException(
-            status_code=401,
+            status_code=get_settings().status_codes.unauthorized,
             detail="Invalid email or password",
         )
     
     if not user.is_active:
         raise HTTPException(
-            status_code=403,
+            status_code=get_settings().status_codes.forbidden,
             detail="Account is deactivated",
         )
     
@@ -145,11 +146,13 @@ async def login(request: LoginRequest, response: Response):
     )
     
     # Set session cookie
+    settings = get_settings()
+    
     response.set_cookie(
         key="session_id",
         value=session.session_id,
         httponly=True,
-        max_age=86400,  # 24 hours
+        max_age=settings.auth.session_hours * 3600,
         samesite="lax",
     )
     
@@ -202,14 +205,14 @@ async def refresh_token(request: RefreshRequest):
     
     if not payload or payload.get("type") != "refresh":
         raise HTTPException(
-            status_code=401,
+            status_code=get_settings().status_codes.unauthorized,
             detail="Invalid refresh token",
         )
     
     user_id = payload.get("sub")
     if not user_id:
         raise HTTPException(
-            status_code=401,
+            status_code=get_settings().status_codes.unauthorized,
             detail="Invalid token payload",
         )
     
@@ -218,7 +221,7 @@ async def refresh_token(request: RefreshRequest):
     
     if not user or not user.is_active:
         raise HTTPException(
-            status_code=401,
+            status_code=get_settings().status_codes.unauthorized,
             detail="User not found or inactive",
         )
     

@@ -8,7 +8,7 @@ logger = structlog.get_logger()
 # Global config
 CONFIG = {
     "service": "nominatim",
-    "user_agent": "kea_research_engine_mcp",
+    "user_agent": "project_research_engine_mcp",
     "api_key": None,
     "timeout": 10
 }

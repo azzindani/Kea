@@ -1,10 +1,10 @@
+
 import pytest
-import asyncio
-import json
-from tests.mcp.client_utils import SafeClientSession as ClientSession
 from mcp.client.stdio import stdio_client
+
+from tests.mcp.client_utils import SafeClientSession as ClientSession
 from tests.mcp.client_utils import get_server_params
-from mcp import McpError
+
 
 @pytest.mark.asyncio
 async def test_pandas_ta_real_simulation():
@@ -12,7 +12,7 @@ async def test_pandas_ta_real_simulation():
     REAL SIMULATION: Verify Pandas TA Server (Technical Analysis).
     """
     params = get_server_params("pandas_ta_server", extra_dependencies=["pandas", "pandas_ta"])
-    
+
     # Synthetic OHLCV Data
     data = [
         {"open": 100, "high": 105, "low": 98, "close": 102, "volume": 1000},
@@ -30,9 +30,9 @@ async def test_pandas_ta_real_simulation():
         {"open": 121, "high": 125, "low": 120, "close": 124, "volume": 2400},
         {"open": 124, "high": 123, "low": 118, "close": 120, "volume": 2300}
     ]
-    
-    print(f"\n--- Starting Real-World Simulation: Pandas TA Server ---")
-    
+
+    print("\n--- Starting Real-World Simulation: Pandas TA Server ---")
+
     try:
         async with stdio_client(params) as (read, write):
             async with ClientSession(read, write) as session:
@@ -74,7 +74,7 @@ async def test_pandas_ta_real_simulation():
             return msgs
         all_msgs = " ".join(_flatten_exc(e))
         if "Connection closed" in all_msgs or "unsatisfiable" in all_msgs:
-            pytest.skip(f"pandas_ta server unavailable (requires Python>=3.12)")
+            pytest.skip("pandas_ta server unavailable (requires Python>=3.12)")
         raise
 
     print("--- Pandas TA Simulation Complete ---")

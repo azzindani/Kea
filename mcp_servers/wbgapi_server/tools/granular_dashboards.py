@@ -1,7 +1,7 @@
 
 import wbgapi as wb
 from shared.mcp.protocol import ToolResult, TextContent
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from mcp_servers.wbgapi_server.tools.indicators import INDICATORS
 
 logger = get_logger(__name__)

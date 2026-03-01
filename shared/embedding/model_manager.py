@@ -7,7 +7,7 @@ Loads models once, shares across the system.
 
 from __future__ import annotations
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 logger = get_logger(__name__)
 
@@ -155,9 +155,10 @@ def get_reranker_provider():
 
 def reset_providers():
     """Reset all providers (for testing)."""
-    global _embedding_provider, _reranker_provider
+    global _embedding_provider, _reranker_provider, _model_manager
     _embedding_provider = None
     _reranker_provider = None
+    _model_manager = None
 
 
 
@@ -174,3 +175,84 @@ def switch_reranker_device(new_device: str):
         logger.info(f"Model Manager: Reranker switched to {new_device}")
     else:
         logger.warning("Model Manager: Cannot switch device (Provider not initialized or incapable)")
+
+
+# ============================================================================
+# ModelManager Facade
+# ============================================================================
+
+_model_manager = None
+
+
+class ModelManager:
+    """Convenience facade over embedding + reranker providers.
+
+    Exposes ``embed_single`` / ``embed_batch`` / ``rerank_single`` so
+    kernel engines can call a consistent API without worrying about
+    the underlying provider topology.  Lazy-initialises providers on
+    first use.
+    """
+
+    def __init__(self) -> None:
+        self._embedding = None
+        self._reranker = None
+
+    # -- lazy accessors ---------------------------------------------------
+
+    def _get_embedding(self):
+        if self._embedding is None:
+            self._embedding = get_embedding_provider()
+        return self._embedding
+
+    def _get_reranker(self):
+        if self._reranker is None:
+            try:
+                self._reranker = get_reranker_provider()
+            except Exception as exc:
+                logger.warning(
+                    "ModelManager: Reranker unavailable",
+                    extra={"error": str(exc)},
+                )
+                self._reranker = None
+        return self._reranker
+
+    # -- public API -------------------------------------------------------
+
+    async def embed_single(self, text: str) -> list[float]:
+        """Embed a single text string and return its vector."""
+        provider = self._get_embedding()
+        return await provider.embed_query(text)
+
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        """Embed a batch of texts and return their vectors."""
+        provider = self._get_embedding()
+        return await provider.embed(texts)
+
+    async def rerank_single(self, query: str, document: str) -> float:
+        """Score a single query-document pair via the reranker.
+
+        Returns a relevance score in roughly [0, 1].  Falls back to
+        0.5 if the reranker is unavailable.
+        """
+        reranker = self._get_reranker()
+        if reranker is None:
+            return 0.5
+
+        results = await reranker.rerank(query, [document], top_k=1)
+        if results:
+            return float(results[0].score)
+        return 0.5
+
+    @property
+    def dimension(self) -> int:
+        """Return the embedding dimension from the underlying provider."""
+        return self._get_embedding().dimension
+
+
+def get_model_manager() -> ModelManager:
+    """Return the singleton ModelManager instance."""
+    global _model_manager
+    if _model_manager is None:
+        _model_manager = ModelManager()
+        logger.info("ModelManager facade initialised")
+    return _model_manager

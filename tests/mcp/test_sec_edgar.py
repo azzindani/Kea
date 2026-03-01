@@ -1,8 +1,10 @@
+
 import pytest
-import asyncio
 from mcp import ClientSession
 from mcp.client.stdio import stdio_client
+
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_sec_edgar_real_simulation():
@@ -10,15 +12,15 @@ async def test_sec_edgar_real_simulation():
     REAL SIMULATION: Verify SEC Edgar Server (Filings).
     """
     params = get_server_params("sec_edgar_server", extra_dependencies=["sec-edgar-downloader", "pandas", "beautifulsoup4", "lxml", "textblob"])
-    
+
     ticker = "AAPL"
-    
-    print(f"\n--- Starting Real-World Simulation: SEC Edgar Server ---")
-    
+
+    print("\n--- Starting Real-World Simulation: SEC Edgar Server ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. Download Latest 10-K
             print(f"1. Downloading 10-K for {ticker}...")
             # Note: SEC EDGAR downloader requires User-Agent. Server likely handles it or uses default.

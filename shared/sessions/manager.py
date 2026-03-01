@@ -13,7 +13,8 @@ from datetime import datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
+from shared.config import get_settings
 
 
 logger = get_logger(__name__)
@@ -27,8 +28,14 @@ class Session:
     tenant_id: str = "default"
     
     created_at: datetime = field(default_factory=datetime.utcnow)
-    expires_at: datetime = field(default_factory=lambda: datetime.utcnow() + timedelta(hours=24))
+    expires_at: datetime = field(init=False)
     last_activity: datetime = field(default_factory=datetime.utcnow)
+    
+    def __post_init__(self):
+        """Initialize expiration from settings."""
+
+        settings = get_settings()
+        self.expires_at = self.created_at + timedelta(hours=settings.auth.session_hours)
     
     device_info: str = ""
     ip_address: str = ""
@@ -64,8 +71,10 @@ class SessionManager:
     - Database storage
     """
     
-    def __init__(self, session_hours: int = 24):
-        self.session_hours = session_hours
+    def __init__(self, session_hours: int | None = None):
+
+        settings = get_settings()
+        self.session_hours = session_hours or settings.auth.session_hours
         self._sessions: dict[str, Session] = {}
         
     async def create_session(
@@ -80,7 +89,6 @@ class SessionManager:
             session_id=f"sess_{uuid4().hex[:16]}",
             user_id=user_id,
             tenant_id=tenant_id,
-            expires_at=datetime.utcnow() + timedelta(hours=self.session_hours),
             device_info=device_info,
             ip_address=ip_address,
         )
@@ -155,14 +163,17 @@ class JWTManager:
     
     def __init__(
         self,
-        secret_key: str = None,
-        access_token_minutes: int = 60,
-        refresh_token_days: int = 7,
+        secret_key: str | None = None,
+        access_token_minutes: int | None = None,
+        refresh_token_days: int | None = None,
     ):
-        self.secret_key = secret_key or os.getenv("JWT_SECRET", secrets.token_hex(32))
-        self.access_token_minutes = access_token_minutes
-        self.refresh_token_days = refresh_token_days
-        self.algorithm = "HS256"
+
+        settings = get_settings()
+        
+        self.secret_key = secret_key or settings.auth.jwt_secret or secrets.token_hex(32)
+        self.access_token_minutes = access_token_minutes or settings.auth.access_token_minutes
+        self.refresh_token_days = refresh_token_days or settings.auth.refresh_token_days
+        self.algorithm = settings.auth.jwt_algorithm
     
     def create_access_token(
         self,

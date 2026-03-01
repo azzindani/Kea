@@ -1,8 +1,8 @@
-# Prometheus Alert Rules for Kea Research Engine
+# Prometheus Alert Rules for Project Research Engine
 # Place in configs/alerting/alerts.yml
 
 groups:
-  - name: kea_availability
+  - name: project_availability
     rules:
       # API Gateway down
       - alert: APIGatewayDown
@@ -26,7 +26,7 @@ groups:
       
       # High error rate
       - alert: HighErrorRate
-        expr: rate(kea_errors_total[5m]) > 0.1
+        expr: rate(project_errors_total[5m]) > 0.1
         for: 5m
         labels:
           severity: warning
@@ -34,11 +34,11 @@ groups:
           summary: "High error rate detected"
           description: "Error rate is {{ $value }} errors/second"
 
-  - name: kea_performance
+  - name: project_performance
     rules:
       # Slow research requests
       - alert: SlowResearch
-        expr: histogram_quantile(0.95, rate(kea_research_duration_seconds_bucket[5m])) > 120
+        expr: histogram_quantile(0.95, rate(project_research_duration_seconds_bucket[5m])) > 120
         for: 10m
         labels:
           severity: warning
@@ -48,7 +48,7 @@ groups:
       
       # High auth latency
       - alert: HighAuthLatency
-        expr: histogram_quantile(0.95, rate(kea_auth_latency_seconds_bucket[5m])) > 2
+        expr: histogram_quantile(0.95, rate(project_auth_latency_seconds_bucket[5m])) > 2
         for: 5m
         labels:
           severity: warning
@@ -58,7 +58,7 @@ groups:
       
       # Low research confidence
       - alert: LowResearchConfidence
-        expr: histogram_quantile(0.5, rate(kea_research_confidence_bucket[1h])) < 0.5
+        expr: histogram_quantile(0.5, rate(project_research_confidence_bucket[1h])) < 0.5
         for: 30m
         labels:
           severity: info
@@ -66,11 +66,11 @@ groups:
           summary: "Research confidence is low"
           description: "Median research confidence is {{ $value }}"
 
-  - name: kea_resources
+  - name: project_resources
     rules:
       # Database connection pool exhausted
       - alert: DatabasePoolExhausted
-        expr: kea_health_database_pool_free < 2
+        expr: project_health_database_pool_free < 2
         for: 5m
         labels:
           severity: warning
@@ -80,7 +80,7 @@ groups:
       
       # High memory usage
       - alert: HighMemoryUsage
-        expr: kea_health_memory_used_percent > 85
+        expr: project_health_memory_used_percent > 85
         for: 10m
         labels:
           severity: warning
@@ -90,7 +90,7 @@ groups:
       
       # Redis unavailable
       - alert: RedisUnavailable
-        expr: kea_health_redis_status == 0
+        expr: project_health_redis_status == 0
         for: 2m
         labels:
           severity: critical
@@ -98,11 +98,11 @@ groups:
           summary: "Redis is unavailable"
           description: "Redis connection failed"
 
-  - name: kea_rate_limiting
+  - name: project_rate_limiting
     rules:
       # Too many rate limit hits
       - alert: HighRateLimitHits
-        expr: rate(kea_rate_limit_hits_total[5m]) > 10
+        expr: rate(project_rate_limit_hits_total[5m]) > 10
         for: 5m
         labels:
           severity: info
@@ -110,11 +110,11 @@ groups:
           summary: "High rate of rate limit hits"
           description: "{{ $value }} rate limit hits per second"
 
-  - name: kea_authentication
+  - name: project_authentication
     rules:
       # High auth failure rate
       - alert: HighAuthFailureRate
-        expr: rate(kea_auth_attempts_total{status="failure"}[5m]) / rate(kea_auth_attempts_total[5m]) > 0.3
+        expr: rate(project_auth_attempts_total{status="failure"}[5m]) / rate(project_auth_attempts_total[5m]) > 0.3
         for: 10m
         labels:
           severity: warning
@@ -124,7 +124,7 @@ groups:
       
       # Possible brute force
       - alert: PossibleBruteForce
-        expr: sum by (instance) (rate(kea_auth_attempts_total{status="failure"}[1m])) > 5
+        expr: sum by (instance) (rate(project_auth_attempts_total{status="failure"}[1m])) > 5
         for: 2m
         labels:
           severity: critical
@@ -132,11 +132,11 @@ groups:
           summary: "Possible brute force attack"
           description: "{{ $value }} auth failures per minute from same source"
 
-  - name: kea_circuit_breaker
+  - name: project_circuit_breaker
     rules:
       # Circuit breaker open
       - alert: CircuitBreakerOpen
-        expr: kea_circuit_breaker_state == 1
+        expr: project_circuit_breaker_state == 1
         for: 1m
         labels:
           severity: critical

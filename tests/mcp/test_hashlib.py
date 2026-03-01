@@ -1,10 +1,11 @@
-import pytest
-import asyncio
 import os
-import time
-from tests.mcp.client_utils import SafeClientSession as ClientSession
+
+import pytest
 from mcp.client.stdio import stdio_client
+
+from tests.mcp.client_utils import SafeClientSession as ClientSession
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_hashlib_full_coverage():
@@ -12,29 +13,29 @@ async def test_hashlib_full_coverage():
     REAL SIMULATION: Verify Hashlib Server (100% Tool Coverage).
     """
     params = get_server_params("hashlib_server", extra_dependencies=[])
-    
+
     # Test Data
     test_string = "The quick brown fox jumps over the lazy dog"
     test_file_name = "test_hash_full.txt"
     test_file_content = "File content for hashing integrity checks."
     dummy_csv = "test_hash.csv"
-    
+
     # Setup
     with open(test_file_name, "w") as f:
         f.write(test_file_content)
     with open(dummy_csv, "w") as f:
         f.write("id,name\n1,Alice\n2,Bob")
-    
+
     # Create a duplicate file for find_duplicates
     with open("test_hash_dup.txt", "w") as f:
         f.write(test_file_content)
-        
-    print(f"\n--- Starting 100% Coverage Simulation: Hashlib Server ---")
-    
+
+    print("\n--- Starting 100% Coverage Simulation: Hashlib Server ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # --- 1. CORE ---
             print("\n[1. Core Info]")
             await session.call_tool("algorithms_guaranteed", arguments={})
@@ -52,7 +53,7 @@ async def test_hashlib_full_coverage():
             ]
             for algo in algos:
                 await session.call_tool(f"{algo}_string", arguments={"text": test_string})
-            
+
             await session.call_tool("hash_string_generic", arguments={"text": test_string, "algo_name": "sha256"})
             print(" \033[92m[PASS]\033[0m All string hash tools")
 
@@ -67,7 +68,7 @@ async def test_hashlib_full_coverage():
             file_algos = ["md5", "sha1", "sha256", "sha512", "blake2b"]
             for algo in file_algos:
                 await session.call_tool(f"{algo}_file", arguments={"file_path": test_file_name})
-            
+
             await session.call_tool("hash_file_generic", arguments={"file_path": test_file_name, "algo_name": "sha256"})
             await session.call_tool("hash_file_partial", arguments={"file_path": test_file_name, "algo_name": "sha256", "chunk_size": 10})
             print(" \033[92m[PASS]\033[0m All file hash tools")
@@ -76,7 +77,7 @@ async def test_hashlib_full_coverage():
             print("\n[5. Bulk Operations]")
             await session.call_tool("bulk_hash_strings", arguments={"texts": ["hello", "world"]})
             await session.call_tool("bulk_hash_files", arguments={"file_paths": [test_file_name, "test_hash_dup.txt"]})
-            
+
             # Directory Hashing
             await session.call_tool("hash_directory", arguments={"directory": ".", "pattern": "*.txt"})
             res = await session.call_tool("hash_directory_manifest", arguments={"directory": "."})
@@ -88,11 +89,11 @@ async def test_hashlib_full_coverage():
             key = "secret_key"
             res = await session.call_tool("hmac_string", arguments={"key": key, "message": test_string})
             sig = res.content[0].text
-            
+
             await session.call_tool("hmac_file", arguments={"key": key, "file_path": test_file_name})
             await session.call_tool("pbkdf2_hmac", arguments={"password": "pass", "salt": "salt"})
             await session.call_tool("scrypt_kdf", arguments={"password": "pass", "salt": "salt"})
-            
+
             # Verify HMAC
             res = await session.call_tool("verify_hmac", arguments={"key": key, "message": test_string, "signature": sig})
             if "true" in str(res.content[0].text).lower():
@@ -104,47 +105,47 @@ async def test_hashlib_full_coverage():
             # Get hash for verification
             res = await session.call_tool("sha256_file", arguments={"file_path": test_file_name})
             file_hash = res.content[0].text
-            
+
             await session.call_tool("verify_file_checksum", arguments={"file_path": test_file_name, "expected_hash": file_hash})
             await session.call_tool("find_duplicates", arguments={"directory": "."})
             await session.call_tool("generate_dir_fingerprint", arguments={"directory": "."})
             await session.call_tool("compare_directories", arguments={"dir_a": ".", "dir_b": "."})
-            
+
             # Verify manifest
             await session.call_tool("verify_manifest", arguments={"manifest_json": manifest_json, "base_dir": "."})
-            
+
             # Rolling Hash
             await session.call_tool("update_rolling_hash", arguments={"current_hash": file_hash, "new_chunk": "update"})
-            
+
             # URL Hash (Using example.com as real target)
             print(" Hashing URL...")
             await session.call_tool("hash_url_content", arguments={"url": "https://example.com"})
-            
+
             await session.call_tool("detect_hash_type", arguments={"hash_str": file_hash})
             await session.call_tool("generate_random_token", arguments={"bytes_len": 16})
-            
+
             # Benchmark (small size)
             await session.call_tool("benchmark_algorithms", arguments={"payload_size_mb": 1})
-            
+
             # Monitor (short check)
             await session.call_tool("monitor_file_changes", arguments={"file_path": test_file_name, "checks": 1, "interval": 0.1})
-            
+
             # CSV Hash
             await session.call_tool("hash_csv_rows", arguments={"input_csv": dummy_csv, "output_csv": "test_hash_out.csv"})
-            
+
             # Password Verify
             # Need a valid hash first. Let's fake one or skip strict check, just call tool.
-            # pbkdf2 default: sha256, 100000 iter. 
+            # pbkdf2 default: sha256, 100000 iter.
             # We'll just call it to ensure it runs, input might be invalid hash format but tool shouldn't crash.
             # Actually, let's skip verification of pass if we don't have valid hash, or generate one.
             # Using pbkdf2_hmac to generate
             res = await session.call_tool("pbkdf2_hmac", arguments={"password": "mypas", "salt": "mysalt"})
             p_hash = res.content[0].text
             await session.call_tool("verify_password_pbkdf2", arguments={"password": "mypas", "stored_hash": p_hash, "salt": "mysalt"})
-            
+
             await session.call_tool("create_merkle_root", arguments={"items": ["a", "b", "c"]})
             await session.call_tool("compare_text_similarity", arguments={"text1": "hello", "text2": "hello world"})
-            
+
             print(" \033[92m[PASS]\033[0m Super tools")
 
     # Cleanup

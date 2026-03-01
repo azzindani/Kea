@@ -1,22 +1,23 @@
-import pytest
-import asyncio
 import os
-import base64
-from PIL import Image, ImageDraw, ImageFont
+
+import pytest
 from mcp import ClientSession
 from mcp.client.stdio import stdio_client
+from PIL import Image, ImageDraw
+
 from tests.mcp.client_utils import get_server_params
+
 
 def create_dummy_image(text="Hello World"):
     """Creates a simple image with text for OCR testing."""
     # OSD needs more characters. Let's create a bigger image with repeated text.
     long_text = (text + " ") * 20 + "\n"
     full_text = long_text * 10
-    
+
     img = Image.new('RGB', (800, 600), color=(255, 255, 255))
     d = ImageDraw.Draw(img)
     d.multiline_text((20,20), full_text, fill=(0,0,0), spacing=10)
-    
+
     path = "test_ocr_image.png"
     img.save(path)
     return path
@@ -27,16 +28,16 @@ async def test_tesseract_real_simulation():
     REAL SIMULATION: Verify Tesseract Server (OCR).
     """
     params = get_server_params("tesseract_server", extra_dependencies=["pytesseract", "pillow", "pandas", "opencv-python"])
-    
+
     img_path = create_dummy_image()
     abs_path = os.path.abspath(img_path)
-    
-    print(f"\n--- Starting Real-World Simulation: Tesseract Server ---")
-    
+
+    print("\n--- Starting Real-World Simulation: Tesseract Server ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. Image to String
             print(f"1. OCR on '{img_path}'...")
             # Note: Tesseract must be installed on the system for this to actually obtain text.

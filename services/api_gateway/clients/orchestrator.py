@@ -11,15 +11,17 @@ from __future__ import annotations
 
 import asyncio
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from shared.config import Settings
 
 import httpx
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.config import get_settings
-from shared.environment import get_environment_config
 
 
 logger = get_logger(__name__)
@@ -35,11 +37,18 @@ class CircuitState(Enum):
 @dataclass
 class CircuitBreaker:
     """Circuit breaker for fault tolerance."""
-    failure_threshold: int = 5
-    reset_timeout: float = 30.0
+    failure_threshold: int = field(init=False)
+    reset_timeout: float = field(init=False)
     state: CircuitState = CircuitState.CLOSED
     failure_count: int = 0
     last_failure: float = 0.0
+    
+    def __post_init__(self):
+        """Initialize parameters strictly from centralized settings."""
+        settings = get_settings()
+        cb_settings = settings.circuit_breaker
+        self.failure_threshold = cb_settings.failure_threshold
+        self.reset_timeout = cb_settings.reset_timeout
     
     def record_success(self):
         self.failure_count = 0
@@ -75,32 +84,34 @@ class OrchestratorClient:
     """
     
     def __init__(self, base_url: str | None = None) -> None:
-        settings = get_settings()
-        env_config = get_environment_config()
+        from shared.service_registry import ServiceRegistry, ServiceName
         
-        self.base_url = base_url or f"http://localhost:{settings.api_port}"
+        self.base_url = base_url or ServiceRegistry.get_url(ServiceName.ORCHESTRATOR)
+        
+        settings = get_settings()
         self.timeout = httpx.Timeout(
-            env_config.request_timeout_seconds,
-            connect=10.0,
+            settings.timeouts.default,
+            connect=settings.timeouts.auth_token,
         )
-        self.max_retries = env_config.max_retries
-        self.retry_delay = env_config.retry_delay_seconds
+        # Using long timeout for execution jobs if needed
+        self.execution_timeout = settings.timeouts.long
+        
+        self.max_retries = settings.mcp.max_retries
+        self.retry_delay = settings.mcp.retry_delay
         
         self._circuit = CircuitBreaker()
+        self.settings = settings
         self._client: httpx.AsyncClient | None = None
     
     async def _get_client(self) -> httpx.AsyncClient:
-        """Get or create pooled client."""
         if self._client is None or self._client.is_closed:
             self._client = httpx.AsyncClient(
                 base_url=self.base_url,
                 timeout=self.timeout,
-                limits=httpx.Limits(max_connections=20),
             )
         return self._client
     
     async def close(self):
-        """Close client."""
         if self._client:
             await self._client.aclose()
             self._client = None
@@ -152,32 +163,40 @@ class OrchestratorClient:
         response = await self._request("GET", "/tools")
         return response.json().get("tools", [])
     
-    async def start_research(
+    async def start_execution(
         self,
         query: str,
-        depth: int = 2,
-        max_sources: int = 10,
+        depth: int | None = None,
+        max_steps: int | None = None,
     ) -> dict[str, Any]:
-        """Start a synchronous research job."""
+        settings = get_settings()
+        depth = depth or settings.jobs.default_depth
+        max_steps = max_steps or settings.jobs.default_max_steps
+        
         response = await self._request(
             "POST",
-            "/research",
-            json={"query": query, "depth": depth, "max_sources": max_sources},
+            "/execute",
+            json={"query": query, "depth": depth, "max_steps": max_steps},
+            timeout=self.execution_timeout,
         )
         return response.json()
     
-    async def stream_research(
+    async def stream_execution(
         self,
         query: str,
-        depth: int = 2,
+        depth: int | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
-        """Stream research results via SSE."""
+        """Stream execution results via SSE."""
+        settings = get_settings()
+        depth = depth or settings.jobs.default_depth
+        
         client = await self._get_client()
         
         async with client.stream(
             "GET",
-            "/research/stream",
+            "/execute/stream",
             params={"query": query, "depth": depth},
+            timeout=self.execution_timeout,
         ) as response:
             async for line in response.aiter_lines():
                 if line.startswith("data: "):
@@ -211,4 +230,3 @@ async def get_orchestrator_client() -> OrchestratorClient:
     if _client is None:
         _client = OrchestratorClient()
     return _client
-

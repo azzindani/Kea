@@ -49,7 +49,7 @@ graph TD
 ```python
 # Extract and summarize a news article
 result = await client.call_tool("get_article_nlp", {
-    "url": "https://techcrunch.com/2026/01/25/kea-ai-releases..."
+    "url": "https://techcrunch.com/2026/01/25/project-ai-releases..."
 })
 ```
 

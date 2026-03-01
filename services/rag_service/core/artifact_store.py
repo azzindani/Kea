@@ -1,7 +1,7 @@
 """
 Artifact Store.
 
-Storage for research artifacts (reports, data files, etc).
+Storage for system artifacts (reports, data files, etc).
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 
 logger = get_logger(__name__)
@@ -27,7 +27,7 @@ logger = get_logger(__name__)
 # ============================================================================
 
 class Artifact(BaseModel):
-    """Research artifact metadata."""
+    """Artifact metadata."""
     artifact_id: str = Field(default_factory=lambda: f"art-{uuid.uuid4().hex[:12]}")
     name: str
     content_type: str = "application/octet-stream"
@@ -53,22 +53,18 @@ class ArtifactStore(ABC):
     @abstractmethod
     async def put(self, artifact: Artifact, content: bytes) -> str:
         """Store artifact content. Returns artifact ID."""
-        pass
     
     @abstractmethod
     async def get(self, artifact_id: str) -> tuple[Artifact, bytes] | None:
         """Get artifact and its content."""
-        pass
     
     @abstractmethod
     async def get_metadata(self, artifact_id: str) -> Artifact | None:
         """Get artifact metadata only."""
-        pass
     
     @abstractmethod
     async def delete(self, artifact_id: str) -> None:
         """Delete artifact."""
-        pass
     
     @abstractmethod
     async def list(
@@ -78,7 +74,6 @@ class ArtifactStore(ABC):
         limit: int = 100,
     ) -> list[Artifact]:
         """List artifacts with optional filtering."""
-        pass
 
 
 # ============================================================================
@@ -96,8 +91,10 @@ class LocalArtifactStore(ArtifactStore):
             content
     """
     
-    def __init__(self, base_path: str = "./artifacts") -> None:
-        self.base_path = Path(base_path)
+    def __init__(self, base_path: str | None = None) -> None:
+        from shared.config import get_settings
+        settings = get_settings()
+        self.base_path = Path(base_path or settings.rag.artifact_path)
         self.base_path.mkdir(parents=True, exist_ok=True)
     
     def _artifact_dir(self, artifact_id: str) -> Path:
@@ -117,7 +114,7 @@ class LocalArtifactStore(ArtifactStore):
         
         # Write metadata
         metadata_path = artifact_dir / "metadata.json"
-        with open(metadata_path, "w") as f:
+        with open(metadata_path, "w", encoding="utf-8") as f:
             json.dump(artifact.model_dump(mode="json"), f, indent=2, default=str)
         
         # Write content
@@ -139,7 +136,7 @@ class LocalArtifactStore(ArtifactStore):
         
         # Read metadata
         metadata_path = artifact_dir / "metadata.json"
-        with open(metadata_path) as f:
+        with open(metadata_path, "r", encoding="utf-8") as f:
             metadata = json.load(f)
         
         artifact = Artifact(**metadata)
@@ -160,7 +157,7 @@ class LocalArtifactStore(ArtifactStore):
         if not metadata_path.exists():
             return None
         
-        with open(metadata_path) as f:
+        with open(metadata_path, "r", encoding="utf-8") as f:
             metadata = json.load(f)
         
         return Artifact(**metadata)
@@ -194,7 +191,7 @@ class LocalArtifactStore(ArtifactStore):
             if not metadata_path.exists():
                 continue
             
-            with open(metadata_path) as f:
+            with open(metadata_path, "r", encoding="utf-8") as f:
                 metadata = json.load(f)
             
             artifact = Artifact(**metadata)
@@ -233,10 +230,12 @@ class S3ArtifactStore(ArtifactStore):
         access_key: str | None = None,
         secret_key: str | None = None,
     ) -> None:
-        self.bucket = bucket or os.getenv("S3_BUCKET", "research-artifacts")
-        self.endpoint = endpoint or os.getenv("S3_ENDPOINT")
-        self.access_key = access_key or os.getenv("S3_ACCESS_KEY")
-        self.secret_key = secret_key or os.getenv("S3_SECRET_KEY")
+        from shared.config import get_settings
+        settings = get_settings()
+        self.bucket = bucket or settings.s3.bucket
+        self.endpoint = endpoint or settings.s3.endpoint
+        self.access_key = access_key or settings.s3.access_key
+        self.secret_key = secret_key or settings.s3.secret_key
         self._client = None
     
     def _get_client(self):
@@ -255,7 +254,6 @@ class S3ArtifactStore(ArtifactStore):
     
     async def put(self, artifact: Artifact, content: bytes) -> str:
         """Store artifact in S3."""
-        import json
         
         client = self._get_client()
         
@@ -376,15 +374,22 @@ class S3ArtifactStore(ArtifactStore):
 # Factory
 # ============================================================================
 
-def create_artifact_store(use_local: bool = True) -> ArtifactStore:
+def create_artifact_store(use_local: bool | None = None) -> ArtifactStore:
     """
     Create artifact store based on configuration.
     
     Args:
         use_local: Use local storage instead of S3
     """
+    from shared.config import get_settings
+    settings = get_settings()
+    
+    if use_local is None:
+        # Default to local if S3 not configured or explicitly disabled
+        use_local = not bool(settings.s3.bucket and settings.s3.access_key)
+        
     # 1. Create Blob Layer (Physical Storage)
-    if use_local or not os.getenv("S3_BUCKET"):
+    if use_local:
         logger.info("Using local artifact blob store")
         blob_store = LocalArtifactStore()
     else:
@@ -392,7 +397,7 @@ def create_artifact_store(use_local: bool = True) -> ArtifactStore:
         blob_store = S3ArtifactStore()
 
     # 2. Add Metadata Layer (Postgres Index)
-    if os.getenv("DATABASE_URL"):
+    if settings.database.url or os.getenv("DATABASE_URL"):
         try:
             from services.rag_service.core.postgres_artifacts import PostgresArtifactStore
             logger.info("Using Postgres artifact metadata index")

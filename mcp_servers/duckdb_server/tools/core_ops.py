@@ -9,9 +9,9 @@ logger = structlog.get_logger()
 # DuckDB can operate on a file or in-memory (:memory:)
 # We will use a singleton connection pattern.
 CONN = None
-DB_PATH = "kea_data.duckdb" # Default persistent DB
+DB_PATH = "project_data.duckdb" # Default persistent DB
 
-def connect_db(path: str = "kea_data.duckdb") -> str:
+def connect_db(path: str = "project_data.duckdb") -> str:
     """Connect to a specific DB file (or :memory:)."""
     global CONN, DB_PATH
     

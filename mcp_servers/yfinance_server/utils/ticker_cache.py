@@ -8,7 +8,7 @@ from typing import List
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 CACHE_EXPIRY = 86400 * 7  # 7 days
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 logger = get_logger(__name__)
 

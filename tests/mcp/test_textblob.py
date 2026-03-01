@@ -1,8 +1,10 @@
+
 import pytest
-import asyncio
 from mcp import ClientSession
 from mcp.client.stdio import stdio_client
+
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_textblob_real_simulation():
@@ -10,16 +12,16 @@ async def test_textblob_real_simulation():
     REAL SIMULATION: Verify TextBlob Server (NLP).
     """
     params = get_server_params("textblob_server", extra_dependencies=["textblob", "pandas", "nltk"])
-    
+
     text = "I love this product! It is amazing and very useful."
     bad_text = "I haet this product." # Spelling error
-    
-    print(f"\n--- Starting Real-World Simulation: TextBlob Server ---")
-    
+
+    print("\n--- Starting Real-World Simulation: TextBlob Server ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 0. Setup
             print("0. Ensuring Corpora...")
             res = await session.call_tool("ensure_corpora", arguments={})
@@ -27,7 +29,7 @@ async def test_textblob_real_simulation():
                 print(f" \033[91m[FAIL]\033[0m ensure_corpora failed: {res.content[0].text if res.content else 'Unknown error'}")
             else:
                 print(f" \033[92m[PASS]\033[0m Corpora check: {res.content[0].text if res.content else 'OK'}")
-            
+
             # 1. Sentiment Analysis
             print(f"1. Analyzing Sentiment: '{text}'...")
             res = await session.call_tool("analyze_sentiment", arguments={"text": text})
@@ -72,7 +74,7 @@ async def test_textblob_real_simulation():
             print("6. Full Text Report...")
             res = await session.call_tool("full_text_report", arguments={"text": text})
             if not res.isError and res.content:
-                 print(f" \033[92m[PASS]\033[0m Report Generated")
+                 print(" \033[92m[PASS]\033[0m Report Generated")
             else:
                 print(f" \033[91m[FAIL]\033[0m {res.content[0].text if res.content else 'No content'}")
 

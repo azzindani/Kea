@@ -61,11 +61,11 @@ Provides a structured bridge for human intervention. When a swarm reaches a "Low
 ## 🧠 Deep Dive
 
 ### 1. Dynamic Quality Gating
-The Swarm Manager doesn't just check for security; it checks for **Utility**. The `QualityGate` system uses a specialized **Judge Agent** to score research outputs. If a report's density of evidence is too low or its tone is hallucination-prone, the Manager blocks the synthesis and requests a "Drill Down" from the Researcher.
+The Swarm Manager doesn't just check for security; it checks for **Utility**. The `QualityGate` system uses a specialized **Judge Agent** to score system outputs. If a report's density of evidence is too low or its tone is hallucination-prone, the Manager blocks the synthesis and requests a "Drill Down" from the Worker.
 
 ### 2. Adaptive Resource Throttling
 Unlike simple rate limiters, the **Resource Guardian** monitors the health of the entire organism. If the **Vault**'s database latency spikes or the **MCP Host** reports VRAM pressure, the Swarm Manager can dynamically lower the `max_concurrency` of all active swarms to prevent a cascade failure.
 
 ---
-*The Swarm Manager ensures that Kea's intelligence is always paired with corporate responsibility.*
+*The Swarm Manager ensures that Project's intelligence is always paired with corporate responsibility.*
 

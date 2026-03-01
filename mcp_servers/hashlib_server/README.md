@@ -1,7 +1,7 @@
 # 🔌 Hashlib Server
 
 The `hashlib_server` is an MCP server providing tools for **Hashlib Server** functionality.
-It is designed to be used within the Kea ecosystem.
+It is designed to be used within the Project ecosystem.
 
 ## 🧰 Tools
 

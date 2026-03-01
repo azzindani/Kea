@@ -6,7 +6,7 @@ Auto-discovered with actual export detection.
 from pathlib import Path
 from typing import Any
 import importlib
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 logger = get_logger(__name__)
 

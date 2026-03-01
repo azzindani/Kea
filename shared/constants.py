@@ -1,5 +1,5 @@
 """
-Enterprise-scale constants for Kea v0.4.0.
+Enterprise-scale constants for Project v0.4.0.
 
 Central constants file defining limits that replace hardcoded values across the codebase.
 These are designed for 100K+ tool handling and enterprise-scale operations.
@@ -65,7 +65,6 @@ FUZZY_MATCH_LIMIT = 100_000
 ENTITY_EXTRACT_LIMIT = 100_000
 
 
-# ============================================================================
 # Service Limits
 # ============================================================================
 
@@ -76,11 +75,6 @@ FACT_STORE_LIMIT = 100_000
 # RAG Service
 RAG_SEARCH_LIMIT = 100_000
 EMBEDDING_BATCH_SIZE = 1_000
-
-# Orchestrator
-MAX_PARALLEL_TOOLS = 100
-MAX_ITERATIONS = 50
-MAX_SUB_QUERIES = 100
 
 
 # ============================================================================

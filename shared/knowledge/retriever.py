@@ -24,7 +24,7 @@ from typing import Any
 
 import httpx
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.service_registry import ServiceName, ServiceRegistry
 
 logger = get_logger(__name__)
@@ -41,10 +41,12 @@ class KnowledgeRetriever:
     """
 
     def __init__(self) -> None:
+        from shared.config import get_settings
+        settings = get_settings()
         # Simple in-memory cache: (key) -> (timestamp, result)
         # Key: (query, domain, category, tags_tuple, limit)
         self._cache: dict[tuple, tuple[float, str]] = {}
-        self._cache_ttl = 60.0  # 60s TTL
+        self._cache_ttl = settings.knowledge.cache_ttl
 
     def _rag_url(self) -> str:
         return ServiceRegistry.get_url(ServiceName.RAG_SERVICE)
@@ -52,11 +54,11 @@ class KnowledgeRetriever:
     async def retrieve_context(
         self,
         query: str,
-        limit: int = 3,
+        limit: int | None = None,
         domain: str | None = None,
         category: str | None = None,
         tags: list[str] | None = None,
-        min_similarity: float = 0.3,
+        min_similarity: float | None = None,
         enable_reranking: bool = False,
     ) -> str:
         """
@@ -67,6 +69,12 @@ class KnowledgeRetriever:
         - Structured logging of selected items
         - Routes through RAG Service API — no direct Postgres access
         """
+        from shared.config import get_settings
+        settings = get_settings()
+        
+        limit = limit or settings.knowledge.default_limit
+        min_similarity = min_similarity if min_similarity is not None else settings.knowledge.min_similarity
+
         # Check cache first
         tags_tuple = tuple(sorted(tags)) if tags else None
         cache_key = (query, domain, category, tags_tuple, limit)
@@ -92,7 +100,7 @@ class KnowledgeRetriever:
         logger.debug(f"KnowledgeRetriever: querying RAG Service [{label}] q='{query[:60]}'")
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=settings.knowledge.timeout_search) as client:
                 resp = await client.post(
                     f"{self._rag_url()}/knowledge/search",
                     json=payload,
@@ -144,57 +152,104 @@ class KnowledgeRetriever:
             logger.warning("KnowledgeRetriever: RAG Service request timed out")
             return ""
         except Exception as e:
-            logger.warning(f"KnowledgeRetriever: Search failed ({e})")
+            logger.warning(f"KnowledgeRetriever: Search failed: {type(e).__name__}: {e}")
             return ""
+
+    async def search_raw(
+        self,
+        query: str,
+        limit: int | None = None,
+        domain: str | None = None,
+        category: str | None = None,
+        tags: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Retrieve raw knowledge items without formatting.
+        
+        Useful for programmatic usage (e.g., loading examples for classifiers).
+        """
+        from shared.config import get_settings
+        settings = get_settings()
+        limit = limit or settings.knowledge.raw_search_limit
+
+        payload: dict[str, Any] = {"query": query, "limit": limit}
+        if domain:
+            payload["domain"] = domain
+        if category:
+            payload["category"] = category
+        if tags:
+            payload["tags"] = tags
+            
+        try:
+            async with httpx.AsyncClient(timeout=settings.knowledge.timeout_raw) as client:
+                resp = await client.post(
+                    f"{self._rag_url()}/knowledge/search",
+                    json=payload,
+                )
+                if resp.status_code == 200:
+                    return resp.json()
+                return []
+        except Exception as e:
+            logger.warning(f"KnowledgeRetriever: Raw search failed: {type(e).__name__}: {e}")
+            return []
 
     async def retrieve_skills(
         self,
         query: str,
-        limit: int = 3,
+        limit: int | None = None,
         domain: str | None = None,
     ) -> str:
         """Retrieve skill-type knowledge (reasoning frameworks, mental models)."""
+        from shared.config import get_settings
+        settings = get_settings().knowledge
+        limit = limit or settings.skill_limit
         return await self.retrieve_context(
             query=query,
             limit=limit,
             domain=domain,
-            category="skill",
+            category=settings.category_skill,
         )
 
     async def retrieve_rules(
         self,
         query: str,
-        limit: int = 2,
+        limit: int | None = None,
         domain: str | None = None,
     ) -> str:
         """Retrieve rule-type knowledge (governance, safety constraints)."""
+        from shared.config import get_settings
+        settings = get_settings().knowledge
+        limit = limit or settings.rule_limit
         return await self.retrieve_context(
             query=query,
             limit=limit,
             domain=domain,
-            category="rule",
+            category=settings.category_rule,
         )
 
     async def retrieve_procedures(
         self,
         query: str,
-        limit: int = 3,
+        limit: int | None = None,
         domain: str | None = None,
     ) -> str:
         """Retrieve procedure-type knowledge (Standard Operating Procedures)."""
+        from shared.config import get_settings
+        settings = get_settings().knowledge
+        limit = limit or settings.procedure_limit
         return await self.retrieve_context(
             query=query,
             limit=limit,
             domain=domain,
-            category="procedure",
+            category=settings.category_procedure,
         )
 
     async def retrieve_all(
         self,
         query: str,
-        skill_limit: int = 3,
-        rule_limit: int = 2,
-        procedure_limit: int = 2,
+        skill_limit: int | None = None,
+        rule_limit: int | None = None,
+        procedure_limit: int | None = None,
         domain: str | None = None,
     ) -> str:
         """
@@ -202,6 +257,12 @@ class KnowledgeRetriever:
 
         Returns combined formatted context with skills, rules, and procedures sections.
         """
+        from shared.config import get_settings
+        settings = get_settings()
+        skill_limit = skill_limit or settings.knowledge.skill_limit
+        rule_limit = rule_limit or settings.knowledge.rule_limit
+        procedure_limit = procedure_limit or settings.knowledge.procedure_limit
+
         skills, rules, procedures = await asyncio.gather(
             self.retrieve_skills(query, limit=skill_limit, domain=domain),
             self.retrieve_rules(query, limit=rule_limit, domain=domain),
@@ -221,8 +282,10 @@ class KnowledgeRetriever:
 
     async def is_available(self) -> bool:
         """Check if the RAG Service knowledge endpoint is reachable."""
+        from shared.config import get_settings
+        settings = get_settings()
         try:
-            async with httpx.AsyncClient(timeout=3.0) as client:
+            async with httpx.AsyncClient(timeout=settings.knowledge.timeout_health) as client:
                 resp = await client.get(f"{self._rag_url()}/health")
                 return resp.status_code == 200
         except Exception:
@@ -233,11 +296,14 @@ class KnowledgeRetriever:
         if not items:
             return ""
 
+        from shared.config import get_settings
+        settings = get_settings().knowledge
+
         sections = []
         for item in items:
-            category = item.get("category", "skill").upper()
+            category = item.get("category", settings.default_category).upper()
             name = item.get("name", "Unknown")
-            domain = item.get("domain", "general")
+            domain = item.get("domain", settings.default_domain)
             similarity = item.get("similarity", 0)
             content = item.get("content", "")
 
@@ -248,7 +314,7 @@ class KnowledgeRetriever:
             )
             sections.append(section)
 
-        header = f"DOMAIN EXPERTISE ({len(items)} relevant knowledge items):"
+        header = f"{settings.context_header} ({len(items)} relevant knowledge items):"
         return header + "\n\n" + "\n\n".join(sections)
 
 

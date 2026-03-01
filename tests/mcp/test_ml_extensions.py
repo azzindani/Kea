@@ -1,11 +1,12 @@
-import pytest
-import asyncio
-import os
-import pandas as pd
+
 import numpy as np
-from tests.mcp.client_utils import SafeClientSession as ClientSession
+import pandas as pd
+import pytest
 from mcp.client.stdio import stdio_client
+
+from tests.mcp.client_utils import SafeClientSession as ClientSession
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_ml_extensions(tmp_path):
@@ -14,7 +15,7 @@ async def test_ml_extensions(tmp_path):
     Clustering, Decomposition, Ensemble.
     """
     params = get_server_params("ml_server", extra_dependencies=["scikit-learn", "pandas", "numpy", "xgboost", "structlog"])
-    
+
     # Create dummy data
     data_path = tmp_path / "iris.csv"
     df = pd.DataFrame({
@@ -25,13 +26,13 @@ async def test_ml_extensions(tmp_path):
     })
     df.to_csv(data_path, index=False)
     data_url = str(data_path)
-    
-    print(f"\n--- Starting ML Extension Simulation ---")
-    
+
+    print("\n--- Starting ML Extension Simulation ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # --- Previous Tests ---
             print("1. XGBoost Train...")
             await session.call_tool("train_xgboost_model", arguments={
@@ -40,7 +41,7 @@ async def test_ml_extensions(tmp_path):
             })
 
             # --- New Tests ---
-            
+
             # 5. Clustering
             print("5. Clustering (KMeans)...")
             res = await session.call_tool("cluster_kmeans", arguments={

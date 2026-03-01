@@ -22,7 +22,7 @@ python tests/simulation/run_simulation.py
 
 These scripts only need:
 - Python 3.10+
-- The Kea codebase
+- The Project codebase
 
 No pytest, no test frameworks - just `python script.py`.
 

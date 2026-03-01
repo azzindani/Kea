@@ -1,7 +1,7 @@
 
 from finvizfinance.quote import finvizfinance
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 import pandas as pd
 
 logger = get_logger(__name__)

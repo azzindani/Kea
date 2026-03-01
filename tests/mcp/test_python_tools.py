@@ -1,8 +1,10 @@
+
 import pytest
-import asyncio
-from tests.mcp.client_utils import SafeClientSession as ClientSession
 from mcp.client.stdio import stdio_client
+
+from tests.mcp.client_utils import SafeClientSession as ClientSession
 from tests.mcp.client_utils import get_server_params
+
 
 # Helper for stdio testing
 async def run_tool_test(tool_name: str, arguments: dict, dependencies: list[str] = None):
@@ -15,14 +17,14 @@ async def run_tool_test(tool_name: str, arguments: dict, dependencies: list[str]
 
 class TestExecuteCode:
     """Tests for execute_code tool."""
-    
+
     @pytest.mark.asyncio
     async def test_simple_print(self):
         """Execute simple print statement."""
         res = await run_tool_test("execute_code", {"code": "print(2 + 2)"})
         assert not res.isError
         assert "4" in res.content[0].text
-    
+
     @pytest.mark.asyncio
     async def test_pandas_operations(self):
         """Execute pandas code."""
@@ -41,7 +43,7 @@ print(df.sum())
 
 class TestSQLQuery:
     """Tests for sql_query tool."""
-    
+
     @pytest.mark.asyncio
     async def test_simple_query(self):
         """Execute simple SQL query."""
@@ -52,14 +54,14 @@ class TestSQLQuery:
 
 class TestDataframeOps:
     """Tests for dataframe_ops tool."""
-    
+
     @pytest.mark.asyncio
     async def test_describe_operation(self):
         """Run describe operation."""
-        # Using execute_code to generate output first might be easier, 
+        # Using execute_code to generate output first might be easier,
         # but dataframe_ops takes a string/json representation usually?
         # Let's check server impl. It accepts 'data' parameter.
-        
+
         data = "a,b\n1,2\n3,4\n5,6"
         res = await run_tool_test("dataframe_ops", {
             "operation": "describe",

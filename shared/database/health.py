@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 
 logger = get_logger(__name__)
@@ -126,10 +126,14 @@ class HealthChecker:
             
             memory = psutil.virtual_memory()
             
-            # Warn if over 80% usage
-            if memory.percent > 90:
+            from shared.config import get_settings
+            settings = get_settings()
+            
+            # Warn if over threshold usage
+            max_ram = settings.governance.max_ram_percent
+            if memory.percent > max_ram:
                 status = "unhealthy"
-            elif memory.percent > 80:
+            elif memory.percent > (max_ram * 0.9):
                 status = "degraded"
             else:
                 status = "healthy"

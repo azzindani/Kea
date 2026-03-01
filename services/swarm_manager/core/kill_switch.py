@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Callable
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 
 logger = get_logger(__name__)
@@ -93,9 +93,12 @@ class KillSwitch:
         self,
         tool_name: str,
         reason: str = "Repeated failures",
-        duration_minutes: int = 30,
+        duration_minutes: int | None = None,
     ) -> None:
         """Temporarily blacklist a tool."""
+        from shared.config import get_settings
+        duration_minutes = duration_minutes or get_settings().swarm.default_blacklist_duration_minutes
+        
         until = datetime.utcnow() + timedelta(minutes=duration_minutes)
         self._blacklisted_tools[tool_name] = BlacklistEntry(
             name=tool_name,

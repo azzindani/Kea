@@ -5,55 +5,55 @@ Tests for streaming research endpoint with real LLM calls.
 Run with: pytest tests/real/test_sse_streaming.py -v -s
 """
 
-import pytest
-import asyncio
 import json
+
+import pytest
 
 
 class TestSSEStreamingLive:
     """Test SSE streaming with real LLM calls."""
-    
+
     @pytest.mark.asyncio
     @pytest.mark.real_api
     @pytest.mark.streaming
     async def test_streaming_endpoint_structure(self, llm_provider, llm_config, logger):
         """Test that streaming endpoint has correct structure."""
         logger.info("Testing SSE streaming structure")
-        
+
         from services.orchestrator.main import app
-        
+
         # Check app has the streaming endpoint
         route_paths = [r.path for r in app.routes if hasattr(r, 'path')]
-        
+
         assert "/research/stream" in route_paths
-        print(f"✅ Streaming endpoint exists: /research/stream")
-    
+        print("✅ Streaming endpoint exists: /research/stream")
+
     @pytest.mark.asyncio
     @pytest.mark.real_api
     @pytest.mark.streaming
     async def test_streaming_llm_direct(self, llm_provider, llm_config, logger):
         """Test direct LLM streaming (not via endpoint)."""
         logger.info("Testing direct LLM streaming")
-        
+
         from shared.llm.provider import LLMMessage, LLMRole
-        
+
         messages = [
             LLMMessage(role=LLMRole.USER, content="Count from 1 to 5, one number per line")
         ]
-        
+
         chunks = []
         full_content = ""
         print("\n🔄 Streaming LLM response:")
-        
+
         async for chunk in llm_provider.stream(messages, llm_config):
             # Check both content and if there's any data in the chunk
             if chunk.content:
                 chunks.append(chunk.content)
                 full_content += chunk.content
                 print(chunk.content, end="", flush=True)
-        
+
         print("\n")
-        
+
         # Some models may not stream chunks but still complete
         # Try non-streaming if streaming didn't work
         if len(chunks) == 0:
@@ -61,19 +61,19 @@ class TestSSEStreamingLive:
             response = await llm_provider.complete(messages, llm_config)
             full_content = response.content
             print(f"📝 Non-streaming response: {full_content[:100]}...")
-        
+
         # At minimum, we should have got some content either way
         assert len(full_content) > 0 or len(chunks) >= 0, "Should receive some content"
-        
+
         print(f"✅ Received {len(chunks)} chunks, {len(full_content)} chars total")
-    
+
     @pytest.mark.asyncio
     @pytest.mark.real_api
     @pytest.mark.streaming
     async def test_sse_event_format(self, logger):
         """Test SSE event format."""
         logger.info("Testing SSE event format")
-        
+
         # Test SSE event formatting
         events = [
             {"event": "start", "job_id": "test-123", "query": "test"},
@@ -81,46 +81,46 @@ class TestSSEStreamingLive:
             {"event": "chunk", "phase": "planning", "content": "Step 1..."},
             {"event": "complete", "report": "Final report"},
         ]
-        
+
         for event in events:
             sse_line = f"data: {json.dumps(event)}\n\n"
-            
+
             # Parse it back
             data = json.loads(sse_line.replace("data: ", "").strip())
             assert data == event
-        
+
         print(f"✅ SSE event format validated for {len(events)} event types")
-    
+
     @pytest.mark.asyncio
     @pytest.mark.real_api
     @pytest.mark.streaming
     async def test_llm_complete_as_fallback(self, llm_provider, llm_config, logger):
         """Test non-streaming LLM as fallback."""
         logger.info("Testing LLM complete (non-streaming)")
-        
+
         from shared.llm.provider import LLMMessage, LLMRole
-        
+
         messages = [
             LLMMessage(role=LLMRole.USER, content="Say hello in one word")
         ]
-        
+
         response = await llm_provider.complete(messages, llm_config)
-        
+
         print(f"\n📝 Response: {response.content or response.reasoning[:100] if response.reasoning else 'empty'}")
         # Some models (reasoning models) may put content in reasoning field
         assert len(response.content) > 0 or len(response.reasoning or "") > 0
-        print(f"✅ Non-streaming complete works")
+        print("✅ Non-streaming complete works")
 
 
 class TestSSEClientConsumption:
     """Test SSE client-side consumption patterns."""
-    
+
     @pytest.mark.asyncio
     @pytest.mark.real_api
     async def test_parse_sse_events(self, logger):
         """Test parsing SSE event stream."""
         logger.info("Testing SSE event parsing")
-        
+
         # Simulate SSE stream
         sse_stream = """data: {"event": "start", "job_id": "test-1"}
 
@@ -133,7 +133,7 @@ data: {"event": "chunk", "content": "World"}
 data: {"event": "complete", "report": "Done"}
 
 """
-        
+
         events = []
         for line in sse_stream.split("\n"):
             if line.startswith("data: "):
@@ -142,17 +142,17 @@ data: {"event": "complete", "report": "Done"}
                     events.append(event)
                 except json.JSONDecodeError:
                     continue
-        
+
         assert len(events) == 5
         assert events[0]["event"] == "start"
         assert events[-1]["event"] == "complete"
-        
+
         # Reconstruct content from chunks
         content = "".join(
             e.get("content", "") for e in events if e.get("event") == "chunk"
         )
         assert content == "Hello World"
-        
+
         print(f"✅ Parsed {len(events)} events, reconstructed: '{content}'")
 
 

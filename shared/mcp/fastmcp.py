@@ -130,8 +130,10 @@ class FastMCP(LibFastMCP):
             @wraps(func)
             async def wrapper(*args, **kwargs):
                 start_time = time.perf_counter()
+                from shared.config import get_settings
+                settings = get_settings()
                 retry_count = 0
-                max_retries = 3
+                max_retries = settings.mcp.max_retries
                 
                 # Metadata for the envelope
                 meta = {
@@ -186,7 +188,7 @@ class FastMCP(LibFastMCP):
                                 attempt=attempt+1, 
                                 error=str(e)
                             )
-                            await asyncio.sleep(0.5 * (attempt + 1)) # Backoff
+                            await asyncio.sleep(settings.mcp.retry_backoff_factor * (attempt + 1)) # Backoff
                             continue
                             
                         except Exception as e:

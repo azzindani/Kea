@@ -1,21 +1,20 @@
 """
 Stress Test Fixtures.
 
-Pytest fixtures and configuration for stress testing Kea.
+Pytest fixtures and configuration for stress testing Project.
 Includes API client with authentication support.
 """
 
-import pytest
 import asyncio
 import logging
 import os
 import sys
 
 import httpx
+import pytest
 
 from tests.stress.metrics import MetricsCollector
 from tests.stress.queries import QUERIES, get_query
-
 
 # =============================================================================
 # API Configuration
@@ -36,10 +35,9 @@ TEST_USER_NAME = "Stress Test User"
 
 def pytest_configure(config):
     """Configure pytest for stress tests."""
-    # Setup Kea logging with console format for readable output
-    from shared.logging import setup_logging, LogConfig
-    from shared.logging.structured import LogLevel
-    
+    # Setup Project logging with console format for readable output
+    from shared.logging.main import LogConfig, LogLevel, setup_logging
+
     # Use console format (not JSON) for test readability
     log_config = LogConfig(
         level=LogLevel.DEBUG,
@@ -47,10 +45,10 @@ def pytest_configure(config):
         service_name="stress-test",
     )
     setup_logging(log_config)
-    
+
     # Ensure root logger is at DEBUG level
     logging.getLogger().setLevel(logging.DEBUG)
-    
+
     # Make sure stress test logger outputs everything
     logging.getLogger("tests.stress").setLevel(logging.DEBUG)
 
@@ -62,19 +60,19 @@ def pytest_configure(config):
             "services.client.runner",
             "uvicorn.access",
         ]
-        
+
         # Set explicitly for current process
         for name in noisy_loggers:
             logging.getLogger(name).setLevel(logging.WARNING)
-            
+
         # Set env var for subprocesses (API Gateway, etc.)
         os.environ["QUIET_LOGGERS"] = ",".join(noisy_loggers)
-        
+
         # Create filesystem flag for running processes
         with open(".quiet_logs", "w") as f:
             f.write("1")
 
-    
+
     # Register markers
     config.addinivalue_line("markers", "stress: Stress/load tests")
 
@@ -101,7 +99,7 @@ def pytest_addoption(parser):
         )
     except ValueError:
         pass
-    
+
     try:
         parser.addoption(
             "--output-dir",
@@ -133,34 +131,34 @@ class AuthenticatedAPIClient:
     
     Handles JWT token management for stress test API calls.
     """
-    
+
     def __init__(self, base_url: str = API_GATEWAY_URL):
         self.base_url = base_url
         self.access_token: str | None = None
         self.refresh_token: str | None = None
         self.user_id: str | None = None
         self._client: httpx.AsyncClient | None = None
-    
+
     async def __aenter__(self):
         """Async context manager entry."""
         await self.initialize()
         return self
-    
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit."""
         await self.close()
-    
+
     async def initialize(self):
         """Initialize HTTP client and authenticate."""
         self._client = httpx.AsyncClient(timeout=300.0)
         await self._authenticate()
-    
+
     async def close(self):
         """Close HTTP client."""
         if self._client:
             await self._client.aclose()
             self._client = None
-    
+
     async def _authenticate(self):
         """
         Authenticate with test user credentials.
@@ -176,7 +174,7 @@ class AuthenticatedAPIClient:
                     "password": TEST_USER_PASSWORD,
                 },
             )
-            
+
             if response.status_code == 200:
                 data = response.json()
                 self.access_token = data["access_token"]
@@ -185,7 +183,7 @@ class AuthenticatedAPIClient:
                 return
         except Exception:
             pass
-        
+
         # If login fails, register new user
         response = await self._client.post(
             f"{self.base_url}/api/v1/auth/register",
@@ -195,7 +193,7 @@ class AuthenticatedAPIClient:
                 "password": TEST_USER_PASSWORD,
             },
         )
-        
+
         if response.status_code == 200:
             data = response.json()
             self.access_token = data["access_token"]
@@ -203,7 +201,7 @@ class AuthenticatedAPIClient:
             self.user_id = data["user"]["user_id"]
         else:
             raise Exception(f"Failed to authenticate: {response.text}")
-    
+
     @property
     def headers(self) -> dict:
         """Get headers with authorization."""
@@ -216,7 +214,7 @@ class AuthenticatedAPIClient:
         """Log full request if verbose mode."""
         if os.getenv("LOG_NO_TRUNCATE") != "1":
             return
-            
+
         print(f"\n⚡ REQUEST: {method} {path}")
         if "json" in kwargs:
             print(f"BODY: {kwargs['json']}")
@@ -229,14 +227,14 @@ class AuthenticatedAPIClient:
         """Log full response if verbose mode."""
         if os.getenv("LOG_NO_TRUNCATE") != "1":
             return
-            
+
         print(f"⚡ RESPONSE: {response.status_code}")
         try:
             print(f"BODY: {response.json()}")
         except:
             print(f"BODY: {response.text}")
         print("")
-    
+
     async def get(self, path: str, **kwargs) -> httpx.Response:
         """Make authenticated GET request."""
         self._log_request("GET", path, kwargs)
@@ -247,7 +245,7 @@ class AuthenticatedAPIClient:
         )
         self._log_response(response)
         return response
-    
+
     async def post(self, path: str, **kwargs) -> httpx.Response:
         """Make authenticated POST request."""
         self._log_request("POST", path, kwargs)
@@ -258,7 +256,7 @@ class AuthenticatedAPIClient:
         )
         self._log_response(response)
         return response
-    
+
     async def delete(self, path: str, **kwargs) -> httpx.Response:
         """Make authenticated DELETE request."""
         self._log_request("DELETE", path, kwargs)
@@ -269,7 +267,7 @@ class AuthenticatedAPIClient:
         )
         self._log_response(response)
         return response
-    
+
     async def stream(self, method: str, path: str, **kwargs):
         """Make streaming request."""
         self._log_request(method, path, kwargs)
@@ -333,11 +331,11 @@ def llm_provider():
     Uses nvidia/nemotron-3-nano-30b-a3b:free model.
     """
     from shared.llm.openrouter import OpenRouterProvider
-    
+
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
         pytest.skip("OPENROUTER_API_KEY not set")
-    
+
     return OpenRouterProvider(api_key=api_key)
 
 
@@ -347,7 +345,6 @@ def llm_provider():
 
 import subprocess
 import time
-import signal
 
 # =============================================================================
 # Service Lifecycle Management
@@ -366,7 +363,7 @@ async def wait_for_service(url: str, name: str, timeout: int = 30) -> bool:
         except Exception:
             pass
         await asyncio.sleep(0.5)
-        
+
     logging.error(f"❌ {name} failed to start at {url} within {timeout}s")
     return False
 
@@ -389,14 +386,14 @@ async def bootstrap_services():
     if not (api_ok and orch_ok and rag_ok):
         logging.info("🚀 Bootstrapping Microservices (Subprocesses)...")
         env = os.environ.copy()
-        
+
         # Ensure Critical Env Vars
         if not env.get("DATABASE_URL"):
              logging.warning("⚠️ DATABASE_URL not set! Services might fail.")
-        
+
         # Paths are relative to project root (cwd)
         # We assume pytest is run from project root
-        
+
         # Start RAG Service (Port 8001)
         if not rag_ok:
             logging.info("   Starting RAG Service...")
@@ -406,7 +403,7 @@ async def bootstrap_services():
                 cwd=os.getcwd()
             )
             procs.append(p_rag)
-        
+
         # Start Orchestrator (Port 8002 / 8000?)
         # Note: conftest says 8000, plan says 8002. Let's trust env or standard.
         # Docker compose says 8002 internal, mapped to 8002.
@@ -433,23 +430,23 @@ async def bootstrap_services():
                 cwd=os.getcwd()
             )
             procs.append(p_api)
-            
+
         # 3. Wait for startup
         logging.info("⏳ Waiting for services to come online...")
         # Give them a moment to crash or bind
-        await asyncio.sleep(5) 
-        
+        await asyncio.sleep(5)
+
         ready = await asyncio.gather(
             wait_for_service(RAG_URL, "RAG Service"),
             wait_for_service(ORCHESTRATOR_URL, "Orchestrator"),
             wait_for_service(API_GATEWAY_URL, "API Gateway")
         )
-        
+
         if not all(ready):
             logging.error("❌ Failed to verify all services. Tearing down...")
             for p in procs:
                 p.terminate()
-            pytest.fail("Could not bootstrap Kea microservices.")
+            pytest.fail("Could not bootstrap Project microservices.")
 
     yield {"api_gateway": True, "custom_procs": len(procs) > 0}
 
@@ -507,7 +504,7 @@ def query_ids(request):
     3. Default to Query 1
     """
     import os
-    
+
     # Priority 1: Environment variable (most reliable for Colab/Kaggle)
     env_query = os.getenv("STRESS_TEST_QUERY")
     if env_query:
@@ -516,11 +513,11 @@ def query_ids(request):
             return [int(q.strip()) for q in env_query.split(",")]
         else:
             return [env_query]
-    
-    # Priority 2: Command line argument  
+
+    # Priority 2: Command line argument
     query_arg = request.config.getoption("--query", default=None)
     print(f"DEBUG: --query arg = {query_arg!r}")
-    
+
     if query_arg:
         # Check if it looks like numeric ID(s)
         if query_arg.replace(",", "").replace(" ", "").isdigit():
@@ -528,7 +525,7 @@ def query_ids(request):
         else:
             # It's a custom query string
             return [query_arg]  # Return as single-item list of string
-    
+
     return [1]  # Default to Query 1 (Indonesian Alpha Hunt)
 
 
@@ -540,7 +537,7 @@ def query_ids(request):
 async def cleanup_after_test():
     """Cleanup resources after each test."""
     yield
-    
+
     # Force garbage collection
     import gc
     gc.collect()
@@ -557,9 +554,12 @@ def setup_stress_test_environment(monkeypatch, request):
     """
     # Enable stress test mode
     monkeypatch.setenv("STRESS_TEST_MODE", "1")
-    
+
     # Set rate limiting
     monkeypatch.setenv("LLM_RATE_LIMIT_SECONDS", "3")
+
+    # Disable tokenizers parallelism to avoid warnings/deadlocks on fork
+    monkeypatch.setenv("TOKENIZERS_PARALLELISM", "false")
 
     # Check for verbosity (mapped to -v flag)
     # Note: request.config.getoption("verbose") returns int (0, 1, 2...)

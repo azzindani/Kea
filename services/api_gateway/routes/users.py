@@ -9,13 +9,14 @@ from __future__ import annotations
 from typing import Optional, List
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.users import User, UserRole
 from shared.users.manager import get_user_manager, get_api_key_manager
 from services.api_gateway.middleware.auth import get_current_user_required, require_role
+from shared.config import get_settings
 
 
 logger = get_logger(__name__)
@@ -36,7 +37,7 @@ class CreateAPIKeyRequest(BaseModel):
     """Create API key request."""
     name: str = Field(..., min_length=1, max_length=255)
     scopes: Optional[List[str]] = None
-    rate_limit: Optional[int] = Field(None, ge=1, le=10000)
+    rate_limit: Optional[int] = Field(None, ge=1, le=get_settings().auth.api_key_max_rate_limit)
 
 
 class APIKeyResponse(BaseModel):
@@ -157,7 +158,7 @@ async def create_api_key(
         user_id=user.user_id,
         name=request.name,
         scopes=request.scopes,
-        rate_limit=request.rate_limit or 1000,
+        rate_limit=request.rate_limit or get_settings().auth.api_key_default_rate_limit,
     )
     
     logger.info(f"Created API key for user {user.user_id}: {api_key.key_prefix}...")
@@ -203,7 +204,7 @@ async def revoke_api_key(
     dependencies=[Depends(require_role(UserRole.ADMIN))],
 )
 async def list_users(
-    limit: int = 100,
+    limit: int = Query(get_settings().users.default_list_limit, ge=1, le=get_settings().users.max_list_limit),
     offset: int = 0,
 ):
     """List all users (admin only)."""

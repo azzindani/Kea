@@ -1,7 +1,7 @@
 # 🔌 Ddg Search Server
 
 The `ddg_search_server` is an MCP server providing tools for **Ddg Search Server** functionality.
-It is designed to be used within the Kea ecosystem.
+It is designed to be used within the Project ecosystem.
 
 ## 🧰 Tools
 

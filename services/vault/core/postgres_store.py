@@ -15,7 +15,8 @@ import asyncpg
 from pgvector.asyncpg import register_vector
 
 from services.vault.core.vector_store import VectorStore, Document, SearchResult
-from shared.logging import get_logger
+from shared.logging.main import get_logger
+from shared.database.connection import get_db_pool
 
 logger = get_logger(__name__)
 
@@ -31,7 +32,7 @@ class PostgresVectorStore(VectorStore):
     
     def __init__(
         self,
-        table_name: str = "research_facts",
+        table_name: str = "system_insights",
         embedding_dim: int = 1024,  # Qwen3 default
         use_local_embedding: bool = False,
         use_vl_model: bool = False,
@@ -40,56 +41,44 @@ class PostgresVectorStore(VectorStore):
         self.embedding_dim = embedding_dim
         self.use_local_embedding = use_local_embedding
         self.use_vl_model = use_vl_model
-        self._pool: asyncpg.Pool | None = None
+        self._initialized = False
         self._embedding_provider = None
         self._reranker = None
-        self._db_url = os.getenv("DATABASE_URL")
-        
-        if not self._db_url:
-            raise ValueError("DATABASE_URL environment variable is required for PostgresVectorStore")
 
-    async def _get_pool(self) -> asyncpg.Pool:
-        """Get or create connection pool."""
-        if self._pool is None:
-            # Create connection pool with limits to prevent exhaustion
-            # PostgreSQL default max_connections is 100, so we limit each component
-            self._pool = await asyncpg.create_pool(
-                self._db_url,
-                min_size=1,
-                max_size=10,  # Limit connections per component
-            )
+    async def _ensure_schema(self, pool: asyncpg.Pool):
+        """Ensure database schema and vector extension exist."""
+        if self._initialized:
+            return
             
-            # Initialize DB schema
-            async with self._pool.acquire() as conn:
-                # Enable vector extension
-                await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
-                
-                # Register vector type for this connection
-                await register_vector(conn)
-                
-                # Create table if not exists
-                # Using JSONB for metadata to be schema-less like Qdrant
+        async with pool.acquire() as conn:
+            # Enable vector extension
+            await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
+            
+            # Register vector type for this connection
+            await register_vector(conn)
+            
+            # Create table if not exists
+            # Using JSONB for metadata to be schema-less like Qdrant
+            await conn.execute(f"""
+                CREATE TABLE IF NOT EXISTS {self.table_name} (
+                    id TEXT PRIMARY KEY,
+                    content TEXT,
+                    metadata JSONB,
+                    embedding vector({self.embedding_dim})
+                )
+            """)
+            
+            # Create HNSW index for faster search (optional but recommended for production)
+            try:
                 await conn.execute(f"""
-                    CREATE TABLE IF NOT EXISTS {self.table_name} (
-                        id TEXT PRIMARY KEY,
-                        content TEXT,
-                        metadata JSONB,
-                        embedding vector({self.embedding_dim})
-                    )
+                    CREATE INDEX IF NOT EXISTS {self.table_name}_embedding_idx 
+                    ON {self.table_name} 
+                    USING hnsw (embedding vector_cosine_ops)
                 """)
-                
-                # Create HNSW index for faster search (optional but recommended for production)
-                # Note: index creation might fail if table is empty or small, so we wrap it
-                try:
-                    await conn.execute(f"""
-                        CREATE INDEX IF NOT EXISTS {self.table_name}_embedding_idx 
-                        ON {self.table_name} 
-                        USING hnsw (embedding vector_cosine_ops)
-                    """)
-                except Exception as e:
-                    logger.warning(f"Failed to create HNSW index (might be harmless if empty): {e}")
-
-        return self._pool
+            except Exception as e:
+                logger.warning(f"Failed to create HNSW index (might be harmless if empty): {e}")
+        
+        self._initialized = True
 
     async def _get_embedding(self, text: str) -> list[float]:
         """Get embedding for text using Qwen3 embedding provider."""
@@ -126,7 +115,8 @@ class PostgresVectorStore(VectorStore):
 
     async def add(self, documents: list[Document]) -> list[str]:
         """Add documents to Postgres."""
-        pool = await self._get_pool()
+        pool = await get_db_pool()
+        await self._ensure_schema(pool)
         
         # Prepare data
         rows = []
@@ -164,7 +154,8 @@ class PostgresVectorStore(VectorStore):
         enable_reranking: bool = True,
     ) -> list[SearchResult]:
         """Search for similar documents with optional reranking."""
-        pool = await self._get_pool()
+        pool = await get_db_pool()
+        await self._ensure_schema(pool)
         query_embedding = await self._get_embedding(query)
         
         # Double the limit if reranking to get a candidate pool
@@ -257,7 +248,8 @@ class PostgresVectorStore(VectorStore):
 
     async def get(self, ids: list[str]) -> list[Document]:
         """Get documents by ID."""
-        pool = await self._get_pool()
+        pool = await get_db_pool()
+        await self._ensure_schema(pool)
         
         async with pool.acquire() as conn:
             await register_vector(conn)
@@ -278,7 +270,8 @@ class PostgresVectorStore(VectorStore):
 
     async def delete(self, ids: list[str]) -> None:
         """Delete documents by ID."""
-        pool = await self._get_pool()
+        pool = await get_db_pool()
+        await self._ensure_schema(pool)
         
         async with pool.acquire() as conn:
             await conn.execute(f"""

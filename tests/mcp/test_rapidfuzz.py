@@ -1,8 +1,10 @@
+
 import pytest
-import asyncio
 from mcp import ClientSession
 from mcp.client.stdio import stdio_client
+
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_rapidfuzz_real_simulation():
@@ -10,16 +12,16 @@ async def test_rapidfuzz_real_simulation():
     REAL SIMULATION: Verify RapidFuzz Server (String Matching).
     """
     params = get_server_params("rapidfuzz_server", extra_dependencies=["rapidfuzz", "pandas", "numpy"])
-    
+
     choices = ["Apple Inc.", "Apple Corp", "Application", "Banana"]
     query = "Apple"
-    
-    print(f"\n--- Starting Real-World Simulation: RapidFuzz Server ---")
-    
+
+    print("\n--- Starting Real-World Simulation: RapidFuzz Server ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. Simple Ratio
             print("1. Calculating Ratio...")
             res = await session.call_tool("ratio", arguments={"s1": "fuzzy", "s2": "wuzzy"})

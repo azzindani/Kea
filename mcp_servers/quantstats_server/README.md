@@ -1,7 +1,7 @@
 # 🔌 Quantstats Server
 
 The `quantstats_server` is an MCP server providing tools for **Quantstats Server** functionality.
-It is designed to be used within the Kea ecosystem.
+It is designed to be used within the Project ecosystem.
 
 ## 🧰 Tools
 

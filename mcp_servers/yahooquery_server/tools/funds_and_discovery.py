@@ -2,7 +2,7 @@
 from yahooquery import search
 from mcp_servers.yahooquery_server.tools.ticker import SmartTicker
 from shared.mcp.protocol import ToolResult, TextContent
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 import pandas as pd
 import json
 

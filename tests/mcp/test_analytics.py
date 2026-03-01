@@ -1,8 +1,10 @@
+
 import pytest
-import asyncio
-from tests.mcp.client_utils import SafeClientSession as ClientSession
 from mcp.client.stdio import stdio_client
+
+from tests.mcp.client_utils import SafeClientSession as ClientSession
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_analytics_real_simulation():
@@ -10,21 +12,21 @@ async def test_analytics_real_simulation():
     REAL SIMULATION: Verify Analytics Server using real datasets.
     """
     params = get_server_params("analytics_server", extra_dependencies=["pandas", "numpy", "scipy"])
-    
-    print(f"\n--- Starting Real-World Simulation: Analytics Server ---")
-    
+
+    print("\n--- Starting Real-World Simulation: Analytics Server ---")
+
     # Use a real public CSV from GitHub (Seaborn data - Iris)
     data_url = "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv"
-    
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. Discover
             tools_res = await session.list_tools()
             tool_names = [t.name for t in tools_res.tools]
             print(f"Discovered {len(tool_names)} tools")
-            
+
             # 2. EDA Auto
             if "eda_auto" in tool_names:
                 print(f"1. Testing EDA Auto ({data_url})...")
@@ -33,7 +35,7 @@ async def test_analytics_real_simulation():
                     print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
                 else:
                     print(f" \033[92m[PASS]\033[0m Report generated ({len(res.content[0].text)} chars)")
-            
+
             # 3. Data Profiler
             if "data_profiler" in tool_names:
                 print("2. Testing Data Profiler...")
@@ -59,10 +61,10 @@ async def test_analytics_real_simulation():
                 # We need to filter data first? Or just run on whole?
                 # The tool takes column1, column2, or group_column.
                 res = await session.call_tool("statistical_test", arguments={
-                    "data_url": data_url, 
+                    "data_url": data_url,
                     "test_type": "ttest",
                     "column1": "sepal_length",
-                    "group_column": "species" 
+                    "group_column": "species"
                 })
                 if not res.isError:
                     print(f" \033[92m[PASS]\033[0m T-Test Result: {res.content[0].text[:1000]}...")
@@ -88,13 +90,13 @@ async def test_analytics_real_simulation():
                 # Operations format depends on implementation, passing empty to see help or no-op
                 res = await session.call_tool("feature_engineer", arguments={
                     "data_url": data_url,
-                    "operations": ["log_transform:sepal_width"] 
+                    "operations": ["log_transform:sepal_width"]
                 })
                 if not res.isError:
                     print(f" \033[92m[PASS]\033[0m Engineered summary: {res.content[0].text[:1000]}...")
                 else:
                     # Might fail if op not supported, strict check later
-                    print(f" [WARN/FAIL] {res.content[0].text}") 
+                    print(f" [WARN/FAIL] {res.content[0].text}")
 
     print("--- Analytics Simulation Complete ---")
 

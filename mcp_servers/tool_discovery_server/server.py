@@ -29,8 +29,8 @@ from typing import List, Optional
 logger = structlog.get_logger()
 
 # Create the FastMCP server
-from shared.logging import setup_logging
-setup_logging()
+from shared.logging.main import setup_logging
+setup_logging(force_stderr=True)
 
 mcp = FastMCP("tool_discovery_server", dependencies=["httpx"])
 
@@ -133,14 +133,14 @@ async def check_compatibility(package_name: str, check_deps: bool = True) -> str
     return await run_op(analysis.check_compatibility, package_name=package_name, check_deps=check_deps)
 
 @mcp.tool()
-async def suggest_tools(research_domain: str, task_type: str = "") -> str:
+async def suggest_tools(task_domain: str, task_type: str = "") -> str:
     """SUGGESTS tools. [ACTION]
     
     [RAG Context]
-    Suggest tools based on research needs (finance, medical, legal, social).
+    Suggest tools based on system needs (finance, medical, legal, social).
     Returns tool suggestions.
     """
-    return await run_op(analysis.suggest_tools, research_domain=research_domain, task_type=task_type)
+    return await run_op(analysis.suggest_tools, task_domain=task_domain, task_type=task_type)
 
 # --- REGISTRY TOOLS ---
 @mcp.tool()
@@ -191,3 +191,4 @@ class ToolDiscoveryServer:
         if hasattr(self.mcp, '_tool_manager') and hasattr(self.mcp._tool_manager, '_tools'):
              return list(self.mcp._tool_manager._tools.values())
         return []
+

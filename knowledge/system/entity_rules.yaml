@@ -1,0 +1,59 @@
+# Entity Recognition Knowledge Rules
+# Used by Tier 1 (Entity Recognition) as anchors and fallback heuristics.
+
+settings:
+  preferred_nlp_model: "en_core_web_sm"  # options: en_core_web_sm, en_core_web_md, en_core_web_lg
+  fallback_nlp_model: "en_core_web_sm"
+
+structured_patterns:
+  EMAIL: "\\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}\\b"
+  IP_ADDRESS: "\\b\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\b"
+  URL: "https?://[^\\s<>\"']+"
+  FILE_PATH: "(?:/[\\w.-]+)+/?|\\b[A-Z]:\\\\(?:[\\w.-]+\\\\?)+"
+  MONETARY: "\\$[\\d,]+(?:\\.\\d{2})?|\\b\\d+(?:,\\d{3})*(?:\\.\\d{2})?\\s*(?:USD|EUR|GBP)\\b"
+  PERCENTAGE: "\\b\\d+(?:\\.\\d+)?%\\b"
+  DATE: "\\b\\d{4}-\\d{2}-\\d{2}\\b|\\b\\d{1,2}/\\d{1,2}/\\d{2,4}\\b|\\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\w*\\s+\\d{1,2},?\\s*\\d{4}\\b"
+  PHONE: "\\+?\\d{1,3}[-.\\s]?\\(?\\d{1,4}\\)?[-.\\s]?\\d{1,4}[-.\\s]?\\d{1,9}"
+  NUMBER: "\\b\\d+(?:\\.\\d+)?\\b"
+
+linguistic_anchors:
+  determiners: ["the", "a", "an", "this", "that", "these", "those", "my", "your", "his", "her", "its"]
+  prepositions: ["in", "on", "at", "to", "for", "with", "from", "by", "of", "about", "into", "through"]
+  pronouns: ["i", "you", "he", "she", "it", "we", "they", "me", "him", "us", "them"]
+  conjunctions: ["and", "or", "but", "nor", "so", "yet"]
+  common_verbs:
+    - "is"
+    - "are"
+    - "was"
+    - "were"
+    - "be"
+    - "been"
+    - "have"
+    - "has"
+    - "had"
+    - "do"
+    - "does"
+    - "did"
+    - "will"
+    - "would"
+    - "could"
+    - "should"
+    - "can"
+    - "shall"
+    - "must"
+    - "get"
+    - "got"
+    - "make"
+    - "go"
+    - "come"
+    - "take"
+    - "give"
+    - "send"
+    - "create"
+    - "delete"
+    - "update"
+    - "find"
+    - "search"
+    - "run"
+    - "start"
+    - "stop"

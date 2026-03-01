@@ -11,10 +11,11 @@ from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 from shared.users import User
 from shared.conversations import get_conversation_manager, MessageRole
 from services.api_gateway.middleware.auth import get_current_user, get_current_user_required
+from shared.config import get_settings
 
 
 logger = get_logger(__name__)
@@ -68,7 +69,7 @@ class MessageResponse(BaseModel):
     created_at: str
     intent: Optional[str] = None
     attachments: List[str] = []
-    sources: List[dict] = []
+    origins: List[dict] = []
 
 
 class ConversationListResponse(BaseModel):
@@ -90,7 +91,7 @@ class MessageListResponse(BaseModel):
 @router.get("", response_model=ConversationListResponse)
 async def list_conversations(
     include_archived: bool = Query(False),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(get_settings().conversations.default_limit, ge=1, le=get_settings().conversations.max_limit),
     offset: int = Query(0, ge=0),
     user: User = Depends(get_current_user_required),
 ):
@@ -125,7 +126,7 @@ async def list_conversations(
 @router.get("/search")
 async def search_conversations(
     q: str = Query(..., min_length=1),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(get_settings().conversations.search_limit, ge=1, le=get_settings().conversations.max_limit),
     user: User = Depends(get_current_user_required),
 ):
     """Search conversations by title or content."""
@@ -193,10 +194,16 @@ async def get_conversation(
     conv = await manager.get_conversation(conversation_id)
     
     if not conv:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+        raise HTTPException(
+            status_code=get_settings().status_codes.not_found, 
+            detail="Conversation not found"
+        )
     
     if conv.user_id != user.user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise HTTPException(
+            status_code=get_settings().status_codes.forbidden, 
+            detail="Access denied"
+        )
     
     messages = await manager.get_messages(conversation_id)
     
@@ -220,7 +227,7 @@ async def get_conversation(
                 created_at=m.created_at.isoformat(),
                 intent=m.intent,
                 attachments=m.attachments,
-                sources=m.sources,
+                origins=m.origins,
             )
             for m in messages
         ],
@@ -239,10 +246,16 @@ async def update_conversation(
     conv = await manager.get_conversation(conversation_id)
     
     if not conv:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+        raise HTTPException(
+            status_code=get_settings().status_codes.not_found, 
+            detail="Conversation not found"
+        )
     
     if conv.user_id != user.user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise HTTPException(
+            status_code=get_settings().status_codes.forbidden, 
+            detail="Access denied"
+        )
     
     updates = {}
     if request.title is not None:
@@ -280,10 +293,16 @@ async def delete_conversation(
     conv = await manager.get_conversation(conversation_id)
     
     if not conv:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+        raise HTTPException(
+            status_code=get_settings().status_codes.not_found, 
+            detail="Conversation not found"
+        )
     
     if conv.user_id != user.user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise HTTPException(
+            status_code=get_settings().status_codes.forbidden, 
+            detail="Access denied"
+        )
     
     await manager.delete_conversation(conversation_id, user_id=user.user_id)
     
@@ -293,7 +312,7 @@ async def delete_conversation(
 @router.get("/{conversation_id}/messages", response_model=MessageListResponse)
 async def get_messages(
     conversation_id: str,
-    limit: int = Query(100, ge=1, le=500),
+    limit: int = Query(get_settings().conversations.message_limit, ge=1, le=get_settings().conversations.message_max_limit),
     user: User = Depends(get_current_user_required),
 ):
     """Get messages from conversation."""
@@ -302,10 +321,16 @@ async def get_messages(
     conv = await manager.get_conversation(conversation_id)
     
     if not conv:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+        raise HTTPException(
+            status_code=get_settings().status_codes.not_found, 
+            detail="Conversation not found"
+        )
     
     if conv.user_id != user.user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise HTTPException(
+            status_code=get_settings().status_codes.forbidden, 
+            detail="Access denied"
+        )
     
     messages = await manager.get_messages(conversation_id, limit=limit)
     
@@ -319,7 +344,7 @@ async def get_messages(
                 created_at=m.created_at.isoformat(),
                 intent=m.intent,
                 attachments=m.attachments,
-                sources=m.sources,
+                origins=m.origins,
             )
             for m in messages
         ],
@@ -336,21 +361,27 @@ async def send_message(
     """
     Send message in conversation.
     
-    This triggers the research pipeline with:
-    - Query classification (casual/utility/research)
+    This triggers the system pipeline with:
+    - Query classification (casual/utility/system)
     - Context caching
-    - Research graph execution
-    - Sources storage
+    - System graph execution
+    - Origins storage
     """
     manager = await get_conversation_manager()
     
     conv = await manager.get_conversation(conversation_id)
     
     if not conv:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+        raise HTTPException(
+            status_code=get_settings().status_codes.not_found, 
+            detail="Conversation not found"
+        )
     
     if conv.user_id != user.user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise HTTPException(
+            status_code=get_settings().status_codes.forbidden, 
+            detail="Access denied"
+        )
     
     # Add user message
     user_msg = await manager.add_message(
@@ -362,14 +393,15 @@ async def send_message(
     
     # Auto-update title for first message
     if conv.message_count == 0:
-        title = request.content[:50] + ("..." if len(request.content) > 50 else "")
+        max_title = get_settings().conversations.title_max_length
+        title = request.content[:max_title] + ("..." if len(request.content) > max_title else "")
         await manager.update_conversation(conversation_id, title=title)
     
-    # Run research pipeline
-    # Run research pipeline
+    # Run system pipeline
     try:
+        settings = get_settings()
         # Call Orchestrator Service
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=settings.timeouts.llm_streaming) as client:
             response = await client.post(
                 f"{ORCHESTRATOR_URL}/chat/message",
                 json={
@@ -380,30 +412,29 @@ async def send_message(
                 },
             )
             
-            if response.status_code != 200:
+            if response.status_code != get_settings().status_codes.ok:
                 raise Exception(f"Orchestrator returned {response.status_code}: {response.text}")
                 
             data = response.json()
             
-            # Simple wrapper to match expected 'result' interface
-            class ResearchResult:
+            class AutonomousResult:
                 def __init__(self, d):
                     self.content = d.get("content", "")
-                    self.sources = d.get("sources", [])
+                    self.origins = d.get("origins", [])
                     self.tool_calls = d.get("tool_calls", [])
                     self.confidence = d.get("confidence", 0.0)
-                    self.query_type = d.get("query_type", "research")
+                    self.query_type = d.get("query_type", "autonomous")
                     self.duration_ms = d.get("duration_ms", 0)
                     self.was_cached = d.get("was_cached", False)
             
-            result = ResearchResult(data)
+            result = AutonomousResult(data)
         
-        # Store assistant response with sources
+        # Store assistant response with origins
         assistant_msg = await manager.add_message(
             conversation_id=conversation_id,
             role=MessageRole.ASSISTANT,
             content=result.content,
-            sources=result.sources,
+            origins=result.origins,
             tool_calls=result.tool_calls,
             confidence=result.confidence,
         )
@@ -422,12 +453,12 @@ async def send_message(
                 role=assistant_msg.role.value if hasattr(assistant_msg.role, 'value') else str(assistant_msg.role),
                 content=assistant_msg.content,
                 created_at=assistant_msg.created_at.isoformat(),
-                sources=assistant_msg.sources,
+                origins=assistant_msg.origins,
             ),
             "meta": {
                 "query_type": result.query_type,
                 "confidence": result.confidence,
-                "sources_count": len(result.sources),
+                "origin_count": len(result.origins),
                 "duration_ms": result.duration_ms,
                 "was_cached": result.was_cached,
             },
@@ -435,7 +466,7 @@ async def send_message(
         
     except Exception as e:
         import traceback
-        logger.error(f"Research pipeline error: {e}")
+        logger.error(f"System pipeline error: {e}")
         logger.error(f"Traceback: {traceback.format_exc()}")
         
         # Fallback to simple response

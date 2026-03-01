@@ -11,7 +11,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-from shared.logging import get_logger
+from shared.logging.main import get_logger
+from shared.config import get_settings
 
 
 logger = get_logger(__name__)
@@ -20,21 +21,24 @@ logger = get_logger(__name__)
 @dataclass
 class RateLimitConfig:
     """Rate limiting configuration."""
-    max_per_minute: int = 100
-    window_seconds: float = 60.0
+    max_per_minute: int = field(default_factory=lambda: get_settings().swarm.max_agents_per_minute)
+    window_seconds: float = field(default_factory=lambda: get_settings().swarm.rate_limit_window_seconds)
 
 
 class RateLimiter:
     """Token bucket rate limiter."""
     
-    def __init__(self, max_per_minute: int = 100):
-        self.max_per_minute = max_per_minute
+    def __init__(self, max_per_minute: int | None = None, window_seconds: float | None = None):
+        from shared.config import get_settings
+        settings = get_settings()
+        self.max_per_minute = max_per_minute or settings.swarm.max_agents_per_minute
+        self.window_seconds = window_seconds or settings.swarm.rate_limit_window_seconds
         self._tokens: dict[str, list[float]] = {}
     
     def check(self, key: str) -> bool:
         """Check if request is allowed."""
         now = time.time()
-        window_start = now - 60.0
+        window_start = now - self.window_seconds
         
         if key not in self._tokens:
             self._tokens[key] = []
@@ -52,7 +56,7 @@ class RateLimiter:
     def get_remaining(self, key: str) -> int:
         """Get remaining quota for key."""
         now = time.time()
-        window_start = now - 60.0
+        window_start = now - self.window_seconds
         
         if key not in self._tokens:
             return self.max_per_minute
@@ -81,16 +85,18 @@ class ResourceGuard:
     
     def __init__(
         self,
-        max_agents_per_minute: int = 100,
-        max_memory_percent: float = 85.0,
-        max_tool_calls_per_minute: int = 100,
+        max_agents_per_minute: int | None = None,
+        max_memory_percent: float | None = None,
+        max_tool_calls_per_minute: int | None = None,
     ):
-        self.max_agents_per_minute = max_agents_per_minute
-        self.max_memory_percent = max_memory_percent
-        self.max_tool_calls_per_minute = max_tool_calls_per_minute
+        from shared.config import get_settings
+        settings = get_settings()
+        self.max_agents_per_minute = max_agents_per_minute or settings.swarm.max_agents_per_minute
+        self.max_memory_percent = max_memory_percent or settings.governance.max_ram_percent
+        self.max_tool_calls_per_minute = max_tool_calls_per_minute or settings.swarm.max_tool_calls_per_minute
         
-        self._agent_limiter = RateLimiter(max_agents_per_minute)
-        self._tool_limiter = RateLimiter(max_tool_calls_per_minute)
+        self._agent_limiter = RateLimiter(self.max_agents_per_minute, settings.swarm.rate_limit_window_seconds)
+        self._tool_limiter = RateLimiter(self.max_tool_calls_per_minute, settings.swarm.rate_limit_window_seconds)
         self._active_agents = 0
     
     async def check_can_spawn(self, session_id: str = "default") -> bool:

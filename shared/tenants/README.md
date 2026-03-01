@@ -34,7 +34,7 @@ graph TD
 The `TenantContext` is the primary defense against data leakage in multi-tenant environments. By injecting the `tenant_id` at the outermost edge (API Gateway) and propagating it through all internal calls, the system ensures that queries to the Vector DB or SQL tables are always restricted to the caller's authorized partition.
 
 ### 2. Regulatory Compliance
-Different organizations have different regulatory requirements. The `tenants` module allows Kea to "switch modes". For example, a tenant in the "EU" can have mandatory GDPR data minimization rules applied automatically, while a "US Finance" tenant might prioritize strict SOC2 audit logging.
+Different organizations have different regulatory requirements. The `tenants` module allows Project to "switch modes". For example, a tenant in the "EU" can have mandatory GDPR data minimization rules applied automatically, while a "US Finance" tenant might prioritize strict SOC2 audit logging.
 
 ## 📚 Reference
 

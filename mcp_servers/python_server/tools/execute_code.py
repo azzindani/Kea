@@ -14,7 +14,7 @@ from contextlib import redirect_stdout, redirect_stderr
 from typing import Any
 
 from shared.mcp.protocol import ToolResult, TextContent
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 
 logger = get_logger(__name__)
@@ -51,7 +51,7 @@ async def execute_code_tool(arguments: dict) -> ToolResult:
     import subprocess
     
     # Create isolated temp directory
-    temp_dir = tempfile.mkdtemp(prefix="kea_sandbox_")
+    temp_dir = tempfile.mkdtemp(prefix="project_sandbox_")
     script_path = os.path.join(temp_dir, "script.py")
     
     try:

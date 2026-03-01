@@ -20,8 +20,8 @@ from typing import List, Dict, Any, Optional
 logger = structlog.get_logger()
 
 # Create the FastMCP server
-from shared.logging import setup_logging
-setup_logging()
+from shared.logging.main import setup_logging
+setup_logging(force_stderr=True)
 
 mcp = FastMCP("deep_learning_server", dependencies=["tensorflow", "pandas", "numpy", "scikit-learn", "structlog"])
 
@@ -317,3 +317,4 @@ def app_mobilenet(input_shape: List[int] = (224, 224, 3), include_top: bool = Fa
 if __name__ == "__main__":
 
     mcp.run()
+

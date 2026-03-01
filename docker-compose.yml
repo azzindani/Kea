@@ -17,7 +17,7 @@ services:
       - LOG_LEVEL=DEBUG
       - LOG_FORMAT=json
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - DATABASE_URL=postgresql://user:password@postgres:5432/research_engine
+      - DATABASE_URL=postgresql://user:password@postgres:5432/system_db
     depends_on:
       - postgres
     volumes:
@@ -34,7 +34,7 @@ services:
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - DATABASE_URL=postgresql://user:password@postgres:5432/research_engine
+      - DATABASE_URL=postgresql://user:password@postgres:5432/system_db
     depends_on:
       - postgres
     volumes:
@@ -66,7 +66,7 @@ services:
     environment:
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
-      - DATABASE_URL=postgresql://user:password@postgres:5432/research_engine
+      - DATABASE_URL=postgresql://user:password@postgres:5432/system_db
     depends_on:
       - postgres
     volumes:
@@ -83,7 +83,7 @@ services:
     environment:
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
-      - DATABASE_URL=postgresql://user:password@postgres:5432/research_engine
+      - DATABASE_URL=postgresql://user:password@postgres:5432/system_db
     depends_on:
       - postgres
 
@@ -97,7 +97,7 @@ services:
     environment:
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
-      - DATABASE_URL=postgresql://user:password@postgres:5432/research_engine
+      - DATABASE_URL=postgresql://user:password@postgres:5432/system_db
     depends_on:
       - postgres
 
@@ -111,7 +111,7 @@ services:
     environment:
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
-      - DATABASE_URL=postgresql://user:password@postgres:5432/research_engine
+      - DATABASE_URL=postgresql://user:password@postgres:5432/system_db
     depends_on:
       - postgres
 
@@ -119,19 +119,6 @@ services:
   # Background Workers
   # =========================================================================
 
-  research-worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: worker
-    command: python -m workers.research_worker
-    environment:
-      - ENVIRONMENT=development
-      - LOG_LEVEL=DEBUG
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - DATABASE_URL=postgresql://user:password@postgres:5432/research_engine
-    depends_on:
-      - postgres
 
   # =========================================================================
   # Infrastructure
@@ -142,7 +129,7 @@ services:
     environment:
       - POSTGRES_USER=user
       - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=research_engine
+      - POSTGRES_DB=system_db
     ports:
       - "5432:5432"
     volumes:
@@ -158,7 +145,17 @@ services:
       - "9090:9090"
     volumes:
       - ./configs/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./configs/alerting:/etc/prometheus/alerting
       - prometheus_data:/prometheus
+    depends_on:
+      - alertmanager
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./configs/alertmanager.yml:/etc/alertmanager/alertmanager.yml
 
   grafana:
     image: grafana/grafana:latest
@@ -167,6 +164,9 @@ services:
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     volumes:
+      - ./configs/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+      - ./configs/grafana/dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml
+      - ./configs/grafana/dashboard.json:/etc/grafana/provisioning/dashboards/dashboard.json
       - grafana_data:/var/lib/grafana
 
 volumes:

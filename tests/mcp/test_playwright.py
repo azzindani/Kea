@@ -1,9 +1,12 @@
-import pytest
 import asyncio
 import os
-from tests.mcp.client_utils import SafeClientSession as ClientSession
+
+import pytest
 from mcp.client.stdio import stdio_client
+
+from tests.mcp.client_utils import SafeClientSession as ClientSession
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_playwright_real_simulation():
@@ -11,13 +14,13 @@ async def test_playwright_real_simulation():
     REAL SIMULATION: Verify Playwright Server (Browser Automation).
     """
     params = get_server_params("playwright_server", extra_dependencies=["playwright"])
-    
-    print(f"\n--- Starting Real-World Simulation: Playwright Server ---")
-    
+
+    print("\n--- Starting Real-World Simulation: Playwright Server ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. Install/Launch
             # Skip install to save time, assume installed or rely on launch
             print("1. Launching Browser...")
@@ -25,13 +28,13 @@ async def test_playwright_real_simulation():
             if res.isError:
                 print(f" \033[91m[FAIL]\033[0m {res.content[0].text}")
                 return
-            
+
             # 2. Navigate
             url = "https://example.com"
             print(f"2. Navigating to {url}...")
             res = await session.call_tool("goto_page", arguments={"url": url})
             if not res.isError:
-                 print(f" \033[92m[PASS]\033[0m Navigated")
+                 print(" \033[92m[PASS]\033[0m Navigated")
 
             # 3. Get Title
             print("3. Getting Title...")
@@ -43,7 +46,7 @@ async def test_playwright_real_simulation():
             screenshot_path = "test_screenshot.png"
             res = await session.call_tool("screenshot_page", arguments={"path": screenshot_path})
             if not res.isError:
-                print(f" \033[92m[PASS]\033[0m Screenshot saved")
+                print(" \033[92m[PASS]\033[0m Screenshot saved")
                 if os.path.exists(screenshot_path):
                     os.remove(screenshot_path)
 
@@ -53,7 +56,7 @@ async def test_playwright_real_simulation():
             print("5. Clicking Element...")
             res = await session.call_tool("click_element", arguments={"selector": "a"}) # The 'More information' link
             if not res.isError:
-                 print(f" \033[92m[PASS]\033[0m Clicked link")
+                 print(" \033[92m[PASS]\033[0m Clicked link")
 
             # 6. Cleanup
             print("6. Closing Browser...")

@@ -2,7 +2,7 @@
 from yahooquery import Ticker, search
 import pandas as pd
 from shared.mcp.protocol import ToolResult, TextContent
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 import json
 
 logger = get_logger(__name__)

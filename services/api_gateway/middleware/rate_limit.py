@@ -18,8 +18,8 @@ from typing import Callable
 from fastapi import Request, Response, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from shared.logging import get_logger
-from shared.environment import get_environment_config
+from shared.logging.main import get_logger
+from shared.config import get_settings
 
 
 logger = get_logger(__name__)
@@ -28,28 +28,23 @@ logger = get_logger(__name__)
 @dataclass
 class RateLimitConfig:
     """Rate limit configuration."""
-    requests_per_minute: int = 60
-    requests_per_hour: int = 1000
-    burst_size: int = 10
-    
-    # Exempt paths
-    exempt_paths: list[str] = field(default_factory=lambda: [
-        "/health",
-        "/docs",
-        "/redoc",
-        "/openapi.json",
-        "/metrics",
-    ])
+    requests_per_minute: int = 0
+    requests_per_hour: int = 0
+    burst_size: int = 0
+    exempt_paths: list[str] = field(default_factory=list)
     
     @classmethod
-    def from_environment(cls) -> "RateLimitConfig":
-        """Create config from environment."""
-        env_config = get_environment_config()
+    def from_settings(cls) -> "RateLimitConfig":
+        """Create config from centralized settings."""
+        settings = get_settings()
+        rl = settings.rate_limit
         return cls(
-            requests_per_minute=env_config.rate_limit_per_minute,
-            requests_per_hour=env_config.rate_limit_per_minute * 60,
-            burst_size=min(env_config.rate_limit_per_minute // 2, 20),
+            requests_per_minute=rl.requests_per_minute,
+            requests_per_hour=rl.requests_per_hour,
+            burst_size=rl.burst_size,
+            exempt_paths=rl.exempt_paths,
         )
+    
 
 
 class SlidingWindowCounter:
@@ -192,12 +187,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     
     def __init__(self, app, config: RateLimitConfig = None):
         super().__init__(app)
-        self.config = config or RateLimitConfig.from_environment()
+        settings = get_settings()
+        self.config = config or RateLimitConfig.from_settings()
         self._memory_limiter = SlidingWindowCounter()
         self._postgres_limiter: PostgresRateLimiter | None = None
         
-        env_config = get_environment_config()
-        if env_config.is_production or True:  # Use Postgres everywhere since Redis is gone
+        if settings.rate_limit.enabled:
             self._postgres_limiter = PostgresRateLimiter()
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
@@ -211,17 +206,19 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         key = self._get_key(request)
         
         # Check rate limit
+        settings = get_settings()
+        window = settings.rate_limit.default_window_seconds
         if self._postgres_limiter:
             allowed, remaining = await self._postgres_limiter.is_allowed(
                 key,
                 self.config.requests_per_minute,
-                60,
+                window,
             )
         else:
             allowed, remaining = self._memory_limiter.is_allowed(
                 key,
                 self.config.requests_per_minute,
-                60,
+                window,
             )
         
         if not allowed:
@@ -230,7 +227,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 status_code=429,
                 detail="Rate limit exceeded. Please try again later.",
                 headers={
-                    "Retry-After": "60",
+                    "Retry-After": str(window),
                     "X-RateLimit-Limit": str(self.config.requests_per_minute),
                     "X-RateLimit-Remaining": "0",
                 },
@@ -260,3 +257,4 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             ip = request.client.host if request.client else "unknown"
         
         return f"ip:{ip}"
+

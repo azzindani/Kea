@@ -29,7 +29,7 @@ This command will:
 
 ## 📐 Architecture
 
-Kea treats tools as isolated micro-agents rather than simple function calls.
+Project treats tools as isolated micro-agents rather than simple function calls.
 
 ### 🗼 The Tool Ecosystem
 
@@ -72,13 +72,13 @@ Each server (e.g., `yfinance_server/`) typically follows this structure:
 ## 🧠 Deep Dive
 
 ### 1. JIT "Zero-Config" Spawning
-Unlike traditional tool systems that require complex environment setups, Kea servers are self-contained. When the MCP Host needs the `yfinance_server`, it uses the `shared/tools/jit_loader` to parse the `dependencies` list in `server.py` and spawns a `uv` process that ensures the exact versions of `pandas`, `yfinance`, and `matplotlib` are present.
+Unlike traditional tool systems that require complex environment setups, Project servers are self-contained. When the MCP Host needs the `yfinance_server`, it uses the `shared/tools/jit_loader` to parse the `dependencies` list in `server.py` and spawns a `uv` process that ensures the exact versions of `pandas`, `yfinance`, and `matplotlib` are present.
 
 ### 2. High-Fidelity Scraping (`playwright_server`)
 The `playwright_server` is one of the most complex "Hands." It exposes 20+ tools for navigation, input, and extraction. It supports "Session Persistence," allowing an agent to log into a portal in one turn and continue browsing in the next without losing state.
 
 ### 3. Financial Intelligence Suite
-Kea includes a multi-layered financial stack:
+Project includes a multi-layered financial stack:
 - **`yfinance` / `yahooquery`**: Fundamental data and history.
 - **`finta` / `pandas_ta`**: Technical indicators (RSI, MACD, etc.).
 - **`mibian`**: Black-Scholes and options Greeks.
@@ -149,7 +149,7 @@ You **MUST** use the provided `setup_logging` utility to ensure logs are routed 
 
 ```python
 # In server.py
-from shared.logging import setup_logging
+from shared.logging.main import setup_logging
 setup_logging()  # <--- CALL THIS IMMEDIATELY
 
 mcp = FastMCP("my_server")
@@ -254,7 +254,7 @@ Create a plan that prioritizes:
 
 ### Phase 4: Verification
 1.  **Dependency Check**: Run `uv sync`.
-2.  **Connectivity Test**: Run `pytest tests/mcp/test_server_connectivity.py` to ensure the server works within the Kea ecosystem.
+2.  **Connectivity Test**: Run `pytest tests/mcp/test_server_connectivity.py` to ensure the server works within the Project ecosystem.
 3.  **Real-World Simulation**: Create and run `pytest tests/mcp/test_<server_name>.py` to validate functionality under real conditions.
 
 ---

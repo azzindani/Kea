@@ -3,7 +3,7 @@ import yfinance as yf
 import pandas as pd
 import uuid
 import os
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 logger = get_logger(__name__)
 

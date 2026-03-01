@@ -10,7 +10,7 @@ import asyncio
 from typing import Any
 
 from shared.mcp.protocol import ToolResult, TextContent
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 from mcp_servers.scraper_server.tools.fetch_url import fetch_url_tool
 

@@ -24,8 +24,8 @@ from typing import List, Union, Dict, Any, Optional
 logger = structlog.get_logger()
 
 # Create the FastMCP server
-from shared.logging import setup_logging
-setup_logging()
+from shared.logging.main import setup_logging
+setup_logging(force_stderr=True)
 
 
 mcp = FastMCP("pandas_server", dependencies=["ydata-profiling", "pandas", "numpy", "structlog", "requests"])
@@ -860,3 +860,4 @@ class PandasServer:
         if hasattr(self.mcp, '_tool_manager') and hasattr(self.mcp._tool_manager, '_tools'):
              return list(self.mcp._tool_manager._tools.values())
         return []
+

@@ -1,7 +1,7 @@
 # 🔌 Ffmpeg Server
 
 The `ffmpeg_server` is an MCP server providing tools for **Ffmpeg Server** functionality.
-It is designed to be used within the Kea ecosystem.
+It is designed to be used within the Project ecosystem.
 
 ## 🧰 Tools
 

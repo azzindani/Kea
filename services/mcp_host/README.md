@@ -70,8 +70,8 @@ Kea can discover 1,000+ tools in milliseconds without executing a single file. I
 The MCP Host treats every server as a potential security risk. By running servers via `uv` in isolated environments, it ensures that one tool's dependencies do not corrupt another. Future versions will support Docker-based sandboxing for even tighter isolation.
 
 ### 2. High-Throughput Batching
-For massive research tasks (e.g., "Check status for 50 URLs"), the Host supports **Batch Execution**. This allows the Researcher node to send 50 requests in a single HTTP payload; the Host then parallelizes these across the available process pool, significantly reducing the bottleneck of tool execution.
+For massive system tasks (e.g., "Check status for 50 URLs"), the Host supports **Batch Execution**. This allows the Worker node to send 50 requests in a single HTTP payload; the Host then parallelizes these across the available process pool, significantly reducing the bottleneck of tool execution.
 
 ---
-*The MCP Host provides the physical capabilities that allow Kea's thoughts to become actions.*
+*The MCP Host provides the physical capabilities that allow Project's thoughts to become actions.*
 

@@ -1,13 +1,13 @@
 """
 Hugging Face Dataset Loader.
 
-Streams datasets from Hugging Face Hub and ingests them into the FactStore.
+Streams datasets from Hugging Face Hub and ingests them into the InsightStore.
 """
 import asyncio
-from typing import AsyncGenerator, Any
+from typing import AsyncGenerator
 
-from shared.schemas import AtomicFact
-from shared.logging import get_logger
+from shared.schemas import AtomicInsight
+from shared.logging.main import get_logger
 
 logger = get_logger(__name__)
 
@@ -19,34 +19,41 @@ class DatasetLoader:
             # Disable caching to save disk space for large crawls
             self._datasets.disable_caching()
         except ImportError:
-            logger.error("datasets library not found. Install with `pip install datasets`")
-            raise
+            logger.warning("datasets library not found. Ingestion from Hugging Face Hub will be unavailable.")
+            self._datasets = None
 
     async def stream_dataset(
         self, 
         dataset_name: str, 
         split: str = "train", 
-        max_rows: int = 1000,
+        max_rows: int | None = None,
         mapping: dict[str, str] = None
-    ) -> AsyncGenerator[AtomicFact, None]:
+    ) -> AsyncGenerator[AtomicInsight, None]:
         """
-        Stream a dataset from HF and yield AtomicFacts.
+        Stream a dataset from HF and yield AtomicInsights.
         
         Args:
             dataset_name: HF dataset ID (e.g. "wikipedia")
             split: Dataset split
             max_rows: Limit rows to ingest
-            mapping: Map dataset columns to AtomicFact fields
+            mapping: Map dataset columns to AtomicInsight fields
                      {"text_col": "value", "title_col": "entity", ...}
         """
+        from shared.config import get_settings
+        settings = get_settings()
+        max_rows = max_rows or settings.rag.ingest_max_rows
         # Default mapping if none provided - tries to be smart
         if not mapping:
             mapping = {
                 "text": "value",
                 "content": "value", 
                 "title": "entity",
-                "url": "source_url"
+                "url": "origin_url"
             }
+
+        if not self._datasets:
+            logger.error("Cannot stream dataset: datasets library not installed")
+            return
 
         logger.info(f"Streaming dataset {dataset_name} [{split}] (max: {max_rows})...")
         
@@ -67,22 +74,22 @@ class DatasetLoader:
                 value = str(value)[:2000]
 
                 entity = row.get(mapping.get("entity") or "title", "Unknown Entity")
-                source_url = row.get(mapping.get("source_url") or "url", f"hf://{dataset_name}")
+                origin_url = row.get(mapping.get("origin_url") or "url", f"hf://{dataset_name}")
                 
-                # Create rudimentary fact
+                # Create rudimentary insight
                 # For basic text datasets, the entire text is the "value", 
                 # and the attribute is effectively "content".
-                fact = AtomicFact(
-                    fact_id=f"hf-{dataset_name}-{count}", 
+                insight = AtomicInsight(
+                    insight_id=f"hf-{dataset_name}-{count}", 
                     entity=str(entity)[:100],
                     attribute="content", # Generic attribute for raw text
                     value=value,
-                    source_url=str(source_url),
-                    source_title=f"{dataset_name}",
+                    origin_url=str(origin_url),
+                    origin_title=f"{dataset_name}",
                     confidence_score=1.0 # It's a gold dataset usually
                 )
                 
-                yield fact
+                yield insight
                 count += 1
                 
                 # Yield control to event loop every 10 rows to prevent blocking

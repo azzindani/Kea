@@ -5,15 +5,17 @@ Shared fixtures and helpers for integration tests.
 These tests require running services.
 """
 
-import os
-import pytest
 import httpx
+import pytest
 
+from shared.config import get_settings
 
-# Service URLs
-API_GATEWAY_URL = os.getenv("API_GATEWAY_URL", "http://localhost:8080")
-ORCHESTRATOR_URL = os.getenv("ORCHESTRATOR_URL", "http://localhost:8000")
-RAG_SERVICE_URL = os.getenv("RAG_SERVICE_URL", "http://localhost:8001")
+settings = get_settings()
+
+# Service URLs from central config
+API_GATEWAY_URL = settings.services.gateway
+ORCHESTRATOR_URL = settings.services.orchestrator
+RAG_SERVICE_URL = settings.services.rag_service
 
 # Test user credentials
 TEST_USER_EMAIL = "integration_test@example.com"
@@ -54,31 +56,31 @@ class AuthenticatedClient:
     """
     HTTP client with automatic authentication for integration tests.
     """
-    
+
     def __init__(self, base_url: str = API_GATEWAY_URL):
         self.base_url = base_url
         self.access_token: str | None = None
         self.user_id: str | None = None
         self._client: httpx.AsyncClient | None = None
-    
+
     async def __aenter__(self):
         await self.initialize()
         return self
-    
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.close()
-    
+
     async def initialize(self):
         """Initialize and authenticate."""
         self._client = httpx.AsyncClient(timeout=30.0)
         await self._authenticate()
-    
+
     async def close(self):
         """Close client."""
         if self._client:
             await self._client.aclose()
             self._client = None
-    
+
     async def _authenticate(self):
         """Register or login test user."""
         # Try login first
@@ -94,7 +96,7 @@ class AuthenticatedClient:
                 return
         except Exception:
             pass
-        
+
         # Register if login fails
         response = await self._client.post(
             f"{self.base_url}/api/v1/auth/register",
@@ -112,7 +114,7 @@ class AuthenticatedClient:
             # If auth fails, tests will run without auth (some endpoints don't need it)
             self.access_token = None
             self.user_id = None
-    
+
     @property
     def headers(self) -> dict:
         """Get auth headers."""
@@ -120,19 +122,19 @@ class AuthenticatedClient:
         if self.access_token:
             headers["Authorization"] = f"Bearer {self.access_token}"
         return headers
-    
+
     async def get(self, path: str, **kwargs) -> httpx.Response:
         """Authenticated GET."""
         return await self._client.get(f"{self.base_url}{path}", headers=self.headers, **kwargs)
-    
+
     async def post(self, path: str, **kwargs) -> httpx.Response:
         """Authenticated POST."""
         return await self._client.post(f"{self.base_url}{path}", headers=self.headers, **kwargs)
-    
+
     async def put(self, path: str, **kwargs) -> httpx.Response:
         """Authenticated PUT."""
         return await self._client.put(f"{self.base_url}{path}", headers=self.headers, **kwargs)
-    
+
     async def delete(self, path: str, **kwargs) -> httpx.Response:
         """Authenticated DELETE."""
         return await self._client.delete(f"{self.base_url}{path}", headers=self.headers, **kwargs)
@@ -186,11 +188,11 @@ async def skip_if_service_unavailable(request):
     # Get the test file name
     test_file = request.fspath.basename
     test_class = request.node.parent.name if request.node.parent else ""
-    
+
     # Skip rules based on test file
     if test_file in [
         "test_artifacts_api.py",
-        "test_e2e.py", 
+        "test_e2e.py",
         "test_graph_api.py",
         "test_interventions_api.py",
         "test_jobs_api.py",
@@ -202,7 +204,7 @@ async def skip_if_service_unavailable(request):
         # These require API Gateway
         if not await check_api_gateway():
             pytest.skip(f"API Gateway not running at {API_GATEWAY_URL}")
-    
+
     elif test_file == "test_pipeline.py":
         # Pipeline tests - check based on class name
         if "APIGateway" in test_class:

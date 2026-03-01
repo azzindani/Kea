@@ -11,14 +11,15 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-import os
 from typing import Any
 
 import asyncpg
 from pgvector.asyncpg import register_vector
 
+from shared.database.connection import get_database_pool
+from shared.config import get_settings
 from shared.embedding.qwen3_embedding import create_embedding_provider
-from shared.logging import get_logger
+from shared.logging.main import get_logger
 
 logger = get_logger(__name__)
 
@@ -28,18 +29,31 @@ class PostgresKnowledgeRegistry:
 
     _init_lock: asyncio.Lock | None = None
 
-    def __init__(self, table_name: str = "knowledge_registry") -> None:
-        self.table_name = table_name
-        self.embedder = create_embedding_provider(use_local=True)
-        self._reranker = None
-        self._pool: asyncpg.Pool | None = None
-        self._db_url = os.getenv("DATABASE_URL")
-        self._initialized = False
+    def __init__(
+        self, 
+        table_name: str | None = None,
+        embedding_model: str | None = None,
+        dimension: int | None = None
+    ) -> None:
+        """
+        Initializes the PostgresKnowledgeRegistry.
 
-        if not self._db_url:
-            raise ValueError(
-                "DATABASE_URL environment variable is required for PostgresKnowledgeRegistry"
-            )
+        Args:
+            table_name: The name of the PostgreSQL table to use for knowledge storage.
+            embedding_model: The name of the embedding model to use.
+            dimension: The dimension of the vector column.
+        """
+        settings = get_settings()
+        self.table_name = table_name or settings.knowledge.registry_table
+        self.embedder = create_embedding_provider(
+            model_name=embedding_model or settings.embedding.model_name,
+            use_local=settings.embedding.use_local
+        )
+        self.dimension = dimension or settings.embedding.dimension
+        self._reranker = None
+        self._rerank_lock = asyncio.Lock()
+        self._pool: asyncpg.Pool | None = None
+        self._initialized = False
 
     async def _get_pool(self) -> asyncpg.Pool:
         """Get or create connection pool with thread-safe initialization."""
@@ -49,18 +63,16 @@ class PostgresKnowledgeRegistry:
         if PostgresKnowledgeRegistry._init_lock is None:
             PostgresKnowledgeRegistry._init_lock = asyncio.Lock()
 
-        async with PostgresKnowledgeRegistry._init_lock:
+        lock = PostgresKnowledgeRegistry._init_lock
+        async with lock:
             if self._pool is not None and self._initialized:
                 return self._pool
 
-            self._pool = await asyncpg.create_pool(
-                self._db_url,
-                min_size=1,
-                max_size=10,
-            )
+            self._pool = await get_database_pool()
 
+            settings = get_settings()
             async with self._pool.acquire() as conn:
-                await conn.execute("SELECT pg_advisory_lock(12346)")
+                await conn.execute(f"SELECT pg_advisory_lock({settings.knowledge.advisory_lock_id})")
                 try:
                     await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
                     await register_vector(conn)
@@ -70,14 +82,14 @@ class PostgresKnowledgeRegistry:
                             knowledge_id TEXT PRIMARY KEY,
                             name TEXT NOT NULL,
                             description TEXT NOT NULL,
-                            domain TEXT NOT NULL DEFAULT 'general',
-                            category TEXT NOT NULL DEFAULT 'skill',
+                            domain TEXT NOT NULL DEFAULT '{settings.knowledge.default_domain}',
+                            category TEXT NOT NULL DEFAULT '{settings.knowledge.default_category}',
                             tags TEXT[] DEFAULT ARRAY[]::TEXT[],
                             content TEXT NOT NULL,
                             content_hash TEXT NOT NULL,
                             metadata JSONB DEFAULT '{{}}'::jsonb,
-                            embedding vector(1024),
-                            version TEXT DEFAULT '1.0',
+                            embedding vector({self.dimension}),
+                            version TEXT DEFAULT '{settings.knowledge.default_version}',
                             parent_id TEXT,
                             last_seen TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
                         )
@@ -86,7 +98,7 @@ class PostgresKnowledgeRegistry:
                     # Idempotent schema migration for existing tables
                     # Add version column
                     try:
-                        await conn.execute(f"ALTER TABLE {self.table_name} ADD COLUMN IF NOT EXISTS version TEXT DEFAULT '1.0'")
+                        await conn.execute(f"ALTER TABLE {self.table_name} ADD COLUMN IF NOT EXISTS version TEXT DEFAULT '{settings.knowledge.default_version}'")
                     except Exception:
                         pass # Column exists or other issue
 
@@ -126,7 +138,7 @@ class PostgresKnowledgeRegistry:
                     except Exception:
                         pass
                 finally:
-                    await conn.execute("SELECT pg_advisory_unlock(12346)")
+                    await conn.execute(f"SELECT pg_advisory_unlock({get_settings().knowledge.advisory_lock_id})")
 
             self._initialized = True
 
@@ -187,82 +199,93 @@ class PostgresKnowledgeRegistry:
             logger.info("Knowledge Registry: All items up to date.")
             return 0
 
-        logger.info(f"Knowledge Registry: Embedding {len(updates_needed)} new/modified items...")
+        logger.info(f"Knowledge Registry: Embedding {len(updates_needed)} new/modified items in batches...")
 
-        texts = []
-        for item, _ in updates_needed:
-            embed_text = (
-                f"Knowledge: {item['name']}\n"
-                f"Description: {item['description']}\n"
-                f"Domain: {item['domain']}\n"
-                f"Tags: {', '.join(item.get('tags', []))}\n"
-                f"Content:\n{item['content'][:4000]}"
-            )
-            texts.append(embed_text)
+        # Senior Architect Fix: Chunked Batching to prevent OOM/Timeout on large libraries
+        batch_size = 20
+        logger.info(f"Registry: Syncing {len(updates_needed)} items to table '{self.table_name}' in batches of {batch_size}...")
+        total_updated = 0
+        
+        for i in range(0, len(updates_needed), batch_size):
+            batch = updates_needed[i : i + batch_size]
+            logger.debug(f"Registry: Processing batch {i//batch_size + 1}", offset=i, batch_count=len(batch))
+            batch_texts = []
+            for item, _ in batch:
+                embed_text = (
+                    f"Knowledge: {item['name']}\n"
+                    f"Description: {item['description']}\n"
+                    f"Domain: {item['domain']}\n"
+                    f"Tags: {', '.join(item.get('tags', []))}\n"
+                    f"Content:\n{item['content'][:get_settings().knowledge.embedding_content_limit]}"
+                )
+                batch_texts.append(embed_text)
 
-        max_retries = 3
-        retry_delay = 2.0
+            settings = get_settings()
+            max_retries = settings.database.max_retries
+            retry_delay = settings.database.retry_delay
 
-        for attempt in range(max_retries):
-            try:
-                embeddings = await self.embedder.embed(texts)
+            batch_success = False
+            for attempt in range(max_retries):
+                try:
+                    # 1. Generate embeddings for the batch
+                    embeddings = await self.embedder.embed(batch_texts)
 
-                async with pool.acquire() as conn:
-                    await register_vector(conn)
+                    # 2. Bulk Insert/Upsert in a single transaction
+                    async with pool.acquire() as conn:
+                        async with conn.transaction():
+                            await register_vector(conn)
+                            for j, (item, content_hash) in enumerate(batch):
+                                tags = item.get("tags", [])
+                                metadata = json.dumps(item.get("metadata", {}))
 
-                    for i, (item, content_hash) in enumerate(updates_needed):
-                        tags = item.get("tags", [])
-                        metadata = json.dumps(item.get("metadata", {}))
+                                await conn.execute(
+                                    f"""
+                                    INSERT INTO {self.table_name}
+                                        (knowledge_id, name, description, domain, category,
+                                         tags, content, content_hash, metadata, embedding, version, parent_id)
+                                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12)
+                                    ON CONFLICT (knowledge_id) DO UPDATE SET
+                                        name = EXCLUDED.name,
+                                        description = EXCLUDED.description,
+                                        domain = EXCLUDED.domain,
+                                        category = EXCLUDED.category,
+                                        tags = EXCLUDED.tags,
+                                        content = EXCLUDED.content,
+                                        content_hash = EXCLUDED.content_hash,
+                                        metadata = EXCLUDED.metadata,
+                                        embedding = EXCLUDED.embedding,
+                                        version = EXCLUDED.version,
+                                        last_seen = CURRENT_TIMESTAMP
+                                    """,
+                                    item["knowledge_id"],
+                                    item["name"],
+                                    item["description"],
+                                    item["domain"],
+                                    item.get("category", settings.knowledge.default_category),
+                                    tags,
+                                    item["content"],
+                                    content_hash,
+                                    metadata,
+                                    embeddings[j],
+                                    item.get("version", settings.knowledge.default_version),
+                                    item.get("parent_id"),
+                                )
+                    
+                    total_updated += len(batch)
+                    logger.info(f"Knowledge Registry: Committed batch {i//batch_size + 1} ({len(batch)} items)")
+                    batch_success = True
+                    # Small delay between batches to let memory stabilize
+                    await asyncio.sleep(0.5)
+                    break
 
-                        await conn.execute(
-                            f"""
-                            INSERT INTO {self.table_name}
-                                (knowledge_id, name, description, domain, category,
-                                 tags, content, content_hash, metadata, embedding, version, parent_id)
-                            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12)
-                            ON CONFLICT (knowledge_id) DO UPDATE SET
-                                name = EXCLUDED.name,
-                                description = EXCLUDED.description,
-                                domain = EXCLUDED.domain,
-                                category = EXCLUDED.category,
-                                tags = EXCLUDED.tags,
-                                content = EXCLUDED.content,
-                                content_hash = EXCLUDED.content_hash,
-                                metadata = EXCLUDED.metadata,
-                                embedding = EXCLUDED.embedding,
-                                version = EXCLUDED.version,
-                                parent_id = EXCLUDED.parent_id,
-                                last_seen = CURRENT_TIMESTAMP
-                            """,
-                            item["knowledge_id"],
-                            item["name"],
-                            item["description"],
-                            item["domain"],
-                            item.get("category", "skill"),
-                            tags,
-                            item["content"],
-                            content_hash,
-                            metadata,
-                            embeddings[i],
-                            item.get("version", "1.0"),
-                            item.get("parent_id"),
-                        )
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"Batch sync failed (attempt {attempt+1}/{max_retries}): {e}. Retrying...")
+                        await asyncio.sleep(retry_delay)
+                    else:
+                        logger.error(f"Batch sync permanently failed at offset {i}", error=str(e))
 
-                logger.info(f"Knowledge Registry: Updated {len(updates_needed)} items.")
-                return len(updates_needed)
-
-            except Exception as e:
-                if attempt < max_retries - 1:
-                    logger.warning(
-                        f"Knowledge embedding failed (attempt {attempt + 1}/{max_retries}): "
-                        f"{e}. Retrying in {retry_delay}s..."
-                    )
-                    await asyncio.sleep(retry_delay)
-                    retry_delay *= 2
-                else:
-                    logger.error(f"Knowledge embedding failed after {max_retries} attempts: {e}")
-
-        return 0
+        return total_updated
 
     async def _get_reranker(self):
         """Lazy load reranker (mirrors Vault's postgres_store pattern)."""
@@ -270,13 +293,12 @@ class PostgresKnowledgeRegistry:
             from shared.embedding.qwen3_reranker import create_reranker_provider
 
             self._reranker = create_reranker_provider()
-            self._rerank_lock = asyncio.Lock()
         return self._reranker
 
     async def search(
         self,
         query: str,
-        limit: int = 5,
+        limit: int | None = None,
         domain: str | None = None,
         category: str | None = None,
         tags: list[str] | None = None,
@@ -300,11 +322,14 @@ class PostgresKnowledgeRegistry:
             List of matching knowledge items with similarity scores
         """
         try:
+            settings = get_settings()
+            limit = limit or settings.rag.knowledge_limit
+            
             pool = await self._get_pool()
             query_emb = await self.embedder.embed_query(query)
-
-            # Fetch 5x candidates when reranking (matches Vault pattern)
-            candidate_limit = limit * 5 if enable_reranking else limit
+            
+            # Fetch candidates when reranking
+            candidate_limit = limit * settings.rag.knowledge_candidate_multiplier if enable_reranking else limit
 
             conditions = []
             params: list[Any] = [query_emb]
@@ -361,7 +386,7 @@ class PostgresKnowledgeRegistry:
                             if isinstance(row["metadata"], str)
                             else row["metadata"]
                         ),
-                        "version": row.get("version", "1.0"),
+                        "version": row.get("version", settings.knowledge.default_version),
                         "parent_id": row.get("parent_id"),
                         "similarity": float(row["similarity"]),
                     }
@@ -373,7 +398,8 @@ class PostgresKnowledgeRegistry:
                 try:
                     reranker = await self._get_reranker()
                     # Use content (truncated) for reranking — same field used for embedding
-                    docs = [r["content"][:4000] for r in initial_results]
+                    limit_chars = get_settings().knowledge.embedding_content_limit
+                    docs = [r["content"][:limit_chars] for r in initial_results]
                     async with self._rerank_lock:
                         reranked = await reranker.rerank(query, docs, top_k=limit)
 
@@ -426,7 +452,7 @@ class PostgresKnowledgeRegistry:
                         if isinstance(row["metadata"], str)
                         else row["metadata"]
                     ),
-                    "version": row.get("version", "1.0"),
+                    "version": row.get("version", get_settings().knowledge.default_version),
                     "parent_id": row.get("parent_id"),
                 }
         except Exception as e:

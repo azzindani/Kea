@@ -4,21 +4,33 @@ Test Fixtures and Configuration.
 Shared fixtures for all tests.
 """
 
-import pytest
+import asyncio
 import os
 
+import pytest
+
+from shared.config import get_settings
 
 # ============================================================================
 # Pytest Configuration
 # ============================================================================
 
 def pytest_configure(config):
-    """Configure pytest markers."""
+    """Configure pytest markers and silence noisy library warnings."""
     config.addinivalue_line("markers", "unit: Unit tests (no API required)")
     config.addinivalue_line("markers", "integration: Integration tests (API required)")
     config.addinivalue_line("markers", "mcp: MCP tool tests (API required)")
     config.addinivalue_line("markers", "stress: Stress/load tests")
     config.addinivalue_line("markers", "slow: Slow-running tests")
+
+    # Silence noisy 3rd-party library warnings project-wide via pytest API
+    # This is more robust than the standard 'warnings' module for import-time noise.
+    config.addinivalue_line("filterwarnings", "ignore::SyntaxWarning:sqlalchemy.*")
+    config.addinivalue_line("filterwarnings", "ignore::UserWarning:spacy.*")
+    config.addinivalue_line("filterwarnings", "ignore:.*Jupyter notebook detected.*:UserWarning:spacy.*")
+    config.addinivalue_line("filterwarnings", "ignore::DeprecationWarning:httpx.*")
+    config.addinivalue_line("filterwarnings", "ignore::DeprecationWarning:asyncio.*")
+    config.addinivalue_line("filterwarnings", "ignore::DeprecationWarning:pydantic.*")
 
 
 # ============================================================================
@@ -41,19 +53,19 @@ def event_loop():
 @pytest.fixture
 def api_gateway_url():
     """API Gateway base URL."""
-    return os.getenv("API_GATEWAY_URL", "http://localhost:8080")
+    return get_settings().services.gateway
 
 
 @pytest.fixture
 def orchestrator_url():
     """Orchestrator service URL."""
-    return os.getenv("ORCHESTRATOR_URL", "http://localhost:8000")
+    return get_settings().services.orchestrator
 
 
 @pytest.fixture
 def rag_service_url():
     """RAG service URL."""
-    return os.getenv("RAG_SERVICE_URL", "http://localhost:8001")
+    return get_settings().services.rag_service
 
 
 # ============================================================================
@@ -63,9 +75,10 @@ def rag_service_url():
 @pytest.fixture
 def sample_fact():
     """Sample atomic fact for testing."""
-    from shared.schemas import AtomicFact
     from datetime import datetime
-    
+
+    from shared.schemas import AtomicFact
+
     return AtomicFact(
         fact_id="test-fact-001",
         entity="Test Entity",
@@ -122,8 +135,8 @@ def sample_research_state():
 @pytest.fixture
 def mock_tool_result():
     """Mock MCP tool result."""
-    from shared.mcp.protocol import ToolResult, TextContent
-    
+    from shared.mcp.protocol import TextContent, ToolResult
+
     return ToolResult(
         content=[TextContent(text="Mock tool result")],
         isError=False,
@@ -133,8 +146,8 @@ def mock_tool_result():
 @pytest.fixture
 def mock_error_result():
     """Mock MCP error result."""
-    from shared.mcp.protocol import ToolResult, TextContent
-    
+    from shared.mcp.protocol import TextContent, ToolResult
+
     return ToolResult(
         content=[TextContent(text="Error: Test error")],
         isError=True,
@@ -149,7 +162,7 @@ def mock_error_result():
 async def http_client():
     """Async HTTP client for tests."""
     import httpx
-    
+
     async with httpx.AsyncClient(timeout=30) as client:
         yield client
 
@@ -166,7 +179,7 @@ def setup_test_environment(monkeypatch):
     # Set environment to development mode (test mode works but dev is more permissive)
     monkeypatch.setenv("ENVIRONMENT", "development")
     monkeypatch.setenv("TEST_MODE", "1")
-    
+
     # Disable external services that may not be available in test environment
     if not os.getenv("QDRANT_URL"):
         monkeypatch.setenv("QDRANT_URL", "")
@@ -180,11 +193,11 @@ def reset_singleton_managers():
     Reset singleton manager instances between tests to avoid state leakage.
     """
     yield
-    
+
     # Reset singletons after each test
-    import shared.users.manager as user_mgr
     import shared.conversations.manager as conv_mgr
-    
+    import shared.users.manager as user_mgr
+
     user_mgr._user_manager = None
     user_mgr._api_key_manager = None
     conv_mgr._conversation_manager = None
@@ -198,14 +211,14 @@ async def db_session():
     Uses savepoints to rollback after each test.
     """
     from shared.database.connection import get_database_pool
-    
+
     pool = await get_database_pool()
-    
+
     async with pool.acquire() as conn:
         # Start a transaction
         tr = conn.transaction()
         await tr.start()
-        
+
         try:
             yield conn
         finally:
@@ -227,15 +240,16 @@ async def shared_db_pool():
     This creates a single pool for the entire test session,
     avoiding repeated pool creation/destruction overhead.
     """
-    from shared.database.connection import DatabasePool, DatabaseConfig
     import os
-    
+
+    from shared.database.connection import DatabaseConfig, DatabasePool
+
     db_url = os.getenv("DATABASE_URL", "")
     if not db_url:
         # No PostgreSQL configured, skip pool creation
         yield None
         return
-    
+
     config = DatabaseConfig(
         url=db_url,
         min_connections=5,
@@ -243,7 +257,52 @@ async def shared_db_pool():
     )
     pool = DatabasePool(config)
     await pool.initialize()
-    
+
     yield pool
-    
+
     await pool.close()
+
+
+# ============================================================================
+# Inference Kit Fixture
+# ============================================================================
+
+@pytest.fixture(scope="session")
+def inference_kit():
+    """Real InferenceKit with OpenRouter LLM + embedding/reranker.
+
+    If OPENROUTER_API_KEY is unset the LLM slot is None and engines
+    fall back to heuristic logic — tests still pass, they just won't
+    exercise the LLM code paths.
+    """
+    from shared.inference_kit import InferenceKit
+    from shared.llm.provider import LLMConfig
+
+    settings = get_settings()
+
+    # --- LLM Provider ---
+    llm = None
+    llm_config = None
+    try:
+        from shared.llm.openrouter import OpenRouterProvider
+
+        llm = OpenRouterProvider()
+        llm_config = LLMConfig(
+            model=settings.llm.default_model,
+            temperature=settings.llm.temperature,
+            max_tokens=settings.llm.max_tokens,
+        )
+    except (ValueError, Exception):
+        # No API key or import error — LLM unavailable
+        pass
+
+    # --- Embedder (ModelManager facade) ---
+    embedder = None
+    try:
+        from shared.embedding.model_manager import get_model_manager
+
+        embedder = get_model_manager()
+    except Exception:
+        pass
+
+    return InferenceKit(llm=llm, llm_config=llm_config, embedder=embedder)

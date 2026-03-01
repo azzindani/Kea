@@ -8,9 +8,69 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, TypedDict
+from typing import Any
 
 from pydantic import BaseModel, Field
+from shared.config import get_settings
+
+
+class ProblemDetails(BaseModel):
+    """RFC 7807 compliant error envelope."""
+    type: str = Field(default="about:blank", description="URI reference identifying the problem type")
+    title: str = Field(..., description="Short, human-readable summary of the problem")
+    status: int = Field(..., description="HTTP status code for this occurrence")
+    detail: str = Field(..., description="Human-readable explanation specific to this occurrence")
+    instance: str | None = Field(default=None, description="URI reference identifying the specific occurrence")
+    extensions: dict[str, Any] = Field(default_factory=dict, description="Extension members for additional info")
+
+
+class SuccessResponse(BaseModel):
+    """Standardized success response envelope."""
+    status: str = "success"
+    message: str | None = None
+    data: Any | None = None
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+
+class AuditEventType(str, Enum):
+    """Types of auditable events."""
+
+    # Query lifecycle
+    QUERY_RECEIVED = "query_received"
+    QUERY_CLASSIFIED = "query_classified"
+    QUERY_COMPLETED = "query_completed"
+
+    # Tool operations
+    TOOL_CALLED = "tool_called"
+    TOOL_RESULT = "tool_result"
+    TOOL_ERROR = "tool_error"
+
+    # Data operations
+    DATA_ACCESSED = "data_accessed"
+    DATA_MODIFIED = "data_modified"
+    DATA_DELETED = "data_deleted"
+
+    # Decisions
+    DECISION_MADE = "decision_made"
+    DECISION_OVERRIDDEN = "decision_overridden"
+
+    # Human in the loop
+    ESCALATION_CREATED = "escalation_created"
+    ESCALATION_RESOLVED = "escalation_resolved"
+    APPROVAL_REQUESTED = "approval_requested"
+    APPROVAL_GRANTED = "approval_granted"
+    APPROVAL_DENIED = "approval_denied"
+
+    # Security
+    SECURITY_CHECK = "security_check"
+    SECURITY_VIOLATION = "security_violation"
+    ACCESS_DENIED = "access_denied"
+
+    # System
+    SYSTEM_START = "system_start"
+    SYSTEM_STOP = "system_stop"
+    CONFIG_CHANGED = "config_changed"
+    ERROR = "error"
 
 from shared.mcp.protocol import (
     ToolResult, TextContent, ImageContent, 
@@ -18,12 +78,31 @@ from shared.mcp.protocol import (
 )
 
 # ============================================================================
-# Research State
+# Execution State
 # ============================================================================
 
 
-class ResearchStatus(str, Enum):
-    """Research job status."""
+class AtomicInsight(BaseModel):
+    """
+    Atomic Insight (Entity-Attribute-Value).
+    
+    The foundational granular finding for the system.
+    """
+
+    insight_id: str = Field(default="", description="Unique identifier")
+    entity: str = Field(..., description="Subject of the insight")
+    attribute: str = Field(..., description="Property described")
+    value: str = Field(..., description="Measured or stated value")
+    unit: str | None = Field(default=None, description="Units of measurement")
+    period: str | None = Field(default=None, description="Time period applicable")
+    origin_url: str = Field(..., description="Originating URL")
+    origin_title: str = Field(default="", description="Originating document title")
+    confidence_score: float = Field(default_factory=lambda: get_settings().memory.min_confidence, ge=0.0, le=1.0)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class JobStatus(str, Enum):
+    """System job status."""
 
     PENDING = "pending"
     RUNNING = "running"
@@ -32,81 +111,18 @@ class ResearchStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class QueryPath(str, Enum):
-    """Research execution path."""
-
-    MEMORY_FORK = "A"  # Incremental research from memory
-    SHADOW_LAB = "B"  # Recalculation with new assumptions
-    GRAND_SYNTHESIS = "C"  # Meta-analysis across topics
-    DEEP_RESEARCH = "D"  # Zero-shot deep research
-
-
-class ResearchState(BaseModel):
-    """LangGraph state for research flow."""
-
-    job_id: str
-    query: str
-    path: QueryPath = QueryPath.DEEP_RESEARCH
-    status: ResearchStatus = ResearchStatus.PENDING
-
-    # Planning
-    sub_queries: list[str] = Field(default_factory=list)
-    hypotheses: list[str] = Field(default_factory=list)
-
-    # Execution
-    facts: list[AtomicFact] = Field(default_factory=list)
-    sources: list[Source] = Field(default_factory=list)
-    artifacts: list[str] = Field(default_factory=list)  # Artifact IDs
-    tool_invocations: list[dict] = Field(default_factory=list)  # Tool call records
-
-    # Consensus
-    generator_output: str = ""
-    critic_feedback: str = ""
-    judge_verdict: str = ""
-
-    # Output
-    report: str = ""
-    confidence: float = 0.0
-
-    # Metadata
-    iteration: int = 0
-    max_iterations: int = 3
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-    error: str | None = None
-
-
 # ============================================================================
-# Atomic Fact Schema
+# Core Models
 # ============================================================================
 
 
-class AtomicFact(BaseModel):
-    """
-    Atomic fact extracted from research.
-
-    Represents a single, verifiable data point.
-    """
-
-    fact_id: str
-    entity: str  # What/who
-    attribute: str  # What property
-    value: str  # The data
-    unit: str | None = None  # Unit of measurement
-    period: str | None = None  # Time reference
-    source_url: str  # Source URL
-    source_title: str = ""  # Source title
-    confidence_score: float = 0.8  # 0.0 - 1.0
-    extracted_at: datetime = Field(default_factory=datetime.utcnow)
-
-
-class Source(BaseModel):
-    """Research source."""
+class Origin(BaseModel):
+    """Information origin."""
 
     url: str
     title: str
     domain: str
-    accessed_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
     content_hash: str = ""
     reliability_score: float = 0.5
 
@@ -119,43 +135,33 @@ class Source(BaseModel):
 class JobType(str, Enum):
     """Job types."""
 
-    DEEP_RESEARCH = "deep_research"
-    MEMORY_FORK = "memory_fork"
-    SHADOW_LAB = "shadow_lab"
-    GRAND_SYNTHESIS = "grand_synthesis"
-    QUICK_ANSWER = "quick_answer"  # Simple fact-based answers
+    AUTONOMOUS = "autonomous"
+    TASK = "task"
+    INTERACTIVE = "interactive"
 
 
 class JobRequest(BaseModel):
-    """Research job request."""
+    """General task/job request."""
 
     query: str
-    job_type: JobType = JobType.DEEP_RESEARCH
-    depth: int = 2
-    max_sources: int = 10
-    domain_hints: list[str] = Field(default_factory=list)
-
-    # For shadow lab
-    artifact_id: str | None = None
-    recalc_instruction: str | None = None
-
-    # For grand synthesis
-    topic_ids: list[str] | None = None
+    job_type: JobType = JobType.AUTONOMOUS
+    depth: int = Field(default_factory=lambda: get_settings().jobs.default_depth)
+    max_steps: int = Field(default_factory=lambda: get_settings().jobs.default_max_steps)
+    context_hints: list[str] = Field(default_factory=list)
 
 
 class JobResponse(BaseModel):
-    """Research job response."""
+    """General task response."""
 
     job_id: str
-    status: ResearchStatus
+    status: JobStatus
     created_at: datetime
     updated_at: datetime | None = None
     progress: float = 0.0
 
     # Results (when completed)
-    report: str | None = None
-    facts_count: int = 0
-    sources_count: int = 0
+    output: str | None = None
+    steps_count: int = 0
     artifact_ids: list[str] = Field(default_factory=list)
     confidence: float = 0.0
 
@@ -178,68 +184,6 @@ class ToolInvocation(BaseModel):
     is_error: bool = False
     duration_ms: float = 0.0
     invoked_at: datetime = Field(default_factory=datetime.utcnow)
-
-
-class ToolCitation(TypedDict, total=False):
-    """
-    Universal tool call citation record. Works for all MCP servers.
-    The tool call itself (name + args + result) is the evidence — no URL fabrication.
-    source_url is only populated when a URL appears in the actual tool output.
-    """
-
-    tool_name: str  # Exact MCP tool name
-    server_name: str  # MCP server that ran it
-    arguments: dict  # Exact args passed
-    result_preview: str  # First 500 chars of raw output
-    is_error: bool
-    duration_ms: float
-    invoked_at: str  # ISO 8601
-    source_url: str  # URL found IN the output text (empty if none)
-
-
-# ============================================================================
-# Session/Project
-# ============================================================================
-
-
-class SessionManifest(BaseModel):
-    """Research session manifest."""
-
-    session_id: str
-    name: str
-    description: str = ""
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-
-    # Related entities
-    job_ids: list[str] = Field(default_factory=list)
-    fact_ids: list[str] = Field(default_factory=list)
-    artifact_ids: list[str] = Field(default_factory=list)
-
-    # Metadata
-    tags: list[str] = Field(default_factory=list)
-    domain: str = ""
-
-
-# ============================================================================
-# Universal Node Protocol
-# ============================================================================
-
-
-class NodeOutput(BaseModel):
-    """
-    Standardized output from any Node/Tool in the system.
-    Enables n8n-style communication and uniform memory storage.
-    """
-
-    trace_id: str = Field(description="Linking ID (Job ID or Trace ID)")
-    source_node: str = Field(description="Name of the tool/node that produced this")
-    content: dict[str, Any] = Field(description="Structured content (text, data, files)")
-    metadata: dict[str, Any] = Field(default_factory=dict)
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-
-    class Config:
-        extra = "allow"
 
 
 # ============================================================================
@@ -378,7 +322,7 @@ class ToolRequest(BaseModel):
 
 
 class ToolSearchRequest(BaseModel):
-    """Semantic tool search request — used by kernel to discover relevant tools via RAG."""
+    """Semantic tool search request — used to discover relevant tools via RAG."""
 
     query: str = Field(
         ...,
@@ -386,13 +330,13 @@ class ToolSearchRequest(BaseModel):
         description="Natural-language task description for semantic matching",
     )
     limit: int = Field(
-        default=10,
+        default_factory=lambda: get_settings().mcp.max_concurrent_tools,
         ge=1,
         le=50,
         description="Max number of tools to return",
     )
     min_similarity: float = Field(
-        default=0.0,
+        default_factory=lambda: get_settings().mcp.min_similarity,
         ge=0.0,
         le=1.0,
         description="Minimum cosine similarity score (0.0-1.0)",
@@ -453,13 +397,13 @@ class ToolResponse(BaseModel):
         
         # B. Explicit FileRefs
         for c in result.content:
-             if isinstance(c, FileContent):
-                 files_list.append(FileReference(
-                     file_id=__import__("pathlib").Path(c.path).name,
-                     file_type=FileType.BINARY, # Generic fallback
-                     path=c.path,
-                     size_bytes=c.size_bytes
-                 ))
+            if isinstance(c, FileContent):
+                files_list.append(FileReference(
+                    file_id=__import__("pathlib").Path(c.path).name,
+                    file_type=FileType.BINARY, # Generic fallback
+                    path=c.path,
+                    size_bytes=c.size_bytes
+                ))
 
         # 4. Construct Output
         tool_output = ToolOutput(

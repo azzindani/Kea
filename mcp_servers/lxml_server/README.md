@@ -1,7 +1,7 @@
 # 🔌 Lxml Server
 
 The `lxml_server` is an MCP server providing tools for **Lxml Server** functionality.
-It is designed to be used within the Kea ecosystem.
+It is designed to be used within the Project ecosystem.
 
 ## 🧰 Tools
 

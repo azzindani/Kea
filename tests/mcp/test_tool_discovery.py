@@ -1,8 +1,10 @@
+
 import pytest
-import asyncio
 from mcp import ClientSession
 from mcp.client.stdio import stdio_client
+
 from tests.mcp.client_utils import get_server_params
+
 
 @pytest.mark.asyncio
 async def test_tool_discovery_real_simulation():
@@ -10,15 +12,15 @@ async def test_tool_discovery_real_simulation():
     REAL SIMULATION: Verify Tool Discovery Server (PyPI/NPM).
     """
     params = get_server_params("tool_discovery_server", extra_dependencies=["httpx"])
-    
+
     query = "requests"
-    
-    print(f"\n--- Starting Real-World Simulation: Tool Discovery Server ---")
-    
+
+    print("\n--- Starting Real-World Simulation: Tool Discovery Server ---")
+
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. Search PyPI
             print(f"1. Searching PyPI for '{query}'...")
             res = await session.call_tool("search_pypi", arguments={"query": query, "max_results": 3})

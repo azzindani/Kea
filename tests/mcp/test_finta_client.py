@@ -1,9 +1,12 @@
-import pytest
-import asyncio
-import sys
 import os
-from tests.mcp.client_utils import SafeClientSession as ClientSession, StdioServerParameters
+import sys
+
+import pytest
 from mcp.client.stdio import stdio_client
+
+from tests.mcp.client_utils import SafeClientSession as ClientSession
+from tests.mcp.client_utils import StdioServerParameters
+
 
 # Define the server execution command
 def get_server_params():
@@ -19,21 +22,21 @@ def get_server_params():
 @pytest.mark.asyncio
 async def test_finta_tools_dynamic():
     """Verify ALL Finta tools using MCP Client."""
-    
+
     params = get_server_params()
-    
+
     # Connect to the server
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # 1. Discover Tools
             tools_res = await session.list_tools()
             tools = tools_res.tools
             print(f"\nDiscovered {len(tools)} tools via Client.")
-            
+
             assert len(tools) > 50, "Expected >50 tools from Finta"
-            
+
             # 2. Test Tools
             # Dummy Data
             prices = [100, 105, 110, 115, 112, 108, 105, 102, 100, 98, 95, 92, 90, 95, 100]
@@ -44,13 +47,13 @@ async def test_finta_tools_dynamic():
                     "open": p - 2, "high": p + 5, "low": p - 5, "close": p,
                     "volume": 1000 + (i * 100)
                 })
-            
+
             success = 0
             failed = 0
-            
+
             for tool in tools:
                 if tool.name.startswith("get_") and "suite" in tool.name: continue
-                
+
                 print(f"Testing {tool.name}...", end="")
                 try:
                     # Generic call with 'data' argument
@@ -65,6 +68,6 @@ async def test_finta_tools_dynamic():
                 except Exception as e:
                      print(f" [EXCEPTION] {e}")
                      failed += 1
-            
+
             print(f"\nPassed: {success}, Failed: {failed}")
             assert success > 0
