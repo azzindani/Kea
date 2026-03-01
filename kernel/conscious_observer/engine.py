@@ -1037,7 +1037,11 @@ class ConsciousObserver:
             if not pre_exec_result.error and pre_exec_result.signals:
                 approval = pre_exec_result.signals[0].body["data"]
                 if approval.get("decision") == "rejected":
-                    log.warning("❌ Execution blocked by pre-execution guardrails", reasoning=approval.get("reasoning"))
+                    log.warning(
+                        "❌ OODA Pre-execution BLOCKED: Guardrails triggered", 
+                        reasoning=approval.get("reasoning"),
+                        dag_id=active_dag.dag_id
+                    )
                     return ObserverExecuteResult(
                         loop_result=LoopResult(
                             agent_id=gate.identity_context.agent_id,
@@ -1544,7 +1548,13 @@ class ConsciousObserver:
             # Log the FINAL result that will be returned to Tier 8 / User
             # This ensures the 'real output' is visible in logs as requested.
             log.info(
-                f"FINAL OUTPUT [GATE-OUT]: {verdict.content[:500]}...",
+                f"\n{'='*60}\n"
+                f"FINAL MISSION OUTPUT [GATE-OUT]\n"
+                f"Objective: {exec_res.objective or 'unknown'}\n"
+                f"Trace ID: {trace_id}\n"
+                f"{'='*60}\n"
+                f"{verdict.content}\n"
+                f"{'='*60}",
                 output_id=tool_output.output_id,
                 objective=exec_res.objective or "unknown"
             )
