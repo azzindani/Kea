@@ -204,7 +204,8 @@ class ConsoleRenderer:
         try:
             from rich.console import Console
             # force_terminal=True ensures rich outputs ANSI even if piped, keeping colors!
-            self.console = Console(theme=_get_rich_theme(), stderr=True, force_terminal=colors)
+            # width=140 gives it a wide preview format but prevents infinite sliders by forcing a wrap at 140 columns
+            self.console = Console(theme=_get_rich_theme(), stderr=True, force_terminal=colors, width=140)
             self._rich_available = True
         except ImportError:
             self.console = None
@@ -243,8 +244,9 @@ class ConsoleRenderer:
             if level not in LEVEL_SYMBOLS:
                 theme_level = "bold blue"
 
-            # Strict Brackets: [Time] Symbol [Level] [Logger]
-            head = f"\\[[bold blue]{timestamp}[/]] {symbol} \\[[{theme_level}]{level.upper():<8}[/]] \\[[bold magenta]{logger_name:<12}[/]]"
+            # Strict Brackets: [Time] [Level] [Logger] Symbol
+            # (Symbol placed at the end of the block so varying emoji widths never misalign the columns)
+            head = f"\\[[bold blue]{timestamp}[/]] \\[[{theme_level}]{level.upper():<8}[/]] \\[[bold magenta]{logger_name:<12}[/]] {symbol}"
             
             tail = ""
             if flags:
