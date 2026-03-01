@@ -510,12 +510,6 @@ class ConsciousObserver:
             role=spawn_request.role,
         )
         bound_log.info("ConsciousObserver.process started")
-        log.debug(
-            "ConsciousObserver Process Context",
-            objective=spawn_request.objective,
-            identity=gate_in.identity_context.agent_id if 'gate_in' in locals() else spawn_request.role,
-            trace_id=trace_id
-        )
 
         try:
             # If evidence is provided but no context, bridge them so the agent
@@ -529,6 +523,13 @@ class ConsciousObserver:
             gate_in_start = time.perf_counter()
             gate_in = await self._phase_gate_in(raw_input, spawn_request, trace_id)
             gate_in_ms = (time.perf_counter() - gate_in_start) * 1000
+
+            log.debug(
+                "ConsciousObserver Process Context",
+                objective=spawn_request.objective,
+                agent_id=gate_in.identity_context.agent_id,
+                trace_id=trace_id
+            )
 
             bound_log.info(
                 "Gate-In complete",
@@ -984,8 +985,8 @@ class ConsciousObserver:
         log.debug(
             "OODA WorldState: Decomposing goal",
             goal=world_state.goal,
-            obs_count=len(world_state.observations),
-            know_keys=list(world_state.knowledge.keys())
+            context_keys=list(world_state.context.keys()),
+            skills=world_state.available_skills
         )
         decomp_result = await decompose_goal(world_state, self._kit)
         subtasks = _extract_subtasks(decomp_result)
