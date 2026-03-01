@@ -111,7 +111,7 @@ python_classes = "Test*"
 python_functions = "test_*"
 log_cli = true
 log_cli_level = "INFO"
-log_cli_format = "%(asctime)s [%(levelname)s] %(message)s"
+log_cli_format = "%(message)s"
 addopts = "-v --tb=short --strict-markers"
 markers = [
     "unit: Unit tests (fast, no external deps)",

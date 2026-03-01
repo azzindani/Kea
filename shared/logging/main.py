@@ -168,7 +168,7 @@ class ConsoleRenderer:
     def __init__(self, colors: bool = True):
         try:
             from rich.console import Console
-            self.console = Console(theme=_get_rich_theme(), force_terminal=colors, width=10000)
+            self.console = Console(theme=_get_rich_theme(), force_terminal=colors)
             self._rich_available = True
         except ImportError:
             self._rich_available = False
@@ -203,9 +203,18 @@ class ConsoleRenderer:
         markup = f"[log.timestamp]{timestamp}[/] [bold {level_style}]{symbol} {level.upper():<8}[/] [log.logger]{logger_name:<12}[/]{io_hint} {message}{flag_str}"
         
         if self._rich_available:
-            with self.console.capture() as capture:
-                self.console.print(markup, end="")
-            return capture.get()
+            try:
+                from rich.text import Text
+                text = Text.from_markup(markup)
+                ansi = ""
+                for seg in text.render(self.console):
+                    if seg.style:
+                        ansi += seg.style.render(seg.text)
+                    else:
+                        ansi += seg.text
+                return ansi
+            except Exception:
+                pass
         return markup
 
 def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optional[str] = None, force_stderr: bool = True):
