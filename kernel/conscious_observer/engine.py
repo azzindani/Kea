@@ -1303,25 +1303,22 @@ class ConsciousObserver:
                     log.warning("OODA Replan skipped: gate or spawn_request not provided.", trace_id=trace_id)
 
             # Map AgentStatus to DecisionAction for CLM monitoring
-            if agent_status == AgentStatus.ACTIVE:
-                action = DecisionAction.CONTINUE
-            elif agent_status in (AgentStatus.BLOCKED, AgentStatus.PARKED):
-                action = DecisionAction.PARK
-            elif agent_status == AgentStatus.SLEEPING:
-                action = DecisionAction.SLEEP
-            elif agent_status == AgentStatus.TERMINATED:
-                action = DecisionAction.COMPLETE
+            if agent_status == AgentStatus.TERMINATED:
                 termination_reason = LoopTerminationReason.OBJECTIVE_COMPLETE
                 break
+            
+            # Record the actual decision from the cycle for CLM loop/oscillation detection
+            if cycle_result.decision:
+                recent_decisions.append(cycle_result.decision)
             else:
-                action = DecisionAction.CONTINUE
-
-            recent_decisions.append(
-                Decision(
-                    action=action,
-                    reasoning=f"Cycle {cycle_num + 1} monitoring",
+                # Fallback for cycles where decision wasn't captured
+                recent_decisions.append(
+                    Decision(
+                        action=DecisionAction.CONTINUE if agent_status == AgentStatus.ACTIVE else DecisionAction.PARK,
+                        reasoning=f"Cycle {cycle_num + 1} execution",
+                    )
                 )
-            )
+
 
             # T6: Cognitive Load Monitor after every cycle
             active_module_count = 0

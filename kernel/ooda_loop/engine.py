@@ -283,11 +283,16 @@ async def decide(
                         action=DecisionAction.COMPLETE,
                         reasoning="Current DAG fully executed",
                     )
-    # Find next pending nodes to execute
+    # Find next pending nodes to execute. Source of truth is STM snapshot if available.
+    current_statuses = {n.node_id: n.status for n in active_dag.nodes}
+    if snapshot and snapshot.node_statuses:
+        current_statuses.update(snapshot.node_statuses)
+
     pending_nodes = [
-        n.node_id for n in active_dag.nodes
-        if n.status == NodeStatus.PENDING
+        nid for nid, status in current_statuses.items()
+        if status == NodeStatus.PENDING
     ]
+
 
     if pending_nodes:
         # Execute next batch from parallel groups
@@ -501,6 +506,7 @@ async def run_ooda_cycle(
         cycle_number=cycle_num,
         next_action=next_action,
         action_results=action_results,
+        decision=decision,
         state_snapshot=state.model_dump(),
         artifacts_produced=[
             r.node_id for r in action_results if r.success

@@ -757,7 +757,7 @@ class KernelSettings(BaseModel):
     ]
 
     # --- T4: OODA Loop ---
-    ooda_max_cycles: int = 10
+    ooda_max_cycles: int = 20
     ooda_poll_timeout_ms: float = 1000.0
     ooda_tick_interval_ms: float = 50.0
     ooda_blocked_retry_limit: int = 3
@@ -809,7 +809,7 @@ class KernelSettings(BaseModel):
     load_loop_repeat_threshold: int = 3
     load_stall_multiplier: float = 3.0
     load_threshold_simplify: float = 0.6
-    load_threshold_escalate: float = 0.8
+    load_threshold_escalate: float = 0.85
     load_threshold_abort: float = 0.95
     load_goal_drift_threshold: float = 0.1
 
@@ -835,7 +835,7 @@ class KernelSettings(BaseModel):
 
     # --- T7: Conscious Observer (Human Kernel Apex) ---
     conscious_observer_emergency_max_cycles: int = 3
-    conscious_observer_expected_cycle_ms: float = 2000.0
+    conscious_observer_expected_cycle_ms: float = 5000.0
     conscious_observer_simplify_max_steps: int = 2
 
     # --- T7: RAG Integration (Knowledge + Tool Retrieval) ---

@@ -12,9 +12,6 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-# ObservationEvent is defined in short_term_memory and re-exported here
-# so callers can import it from either module.
-from kernel.short_term_memory.types import ObservationEvent as ObservationEvent
 
 # ============================================================================
 # Agent State (the central state object flowing through the loop)
@@ -207,6 +204,7 @@ class CycleResult(BaseModel):
     cycle_number: int = Field(default=0, ge=0)
     next_action: CycleAction = Field(default=CycleAction.CONTINUE)
     action_results: list[ActionResult] = Field(default_factory=list)
+    decision: Decision | None = Field(default=None, description="The decision made during this cycle")
     state_snapshot: dict[str, Any] = Field(
         default_factory=dict,
         description="Agent state at cycle end",
