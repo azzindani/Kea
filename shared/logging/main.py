@@ -318,7 +318,18 @@ def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optiona
         cache_logger_on_first_use=True,
     )
 
-    for lib in ("httpx", "httpcore", "asyncio", "urllib3"):
+    # Suppress noisy framework / infrastructure loggers
+    for lib in (
+        "httpx", "httpcore", "asyncio", "urllib3",
+        # Jupyter / IPython kernel internals
+        "IPKernelApp", "ipykernel", "jupyter_client", "jupyter_core",
+        "traitlets", "tornado", "zmq",
+        # ML framework noise
+        "matplotlib", "PIL", "jax", "absl",
+        "tensorflow", "torch", "torchao",
+        # Misc
+        "pydot", "numexpr", "parso",
+    ):
         logging.getLogger(lib).setLevel(logging.WARNING)
 
 # ============================================================================
