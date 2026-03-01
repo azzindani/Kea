@@ -1010,7 +1010,6 @@ class ConsciousObserver:
                         "id": n.node_id,
                         "type": n.instruction.action_type,
                         "description": n.instruction.description[:50],
-                        "depends_on": n.depends_on,
                         "tool": n.tool_binding,
                         "input_schema": n.input_schema,
                         "output_schema": n.output_schema,
