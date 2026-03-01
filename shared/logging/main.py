@@ -53,14 +53,14 @@ def _get_rich_theme():
     try:
         from rich.theme import Theme
         return Theme({
-            "logging.level.success": "bright_green bold",
-            "logging.level.info": "bright_blue bold",
-            "logging.level.notice": "bright_cyan bold italic",
-            "logging.level.warning": "bright_yellow bold",
-            "logging.level.error": "bright_red bold",
-            "logging.level.critical": "bright_magenta bold",
-            "logging.level.alert": "white on bright_red bold",
-            "logging.level.emergency": "white on bright_red bold blink",
+            "logging.level.success": "bold green",
+            "logging.level.info": "bold blue",
+            "logging.level.notice": "bold cyan italic",
+            "logging.level.warning": "bold yellow",
+            "logging.level.error": "bold red",
+            "logging.level.critical": "bold magenta reverse",
+            "logging.level.alert": "bold red reverse",
+            "logging.level.emergency": "bold red blink reverse",
             "logging.level.debug": "cyan",
             "log.timestamp": "blue",
             "log.logger": "magenta",
@@ -166,16 +166,9 @@ class JSONRPCLog(BaseModel):
 class ConsoleRenderer:
     """Custom structlog renderer for high-end vibrant console output."""
     def __init__(self, colors: bool = True):
-        try:
-            from rich.console import Console
-            self.console = Console(theme=_get_rich_theme(), force_terminal=colors)
-            self._rich_available = True
-        except ImportError:
-            self._rich_available = False
+        self._colors = colors
         
     def __call__(self, logger: Any, method_name: str, event_dict: Dict[str, Any]) -> str:
-        if not self._rich_available:
-            return str(event_dict)  # Basic fallback
         level = method_name.lower()
         symbol = LEVEL_SYMBOLS.get(level, "•")
         timestamp = event_dict.pop("timestamp", datetime.now().strftime("%H:%M:%S"))
@@ -183,39 +176,47 @@ class ConsoleRenderer:
         message = event_dict.pop("event", "")
         
         flags = []
-        for key, value in event_dict.items():
-            if key not in ("level", "timestamp", "logger", "exception", "io", "env", "version"):
-                flags.append(f"[log.key]{key}[/]=[log.value]{value}[/]")
-        
-        flag_str = f" [bold blue]→[/] {' '.join(flags)}" if flags else ""
-        
-        io_hint = ""
-        if "io" in event_dict:
-            io_type = event_dict["io"].get("type", "unknown")
-            io_hint = f" [bold yellow][[IO:{io_type.upper()}]][/]"
-
-        level_style = {
-            "debug": "cyan", "info": "bright_blue", "success": "bright_green", "notice": "bright_cyan italic",
-            "warning": "bright_yellow", "error": "bright_red", "critical": "bright_magenta bold",
-            "alert": "white on bright_red bold", "emergency": "white on bright_red bold blink",
-        }.get(level, "bright_blue")
-        
-        markup = f"[log.timestamp]{timestamp}[/] [bold {level_style}]{symbol} {level.upper():<8}[/] [log.logger]{logger_name:<12}[/]{io_hint} {message}{flag_str}"
-        
-        if self._rich_available:
-            try:
-                from rich.text import Text
-                text = Text.from_markup(markup)
-                ansi = ""
-                for seg in text.render(self.console):
-                    if seg.style:
-                        ansi += seg.style.render(seg.text)
-                    else:
-                        ansi += seg.text
-                return ansi
-            except Exception:
-                pass
-        return markup
+        if self._colors:
+            C_BLUE = "\033[34m"
+            C_MAGA = "\033[35m"
+            C_CYAN = "\033[36m"
+            C_GREEN = "\033[32m"
+            BOLD = "\033[1m"
+            RESET = "\033[0m"
+            
+            level_style = {
+                "debug": C_CYAN,
+                "info": f"{BOLD}{C_BLUE}",
+                "success": f"{BOLD}{C_GREEN}",
+                "notice": f"{BOLD}{C_CYAN}",
+                "warning": f"{BOLD}\033[33m",
+                "error": f"{BOLD}\033[31m",
+                "critical": f"{BOLD}{C_MAGA}",
+                "alert": f"{BOLD}\033[31m",
+                "emergency": f"{BOLD}\033[31m"
+            }.get(level, f"{BOLD}{C_BLUE}")
+            
+            for key, value in event_dict.items():
+                if key not in ("level", "timestamp", "logger", "exception", "io", "env", "version"):
+                    flags.append(f"[{C_CYAN}{key}{RESET}={C_GREEN}{value}{RESET}]")
+            
+            flag_str = f" {BOLD}{C_BLUE}→{RESET} " + " ".join(flags) if flags else ""
+            
+            io_hint = ""
+            if "io" in event_dict:
+                io_type = event_dict["io"].get("type", "unknown")
+                io_hint = f" [{BOLD}\033[33mIO:{io_type.upper()}{RESET}]"
+                
+            return f"[{C_BLUE}{timestamp}{RESET}] [{level_style}{symbol} {level.upper():<8}{RESET}] [{C_MAGA}{logger_name:<12}{RESET}]{io_hint} {message}{flag_str}"
+        else:
+            for key, value in event_dict.items():
+                if key not in ("level", "timestamp", "logger", "exception", "io", "env", "version"):
+                    flags.append(f"[{key}={value}]")
+            flag_str = " → " + " ".join(flags) if flags else ""
+            io_hint = ""
+            if "io" in event_dict:
+                io_hint = f" [IO:{event_dict['io'].get('type', 'unknown').upper()}]"
+            return f"[{timestamp}] [{symbol} {level.upper():<8}] [{logger_name:<12}]{io_hint} {message}{flag_str}"
 
 def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optional[str] = None, force_stderr: bool = True):
     """Standardized logging setup for all codebases."""
