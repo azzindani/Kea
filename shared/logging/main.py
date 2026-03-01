@@ -45,8 +45,8 @@ class LogConfig:
         self.service_name = service_name
 
 LEVEL_SYMBOLS = {
-    "debug": "🔍", "info": "ℹ️ ", "success": "✅", "notice": "🔔",
-    "warning": "⚠️ ", "error": "❌", "critical": "💀", "alert": "🚨", "emergency": "☢️ "
+    "debug": "🔍", "info": "ℹ️", "success": "✅", "notice": "🔔",
+    "warning": "⚠️", "error": "❌", "critical": "💀", "alert": "🚨", "emergency": "☢️"
 }
 
 def _get_rich_theme():
@@ -163,6 +163,39 @@ class JSONRPCLog(BaseModel):
 # 🖥️ Rendering & Configuration
 # ============================================================================
 
+import re
+
+def _colorize_message(msg: str) -> str:
+    """Make arbitrary raw text heavily colored and formatted for Rich console."""
+    m = str(msg).replace("[", "\\[")
+    
+    # Transform `Word=value` or `Word: value` into colored brackets
+    def kv_replacer(match):
+        k = match.group(1)
+        v = match.group(2)
+        # Prevent mis-coloring URLs as keys (e.g. http: //...)
+        if k.lower() in ("http", "https", "file"):
+            return match.group(0)
+        
+        # Colorize true/false specifically within values
+        if v.lower() == "true":
+            v = f"[bold green]{v}[/]"
+        elif v.lower() == "false":
+            v = f"[bold red]{v}[/]"
+        elif v.isdigit() or v.replace('.', '', 1).isdigit():
+            v = f"[bold magenta]{v}[/]"
+            
+        return f"\\[[bold cyan]{k}[/]=[green]{v}[/]]"
+
+    # Regex: Boundary -> Word -> optional space -> = or : -> optional space -> NoSpacesOrQuotesOrBrackets
+    m = re.sub(r'\b([A-Za-z_][A-Za-z0-9_]*)\s*[:=]\s*([^\s\\[\\]\'\"]+)', kv_replacer, m)
+    
+    # Colorize any single or double quoted strings
+    m = re.sub(r"('[^']*')", r"[yellow]\1[/]", m)
+    m = re.sub(r'("[^"]*")', r"[yellow]\1[/]", m)
+    
+    return m
+
 class ConsoleRenderer:
     """Custom structlog renderer via Rich to console (bypassing stdlib to fix Pytest mangling)."""
     def __init__(self, colors: bool = True):
@@ -184,14 +217,21 @@ class ConsoleRenderer:
         message = str(event_dict.pop("event", ""))
 
         if self._colors and self._rich_available:
-            # Escape message for rich markup
-            message_safed = message.replace("[", "\\[")
+            
+            # Use incredibly diverse text coloring on the raw payload
+            message_colored = _colorize_message(message)
             
             flags = []
             for key, value in event_dict.items():
                 if key in ("level", "timestamp", "logger", "exception", "io", "env", "version"):
                     continue
                 val_str = str(value).replace("[", "\\[")
+                if val_str.lower() == "true":
+                    val_str = f"[bold green]{val_str}[/]"
+                elif val_str.lower() == "false":
+                    val_str = f"[bold red]{val_str}[/]"
+                elif val_str.isdigit() or val_str.replace('.', '', 1).isdigit():
+                    val_str = f"[bold magenta]{val_str}[/]"
                 flags.append(f"\\[[bold cyan]{key}[/]=[green]{val_str}[/]]")
 
             io_hint = ""
@@ -203,14 +243,14 @@ class ConsoleRenderer:
             if level not in LEVEL_SYMBOLS:
                 theme_level = "bold blue"
 
-            # Adding bold cyan, bold magenta, green, blue for maximum diversity
-            head = f"\\[[bold blue]{timestamp}[/]] \\[[{theme_level}]{symbol} {level.upper():<8}[/]] \\[[bold magenta]{logger_name:<12}[/]]"
+            # Strict Brackets: [Time] Symbol [Level] [Logger]
+            head = f"\\[[bold blue]{timestamp}[/]] {symbol} \\[[{theme_level}]{level.upper():<8}[/]] \\[[bold magenta]{logger_name:<12}[/]]"
             
             tail = ""
             if flags:
                 tail = " [bold yellow]→[/] " + " ".join(flags)
 
-            markup = f"{head}{io_hint} {message_safed}{tail}"
+            markup = f"{head}{io_hint} {message_colored}{tail}"
             
             self.console.print(markup)
             
@@ -262,6 +302,7 @@ def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optiona
     root_logger.setLevel(getattr(logging, raw_level.upper()))
     
     processors = [
+        structlog.stdlib.filter_by_level,
         structlog.contextvars.merge_contextvars,
         structlog.processors.add_log_level,
         structlog.processors.StackInfoRenderer(),
