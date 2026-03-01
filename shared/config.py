@@ -835,7 +835,7 @@ class KernelSettings(BaseModel):
 
     # --- T7: Conscious Observer (Human Kernel Apex) ---
     conscious_observer_emergency_max_cycles: int = 3
-    conscious_observer_expected_cycle_ms: float = 5000.0
+    conscious_observer_expected_cycle_ms: float = 10000.0
     conscious_observer_simplify_max_steps: int = 2
 
     # --- T7: RAG Integration (Knowledge + Tool Retrieval) ---

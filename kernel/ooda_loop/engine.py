@@ -308,7 +308,7 @@ async def decide(
 
         return Decision(
             action=DecisionAction.CONTINUE,
-            reasoning=f"Continuing DAG execution with {len(next_batch)} node(s)",
+            reasoning=f"Continuing DAG execution with nodes: {', '.join(next_batch)}",
             target_node_ids=next_batch,
         )
 

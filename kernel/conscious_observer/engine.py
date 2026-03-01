@@ -1201,7 +1201,7 @@ class ConsciousObserver:
             memory_summary = tool_memory.get_memory_summary()
             if memory_summary:
                 rag_context = rag_context or {}
-                log.info("🧠 STM: Pulled tool execution memory (Layer 3 Artifact retrieval)", records_count=len(tool_memory.records))
+                log.info("🧠 STM: Pulled tool execution memory (Layer 3 Artifact retrieval)", records_count=len(tool_memory.succeeded) + len(tool_memory.failed))
                 rag_context["tool_execution_memory"] = memory_summary
 
             # Run one OODA cycle
