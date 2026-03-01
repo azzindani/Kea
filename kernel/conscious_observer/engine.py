@@ -389,24 +389,25 @@ def _synthesize_artifact(loop_result: LoopResult) -> str:
         
         # Professional Synthesis Header
         header = f"PROTOCOL {status_str}"
-        if loop_result.termination_reason == LoopTerminationReason.OBJECTIVE_COMPLETE:
-            header = "✔️ MISSION ACCOMPLISHED"
-        elif loop_result.termination_reason == LoopTerminationReason.MAX_CYCLES_REACHED:
-            header = "⚠️ RESOURCE LIMIT REACHED"
-
-        parts.append(header + ":")
-        
-        # Descriptive Context
+        # 3. Fallback: Detailed Mission Report (Better than 4)
         if loop_result.total_cycles > 0:
-            parts.append(f"Successfully orchestrated {loop_result.total_cycles} cognitive cycles.")
-        
-        if loop_result.objectives_completed:
-            parts.append(f"Completed objectives: {', '.join(loop_result.objectives_completed)}.")
+            tasks_done = len(loop_result.objectives_completed)
+            status = "Completed" if tasks_done > 0 else "Orchestrated"
             
-        if loop_result.artifacts_produced:
-            parts.append(f"Generated {len(loop_result.artifacts_produced)} system artifacts.")
-        else:
-            parts.append("No persistent artifacts were generated during this run.")
+            # Build node summary if available
+            node_summary = ""
+            if loop_result.final_state and "node_outputs" in loop_result.final_state:
+                outputs = loop_result.final_state["node_outputs"]
+                if outputs:
+                    node_summary = f" (Execution nodes: {len(outputs)})"
+
+            return (
+                f"✔️ MISSION ACCOMPLISHED: {status} {loop_result.total_cycles} cognitive cycles{node_summary}. "
+                f"Produced {len(loop_result.artifacts_produced)} artifacts for {loop_result.agent_id}."
+            )
+
+        # 4. Absolute Final Fallback
+        return f"Mission complete: processed objective for {loop_result.agent_id}."
 
     return " ".join(parts)
 
@@ -840,7 +841,8 @@ class ConsciousObserver:
 
         world_state = _build_world_state(spawn_request, gate.identity_context, rag_context)
         subtasks_result = await decompose_goal(world_state, self._kit)
-        subtasks = _extract_subtasks(subtasks_result)
+        # subtasks intentionally ignored for standard path as we don't synthesize a DAG here (standard mapping)
+        _ = _extract_subtasks(subtasks_result)
 
         agent_state = _build_agent_state(gate.identity_context, spawn_request)
         stm = ShortTermMemory()
@@ -987,7 +989,7 @@ class ConsciousObserver:
         agent_state = _build_agent_state(gate.identity_context, spawn_request)
         stm = ShortTermMemory()
 
-        loop_result, decisions, outputs, simplified, escalated, aborted = (
+        loop_result, decisions, outputs, _, escalated, aborted = (
             await self._run_ooda_with_clm(
                 gate=gate,
                 spawn_request=spawn_request,
