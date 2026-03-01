@@ -200,14 +200,10 @@ class ConsoleRenderer:
             "alert": "white on bright_red bold", "emergency": "white on bright_red bold blink",
         }.get(level, "bright_blue")
         
-        markup = f"[log.timestamp]{timestamp}[/] [bold {level_style}]{symbol} {level.upper():<8}[/] [log.logger]{logger_name:<12}[/]{io_hint} {message}{flag_str}"
-        
-        # We render the markup to a string with ANSI escape codes. 
-        # This ensures that even "simple" logging handlers (like pytest's log-cli)
-        # will show the vibrant colors and icons instead of raw [log.key] tags.
-        with self.console.capture() as capture:
-            self.console.print(markup, end="")
-        return capture.get().strip()
+        # Return the markup string. RichHandler (configured below) will render this
+        # into vibrant console output. We use [log.timestamp] for custom coloring
+        # if the handler doesn't provide its own timestamp.
+        return f"[log.timestamp]{timestamp}[/] [bold {level_style}]{symbol} {level.upper():<8}[/] [log.logger]{logger_name:<12}[/]{io_hint} {message}{flag_str}"
 
 def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optional[str] = None, force_stderr: bool = True):
     """Standardized logging setup for all codebases."""
@@ -224,14 +220,24 @@ def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optiona
     root_logger = logging.getLogger()
     for h in root_logger.handlers[:]:
         root_logger.removeHandler(h)
+    root_logger.propagate = False
         
     if log_format == "console":
         try:
             from rich.console import Console
             from rich.logging import RichHandler
-            # Standard: Logs should go to stderr to avoid breaking stdio-based protocols (like MCP)
+            # Use show_time=True here so Rich handles the clock consistently
             console = Console(theme=_get_rich_theme(), stderr=force_stderr)
-            handler = RichHandler(console=console, show_time=False, show_path=False, markup=True, rich_tracebacks=True)
+            handler = RichHandler(
+                console=console, 
+                show_time=True, 
+                show_path=False, 
+                markup=True, 
+                rich_tracebacks=True
+            )
+            # Crucial: Use a formatter that ONLY passes the message
+            # because ConsoleRenderer already provides the level, name, and symbol.
+            handler.setFormatter(logging.Formatter("%(message)s"))
         except ImportError:
             # Fallback if rich is not installed (e.g. in some isolated MCP environments)
             handler = logging.StreamHandler(sys.stderr if force_stderr else sys.stdout)
