@@ -112,16 +112,30 @@ async def trigger_knowledge_sync():
     rag_url = ServiceRegistry.get_url(ServiceName.RAG_SERVICE)
     print(f"\n   [SYSTEM]: Triggering FORCED Knowledge Sync at {rag_url}...")
     try:
-        async with httpx.AsyncClient(timeout=900.0) as client:
-            # Call with background=False to block until done
-            resp = await client.post(f"{rag_url}/knowledge/sync?background=False")
-            if resp.status_code == 200:
-                print("   [SYSTEM]: Knowledge sync COMPLETED successfully.")
-                return True
-            else:
-                print(f"   [ERROR]: Sync failed with status {resp.status_code}: {resp.text}")
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # Call with background=True to avoid socket timeouts
+            resp = await client.post(f"{rag_url}/knowledge/sync?background=True")
+            
+            # Now poll the stats/summary
+            import asyncio
+            print("   [SYSTEM]: Polling for sync completion...")
+            
+            for i in range(120): # wait up to 1200s (20 mins)
+                await asyncio.sleep(10.0)
+                stats = await client.get(f"{rag_url}/knowledge/stats/summary")
+                if stats.status_code == 200:
+                    data = stats.json()
+                    count = data.get("total_items", 0)
+                    is_syncing = data.get("syncing", False)
+                    print(f"   [SYSTEM]: Polling... DB holds {count} items (Syncing: {is_syncing})")
+                    if not is_syncing and count > 0:
+                        print(f"   [SYSTEM]: Sync COMPLETE! Final DB count: {count} items.")
+                        return True
+            
+            print("   [ERROR]: Sync took too long to complete.")
+            
     except Exception as e:
-        print(f"   [ERROR]: Failed to trigger knowledge sync: {e}")
+        print(f"   [ERROR]: Failed to trigger knowledge: {e}")
     return False
 
 

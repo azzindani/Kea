@@ -1286,7 +1286,7 @@ class ConsciousObserver:
             log.info(
                 f"FINAL OUTPUT [GATE-OUT]: {verdict.content[:500]}...",
                 output_id=tool_output.output_id,
-                objective=gate.identity_context.objective.objective_id if gate.identity_context.objective else "unknown"
+                objective=exec_res.objective or "unknown"
             )
             return ConsciousObserverResult(
                 trace_id=trace_id,

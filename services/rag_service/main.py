@@ -449,10 +449,19 @@ async def sync_knowledge(background: bool = True):
         )
 
     if background:
+        if _sync_lock.locked():
+            return {"status": "sync_in_progress", "detail": "Background indexing already running"}
         asyncio.create_task(_sync_knowledge_job())
         return {"status": "sync_started", "detail": "Indexing in background"}
     else:
+        # If running in foreground, wait for the lock (so we block until the job completes)
+        async with _sync_lock:
+            pass # Just to wait for it if it's already running
+        
+        # Then, we can't just run it again if we just waited, but wait, the job might have finished.
+        # Actually, it's safer to just run it. The registry handles deduplication.
         await _sync_knowledge_job()
+         
         count = 0
         if knowledge_store:
             count = await knowledge_store.count()
@@ -508,7 +517,11 @@ async def knowledge_stats():
         )
 
     count = await knowledge_store.count()
-    return {"total_items": count}
+    return {
+        "status": "online",
+        "total_items": count,
+        "syncing": _sync_lock.locked()
+    }
 
 
 # ============================================================================

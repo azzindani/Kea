@@ -302,10 +302,22 @@ class LocalEmbedding(EmbeddingProvider):
         def process_all():
             """Process all texts in batches."""
             all_embeddings = []
-            for i in range(0, len(texts), batch_size):
-                batch = texts[i:i + batch_size]
-                embs = encode_batch(batch)
-                all_embeddings.extend(embs)
+            import sys
+            
+            # CPU heuristics to prevent thrashing
+            actual_batch_size = batch_size
+            if model.device.type == "cpu":
+                actual_batch_size = min(batch_size, 4)
+            
+            for i in range(0, len(texts), actual_batch_size):
+                batch = texts[i:i + actual_batch_size]
+                try:
+                    embs = encode_batch(batch)
+                    all_embeddings.extend(embs)
+                    print(f"DEBUG: Embedder processed {i + len(batch)}/{len(texts)} items on {model.device.type}", file=sys.stderr)
+                except Exception as e:
+                    print(f"DEBUG: Embedder error at offset {i}: {e}", file=sys.stderr)
+                    raise
                 # Clear cache after each batch
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()

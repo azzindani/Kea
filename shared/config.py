@@ -337,7 +337,7 @@ class KnowledgeSettings(BaseModel):
     timeout_health: float = 3.0
     
     # Registry & Backend
-    embedding_content_limit: int = 4000
+    embedding_content_limit: int = 2048  # Reduced to speed up CPU RAG indexing
     advisory_lock_id: int = 12346
     
     # Heuristics
