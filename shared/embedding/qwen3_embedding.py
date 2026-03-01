@@ -320,9 +320,14 @@ class LocalEmbedding(EmbeddingProvider):
                 try:
                     embs = encode_batch(batch)
                     all_embeddings.extend(embs)
-                    print(f"DEBUG: Embedder processed {i + len(batch)}/{len(texts)} items on {model.device.type}", file=sys.stderr)
+                    logger.debug(
+                        f"Embedder progress",
+                        processed=i + len(batch),
+                        total=len(texts),
+                        device=model.device.type
+                    )
                 except Exception as e:
-                    print(f"DEBUG: Embedder error at offset {i}: {e}", file=sys.stderr)
+                    logger.error(f"Embedder error at offset {i}", error=str(e))
                     raise
                 # Clear cache after each batch
                 if torch.cuda.is_available():

@@ -50,6 +50,19 @@ async def run_diagnostics():
     print(f"   [DATABASE]: {settings.database.url.split('@')[-1] if '@' in settings.database.url else 'Local'}")
     print(f"   [RAG SERVICE]: {rag_url}")
     
+    # 0. Hardware Profile
+    try:
+        from shared.hardware.detector import detect_hardware
+        hw = detect_hardware()
+        print(f"   [HARDWARE PROFILE]: {hw.cpu_threads} threads, {hw.ram_total_gb:.1f}GB RAM ({hw.ram_available_gb:.1f}GB avail)")
+        if hw.cuda_available:
+            hw.refresh_vram()
+            print(f"   [GPU DETECTED]: {hw.gpu_names[0]} ({hw.vram_total_gb:.1f}GB VRAM, {hw.vram_available_gb:.1f}GB avail)")
+        else:
+            print(f"   [GPU DETECTED]: ❌ NONE (Running on CPU)")
+    except Exception as e:
+        print(f"   [HARDWARE PROFILE]: ❌ DETECTION FAILED ({e})")
+    
     # 1. Check RAG Service Health & Stats
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:

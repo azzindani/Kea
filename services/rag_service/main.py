@@ -2,6 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import os
+
+# Optimize PyTorch memory allocation before other imports
+if "PYTORCH_CUDA_ALLOC_CONF" not in os.environ:
+    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
 import json
 from contextlib import asynccontextmanager
 from datetime import datetime, UTC

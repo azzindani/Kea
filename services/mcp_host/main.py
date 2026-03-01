@@ -1,6 +1,11 @@
 from dotenv import load_dotenv
 load_dotenv()
 
+import os
+# Optimize PyTorch memory allocation
+if "PYTORCH_CUDA_ALLOC_CONF" not in os.environ:
+    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
 from fastapi import FastAPI
 import uvicorn
 from prometheus_client import make_asgi_app

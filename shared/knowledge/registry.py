@@ -202,13 +202,13 @@ class PostgresKnowledgeRegistry:
         logger.info(f"Knowledge Registry: Embedding {len(updates_needed)} new/modified items in batches...")
 
         # Senior Architect Fix: Chunked Batching to prevent OOM/Timeout on large libraries
-        batch_size = 50
+        batch_size = 20
         logger.info(f"Registry: Syncing {len(updates_needed)} items to table '{self.table_name}' in batches of {batch_size}...")
         total_updated = 0
         
         for i in range(0, len(updates_needed), batch_size):
             batch = updates_needed[i : i + batch_size]
-            logger.debug(f"Registry: Processing batch {i//batch_size + 1} ({len(batch)} items)...")
+            logger.debug(f"Registry: Processing batch {i//batch_size + 1}", offset=i, batch_count=len(batch))
             batch_texts = []
             for item, _ in batch:
                 embed_text = (
@@ -274,6 +274,8 @@ class PostgresKnowledgeRegistry:
                     total_updated += len(batch)
                     logger.info(f"Knowledge Registry: Committed batch {i//batch_size + 1} ({len(batch)} items)")
                     batch_success = True
+                    # Small delay between batches to let memory stabilize
+                    await asyncio.sleep(0.5)
                     break
 
                 except Exception as e:
@@ -281,7 +283,7 @@ class PostgresKnowledgeRegistry:
                         logger.warning(f"Batch sync failed (attempt {attempt+1}/{max_retries}): {e}. Retrying...")
                         await asyncio.sleep(retry_delay)
                     else:
-                        logger.error(f"Batch sync permanently failed at offset {i}: {e}")
+                        logger.error(f"Batch sync permanently failed at offset {i}", error=str(e))
 
         return total_updated
 

@@ -359,44 +359,55 @@ def _build_tool_output(loop_result: LoopResult, trace_id: str) -> ToolOutput:
 
 
 def _synthesize_artifact(loop_result: LoopResult) -> str:
-    """Produce a human-readable summary of what the OODA loop accomplished.
+    """Produce a high-fidelity synthesis of the OODA loop's accomplishments.
 
-    Prioritizes ACTUAL results from the world (action_outputs) over
-    metacognition about the loop process.
+    Prioritizes ACTUAL results from the world (action_outputs). If missing,
+    generates a professional 'Mission Report' summary.
     """
     parts: list[str] = []
 
-    # 1. ACTUAL CONTENT (Primary)
+    # 1. PRIMARY: Action Outputs (What the agent actually did/found)
     if loop_result.action_outputs:
         valid_outputs = [o.strip() for o in loop_result.action_outputs if o]
         for out in valid_outputs:
-            # Clean up 'key=value' noise if it's a generic field
             clean_out = out
             for noise_key in ("answer=", "output=", "content=", "text=", "result=", "instruction="):
                 if clean_out.lower().startswith(noise_key):
                     clean_out = clean_out[len(noise_key):].strip()
                     break
 
-            # Skip entries that are clearly just echoed questions/instructions
             if clean_out.rstrip(".!?").endswith("?"):
                 continue
 
             suffix = "." if not clean_out.endswith((".", "!", "?")) else ""
             parts.append(clean_out + suffix)
 
-    # 2. META CONTEXT (Secondary)
+    # 2. SECONDARY: Composite Mission Report (If no direct strings were produced)
     if not parts:
         reason = loop_result.termination_reason.value
-        status_str = reason.replace("_", " ").capitalize()
+        status_str = reason.replace("_", " ").upper()
         
+        # Professional Synthesis Header
+        header = f"PROTOCOL {status_str}"
+        if loop_result.termination_reason == LoopTerminationReason.OBJECTIVE_COMPLETE:
+            header = "✔️ MISSION ACCOMPLISHED"
+        elif loop_result.termination_reason == LoopTerminationReason.MAX_CYCLES_REACHED:
+            header = "⚠️ RESOURCE LIMIT REACHED"
+
+        parts.append(header + ":")
+        
+        # Descriptive Context
         if loop_result.total_cycles > 0:
-            parts.append(f"The agent processed {loop_result.total_cycles} cognitive cycles.")
+            parts.append(f"Successfully orchestrated {loop_result.total_cycles} cognitive cycles.")
         
-        parts.append(f"Status: {status_str}.")
-        
+        if loop_result.objectives_completed:
+            parts.append(f"Completed objectives: {', '.join(loop_result.objectives_completed)}.")
+            
         if loop_result.artifacts_produced:
-            parts.append(f"Internal artifacts identified: {len(loop_result.artifacts_produced)}.")
-    
+            parts.append(f"Generated {len(loop_result.artifacts_produced)} system artifacts.")
+        else:
+            parts.append("No persistent artifacts were generated during this run.")
+
     return " ".join(parts)
 
 
@@ -906,6 +917,8 @@ class ConsciousObserver:
 
         loop_result, decisions, outputs, simplified, escalated, aborted = (
             await self._run_ooda_with_clm(
+                gate=gate,
+                spawn_request=spawn_request,
                 agent_state=agent_state,
                 stm=stm,
                 active_dag=active_dag,
@@ -945,6 +958,8 @@ class ConsciousObserver:
 
         loop_result, decisions, outputs, simplified, escalated, aborted = (
             await self._run_ooda_with_clm(
+                gate=gate,
+                spawn_request=spawn_request,
                 agent_state=agent_state,
                 stm=stm,
                 active_dag=None,
@@ -975,6 +990,8 @@ class ConsciousObserver:
 
     async def _run_ooda_with_clm(
         self,
+        gate: GateInResult,
+        spawn_request: SpawnRequest,
         agent_state: AgentState,
         stm: ShortTermMemory,
         active_dag: ExecutableDAG | None,
@@ -1053,9 +1070,24 @@ class ConsciousObserver:
                         for k, v in (prioritised + rest)[:3]:
                             recent_outputs.append(f"{k}={v}")
 
-            # Recover last decision from state snapshot
+            # Cycle Decision Analysis (T7 Executive Integration)
+            # Determine the macro-status and extract any replan requests
             agent_status = cycle_result.state_snapshot.get("status", "active")
             
+            # Check if we need to trigger a Tier 3 Planner invocation.
+            if agent_status == AgentStatus.ACTIVE and not active_dag:
+                # We are active but have no work — this implies a REPLAN is needed
+                log.info("OODA Replan triggered: no active DAG. Invoking Tier 3 Planner...", trace_id=trace_id)
+                if gate and spawn_request: 
+                    plan_res = await self._phase_plan(gate, spawn_request, rag_context)
+                    if not plan_res.error and plan_res.signals:
+                        active_dag = _extract_dag(plan_res)
+                        log.info(f"OODA Replan successful: injected new DAG {active_dag.dag_id}", trace_id=trace_id)
+                    else:
+                        log.warning("OODA Replan failed: Plan phase returned error/no signals.", trace_id=trace_id)
+                else:
+                    log.warning("OODA Replan skipped: gate or spawn_request not provided.", trace_id=trace_id)
+
             # Map AgentStatus to DecisionAction for CLM monitoring
             if agent_status == AgentStatus.ACTIVE:
                 action = DecisionAction.CONTINUE
@@ -1065,13 +1097,15 @@ class ConsciousObserver:
                 action = DecisionAction.SLEEP
             elif agent_status == AgentStatus.TERMINATED:
                 action = DecisionAction.COMPLETE
+                termination_reason = LoopTerminationReason.OBJECTIVE_COMPLETE
+                break
             else:
                 action = DecisionAction.CONTINUE
 
             recent_decisions.append(
                 Decision(
                     action=action,
-                    reasoning=f"cycle {cycle_num + 1}",
+                    reasoning=f"Cycle {cycle_num + 1} monitoring",
                 )
             )
 
@@ -1081,8 +1115,9 @@ class ConsciousObserver:
                 val = getattr(v, "value", str(v)).lower()
                 if val == "active" or val.endswith("active"):
                     active_module_count += 1
+            
             telemetry = CycleTelemetry(
-                cycle_number=cycle_num,
+                cycle_number=cycle_num + 1,
                 tokens_consumed=0,
                 cycle_duration_ms=cycle_ms,
                 expected_duration_ms=expected_ms,
