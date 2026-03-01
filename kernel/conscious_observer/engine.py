@@ -93,12 +93,17 @@ from shared.standard_io import (
     processing_error,
 )
 
+from .rag_bridge import RAGBridge
 from .types import (
     ConsciousObserverResult,
     GateInResult,
     ObserverExecuteResult,
     ObserverPhase,
     ProcessingMode,
+    RAGEnrichmentResult,
+    RAGToolResult,
+    ToolExecutionMemory,
+    ToolExecutionRecord,
 )
 
 log = get_logger(__name__)
@@ -326,16 +331,25 @@ def _build_world_state(
     spawn_request: SpawnRequest,
     identity_context: IdentityContext,
     rag_context: dict[str, Any] | None,
+    rag_enrichment: RAGEnrichmentResult | None = None,
 ) -> WorldState:
     """Construct WorldState for Tier 2 task decomposition."""
     ctx: dict[str, str] = {k: str(v) for k, v in spawn_request.context.items()}
     if rag_context:
         ctx.update({k: str(v) for k, v in rag_context.items()})
+
+    # Merge RAG-discovered skills/tools with identity-defined ones
+    available_skills = list(identity_context.skills)
+    available_tools = list(identity_context.tools_allowed)
+    if rag_enrichment:
+        available_skills.extend(rag_enrichment.knowledge.skills_found)
+        available_tools.extend(rag_enrichment.tools.tool_names)
+
     return WorldState(
         goal=spawn_request.objective,
         context=ctx,
-        available_skills=list(identity_context.skills),
-        available_tools=list(identity_context.tools_allowed),
+        available_skills=available_skills,
+        available_tools=available_tools,
         knowledge_domains=list(identity_context.knowledge_domains),
     )
 
@@ -458,6 +472,7 @@ class ConsciousObserver:
 
     def __init__(self, kit: InferenceKit | None = None) -> None:
         self._kit = kit
+        self._rag = RAGBridge()
 
     # ------------------------------------------------------------------
     # Public Entry Point
@@ -656,6 +671,25 @@ class ConsciousObserver:
         # 3. T5: Set immutable identity constraints
         identity_context = set_identity_constraints(identity.agent_id, profile)
 
+        # 3a. RAG Knowledge Retrieval (ONE-TIME)
+        rag_enrichment = RAGEnrichmentResult()
+        settings = get_settings()
+        if settings.kernel.rag_knowledge_enabled:
+            knowledge_result = await self._rag.retrieve_knowledge(
+                objective=spawn_request.objective,
+                role=spawn_request.role,
+                domain=None,
+            )
+            rag_enrichment.knowledge = knowledge_result
+            rag_enrichment.knowledge_available = bool(knowledge_result.formatted_context)
+
+            # 3b. Enrich CognitiveProfile with RAG results
+            if knowledge_result.skills_found or knowledge_result.knowledge_domains:
+                profile = RAGBridge.enrich_cognitive_profile(profile, knowledge_result)
+                identity_context = set_identity_constraints(
+                    identity.agent_id, profile
+                )
+
         # Track gate-in phase in self-model
         update_cognitive_state(
             processing_phase=ProcessingPhase.PRE_EXECUTION,
@@ -730,6 +764,7 @@ class ConsciousObserver:
             capability=capability,
             mode=mode,
             gate_in_duration_ms=(time.perf_counter() - start) * 1000,
+            rag_enrichment=rag_enrichment,
         )
 
     # ------------------------------------------------------------------
@@ -743,7 +778,7 @@ class ConsciousObserver:
         rag_context: dict[str, Any] | None,
     ) -> Result:
         """T2 Decompose → T3 Synthesize plan."""
-        world_state = _build_world_state(spawn_request, gate.identity_context, rag_context)
+        world_state = _build_world_state(spawn_request, gate.identity_context, rag_context, gate.rag_enrichment)
         decomp_result = await decompose_goal(world_state, self._kit)
         subtasks = _extract_subtasks(decomp_result)
 
@@ -775,6 +810,37 @@ class ConsciousObserver:
             processing_phase=ProcessingPhase.DURING_EXECUTION,
             current_task_description=spawn_request.objective,
         )
+
+        # Dynamic Tool Retrieval (TIER B) — retrieve per task
+        settings = get_settings()
+        if settings.kernel.rag_tools_enabled:
+            tool_result = await self._rag.retrieve_tools(
+                objective=spawn_request.objective,
+                signal_tags=gate.signal_tags,
+                entities=list(gate.entities),
+            )
+            # Tool schemas from PostgresToolRegistry are already validated
+            # at insertion time — filter only for completeness (name present)
+            valid_tools = [
+                t for t in tool_result.tool_schemas
+                if t.get("name")
+            ]
+            tool_names = [t["name"] for t in valid_tools]
+            gate.rag_enrichment.tools = RAGToolResult(
+                tool_schemas=valid_tools,
+                tool_names=tool_names,
+                retrieval_ms=tool_result.retrieval_ms,
+            )
+            gate.rag_enrichment.tools_available = bool(tool_names)
+
+        # Auto-construct rag_context from RAG enrichment
+        if gate.rag_enrichment.knowledge_available or gate.rag_enrichment.tools_available:
+            rag_context = rag_context or {}
+            if gate.rag_enrichment.knowledge_available:
+                rag_context["knowledge_context"] = gate.rag_enrichment.knowledge.formatted_context
+                rag_context["available_skills"] = gate.rag_enrichment.knowledge.skills_found
+            if gate.rag_enrichment.tools_available:
+                rag_context["available_tools"] = gate.rag_enrichment.tools.tool_names
 
         if gate.mode == ProcessingMode.FAST:
             return await self._execute_fast_path(gate, spawn_request, rag_context)
@@ -839,7 +905,7 @@ class ConsciousObserver:
         """STANDARD: T2 decompose → T4. For MODERATE signals."""
         start = time.perf_counter()
 
-        world_state = _build_world_state(spawn_request, gate.identity_context, rag_context)
+        world_state = _build_world_state(spawn_request, gate.identity_context, rag_context, gate.rag_enrichment)
         subtasks_result = await decompose_goal(world_state, self._kit)
         # subtasks intentionally ignored for standard path as we don't synthesize a DAG here (standard mapping)
         _ = _extract_subtasks(subtasks_result)
@@ -885,7 +951,7 @@ class ConsciousObserver:
         settings = get_settings().kernel
 
         # T2: Decompose goal
-        world_state = _build_world_state(spawn_request, gate.identity_context, rag_context)
+        world_state = _build_world_state(spawn_request, gate.identity_context, rag_context, gate.rag_enrichment)
         decomp_result = await decompose_goal(world_state, self._kit)
         subtasks = _extract_subtasks(decomp_result)
 
@@ -1062,6 +1128,10 @@ class ConsciousObserver:
         simplify_steps_used = 0
         current_activation_map = activation_map
 
+        # Layer 3: Tool Execution Memory — tracks success/failure per cycle
+        tool_memory = ToolExecutionMemory()
+        settings = get_settings()
+
         start_loop = time.perf_counter()
 
         for cycle_num in range(max_cycles):
@@ -1070,6 +1140,12 @@ class ConsciousObserver:
                 break
 
             cycle_start = time.perf_counter()
+
+            # Inject tool execution memory into rag_context for orient phase
+            memory_summary = tool_memory.get_memory_summary()
+            if memory_summary:
+                rag_context = rag_context or {}
+                rag_context["tool_execution_memory"] = memory_summary
 
             # Run one OODA cycle
             cycle_result = await run_ooda_cycle(
@@ -1086,6 +1162,24 @@ class ConsciousObserver:
             # Accumulate recent context for CLM and Gate-Out
             if cycle_result.action_results:
                 for ar in cycle_result.action_results:
+                    # Update tool execution memory (Layer 3)
+                    tool_name = ar.node_id
+                    record = ToolExecutionRecord(
+                        tool_name=tool_name,
+                        arguments=ar.outputs.get("arguments", {}),
+                        success=ar.success,
+                        output_summary=str(ar.outputs.get("answer", ""))[:500],
+                        error_message=ar.error_message,
+                        cycle_number=cycle_num + 1,
+                        duration_ms=ar.duration_ms,
+                    )
+                    if ar.success:
+                        tool_memory.record_success(record)
+                    else:
+                        tool_memory.record_failure(
+                            record, settings.kernel.rag_tool_max_retries_per_tool
+                        )
+
                     if ar.outputs:
                         # Prioritize actual answer content over meta keys
                         # 'instruction' is just the task description echo — skip it.
@@ -1103,6 +1197,10 @@ class ConsciousObserver:
                         for k, v in (prioritised + rest)[:3]:
                             recent_outputs.append(f"{k}={v}")
 
+            # Cache tool memory into STM for downstream access
+            if tool_memory.succeeded or tool_memory.failed:
+                stm.cache_entity("tool_execution_memory", tool_memory.model_dump())
+
             # Cycle Decision Analysis (T7 Executive Integration)
             # Determine the macro-status and extract any replan requests
             agent_status = cycle_result.state_snapshot.get("status", "active")
@@ -1111,6 +1209,27 @@ class ConsciousObserver:
             if agent_status == AgentStatus.ACTIVE and not active_dag:
                 # We are active but have no work — this implies a REPLAN is needed
                 log.info("OODA Replan triggered: no active DAG. Invoking Tier 3 Planner...", trace_id=trace_id)
+
+                # JIT Tool Refresh: re-retrieve tools excluding blacklisted
+                if (
+                    settings.kernel.rag_jit_tool_refresh_enabled
+                    and tool_memory.blacklisted
+                ):
+                    refreshed = await self._rag.retrieve_tools(
+                        objective=spawn_request.objective,
+                        signal_tags=gate.signal_tags if gate else None,
+                        exclude_tools=list(tool_memory.blacklisted),
+                    )
+                    if refreshed.tool_names:
+                        rag_context = rag_context or {}
+                        rag_context["available_tools"] = refreshed.tool_names
+                        log.info(
+                            "JIT tool refresh: replaced blacklisted tools",
+                            blacklisted=list(tool_memory.blacklisted),
+                            replacements=refreshed.tool_names[:5],
+                            trace_id=trace_id,
+                        )
+
                 if gate and spawn_request: 
                     plan_res = await self._phase_plan(gate, spawn_request, rag_context)
                     if not plan_res.error and plan_res.signals:
