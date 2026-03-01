@@ -36,9 +36,7 @@ TEST_USER_NAME = "Stress Test User"
 def pytest_configure(config):
     """Configure pytest for stress tests."""
     # Setup Project logging with console format for readable output
-    from shared.logging.structured import LogLevel
-
-    from shared.logging.main import LogConfig, setup_logging
+    from shared.logging.main import LogConfig, LogLevel, setup_logging
 
     # Use console format (not JSON) for test readability
     log_config = LogConfig(
@@ -559,6 +557,9 @@ def setup_stress_test_environment(monkeypatch, request):
 
     # Set rate limiting
     monkeypatch.setenv("LLM_RATE_LIMIT_SECONDS", "3")
+
+    # Disable tokenizers parallelism to avoid warnings/deadlocks on fork
+    monkeypatch.setenv("TOKENIZERS_PARALLELISM", "false")
 
     # Check for verbosity (mapped to -v flag)
     # Note: request.config.getoption("verbose") returns int (0, 1, 2...)

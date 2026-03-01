@@ -92,7 +92,7 @@ class TestStructuredLogging:
 
     def test_import_structured(self):
         """Test that structured logging can be imported."""
-        from shared.logging.structured import get_logger
+        from shared.logging.main import get_logger
         assert get_logger is not None
 
     def test_create_logger(self):
