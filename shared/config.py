@@ -333,11 +333,11 @@ class KnowledgeSettings(BaseModel):
     rule_limit: int = 2
     procedure_limit: int = 3
     timeout_search: float = 30.0
-    timeout_raw: float = 10.0
+    timeout_raw: float = 30.0
     timeout_health: float = 3.0
     
     # Registry & Backend
-    embedding_content_limit: int = 2048  # Reduced to speed up CPU RAG indexing
+    embedding_content_limit: int = 32768  # Reduced to speed up CPU RAG indexing
     advisory_lock_id: int = 12346
     
     # Heuristics

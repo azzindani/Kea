@@ -177,7 +177,11 @@ async def test_knowledge_rag():
         pytest.skip("RAG Service is offline")
 
     # Double check stats - if literally 0, sync
-    stats = await retriever.search_raw(query="", limit=1)
+    # Use a longer timeout for the first search which might cold-load the model
+    try:
+        stats = await retriever.search_raw(query="", limit=1)
+    except Exception:
+        stats = None
     if not stats:
         print("   [WARNING]: Knowledge store reports 0 indexable items. Syncing...")
         await trigger_knowledge_sync()

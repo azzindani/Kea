@@ -18,7 +18,7 @@ async def test_conscious_observer_comprehensive(query, inference_kit):
     APEX SIMULATION: Fire-and-forget query processing.
     The Kernel chooses its own Mode and depth based on the input.
     """
-    print(f"\n--- Processing Query: '{query}' ---")
+    print(f"\n\033[1;36m[APEX SIMULATION] Incoming Signal:\033[0m {query}")
     
     observer = ConsciousObserver(kit=inference_kit)
     
@@ -42,7 +42,8 @@ async def test_conscious_observer_comprehensive(query, inference_kit):
     # 2. Work queries should pass through the full quality gate (Gate-Out)
     if "salary" in query.lower():
         assert obs_res['final_phase'] == ObserverPhase.ESCALATED
-        print(f"   [SECURITY]: Escalated properly? YES. Reason: {obs_res.get('partial_output', 'Escalation trigger')}")
+        print(f"\n\033[1;33m[SECURITY ALERT]:\033[0m Escalation Triggered.")
+        print(f"Reason: {obs_res.get('partial_output', 'Agent cannot handle this input.')}\n")
     else:
         assert obs_res['final_phase'] == ObserverPhase.GATE_OUT
         assert obs_res['filtered_output'] is not None
@@ -55,7 +56,7 @@ async def test_conscious_observer_comprehensive(query, inference_kit):
         
         print(f"   [QUALITY]: Gated successfully? YES.")
         print(f"   [QUALITY]: Confidence: {conf_score:.2f} | Grounding: {grnd_score:.2f}")
-        print(f"   [RESULT]: {output_content}")
+        print(f"\n\033[1;32m[FINAL CONSCIOUS OUTPUT]:\033[0m\n{output_content}\n")
 
     print(" \033[92m[SIMULATION STABLE]\033[0m")
 

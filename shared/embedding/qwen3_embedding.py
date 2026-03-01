@@ -141,7 +141,8 @@ class LocalEmbedding(EmbeddingProvider):
     # Class-level cache for model singleton (shared across all instances)
     _shared_model = None
     _shared_tokenizer = None
-    _shared_lock = None  # Will be created on first use
+    _shared_lock = None  # Threading lock for model loading
+    _shared_execution_lock = None # Asyncio lock for inference
     _shared_device = None
     
     def __init__(
@@ -159,6 +160,10 @@ class LocalEmbedding(EmbeddingProvider):
         self.device = device or ("cuda" if self._has_cuda() else "cpu")
         self.use_flash_attention = use_flash_attention
         self.max_length = max_length or settings.embedding.max_length
+        
+        if LocalEmbedding._shared_execution_lock is None:
+            import asyncio
+            LocalEmbedding._shared_execution_lock = asyncio.Lock()
     
     def _has_cuda(self) -> bool:
         try:
@@ -254,8 +259,9 @@ class LocalEmbedding(EmbeddingProvider):
         import torch
         import torch.nn.functional as F
         
-        model, tokenizer = self._load_model()
-        loop = asyncio.get_event_loop()
+        async with LocalEmbedding._shared_execution_lock:
+            model, tokenizer = self._load_model()
+            loop = asyncio.get_event_loop()
         
         from shared.config import get_settings
         settings = get_settings()

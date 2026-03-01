@@ -33,6 +33,7 @@ This document is an automatically generated index of all available 'Pure Context
 - [Tech (13)](#tech)
 - [Trades (4)](#trades)
 - [Web_Research (13)](#web_research)
+- [Kea (1)](#kea)
 - [Silicon Corporate Infrastructure](#infrastructure)
 
 ---
@@ -364,6 +365,12 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Social Media Strategist](skills/web_research/social_media_manager.md)** | Expertise in viral loops, community management, and brand voice. | `social, marketing, community, viral` |
 | **[Technical Product Manager](skills/web_research/product_manager.md)** | Expertise in user stories, prioritization frameworks, and stakeholder management. | `product, management, agile, strategy` |
 | **[UX Researcher](skills/web_research/ux_researcher.md)** | Expertise in user interviews, usability testing, and persona creation. | `ux, user-research, design, testing` |
+
+---
+## Kea <a name='kea'></a>
+| Skill Name | Description | Tags |
+|---|---|---|
+| **[Kea Cognitive Architecture](skills/kea/cognitive_architecture.md)** | Core architectural principles of the Kea Kernel, including the Tiered Hierarchy, Conscious Observer (Tier 7), and the Cognitive Cycle (OODA). | `kea, architecture, ooda, tier-7` |
 
 ---
 ## Silicon Corporate Infrastructure <a name='infrastructure'></a>

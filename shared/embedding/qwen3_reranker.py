@@ -60,6 +60,7 @@ class LocalReranker(RerankerProvider):
     _shared_token_false_id = None
     _shared_prefix_tokens = None
     _shared_suffix_tokens = None
+    _shared_execution_lock = None # Asyncio lock for inference
     
     def __init__(
         self,
@@ -76,6 +77,10 @@ class LocalReranker(RerankerProvider):
             self.device = "cuda:0"
         self.max_length = max_length or settings.reranker.max_length
         self.use_flash_attention = use_flash_attention
+        
+        if LocalReranker._shared_execution_lock is None:
+            import asyncio
+            LocalReranker._shared_execution_lock = asyncio.Lock()
     
     def _has_cuda(self) -> bool:
         try:
@@ -216,9 +221,10 @@ class LocalReranker(RerankerProvider):
         if not documents:
             return []
         
-        model, _ = self._load_model()
-        
-        from shared.config import get_settings
+        async with LocalReranker._shared_execution_lock:
+            model, _ = self._load_model()
+            
+            from shared.config import get_settings
         settings = get_settings()
         
         # Batching configuration (to prevent OOM)
