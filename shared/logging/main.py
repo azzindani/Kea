@@ -204,7 +204,7 @@ class ConsoleRenderer:
         try:
             from rich.console import Console
             # force_terminal=True ensures rich outputs ANSI even if piped, keeping colors!
-            self.console = Console(theme=_get_rich_theme(), stderr=True, force_terminal=colors, soft_wrap=True)
+            self.console = Console(theme=_get_rich_theme(), stderr=True, force_terminal=colors)
             self._rich_available = True
         except ImportError:
             self.console = None
