@@ -21,7 +21,7 @@ from pydantic import BaseModel, ValidationError
 from kernel.graph_synthesizer.types import ActionInstruction, ExecutableNode, NodeStatus
 from shared.inference_kit import InferenceKit
 from shared.llm.provider import LLMMessage
-from shared.logging.main import get_logger
+from shared.logging.main import get_logger, log_node_assembly
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -336,6 +336,16 @@ async def assemble_node(
             node_id=node_id,
             layers=layers_applied,
             duration_ms=round(elapsed, 2),
+        )
+
+        # NEW: Detailed assembly logging
+        log_node_assembly(
+            logger=log,
+            node_id=node_id,
+            type=instruction.action_type,
+            layers=layers_applied,
+            input_schema=node.input_schema,
+            output_schema=node.output_schema
         )
 
         return ok(signals=[signal], metrics=metrics)

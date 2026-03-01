@@ -506,3 +506,84 @@ def log_llm_response(logger: Any, content: str, model: str, reasoning: Optional[
             lines.append(f"\n[bold yellow]Reasoning:[/] [cyan]{str(reasoning).replace('[', '\\[')}[/]")
         lines.append("[bold cyan]" + "━" * 88 + "[/]")
         console.print("\n".join(lines))
+
+def log_dag_blueprint(logger: Any, dag_id: str, objective: str, nodes: List[Dict[str, Any]], edges: List[Dict[str, Any]]):
+    """Log a structured, architect-level blueprint of the DAG."""
+    logger.info("DAG Blueprint generated", dag_id=dag_id, node_count=len(nodes), edge_count=len(edges))
+    
+    if os.getenv("TEST_MODE") == "1" or True: # Always show for now to satisfy USER
+        console = _get_rich_console()
+        if not console: return
+
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        lines = [f"\n\\[[bold blue]{timestamp}[/]] 🏗️  [bold yellow]DAG BLUEPRINT: {dag_id}[/]"]
+        lines.append(f"[bold cyan]Objective:[/] [green]{objective}[/]")
+        lines.append("[bold cyan]" + "━" * 88 + "[/]")
+        
+        lines.append("[bold magenta]NODES:[/]")
+        for n in nodes:
+            nid = n.get("id", "??")
+            ntype = n.get("type", "??").upper()
+            desc = n.get("description", "??")
+            tool = n.get("tool", "")
+            tool_str = f" [bold blue](Tool: {tool})[/]" if tool else ""
+            lines.append(f"  • [bold cyan][{nid}][/] [{ntype}]{tool_str} {desc[:80]}...")
+            
+            inputs = n.get("inputs", [])
+            outputs = n.get("outputs", [])
+            if inputs or outputs:
+                lines.append(f"    [dim]↳ Inputs: {inputs} | Outputs: {outputs}[/]")
+
+        if edges:
+            lines.append("\n[bold magenta]EDGES (Data Flow):[/]")
+            for e in edges:
+                u = e.get("from", "??")
+                v = e.get("to", "??")
+                key = e.get("key", "??")
+                lines.append(f"  • [bold cyan]{u}[/] [yellow]──({key})──>[/] [bold cyan]{v}[/]")
+        else:
+            lines.append("\n[bold magenta]EDGES:[/] [dim]None (Parallel execution batching)[/]")
+
+        lines.append("[bold cyan]" + "━" * 88 + "[/]")
+        console.print("\n".join(lines))
+
+def log_node_assembly(logger: Any, node_id: str, node_type: str, layers: List[str], input_schema: str, output_schema: str):
+    """Log detailed node assembly information."""
+    logger.info("Node assembled", node_id=node_id, type=node_type, layers=layers, input_schema=input_schema, output_schema=output_schema)
+    
+    if os.getenv("TEST_MODE") == "1" or True: # Always show for now to satisfy USER
+        console = _get_rich_console()
+        if not console: return
+
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        lines = [f"\n\\[[bold blue]{timestamp}[/]] ⚙️  [bold cyan]NODE ASSEMBLED: {node_id}[/]"]
+        lines.append(f"  • [bold magenta]Type:[/] {node_type.upper()}")
+        lines.append(f"  • [bold magenta]Layers:[/] [green]{', '.join(layers)}[/]")
+        lines.append(f"  • [bold magenta]Schemas:[/] [yellow]In: {input_schema}[/] | [yellow]Out: {output_schema}[/]")
+        console.print("\n".join(lines))
+
+def log_tool_execution(logger: Any, node_id: str, tool_name: str, arguments: Dict[str, Any], outputs: Dict[str, Any], success: bool, duration_ms: float):
+    """Log premium tool execution details for test visibility."""
+    logger.info("Tool execution metrics", node_id=node_id, tool=tool_name, success=success, duration_ms=duration_ms)
+    
+    if os.getenv("TEST_MODE") == "1" or True: # Always show for now to satisfy USER
+        console = _get_rich_console()
+        if not console: return
+
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        status_sym = "[bold green]✅ SUCCESS[/]" if success else "[bold red]❌ FAILED[/]"
+        lines = [f"\n\\[[bold blue]{timestamp}[/]] 🛠️  [bold cyan]TOOL EXECUTION: {tool_name}[/] ({node_id})"]
+        lines.append(f"  • [bold magenta]Status:[/] {status_sym} [dim]({round(duration_ms, 2)}ms)[/]")
+        
+        # Format arguments
+        arg_str = json.dumps(arguments, indent=2).replace("[", "\\[")
+        lines.append(f"  • [bold magenta]Arguments:[/] [yellow]{arg_str}[/]")
+        
+        # Format outputs
+        out_str = json.dumps(outputs, indent=2).replace("[", "\\[")
+        if len(out_str) > 1000:
+             out_str = out_str[:1000] + "... (truncated)"
+        lines.append(f"  • [bold magenta]Outputs:[/] [green]{out_str}[/]")
+        
+        lines.append("[bold cyan]" + "━" * 88 + "[/]")
+        console.print("\n".join(lines))

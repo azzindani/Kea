@@ -1279,7 +1279,18 @@ class ConsciousObserver:
             # Check if we need to trigger a Tier 3 Planner invocation.
             if agent_status == AgentStatus.ACTIVE and not active_dag:
                 # We are active but have no work — this implies a REPLAN is needed
-                log.info("OODA Replan triggered: no active DAG. Invoking Tier 3 Planner...", trace_id=trace_id)
+                
+                # Logic enhancement: Add reasoning to the replan log
+                replan_reason = "No active DAG (initial start or completion of previous plan)"
+                if tool_memory.failed:
+                    replan_reason = f"Failure detected in previous tools: {list(tool_memory.failed.keys())}"
+                
+                log.info(
+                    "🔄 OODA Replan triggered", 
+                    reason=replan_reason,
+                    trace_id=trace_id,
+                    blacklisted_tools=list(tool_memory.blacklisted)
+                )
 
                 # JIT Tool Refresh: re-retrieve tools excluding blacklisted
                 if (

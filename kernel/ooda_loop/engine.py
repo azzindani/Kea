@@ -29,7 +29,7 @@ from shared.config import get_settings
 from shared.id_and_hash import generate_id
 from shared.inference_kit import InferenceKit
 from shared.llm.provider import LLMMessage
-from shared.logging.main import get_logger
+from shared.logging.main import get_logger, log_tool_execution
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -408,6 +408,17 @@ async def act(
                     node_id=node_id, 
                     content_preview=node_outputs["answer"][:100]
                 )
+                
+                # NEW: Premium LLM Result visibility
+                log_tool_execution(
+                    logger=log,
+                    node_id=node_id,
+                    tool_name="LLM_Inference",
+                    arguments={"description": node.instruction.description},
+                    outputs=node_outputs,
+                    success=True,
+                    duration_ms=(time.perf_counter() - start) * 1000
+                )
             except Exception as e:
                 log.warning("OODA Act: LLM inference failed, fallback to echo", error=str(e))
 
@@ -445,6 +456,17 @@ async def act(
             node_outputs["arguments"] = arguments
             node_outputs["answer"] = f"Simulated output from {tool_name} for task: {node.instruction.description[:50]}"
             log.info("🚀 OODA Act: Tool executed successfully", node_id=node_id, tool=tool_name, success=True)
+
+            # NEW: Premium Tool Result visibility
+            log_tool_execution(
+                logger=log,
+                node_id=node_id,
+                tool_name=tool_name,
+                arguments=arguments,
+                outputs=node_outputs,
+                success=True,
+                duration_ms=(time.perf_counter() - start) * 1000
+            )
         
         elapsed_ms = (time.perf_counter() - start) * 1000
         

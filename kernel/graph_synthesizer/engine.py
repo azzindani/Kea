@@ -22,7 +22,7 @@ from shared.config import get_settings
 from shared.id_and_hash import generate_id
 from shared.inference_kit import InferenceKit
 from shared.llm.provider import LLMMessage
-from shared.logging.main import get_logger
+from shared.logging.main import get_logger, log_dag_blueprint
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -115,6 +115,8 @@ async def map_subtasks_to_nodes(subtasks: list[SubTaskItem], kit: InferenceKit |
             node_id=node.node_id,
             type=instruction.action_type,
             tools=instruction.required_tools,
+            inputs=node.input_keys,
+            outputs=node.output_keys,
             input_schema=node.input_schema,
             output_schema=node.output_schema
         )
@@ -261,6 +263,26 @@ def compile_dag(
         nodes=len(nodes),
         edges=len(edges),
         parallel_groups=len(capped_groups),
+    )
+
+    # NEW: Architect-level blueprint logging
+    log_dag_blueprint(
+        logger=log,
+        dag_id=dag_id,
+        objective=objective,
+        nodes=[{
+            "id": n.node_id,
+            "type": n.instruction.action_type,
+            "description": n.instruction.description,
+            "tool": n.instruction.required_tools[0] if n.instruction.required_tools else "",
+            "inputs": n.input_keys,
+            "outputs": n.output_keys
+        } for n in nodes],
+        edges=[{
+            "from": e.from_node_id,
+            "to": e.to_node_id,
+            "key": e.data_key
+        } for e in edges]
     )
 
     return dag
