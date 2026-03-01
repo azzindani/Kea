@@ -168,7 +168,7 @@ class ConsoleRenderer:
     def __init__(self, colors: bool = True):
         try:
             from rich.console import Console
-            self.console = Console(theme=_get_rich_theme(), force_terminal=colors)
+            self.console = Console(theme=_get_rich_theme(), force_terminal=colors, width=10000)
             self._rich_available = True
         except ImportError:
             self._rich_available = False
@@ -200,10 +200,13 @@ class ConsoleRenderer:
             "alert": "white on bright_red bold", "emergency": "white on bright_red bold blink",
         }.get(level, "bright_blue")
         
-        # Return the markup string. 
-        # We rely on setup_logging to configure a RichHandler(markup=True) 
-        # which will turn these tags into vibrant terminal colors.
-        return f"[log.timestamp]{timestamp}[/] [bold {level_style}]{symbol} {level.upper():<8}[/] [log.logger]{logger_name:<12}[/]{io_hint} {message}{flag_str}"
+        markup = f"[log.timestamp]{timestamp}[/] [bold {level_style}]{symbol} {level.upper():<8}[/] [log.logger]{logger_name:<12}[/]{io_hint} {message}{flag_str}"
+        
+        if self._rich_available:
+            with self.console.capture() as capture:
+                self.console.print(markup, end="")
+            return capture.get()
+        return markup
 
 def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optional[str] = None, force_stderr: bool = True):
     """Standardized logging setup for all codebases."""
@@ -240,7 +243,7 @@ def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optiona
                 show_time=False, 
                 show_level=False, 
                 show_path=False, 
-                markup=True, 
+                markup=False, 
                 rich_tracebacks=True
             )
             # Use a formatter that ONLY passes the message string 
@@ -251,8 +254,10 @@ def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optiona
             handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
     else:
         handler = logging.StreamHandler(sys.stderr if force_stderr else sys.stdout)
-        
-    root_logger.addHandler(handler)
+
+    in_pytest = "pytest" in sys.modules or "PYTEST_CURRENT_TEST" in os.environ
+    if not in_pytest:
+        root_logger.addHandler(handler)
     root_logger.setLevel(getattr(logging, raw_level.upper()))
     
     processors = [
