@@ -163,79 +163,74 @@ class JSONRPCLog(BaseModel):
 # 🖥️ Rendering & Configuration
 # ============================================================================
 
-# ── ANSI color constants (8-color base, no bright/white/gray) ──────────────
-_A_RESET  = "\033[0m"
-_A_BOLD   = "\033[1m"
-_A_RED    = "\033[31m"
-_A_GREEN  = "\033[32m"
-_A_YELLOW = "\033[33m"
-_A_BLUE   = "\033[34m"
-_A_MAGENTA = "\033[35m"
-_A_CYAN   = "\033[36m"
-
-_LEVEL_ANSI = {
-    "debug":     _A_CYAN,
-    "info":      f"{_A_BOLD}{_A_BLUE}",
-    "success":   f"{_A_BOLD}{_A_GREEN}",
-    "notice":    f"{_A_BOLD}{_A_CYAN}",
-    "warning":   f"{_A_BOLD}{_A_YELLOW}",
-    "error":     f"{_A_BOLD}{_A_RED}",
-    "critical":  f"{_A_BOLD}{_A_MAGENTA}",
-    "alert":     f"{_A_BOLD}{_A_RED}",
-    "emergency":  f"{_A_BOLD}{_A_RED}",
-}
-
-
 class ConsoleRenderer:
-    """Custom structlog renderer – pure ANSI, zero Rich dependency."""
+    """Custom structlog renderer via Rich to console (bypassing stdlib to fix Pytest mangling)."""
     def __init__(self, colors: bool = True):
         self._colors = colors
+        self._rich_available = False
+        try:
+            from rich.console import Console
+            # force_terminal=True ensures rich outputs ANSI even if piped, keeping colors!
+            self.console = Console(theme=_get_rich_theme(), stderr=True, force_terminal=colors, soft_wrap=True)
+            self._rich_available = True
+        except ImportError:
+            self.console = None
 
     def __call__(self, logger: Any, method_name: str, event_dict: Dict[str, Any]) -> str:
         level = method_name.lower()
         symbol = LEVEL_SYMBOLS.get(level, "•")
         timestamp = event_dict.pop("timestamp", datetime.now().strftime("%H:%M:%S"))
         logger_name = event_dict.pop("logger", "root")
-        message = event_dict.pop("event", "")
+        message = str(event_dict.pop("event", ""))
 
-        kv_pairs: List[str] = []
-        for key, value in event_dict.items():
-            if key in ("level", "timestamp", "logger", "exception", "io", "env", "version"):
-                continue
-            if self._colors:
-                kv_pairs.append(
-                    f"{_A_BOLD}{_A_CYAN}{key}{_A_RESET}"
-                    f"={_A_GREEN}{value}{_A_RESET}"
-                )
-            else:
-                kv_pairs.append(f"{key}={value}")
+        if self._colors and self._rich_available:
+            # Escape message for rich markup
+            message_safed = message.replace("[", "\\[")
+            
+            flags = []
+            for key, value in event_dict.items():
+                if key in ("level", "timestamp", "logger", "exception", "io", "env", "version"):
+                    continue
+                val_str = str(value).replace("[", "\\[")
+                flags.append(f"\\[[bold cyan]{key}[/]=[green]{val_str}[/]]")
 
-        # IO type badge
-        io_hint = ""
-        if "io" in event_dict:
-            io_type = event_dict["io"].get("type", "unknown").upper()
-            if self._colors:
-                io_hint = f" {_A_BOLD}{_A_YELLOW}IO:{io_type}{_A_RESET}"
-            else:
-                io_hint = f" IO:{io_type}"
+            io_hint = ""
+            if "io" in event_dict:
+                io_type = event_dict["io"].get("type", "unknown").upper()
+                io_hint = f" \\[[bold yellow]IO:{io_type}[/]]"
 
-        if self._colors:
-            lv = _LEVEL_ANSI.get(level, f"{_A_BOLD}{_A_BLUE}")
-            head = (
-                f"{_A_BLUE}{timestamp}{_A_RESET} "
-                f"{lv}{symbol} {level.upper():<8}{_A_RESET} "
-                f"{_A_MAGENTA}{logger_name:<12}{_A_RESET}"
-            )
+            theme_level = f"logging.level.{level}" 
+            if level not in LEVEL_SYMBOLS:
+                theme_level = "bold blue"
+
+            # Adding bold cyan, bold magenta, green, blue for maximum diversity
+            head = f"\\[[bold blue]{timestamp}[/]] \\[[{theme_level}]{symbol} {level.upper():<8}[/]] \\[[bold magenta]{logger_name:<12}[/]]"
+            
             tail = ""
-            if kv_pairs:
-                tail = f" {_A_BOLD}{_A_YELLOW}→{_A_RESET} " + "  ".join(kv_pairs)
-            return f"{head}{io_hint} {message}{tail}"
+            if flags:
+                tail = " [bold yellow]→[/] " + " ".join(flags)
+
+            markup = f"{head}{io_hint} {message_safed}{tail}"
+            
+            self.console.print(markup)
+            
+            import structlog
+            raise structlog.DropEvent
         else:
-            head = f"{timestamp} {symbol} {level.upper():<8} {logger_name:<12}"
-            tail = ""
-            if kv_pairs:
-                tail = " → " + "  ".join(kv_pairs)
-            return f"{head}{io_hint} {message}{tail}"
+            # Fallback pure string for standard logging without rich
+            flags = []
+            for key, value in event_dict.items():
+                if key in ("level", "timestamp", "logger", "exception", "io", "env", "version"):
+                    continue
+                flags.append(f"[{key}={value}]")
+            
+            io_hint = ""
+            if "io" in event_dict:
+                io_type = event_dict["io"].get("type", "unknown").upper()
+                io_hint = f" [IO:{io_type}]"
+                
+            tail = " → " + " ".join(flags) if flags else ""
+            return f"[{timestamp}] [{symbol} {level.upper():<8}] [{logger_name:<12}]{io_hint} {message}{tail}"
 
 def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optional[str] = None, force_stderr: bool = True):
     """Standardized logging setup for all codebases."""
@@ -405,8 +400,8 @@ def log_llm_request(logger: Any, messages: List[Union[Dict[str, Any], Any]], mod
 
         # Premium Test Mode View
         timestamp = datetime.now().strftime("%H:%M:%S")
-        lines = [f"\n[blue]{timestamp}[/] [bold blue]LLM Request[/] [cyan]({model})[/]"]
-        lines.append("[blue]" + "─" * 88 + "[/]")
+        lines = [f"\n\\[[bold blue]{timestamp}[/]] [bold cyan]LLM Request[/] [magenta]({model})[/]"]
+        lines.append("[bold cyan]" + "━" * 88 + "[/]")
         for m in messages:
             role = "unknown"
             content = ""
@@ -417,11 +412,11 @@ def log_llm_request(logger: Any, messages: List[Union[Dict[str, Any], Any]], mod
                 role = str(m.get("role", "unknown"))
                 content = str(m.get("content", ""))
             
-            role_style = "magenta" if role == "system" else "green" if role == "user" else "yellow"
+            role_style = "bold magenta" if role == "system" else "bold green" if role == "user" else "bold cyan"
             # Escape content to prevent rich markup issues
-            escaped_content = str(content).replace("[", "[[").replace("]", "]]")
-            lines.append(f"[bold {role_style}]{role.upper():<9}[/] {escaped_content}")
-        lines.append("[blue]" + "─" * 88 + "[/]")
+            escaped_content = str(content).replace("[", "\\[")
+            lines.append(f"[{role_style}]{role.upper():<9}[/] {escaped_content}")
+        lines.append("[bold cyan]" + "━" * 88 + "[/]")
         console.print("\n".join(lines))
 
 def log_llm_response(logger: Any, content: str, model: str, reasoning: Optional[str] = None, event_name: str = "LLM Response"):
@@ -438,8 +433,8 @@ def log_llm_response(logger: Any, content: str, model: str, reasoning: Optional[
 
         # Premium Test Mode View
         timestamp = datetime.now().strftime("%H:%M:%S")
-        lines = [f"\n[blue]{timestamp}[/] [bold green]{event_name}[/] [cyan]({model})[/]"]
-        lines.append("[blue]" + "─" * 88 + "[/]")
+        lines = [f"\n\\[[bold blue]{timestamp}[/]] [bold green]{event_name}[/] [magenta]({model})[/]"]
+        lines.append("[bold cyan]" + "━" * 88 + "[/]")
         
         # Attempt to pretty-print JSON if possible
         display_content = str(content)
@@ -451,9 +446,9 @@ def log_llm_response(logger: Any, content: str, model: str, reasoning: Optional[
             pass
 
         # Escape content to prevent rich markup issues
-        escaped_content = display_content.replace("[", "[[").replace("]", "]]")
+        escaped_content = display_content.replace("[", "\\[")
         lines.append(escaped_content)
         if reasoning:
-            lines.append(f"\n[bold cyan]Reasoning:[/] [cyan]{str(reasoning).replace('[', '[[').replace(']', ']]')}[/]")
-        lines.append("[blue]" + "─" * 88 + "[/]")
+            lines.append(f"\n[bold yellow]Reasoning:[/] [cyan]{str(reasoning).replace('[', '\\[')}[/]")
+        lines.append("[bold cyan]" + "━" * 88 + "[/]")
         console.print("\n".join(lines))
