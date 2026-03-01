@@ -387,11 +387,16 @@ def _synthesize_artifact(loop_result: LoopResult) -> str:
     # 2. META CONTEXT (Secondary)
     if not parts:
         reason = loop_result.termination_reason.value
-        parts.append(
-            f"Execution completed in {loop_result.total_cycles} cycles. "
-            f"Status: {reason.replace('_', ' ').capitalize()}."
-        )
-
+        status_str = reason.replace("_", " ").capitalize()
+        
+        if loop_result.total_cycles > 0:
+            parts.append(f"The agent processed {loop_result.total_cycles} cognitive cycles.")
+        
+        parts.append(f"Status: {status_str}.")
+        
+        if loop_result.artifacts_produced:
+            parts.append(f"Internal artifacts identified: {len(loop_result.artifacts_produced)}.")
+    
     return " ".join(parts)
 
 
@@ -1273,7 +1278,15 @@ class ConsciousObserver:
                 "Gate-Out complete: PASS",
                 output_id=tool_output.output_id,
                 confidence=calibrated_confidence.calibrated_confidence if calibrated_confidence else 0.0,
+                grounding_score=grounding.grounding_score if grounding else 0.8,
                 content_preview=(verdict.content[:100] + "...") if len(verdict.content) > 100 else verdict.content,
+            )
+            # Log the FINAL result that will be returned to Tier 8 / User
+            # This ensures the 'real output' is visible in logs as requested.
+            log.info(
+                f"FINAL OUTPUT [GATE-OUT]: {verdict.content[:500]}...",
+                output_id=tool_output.output_id,
+                objective=gate.identity_context.objective.objective_id if gate.identity_context.objective else "unknown"
             )
             return ConsciousObserverResult(
                 trace_id=trace_id,
@@ -1295,12 +1308,19 @@ class ConsciousObserver:
 
         # REJECT — check retry budget from guidance
         guidance = verdict.guidance
+        log.warning(
+            f"Gate-Out verdict: REJECT (Escalated: {guidance.should_escalate})",
+            output_id=tool_output.output_id,
+            reason=guidance.rejection_reason,
+            confidence=calibrated_confidence.calibrated_confidence if calibrated_confidence else 0.0,
+            grounding_score=grounding.grounding_score if grounding else 0.8,
+        )
+
         if not guidance.should_escalate:
             log.info(
                 "Noise gate rejected — retry budget available",
                 output_id=tool_output.output_id,
                 retries_used=guidance.retry_count,
-                reason=guidance.rejection_reason,
             )
 
 

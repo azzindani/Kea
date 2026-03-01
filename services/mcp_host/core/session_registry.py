@@ -34,6 +34,7 @@ class SessionRegistry:
     _shared_discovered_tools: List[Tool] | None = None
     _discovery_lock = None  # Will be created on first use
     _discovery_done = False
+    _sync_lock = asyncio.Lock()
     
     def __init__(self):
         # Active sessions (server_name -> client object) - per-instance
@@ -94,17 +95,13 @@ class SessionRegistry:
         Syncs statically discovered tools to the Postgres RAG backend.
         Should be called as a background task after initialization.
         """
-        if self.pg_registry and self.discovered_tools:
-            logger.info(f"🔄 Syncing {len(self.discovered_tools)} statically discovered tools to RAG...")
-            try:
-                await self.pg_registry.sync_tools(self.discovered_tools)
-                # Clear buffer to free memory, or keep if we want to query them locally later?
-                # RAG is persistent, so we can clear. but keep for debugging if needed.
-                # Clear buffer to free memory, or keep if we want to query them locally later?
-                # KEEPING for static listing (fix for "No tools found" error)
-                # self.discovered_tools.clear() 
-            except Exception as e:
-                logger.error(f"❌ Failed to sync discovered tools to RAG: {e}")
+        async with SessionRegistry._sync_lock:
+            if self.pg_registry and self.discovered_tools:
+                logger.info(f"🔄 Syncing {len(self.discovered_tools)} statically discovered tools to RAG...")
+                try:
+                    await self.pg_registry.sync_tools(self.discovered_tools)
+                except Exception as e:
+                    logger.error(f"❌ Failed to sync discovered tools to RAG: {e}")
 
     def _discover_local_servers(self):
         """

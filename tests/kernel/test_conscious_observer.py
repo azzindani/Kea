@@ -48,8 +48,13 @@ async def test_conscious_observer_comprehensive(query, inference_kit):
         assert obs_res['filtered_output'] is not None
         assert obs_res['calibrated_confidence'] is not None
         conf_score = obs_res['calibrated_confidence'].get('calibrated_confidence', 0.0)
+        grounding = obs_res.get('grounding_report')
+        grnd_score = grounding.get('grounding_score', 0.0) if grounding else 0.8
+        
         output_content = obs_res['filtered_output'].get('content', '')
-        print(f"   [QUALITY]: Gated successfully? YES. Confidence: {conf_score:.2f}")
+        
+        print(f"   [QUALITY]: Gated successfully? YES.")
+        print(f"   [QUALITY]: Confidence: {conf_score:.2f} | Grounding: {grnd_score:.2f}")
         print(f"   [RESULT]: {output_content}")
 
     print(" \033[92m[SIMULATION STABLE]\033[0m")

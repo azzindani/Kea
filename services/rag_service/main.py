@@ -461,10 +461,6 @@ async def sync_knowledge(background: bool = True):
 
 async def _sync_knowledge_job(domain: str | None = None, category: str | None = None):
     """Background job to sync knowledge files from the library directory."""
-    if _sync_lock.locked():
-        logger.info("Knowledge sync already in progress, skipping duplicate request.")
-        return
-
     async with _sync_lock:
         logger.info("🚀 Starting Knowledge Library Sync...")
         try:
