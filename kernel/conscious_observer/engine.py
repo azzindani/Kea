@@ -1031,12 +1031,13 @@ class ConsciousObserver:
 
         # T3: Pre-execution conscience gate
         if active_dag:
-            log.debug("Pre-execution check: validating DAG nodes and schemas", dag_id=active_dag.dag_id)
+            log.info("📊 Final DAG Structure", dag_id=active_dag.dag_id, node_count=len(active_dag.nodes))
+            log.info("🛡️ Pre-execution check: validating DAG nodes and schemas", dag_id=active_dag.dag_id)
             pre_exec_result = await run_pre_execution_check(active_dag, self._kit)
             if not pre_exec_result.error and pre_exec_result.signals:
                 approval = pre_exec_result.signals[0].body["data"]
                 if approval.get("decision") == "rejected":
-                    # Guardrails blocked execution
+                    log.warning("❌ Execution blocked by pre-execution guardrails", reasoning=approval.get("reasoning"))
                     return ObserverExecuteResult(
                         loop_result=LoopResult(
                             agent_id=gate.identity_context.agent_id,
@@ -1059,6 +1060,9 @@ class ConsciousObserver:
                         execute_duration_ms=(time.perf_counter() - start) * 1000,
                     )
 
+                else:
+                    log.info("✅ Pre-execution check: DAG approved for execution", dag_id=active_dag.dag_id)
+        
         # T4: OODA loop with CLM monitoring
         agent_state = _build_agent_state(gate.identity_context, spawn_request)
         if active_dag:
@@ -1197,6 +1201,7 @@ class ConsciousObserver:
             memory_summary = tool_memory.get_memory_summary()
             if memory_summary:
                 rag_context = rag_context or {}
+                log.info("🧠 STM: Pulled tool execution memory (Layer 3 Artifact retrieval)", records_count=len(tool_memory.records))
                 rag_context["tool_execution_memory"] = memory_summary
 
             # Run one OODA cycle

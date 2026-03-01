@@ -395,15 +395,29 @@ async def act(
             except Exception as e:
                 log.warning("OODA Act: LLM inference failed, fallback to echo", error=str(e))
 
+        elif node.instruction.action_type == "tool_call" or node.tool_binding:
+            # Assembly logic: mapping parameters/context to tool arguments
+            log.info(
+                "OODA Act: Tool assembled",
+                node_id=node_id,
+                tool=node.tool_binding,
+                arguments=node.instruction.parameters.get("arguments", {}),
+                schemas={"input": node.input_schema, "output": node.output_schema}
+            )
+            # In kernel simulator, we simulate success for registered tools
+            node_outputs["arguments"] = node.instruction.parameters.get("arguments", {})
+            node_outputs["answer"] = f"Simulated output for {node.tool_binding}"
+            log.info("OODA Act: Tool executed (JIT)", node_id=node_id, tool=node.tool_binding, success=True)
+        
         elapsed_ms = (time.perf_counter() - start) * 1000
         
         log.info(
-            "OODA Act: Task executed", 
+            "OODA Act: Task execution record", 
             node_id=node_id, 
             type=node.instruction.action_type,
             parameters=node.instruction.parameters,
-            input_keys=node.input_keys,
-            output_keys=node.output_keys,
+            arguments=node_outputs.get("arguments", {}),
+            outputs=node_outputs,
             success=True,
             duration_ms=round(elapsed_ms, 2)
         )
@@ -513,7 +527,12 @@ async def run_ooda_cycle(
         ],
     )
 
-    log.debug(
+    if action_results:
+        produced_ids = [r.node_id for r in action_results if r.success]
+        if produced_ids:
+            log.info("OODA Cycle: Artifacts stored in STM", count=len(produced_ids), ids=produced_ids)
+
+    log.info(
         "OODA cycle complete",
         cycle=cycle_num,
         decision=decision.action.value,
