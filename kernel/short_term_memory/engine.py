@@ -220,12 +220,15 @@ class ShortTermMemory:
             self._entity_embeddings.pop(evicted_key, None)
             log.debug("Evicted entity from STM cache", key=evicted_key)
 
+        log.info("STM: Entity cached (Artifact stored)", key=key, size=len(str(value)))
+
     def get_entity(self, key: str) -> Any | None:
         """Retrieve a cached entity by key, or None if expired/missing."""
         if key not in self._entity_cache:
             return None
 
         entity = self._entity_cache[key]
+        log.debug("STM: Entity retrieved (Artifact pulled)", key=key)
 
         # Check TTL expiry
         if entity.ttl_seconds is not None:
@@ -303,6 +306,13 @@ class ShortTermMemory:
                     break
                 if query is None or query.lower() in key.lower() or query.lower() in str(self._entity_cache[key].value).lower():
                     entities[key] = self._entity_cache[key].value
+
+        log.debug(
+            "STM: Building context slice",
+            query=query,
+            total_history=len(self._event_history),
+            total_cached=len(self._entity_cache)
+        )
 
         return ContextSlice(
             dag_snapshots=dag_snapshots,

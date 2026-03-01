@@ -168,6 +168,10 @@ class ActionResult(BaseModel):
     )
     error_message: str = Field(default="")
     duration_ms: float = Field(default=0.0, ge=0.0)
+    action_type: str = Field(default="general")
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    input_keys: list[str] = Field(default_factory=list)
+    output_keys: list[str] = Field(default_factory=list)
     cost: float = Field(default=0.0, ge=0.0)
     is_async: bool = Field(
         default=False,

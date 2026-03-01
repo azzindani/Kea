@@ -137,6 +137,14 @@ async def orient(
     # Summarize observations
     summaries = [obs.description for obs in observations[:10]]
     observation_summary = "; ".join(summaries) if summaries else "No new observations"
+    
+    log.debug(
+        "OODA Orient: Processing observations",
+        count=len(observations),
+        summaries=summaries,
+        stm_keys=list(context_slice.cached_entities.keys()),
+        rag_keys=list(rag_context.keys()) if rag_context else []
+    )
 
     # LLM Context Analysis
     if kit and kit.has_llm and observations:
@@ -229,6 +237,7 @@ async def decide(
 
     # If no active DAG, we need to plan
     if active_dag is None:
+        log.debug("OODA Decide: No active DAG detected")
         if current_objectives:
             obj = current_objectives[0]
             return Decision(
@@ -250,6 +259,8 @@ async def decide(
             action=DecisionAction.COMPLETE,
             reasoning="All macro objectives completed",
         )
+    
+    log.debug("OODA Decide: Checking DAG progress", dag_id=active_dag.dag_id if active_dag else None)
 
     # Check DAG progress
     if stm is not None:
@@ -267,11 +278,11 @@ async def decide(
                     )
                 else:
                     # All succeeded
+                    log.debug("OODA Decide: Current DAG fully executed successfully")
                     return Decision(
                         action=DecisionAction.COMPLETE,
                         reasoning="Current DAG fully executed",
                     )
-
     # Find next pending nodes to execute
     pending_nodes = [
         n.node_id for n in active_dag.nodes
@@ -380,11 +391,27 @@ async def act(
                 log.warning("OODA Act: LLM inference failed, fallback to echo", error=str(e))
 
         elapsed_ms = (time.perf_counter() - start) * 1000
+        
+        log.info(
+            "OODA Act: Task executed", 
+            node_id=node_id, 
+            type=node.instruction.action_type,
+            parameters=node.instruction.parameters,
+            input_keys=node.input_keys,
+            output_keys=node.output_keys,
+            success=True,
+            duration_ms=round(elapsed_ms, 2)
+        )
+
         result = ActionResult(
             node_id=node_id,
             success=True,
             outputs=node_outputs,
             duration_ms=elapsed_ms,
+            action_type=node.instruction.action_type,
+            parameters=node.instruction.parameters,
+            input_keys=node.input_keys,
+            output_keys=node.output_keys,
         )
 
         # Update node status

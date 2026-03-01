@@ -510,6 +510,12 @@ class ConsciousObserver:
             role=spawn_request.role,
         )
         bound_log.info("ConsciousObserver.process started")
+        log.debug(
+            "ConsciousObserver Process Context",
+            objective=spawn_request.objective,
+            identity=gate_in.identity_context.agent_id if 'gate_in' in locals() else spawn_request.role,
+            trace_id=trace_id
+        )
 
         try:
             # If evidence is provided but no context, bridge them so the agent
@@ -528,6 +534,9 @@ class ConsciousObserver:
                 "Gate-In complete",
                 mode=gate_in.mode.value,
                 capable=gate_in.capability.can_handle,
+                complexity=gate_in.activation_map.original_complexity,
+                domain=gate_in.signal_tags.domain,
+                intent=gate_in.signal_tags.intent,
                 gate_in_ms=round(gate_in_ms, 2),
             )
 
@@ -751,6 +760,13 @@ class ConsciousObserver:
             signal_tags, capability, pressure=0.0, kit=self._kit
         )
         activation_map = _extract_activation_map(activation_result)
+        log.debug(
+            "T6 Activation Map computed",
+            pipeline=activation_map.pipeline.pipeline_name if activation_map.pipeline else "NONE",
+            complexity=activation_map.original_complexity,
+            pressure_downgraded=activation_map.pressure_downgraded,
+            module_states={k: getattr(v, "value", str(v)) for k, v in activation_map.module_states.items()}
+        )
         mode = _complexity_to_mode(activation_map.pipeline.complexity_level)
 
         return GateInResult(
@@ -832,6 +848,12 @@ class ConsciousObserver:
                 retrieval_ms=tool_result.retrieval_ms,
             )
             gate.rag_enrichment.tools_available = bool(tool_names)
+            log.info(
+                "Dynamic Tool Retrieval complete",
+                count=len(tool_names),
+                tools=tool_names,
+                retrieval_ms=round(tool_result.retrieval_ms, 2)
+            )
 
         # Auto-construct rag_context from RAG enrichment
         if gate.rag_enrichment.knowledge_available or gate.rag_enrichment.tools_available:
@@ -841,6 +863,13 @@ class ConsciousObserver:
                 rag_context["available_skills"] = gate.rag_enrichment.knowledge.skills_found
             if gate.rag_enrichment.tools_available:
                 rag_context["available_tools"] = gate.rag_enrichment.tools.tool_names
+            
+            log.info(
+                "RAG context injected into OODA Orient",
+                knowledge_available=gate.rag_enrichment.knowledge_available,
+                tools_available=gate.rag_enrichment.tools_available,
+                skills=gate.rag_enrichment.knowledge.skills_found if gate.rag_enrichment.knowledge_available else []
+            )
 
         if gate.mode == ProcessingMode.FAST:
             return await self._execute_fast_path(gate, spawn_request, rag_context)
@@ -952,8 +981,15 @@ class ConsciousObserver:
 
         # T2: Decompose goal
         world_state = _build_world_state(spawn_request, gate.identity_context, rag_context, gate.rag_enrichment)
+        log.debug(
+            "OODA WorldState: Decomposing goal",
+            goal=world_state.goal,
+            obs_count=len(world_state.observations),
+            know_keys=list(world_state.knowledge.keys())
+        )
         decomp_result = await decompose_goal(world_state, self._kit)
         subtasks = _extract_subtasks(decomp_result)
+        log.debug("OODA Subtasks generated", count=len(subtasks))
 
         # T3: Synthesize DAG (delegates to Tier 2 What-If simulation internally)
         active_dag: ExecutableDAG | None = None
@@ -965,6 +1001,21 @@ class ConsciousObserver:
                 subtasks=subtasks,
             )
             active_dag = _extract_dag(plan_result)
+            if active_dag:
+                log.info(
+                    "DAG Synthesized",
+                    dag_id=active_dag.dag_id,
+                    nodes=[{
+                        "id": n.node_id,
+                        "type": n.instruction.action_type,
+                        "description": n.instruction.description[:50],
+                        "depends_on": n.depends_on,
+                        "tool": n.tool_binding,
+                        "input_schema": n.input_schema,
+                        "output_schema": n.output_schema,
+                        "parameters": n.instruction.parameters
+                    } for n in active_dag.nodes]
+                )
 
         # T3: Advanced planning (constraints from identity context)
         if active_dag and subtasks:
@@ -980,6 +1031,7 @@ class ConsciousObserver:
 
         # T3: Pre-execution conscience gate
         if active_dag:
+            log.debug("Pre-execution check: validating DAG nodes and schemas", dag_id=active_dag.dag_id)
             pre_exec_result = await run_pre_execution_check(active_dag, self._kit)
             if not pre_exec_result.error and pre_exec_result.signals:
                 approval = pre_exec_result.signals[0].body["data"]
@@ -1173,6 +1225,16 @@ class ConsciousObserver:
                         cycle_number=cycle_num + 1,
                         duration_ms=ar.duration_ms,
                     )
+                    log.info(
+                        "OODA Act: Task executed",
+                        node_id=ar.node_id,
+                        type=ar.action_type,
+                        parameters=ar.parameters,
+                        input_keys=ar.input_keys,
+                        outputs=ar.outputs,
+                        success=ar.success,
+                        duration_ms=round(ar.duration_ms, 2),
+                    )
                     if ar.success:
                         tool_memory.record_success(record)
                     else:
@@ -1285,6 +1347,14 @@ class ConsciousObserver:
                 recent_outputs=recent_outputs or None,
                 original_objective=objective,
                 kit=self._kit,
+            )
+
+            log.debug(
+                "CLM Telemetry Check",
+                cycle=cycle_num + 1,
+                duration_ms=round(cycle_ms, 2),
+                modules_active=active_module_count,
+                trace_id=trace_id
             )
 
             if not clm_result.error and clm_result.signals:
@@ -1428,6 +1498,7 @@ class ConsciousObserver:
         # T6: Hallucination Monitor
         grounding: GroundingReport | None = None
         if evidence:
+            log.info("Grounding Verification started", evidence_count=len(evidence), output_id=tool_output.output_id)
             grounding_result = await verify_grounding(tool_output, evidence, self._kit)
             if not grounding_result.error and grounding_result.signals:
                 grounding = _extract_grounding_report(grounding_result)
