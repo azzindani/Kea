@@ -200,9 +200,9 @@ class ConsoleRenderer:
             "alert": "white on bright_red bold", "emergency": "white on bright_red bold blink",
         }.get(level, "bright_blue")
         
-        # Return the markup string. RichHandler (configured below) will render this
-        # into vibrant console output. We use [log.timestamp] for custom coloring
-        # if the handler doesn't provide its own timestamp.
+        # Return the markup string. 
+        # We rely on setup_logging to configure a RichHandler(markup=True) 
+        # which will turn these tags into vibrant terminal colors.
         return f"[log.timestamp]{timestamp}[/] [bold {level_style}]{symbol} {level.upper():<8}[/] [log.logger]{logger_name:<12}[/]{io_hint} {message}{flag_str}"
 
 def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optional[str] = None, force_stderr: bool = True):
@@ -218,28 +218,35 @@ def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optiona
     log_format = settings.logging.format.lower()
 
     root_logger = logging.getLogger()
-    for h in root_logger.handlers[:]:
-        root_logger.removeHandler(h)
-    root_logger.propagate = False
-        
+    
+    # Aggressively clear ALL handlers from the root and ALL other loggers 
+    # to stop double-logging (especially under pytest/log-cli).
+    root_logger.handlers = []
+    # Force propagation to root for all loggers so we have ONE terminal outlet
+    for name in logging.root.manager.loggerDict:
+        l = logging.getLogger(name)
+        l.handlers = []
+        l.propagate = True
+
     if log_format == "console":
         try:
             from rich.console import Console
             from rich.logging import RichHandler
-            # Use show_time=True here so Rich handles the clock consistently
+            # We use show_time=False and show_level=False because ConsoleRenderer 
+            # already provides a highly stylized, colored preamble in the markup.
             console = Console(theme=_get_rich_theme(), stderr=force_stderr)
             handler = RichHandler(
                 console=console, 
-                show_time=True, 
+                show_time=False, 
+                show_level=False, 
                 show_path=False, 
                 markup=True, 
                 rich_tracebacks=True
             )
-            # Crucial: Use a formatter that ONLY passes the message
-            # because ConsoleRenderer already provides the level, name, and symbol.
+            # Use a formatter that ONLY passes the message string 
+            # (which contains our custom preamble and payload markup).
             handler.setFormatter(logging.Formatter("%(message)s"))
         except ImportError:
-            # Fallback if rich is not installed (e.g. in some isolated MCP environments)
             handler = logging.StreamHandler(sys.stderr if force_stderr else sys.stdout)
             handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
     else:
