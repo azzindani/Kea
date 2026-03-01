@@ -1110,10 +1110,11 @@ class ConsciousObserver:
             (loop_result, recent_decisions, recent_outputs,
              was_simplified, was_escalated, was_aborted)
         """
-        settings = get_settings().kernel
-        max_cycles = max_cycles_override or settings.ooda_max_cycles
-        expected_ms = settings.conscious_observer_expected_cycle_ms
-        max_simplify = settings.conscious_observer_simplify_max_steps
+        settings = get_settings()
+        k_settings = settings.kernel
+        max_cycles = max_cycles_override or k_settings.ooda_max_cycles
+        expected_ms = k_settings.conscious_observer_expected_cycle_ms
+        max_simplify = k_settings.conscious_observer_simplify_max_steps
 
         state = agent_state
         all_artifacts: list[str] = []
@@ -1130,7 +1131,6 @@ class ConsciousObserver:
 
         # Layer 3: Tool Execution Memory — tracks success/failure per cycle
         tool_memory = ToolExecutionMemory()
-        settings = get_settings()
 
         start_loop = time.perf_counter()
 
@@ -1177,7 +1177,7 @@ class ConsciousObserver:
                         tool_memory.record_success(record)
                     else:
                         tool_memory.record_failure(
-                            record, settings.kernel.rag_tool_max_retries_per_tool
+                            record, k_settings.rag_tool_max_retries_per_tool
                         )
 
                     if ar.outputs:
@@ -1212,7 +1212,7 @@ class ConsciousObserver:
 
                 # JIT Tool Refresh: re-retrieve tools excluding blacklisted
                 if (
-                    settings.kernel.rag_jit_tool_refresh_enabled
+                    k_settings.rag_jit_tool_refresh_enabled
                     and tool_memory.blacklisted
                 ):
                     refreshed = await self._rag.retrieve_tools(
@@ -1275,7 +1275,7 @@ class ConsciousObserver:
                 expected_duration_ms=expected_ms,
                 active_module_count=active_module_count,
                 total_cycles_budget=max_cycles,
-                total_tokens_budget=settings.budget_epoch_token_limit,
+                total_tokens_budget=k_settings.budget_epoch_token_limit,
             )
 
             clm_result = await monitor_cognitive_load(
