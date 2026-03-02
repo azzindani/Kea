@@ -278,10 +278,24 @@ class ConsoleRenderer:
         message = str(event_dict.pop("event", ""))
 
         if self._colors and self._rich_available:
-            
             # Use incredibly diverse text coloring on the raw payload
             message_colored = _colorize_message(message)
             
+            io_hint = ""
+            if "io" in event_dict:
+                io_val = event_dict["io"]
+                io_type = io_val.get("type", "unknown").upper()
+                io_hint = f" \\[[bold yellow]IO:{io_type}[/]]"
+                
+                # Flatten IO data into the dict so it renders as flags
+                io_data = io_val.get("data")
+                if isinstance(io_data, dict):
+                    for k, v in io_data.items():
+                        if k not in event_dict:
+                            event_dict[k] = v
+                elif io_data is not None:
+                    event_dict["data"] = io_data
+
             flags = []
             for key, value in event_dict.items():
                 if key in ("level", "timestamp", "logger", "exception", "io", "env", "version"):
@@ -294,11 +308,6 @@ class ConsoleRenderer:
                 elif val_str.isdigit() or val_str.replace('.', '', 1).isdigit():
                     val_str = f"[bold magenta]{val_str}[/]"
                 flags.append(f"\\[[bold cyan]{key}[/]=[green]{val_str}[/]]")
-
-            io_hint = ""
-            if "io" in event_dict:
-                io_type = event_dict["io"].get("type", "unknown").upper()
-                io_hint = f" \\[[bold yellow]IO:{io_type}[/]]"
 
             theme_level = f"logging.level.{level}" 
             if level not in LEVEL_SYMBOLS:
@@ -320,16 +329,26 @@ class ConsoleRenderer:
             raise structlog.DropEvent
         else:
             # Fallback pure string for standard logging without rich
+            io_hint = ""
+            if "io" in event_dict:
+                io_val = event_dict["io"]
+                io_type = io_val.get("type", "unknown").upper()
+                io_hint = f" [IO:{io_type}]"
+                
+                # Flatten IO data
+                io_data = io_val.get("data")
+                if isinstance(io_data, dict):
+                    for k, v in io_data.items():
+                        if k not in event_dict:
+                            event_dict[k] = v
+                elif io_data is not None:
+                    event_dict["data"] = io_data
+
             flags = []
             for key, value in event_dict.items():
                 if key in ("level", "timestamp", "logger", "exception", "io", "env", "version"):
                     continue
                 flags.append(f"[{key}={value}]")
-            
-            io_hint = ""
-            if "io" in event_dict:
-                io_type = event_dict["io"].get("type", "unknown").upper()
-                io_hint = f" [IO:{io_type}]"
                 
             tail = " → " + " ".join(flags) if flags else ""
             return f"[{timestamp}] [{symbol} {level.upper():<8}] [{logger_name:<12}]{io_hint} {message}{tail}"
