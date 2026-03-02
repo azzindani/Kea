@@ -368,6 +368,21 @@ class ConsoleRenderer:
             tail = " → " + " ".join(flags) if flags else ""
             return f"[{timestamp}] [{symbol} {level.upper():<8}] [{logger_name:<12}]{io_hint} {message}{tail}"
 
+class UnifiedBoundLogger(structlog.stdlib.BoundLogger):
+    """Custom BoundLogger to support extended RFC 5424 log levels."""
+    
+    def success(self, event: str, **kw: Any) -> Any:
+        return self._proxy_to_logger("info", event, **{**kw, "level": "success"})
+
+    def notice(self, event: str, **kw: Any) -> Any:
+        return self._proxy_to_logger("info", event, **{**kw, "level": "notice"})
+
+    def alert(self, event: str, **kw: Any) -> Any:
+        return self._proxy_to_logger("error", event, **{**kw, "level": "alert"})
+
+    def emergency(self, event: str, **kw: Any) -> Any:
+        return self._proxy_to_logger("critical", event, **{**kw, "level": "emergency"})
+
 def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optional[str] = None, force_stderr: bool = True):
     """Standardized logging setup for all codebases."""
     from shared.config import get_settings
@@ -410,7 +425,7 @@ def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optiona
     structlog.configure(
         processors=processors,
         logger_factory=structlog.stdlib.LoggerFactory(),
-        wrapper_class=structlog.stdlib.BoundLogger,
+        wrapper_class=UnifiedBoundLogger,
         cache_logger_on_first_use=True,
     )
 
@@ -477,7 +492,7 @@ def bind_contextvars(**kwargs): structlog.contextvars.bind_contextvars(**kwargs)
 def clear_contextvars(): structlog.contextvars.clear_contextvars()
 
 def get_logger(name: str) -> structlog.stdlib.BoundLogger: 
-    """Get a standardized logger with Kea metadata."""
+    """Get a standardized logger with unified metadata."""
     # Note: We avoid importing from shared.config at module level to prevent circular deps
     # We only sync flags if they are still unknown, using a safe lazy import
     if DEFAULT_FLAGS["env"] == "unknown":
@@ -522,16 +537,6 @@ def log_mcp_message(source: str, level: LogLevel, data: Any, logger_name: Option
     rpc = JSONRPCLog(method="notifications/message", params={"level": level.value, "logger": logger_name, "data": data})
     env = IOEnvelope(type=IOType.RPC_NOTIFICATION, source=source, data=rpc.model_dump(exclude_none=True), proto="json-rpc", **kw)
     get_logger("io").info(f"📢 MCP LOG [{level.value}] from {source}", io=env.model_dump())
-
-def success(self, event, **kw): return self._proxy_to_logger("info", event, **{**kw, "level": "success"})
-def notice(self, event, **kw): return self._proxy_to_logger("info", event, **{**kw, "level": "notice"})
-def alert(self, event, **kw): return self._proxy_to_logger("error", event, **{**kw, "level": "alert"})
-def emergency(self, event, **kw): return self._proxy_to_logger("critical", event, **{**kw, "level": "emergency"})
-structlog.stdlib.BoundLogger.success = success
-structlog.stdlib.BoundLogger.notice = notice
-structlog.stdlib.BoundLogger.alert = alert
-structlog.stdlib.BoundLogger.emergency = emergency
-
 
 # ============================================================================
 # 🤖 LLM Interaction Helpers (Premium Test Mode Visibility)
