@@ -279,34 +279,44 @@ class ConsoleRenderer:
 
         if self._colors and self._rich_available:
             # Use incredibly diverse text coloring on the raw payload
-            message_colored = _colorize_message(message)
+            # Limit message length for colorization to prevent regex performance issues
+            message_colored = _colorize_message(message[:5000])
             
             io_hint = ""
             if "io" in event_dict:
-                io_val = event_dict["io"]
-                io_type = io_val.get("type", "unknown").upper()
-                io_hint = f" \\[[bold yellow]IO:{io_type}[/]]"
-                
-                # Flatten IO data into the dict so it renders as flags
-                io_data = io_val.get("data")
-                if isinstance(io_data, dict):
-                    for k, v in io_data.items():
-                        if k not in event_dict:
-                            event_dict[k] = v
-                elif io_data is not None:
-                    event_dict["data"] = io_data
+                try:
+                    io_val = event_dict["io"]
+                    if isinstance(io_val, dict):
+                        io_type = io_val.get("type", "unknown").upper()
+                        io_hint = f" \\[[bold yellow]IO:{io_type}[/]]"
+                        
+                        # Flatten IO data into the dict so it renders as flags
+                        io_data = io_val.get("data")
+                        if isinstance(io_data, dict):
+                            for k, v in io_data.items():
+                                if k not in event_dict:
+                                    event_dict[k] = v
+                        elif io_data is not None:
+                            event_dict["data"] = io_data
+                except Exception:
+                    pass
 
             flags = []
             for key, value in event_dict.items():
                 if key in ("level", "timestamp", "logger", "exception", "io", "env", "version"):
                     continue
-                val_str = str(value).replace("[", "\\[")
+                
+                # Defensively truncate large objects to prevent console overflow or memory crashes
+                safe_val = _truncate_data(value, max_len=1000, max_depth=2)
+                val_str = str(safe_val).replace("[", "\\[")
+                
                 if val_str.lower() == "true":
                     val_str = f"[bold green]{val_str}[/]"
                 elif val_str.lower() == "false":
                     val_str = f"[bold red]{val_str}[/]"
                 elif val_str.isdigit() or val_str.replace('.', '', 1).isdigit():
                     val_str = f"[bold magenta]{val_str}[/]"
+                
                 flags.append(f"\\[[bold cyan]{key}[/]=[green]{val_str}[/]]")
 
             theme_level = f"logging.level.{level}" 
@@ -331,24 +341,29 @@ class ConsoleRenderer:
             # Fallback pure string for standard logging without rich
             io_hint = ""
             if "io" in event_dict:
-                io_val = event_dict["io"]
-                io_type = io_val.get("type", "unknown").upper()
-                io_hint = f" [IO:{io_type}]"
-                
-                # Flatten IO data
-                io_data = io_val.get("data")
-                if isinstance(io_data, dict):
-                    for k, v in io_data.items():
-                        if k not in event_dict:
-                            event_dict[k] = v
-                elif io_data is not None:
-                    event_dict["data"] = io_data
+                try:
+                    io_val = event_dict["io"]
+                    if isinstance(io_val, dict):
+                        io_type = io_val.get("type", "unknown").upper()
+                        io_hint = f" [IO:{io_type}]"
+                        
+                        # Flatten IO data
+                        io_data = io_val.get("data")
+                        if isinstance(io_data, dict):
+                            for k, v in io_data.items():
+                                if k not in event_dict:
+                                    event_dict[k] = v
+                        elif io_data is not None:
+                            event_dict["data"] = io_data
+                except Exception:
+                    pass
 
             flags = []
             for key, value in event_dict.items():
                 if key in ("level", "timestamp", "logger", "exception", "io", "env", "version"):
                     continue
-                flags.append(f"[{key}={value}]")
+                safe_val = _truncate_data(value, max_len=1000, max_depth=2)
+                flags.append(f"[{key}={safe_val}]")
                 
             tail = " → " + " ".join(flags) if flags else ""
             return f"[{timestamp}] [{symbol} {level.upper():<8}] [{logger_name:<12}]{io_hint} {message}{tail}"
