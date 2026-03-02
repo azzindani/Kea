@@ -954,6 +954,8 @@ class ConsciousObserver:
             agent_state.active_dag_id = active_dag.dag_id
 
         stm = ShortTermMemory()
+        if active_dag:
+            stm.register_dag(active_dag.dag_id, [n.node_id for n in active_dag.nodes])
 
         loop_result, decisions, outputs, simplified, escalated, aborted = (
             await self._run_ooda_with_clm(
@@ -1085,6 +1087,8 @@ class ConsciousObserver:
             agent_state.active_dag_id = active_dag.dag_id
 
         stm = ShortTermMemory()
+        if active_dag:
+            stm.register_dag(active_dag.dag_id, [n.node_id for n in active_dag.nodes])
 
         loop_result, decisions, outputs, simplified, escalated, aborted = (
             await self._run_ooda_with_clm(

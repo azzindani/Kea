@@ -385,7 +385,7 @@ async def decompose_goal(context: WorldState, kit: InferenceKit | None = None) -
                         "Decompose the task into sub-tasks. "
                         "Respond EXACTLY in JSON: [{\"id\": \"...\", \"description\": \"...\", \"domain\": \"...\", "
                         "\"required_skills\": [\"...\"], \"required_tools\": [\"...\"], \"depends_on\": [\"id_...\"], "
-                        "\"inputs\": [\"...\"], \"outputs\": [\"...\"], \"action_type\": \"...\", \"parallelizable\": true/false}]"
+                        "\"inputs\": [\"...\"], \"outputs\": [\"...\"], \"action_type\": \"...\" (must be one of: tool_call, llm_inference, data_transform, general), \"parallelizable\": true/false}]"
                     )
                 )
                 user_msg = LLMMessage(role="user", content=f"Goal: {context.goal}\nContext: {json.dumps(context.context)}")
