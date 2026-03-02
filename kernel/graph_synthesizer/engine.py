@@ -92,7 +92,7 @@ async def map_subtasks_to_nodes(subtasks: list[SubTaskItem], kit: InferenceKit |
         )
         
         # Log the mapping details for JIT transparency
-        log.info(
+        log.debug(
             "📍 JIT Mapping: Task to Node established",
             task_id=task.id,
             node_id=node.node_id,
@@ -106,7 +106,7 @@ async def map_subtasks_to_nodes(subtasks: list[SubTaskItem], kit: InferenceKit |
 
         nodes.append(node)
 
-    log.info("📊 Graph Synthesis: Mapped sub-tasks to nodes", task_count=len(subtasks), node_count=len(nodes))
+    log.debug("📊 Graph Synthesis: Mapped sub-tasks to nodes", task_count=len(subtasks), node_count=len(nodes))
     return nodes
 
 
@@ -157,7 +157,7 @@ def calculate_dependency_edges(nodes: list[ExecutableNode]) -> list[Edge]:
                     ))
                     node_ids_with_deps.add(node.node_id)
 
-    log.info(
+    log.debug(
         "Dependency edges calculated",
         total_edges=len(edges),
         nodes_with_deps=len(node_ids_with_deps),
@@ -242,7 +242,7 @@ def compile_dag(
         has_state_mutations=has_mutations,
     )
 
-    log.info(
+    log.notice(
         "DAG compiled",
         dag_id=dag_id,
         nodes=len(nodes),
@@ -468,7 +468,7 @@ async def synthesize_plan(
             },
         )
 
-        log.info(
+        log.notice(
             "Plan synthesis complete",
             dag_id=dag.dag_id,
             nodes=len(nodes),

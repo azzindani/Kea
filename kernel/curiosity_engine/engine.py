@@ -146,7 +146,7 @@ async def formulate_questions(
                 data = json.loads(content)
                 query_text = data.get("query", query_text)
             except Exception as e:
-                log.warning("LLM query refinement failed", error=str(e))
+                log.debug("LLM query refinement failed", error=str(e))
                 pass
 
         queries.append(ExplorationQuery(
@@ -263,7 +263,7 @@ async def explore_gaps(
             },
         )
 
-        log.info(
+        log.notice(
             "Gap exploration complete",
             gaps=len(gaps),
             queries=len(queries),

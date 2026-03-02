@@ -115,7 +115,7 @@ async def evaluate_consensus(
                     best_score = candidate_score
                     best_dag = dag
 
-    log.info(
+    log.notice(
         "Consensus evaluation complete",
         candidates_evaluated=len(candidates),
         selected_dag=best_dag.dag_id,
@@ -202,7 +202,7 @@ async def check_value_guardrails(dag: ExecutableDAG, kit: InferenceKit | None = 
         policies_checked=len(forbidden_actions) * len(dag.nodes),
     )
 
-    log.info(
+    log.notice(
         "Guardrail check complete",
         dag_id=dag.dag_id,
         passed=passed,
@@ -283,7 +283,7 @@ async def run_pre_execution_check(dag: ExecutableDAG, kit: InferenceKit | None =
             },
         )
 
-        log.info(
+        log.notice(
             "Pre-execution check complete",
             decision=decision.value,
             violations=len(guardrail_result.violations),
@@ -377,7 +377,7 @@ def critique_execution(
         strengths=strengths,
     )
 
-    log.info(
+    log.notice(
         "Execution critique complete",
         dag_id=result.dag_id,
         success_rate=round(success_rate, 3),
@@ -441,7 +441,7 @@ def optimize_loop(critique: CritiqueReport) -> list[OptimizationSuggestion]:
             estimated_improvement=0.3,
         ))
 
-    log.info("Optimization suggestions generated", count=len(suggestions))
+    log.debug("Optimization suggestions generated", count=len(suggestions))
     return suggestions
 
 
@@ -473,7 +473,7 @@ async def commit_policy_update(
         committed_to_vault=False,  # Vault integration is via service API
     )
 
-    log.info(
+    log.debug(
         "Reflection insight packaged",
         insight_id=insight.insight_id,
         dag_id=critique.dag_id,
@@ -527,7 +527,7 @@ async def run_post_execution_reflection(
             },
         )
 
-        log.info(
+        log.notice(
             "Post-execution reflection complete",
             dag_id=result.dag_id,
             success_rate=round(critique.success_rate, 3),

@@ -110,14 +110,14 @@ def inject_telemetry(
             dag_id=dag_id,
             node_id=node_id,
         )
-        bound_log.info("Node execution started")
+        bound_log.debug("Node execution started")
         start = time.perf_counter()
 
         result = await wrapped_callable(state)
 
         elapsed_ms = (time.perf_counter() - start) * 1000
         success = result.get("__node_success__", True)
-        bound_log.info(
+        bound_log.debug(
             "Node execution completed",
             duration_ms=round(elapsed_ms, 2),
             success=success,
@@ -337,7 +337,7 @@ async def assemble_node(
             tags={"layers": ",".join(layers_applied)},
         )
 
-        log.info(
+        log.debug(
             "Node assembled",
             node_id=node_id,
             layers=layers_applied,

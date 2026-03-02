@@ -304,7 +304,7 @@ async def score(
             tags={"score": f"{final:.3f}"},
         )
 
-        log.info(
+        log.debug(
             "Scoring complete",
             final=round(final, 3),
             semantic=round(semantic, 3),

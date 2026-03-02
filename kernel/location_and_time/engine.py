@@ -666,7 +666,7 @@ async def anchor_spatiotemporal(
                             spatial.constituent_labels = s["constituents"]
                         spatial.confidence = 0.95
 
-                log.info("Semantic reasoning complete", reasoning=data.get("reasoning"))
+                log.debug("Semantic reasoning complete", reasoning=data.get("reasoning"))
 
             except Exception as e:
                 log.warning("Semantic spatiotemporal reasoning failed", error=str(e))
@@ -690,7 +690,7 @@ async def anchor_spatiotemporal(
             },
         )
 
-        log.info(
+        log.notice(
             "Spatiotemporal anchoring complete",
             temporal_signals=len(temporal_signals),
             spatial_signals=len(spatial_signals),

@@ -294,7 +294,7 @@ async def filter_output(
             # Clear retry budget on success
             clear_retry_budget(output.output_id)
 
-            log.info(
+            log.notice(
                 "Output passed noise gate",
                 output_id=output.output_id,
                 grounding_score=round(grounding.grounding_score, 3),

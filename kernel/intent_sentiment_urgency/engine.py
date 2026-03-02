@@ -452,7 +452,7 @@ async def run_primitive_scorers(text: str, kit: InferenceKit | None = None) -> R
             },
         )
 
-        log.info(
+        log.debug(
             "Primitive scorers complete",
             intent=intent.primary.value,
             sentiment=sentiment.primary.value,

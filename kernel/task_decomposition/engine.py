@@ -438,7 +438,7 @@ async def decompose_goal(context: WorldState, kit: InferenceKit | None = None) -
             },
         )
 
-        log.info(
+        log.notice(
             "Goal decomposition complete",
             complexity=assessment.level.value,
             task_count=len(tasks),

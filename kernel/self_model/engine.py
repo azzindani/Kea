@@ -371,7 +371,7 @@ async def refresh_capability_map(
     if knowledge_domains is not None:
         _knowledge_domains = set(knowledge_domains)
 
-    log.info(
+    log.notice(
         "Capability map refreshed",
         skills=len(_known_skills),
         tools=len(_available_tools),
@@ -424,7 +424,7 @@ async def run_self_model(
             },
         )
 
-        log.info(
+        log.notice(
             "Self-model evaluation complete",
             can_handle=assessment.can_handle,
             confidence=round(assessment.confidence, 3),

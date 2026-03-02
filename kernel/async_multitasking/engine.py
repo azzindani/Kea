@@ -112,7 +112,7 @@ async def park_dag_state(
         parked_utc=datetime.now(UTC).isoformat(),
     )
 
-    log.info(
+    log.notice(
         "DAG parked",
         dag_id=dag.dag_id,
         ticket_id=ticket.ticket_id,
@@ -159,7 +159,7 @@ async def register_wait_listener(
         registered_utc=datetime.now(UTC).isoformat(),
     )
 
-    log.info(
+    log.debug(
         "Wait listener registered",
         handle_id=handle.handle_id,
         ticket_id=parking_ticket.ticket_id,
@@ -188,14 +188,14 @@ async def switch_context(dag_queue: DAGQueue) -> str | None:
     ]
 
     if not active_entries:
-        log.info("No actionable DAGs in queue, signaling for sleep")
+        log.debug("No actionable DAGs in queue, signaling for sleep")
         return None
 
     # Sort by priority (lower = higher priority)
     active_entries.sort(key=lambda e: e.priority)
     selected = active_entries[0]
 
-    log.info(
+    log.notice(
         "Context switch",
         target_dag=selected.dag_id,
         priority=selected.priority,
@@ -230,7 +230,7 @@ async def request_deep_sleep(
         entered_sleep_utc=datetime.now(UTC).isoformat(),
     )
 
-    log.info(
+    log.notice(
         "Deep sleep requested",
         token_id=token.token_id,
         parked_dags=len(parked_tickets),
@@ -330,7 +330,7 @@ async def manage_async_tasks(
             },
         )
 
-        log.info(
+        log.notice(
             "Async task management complete",
             action=next_action.kind.value,
             async_required=needs_async,

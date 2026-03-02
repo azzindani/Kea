@@ -142,7 +142,7 @@ async def handle_interrupt(
 
     action = action_map.get(interrupt_signal.interrupt_type, InterruptAction.IGNORE)
 
-    log.info(
+    log.notice(
         "Interrupt handled",
         interrupt_type=interrupt_signal.interrupt_type.value,
         action=action.value,
@@ -191,7 +191,7 @@ async def manage_lifecycle_state(
         agent_id=agent_id,
     )
 
-    log.info(
+    log.notice(
         "Lifecycle state transition",
         from_phase=current_phase.value,
         to_phase=new_phase.value,
@@ -305,7 +305,7 @@ async def enforce_energy_authority(
             },
         )
 
-        log.info(
+        log.notice(
             "Energy authority decision",
             action=action.value,
             utilization=round(budget_state.utilization, 3),

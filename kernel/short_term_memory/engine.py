@@ -225,7 +225,7 @@ class ShortTermMemory:
             self._entity_embeddings.pop(evicted_key, None)
             log.debug("Evicted entity from STM cache", key=evicted_key)
 
-        log.info("STM: Entity cached (Artifact stored)", key=key, size=len(str(value)))
+        log.debug("STM: Entity cached (Artifact stored)", key=key, size=len(str(value)))
 
     def get_entity(self, key: str) -> Any | None:
         """Retrieve a cached entity by key, or None if expired/missing."""
@@ -388,7 +388,7 @@ class ShortTermMemory:
         self._total_events_processed = 0
         self._total_entities_cached = 0
 
-        log.info(
+        log.notice(
             "STM epoch flush complete",
             epoch_id=summary.epoch_id,
             dags_processed=len(dag_ids),

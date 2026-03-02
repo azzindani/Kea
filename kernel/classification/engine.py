@@ -342,7 +342,7 @@ async def classify(
             tags={"domain": "classification"},
         )
 
-        log.info(
+        log.debug(
             "Classification complete",
             top_label=result.top_label if isinstance(result, ClassificationResult) else "FALLBACK",
             confidence=result.confidence if isinstance(result, ClassificationResult) else 0.0,

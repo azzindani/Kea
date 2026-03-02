@@ -90,7 +90,7 @@ async def filter_attention(task_state: TaskState) -> FilteredState:
     # Sort by relevance (highest first)
     critical.sort(key=lambda e: e.relevance, reverse=True)
 
-    log.info(
+    log.debug(
         "Attention filter complete",
         total=len(task_state.context_elements),
         kept=len(critical),
@@ -252,7 +252,7 @@ async def run_cognitive_filters(
                 tags={"verdict": "pass", "confidence": f"{plausibility.confidence:.2f}"},
             )
 
-            log.info(
+            log.notice(
                 "Cognitive filters passed",
                 confidence=round(plausibility.confidence, 3),
                 context_kept=len(filtered.critical_elements),

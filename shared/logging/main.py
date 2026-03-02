@@ -496,11 +496,11 @@ def get_logger(name: str) -> structlog.stdlib.BoundLogger:
 
 def log_input(source: str, data: Any, **kw):
     env = IOEnvelope(type=IOType.INPUT, source=source, data=data, **kw)
-    get_logger("io").info(f"📥 INPUT from {source}", io=env.model_dump())
+    get_logger("io").debug(f"📥 INPUT from {source}", io=env.model_dump())
 
 def log_output(source: str, data: Any, **kw):
     env = IOEnvelope(type=IOType.OUTPUT, source=source, data=data, **kw)
-    get_logger("io").info(f"📤 OUTPUT from {source}", io=env.model_dump())
+    get_logger("io").debug(f"📤 OUTPUT from {source}", io=env.model_dump())
 
 def log_error(source: str, err: Any, **kw):
     error_data = err if isinstance(err, (dict, list)) else str(err)

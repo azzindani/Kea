@@ -312,7 +312,7 @@ async def simulate_outcomes(
             },
         )
 
-        log.info(
+        log.notice(
             "Simulation complete",
             decision=verdict.decision.value,
             risk=round(verdict.risk_score, 3),

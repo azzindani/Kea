@@ -81,7 +81,7 @@ async def initialize_agent(spawn_request: SpawnRequest) -> AgentIdentity:
         created_utc=_now_utc(),
     )
 
-    log.info(
+    log.notice(
         "Agent initialized",
         agent_id=agent_id,
         role=spawn_request.role,
@@ -117,7 +117,7 @@ async def load_cognitive_profile(profile_id: str) -> CognitiveProfile:
         quality_bar=settings.noise_gate_grounding_threshold,
     )
 
-    log.info(
+    log.debug(
         "Cognitive profile loaded",
         profile_id=profile.profile_id,
         role=profile.role_name,
@@ -151,7 +151,7 @@ def set_identity_constraints(
         quality_bar=profile.quality_bar,
     )
 
-    log.info(
+    log.debug(
         "Identity constraints set",
         agent_id=agent_id,
         role=profile.role_name,
@@ -260,7 +260,7 @@ async def control_sleep_wake(
         transitioned_utc=_now_utc(),
     )
 
-    log.info(
+    log.notice(
         "Lifecycle transition",
         from_phase=current_phase.value,
         to_phase=new_phase.value,
@@ -287,7 +287,7 @@ async def commit_epoch_memory(
     """
     summary = stm.flush_to_summarizer()
 
-    log.info(
+    log.notice(
         "Epoch memory committed",
         epoch_id=summary.epoch_id,
         dags_processed=len(summary.dag_ids_processed),
@@ -362,7 +362,7 @@ async def run_lifecycle(spawn_request: SpawnRequest) -> Result:
             },
         )
 
-        log.info(
+        log.notice(
             "Lifecycle initialized",
             agent_id=identity.agent_id,
             role=identity.role,

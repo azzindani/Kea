@@ -183,7 +183,7 @@ async def transcribe_audio(audio_path: str) -> str:
 
     Delegates to configured STT model. Returns raw transcript.
     """
-    log.info("Audio transcription requested", path=audio_path)
+    log.debug("Audio transcription requested", path=audio_path)
     return f"[Audio transcription pending for: {audio_path}]"
 
 
@@ -198,7 +198,7 @@ async def parse_vision(image_path: str) -> str:
 
     Delegates to configured vision model. Returns text representation.
     """
-    log.info("Vision parsing requested", path=image_path)
+    log.debug("Vision parsing requested", path=image_path)
     return f"[Vision parsing pending for: {image_path}]"
 
 
@@ -299,7 +299,7 @@ async def ingest(input_data: RawInput, kit: InferenceKit | None = None) -> Resul
             tags={"modality": modality.value},
         )
 
-        log.info(
+        log.notice(
             "Modality ingestion complete",
             modality=modality.value,
             has_text=cognitive_context is not None,

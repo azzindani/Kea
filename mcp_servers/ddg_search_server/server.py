@@ -28,6 +28,7 @@ logger = structlog.get_logger()
 
 # Create the FastMCP server
 from shared.logging.main import setup_logging
+from shared.logging.decorators import trace_io
 setup_logging(force_stderr=True)
 
 mcp = FastMCP("ddg_search_server", dependencies=["duckduckgo_search"])
@@ -39,6 +40,7 @@ mcp = FastMCP("ddg_search_server", dependencies=["duckduckgo_search"])
 # 1. Text Search
 # ==========================================
 @mcp.tool()
+@trace_io()
 async def search_text(query: str, region: str = "wt-wt", safe_search: str = "moderate", time: Optional[str] = None, max_results: int = 100000) -> List[Any]: 
     """SEARCHES text. [ACTION]
     
@@ -152,6 +154,7 @@ async def search_stackoverflow(query: str, max_results: int = 100000) -> List[An
 # 2. Image Search
 # ==========================================
 @mcp.tool()
+@trace_io()
 async def search_images(query: str, size: Optional[str] = None, type_image: Optional[str] = None, layout: Optional[str] = None, license_image: Optional[str] = None, max_results: int = 100000) -> List[Any]: 
     """SEARCHES images. [ACTION]
     
@@ -258,6 +261,7 @@ async def find_blue_images(query: str, max_results: int = 100000) -> List[Any]:
 # 3. Video Search
 # ==========================================
 @mcp.tool()
+@trace_io()
 async def search_videos(query: str, resolution: Optional[str] = None, duration: Optional[str] = None, max_results: int = 100000) -> List[Any]: 
     """SEARCHES videos. [ACTION]
     
@@ -311,6 +315,7 @@ async def find_cc_videos(query: str, max_results: int = 100000) -> List[Any]:
 # 4. News
 # ==========================================
 @mcp.tool()
+@trace_io()
 async def search_news(query: str, region: str = "wt-wt", max_results: int = 100000) -> List[Any]: 
     """SEARCHES news. [ACTION]
     

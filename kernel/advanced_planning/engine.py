@@ -143,7 +143,7 @@ async def sequence_and_prioritize(
     # Sort by priority rank (lower = higher priority)
     sequenced.sort(key=lambda t: t.priority_rank)
 
-    log.info(
+    log.debug(
         "Tasks sequenced",
         total=len(sequenced),
         mode=constraints.priority_mode.value,
@@ -208,7 +208,7 @@ async def bind_tools(
         ))
 
     bound_count = sum(1 for t in bound if t.tool_binding is not None)
-    log.info(
+    log.debug(
         "Tools bound",
         total_tasks=len(bound),
         tasks_with_tools=bound_count,
@@ -296,7 +296,7 @@ def generate_hypotheses(bound_tasks: list[BoundTask]) -> list[ExpectedOutcome]:
             confidence=round(confidence, 3),
         ))
 
-    log.info("Hypotheses generated", count=len(hypotheses))
+    log.debug("Hypotheses generated", count=len(hypotheses))
     return hypotheses
 
 
@@ -332,7 +332,7 @@ def inject_progress_tracker(
         constraints=constraints,
     )
 
-    log.info(
+    log.debug(
         "Progress tracker injected",
         plan_id=plan.plan_id,
         total_tasks=len(tasks),
@@ -396,7 +396,7 @@ async def plan_advanced(
             },
         )
 
-        log.info(
+        log.notice(
             "Advanced planning complete",
             plan_id=plan.plan_id,
             tasks=len(plan.tasks),

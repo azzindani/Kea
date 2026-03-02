@@ -504,7 +504,7 @@ async def monitor_cognitive_load(
             },
         )
 
-        log.info(
+        log.notice(
             "Cognitive load monitored",
             action=recommendation.action.value,
             aggregate_load=round(load.aggregate, 3),

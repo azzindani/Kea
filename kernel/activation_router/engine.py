@@ -209,7 +209,7 @@ async def classify_signal_complexity(
                     embedding_bonus = (weight - 0.3) * sim 
             
             if embedding_match:
-                log.info("Complexity determined via embedding anchor", complexity=embedding_match.value, confidence=round(best_sim, 3))
+                log.debug("Complexity determined via embedding anchor", complexity=embedding_match.value, confidence=round(best_sim, 3))
                 return embedding_match
                 
         except Exception as e:
@@ -296,7 +296,7 @@ def select_pipeline(
     pipeline = templates[selected_complexity]
 
     if downgrade > 0:
-        log.info(
+        log.notice(
             "Pipeline downgraded due to pressure",
             original=complexity.value,
             selected=selected_complexity.value,
@@ -429,7 +429,7 @@ async def compute_activation_map(
             },
         )
 
-        log.info(
+        log.notice(
             "Activation map computed",
             pipeline=pipeline.pipeline_name,
             complexity=complexity.value,

@@ -504,7 +504,7 @@ async def verify_grounding(
             },
         )
 
-        log.info(
+        log.notice(
             "Grounding verification complete",
             total_claims=report.total_claims,
             grounded=grounded_count,

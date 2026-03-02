@@ -27,6 +27,7 @@ logger = structlog.get_logger()
 
 # Create the FastMCP server
 from shared.logging.main import setup_logging
+from shared.logging.decorators import trace_io
 setup_logging(force_stderr=True)
 
 mcp = FastMCP("python_server")
@@ -56,6 +57,7 @@ async def run_op(op_func, diff_args=None, **kwargs):
         return f"Error executing tool: {e}"
 
 @mcp.tool()
+@trace_io()
 async def execute_code(
     code: str,
     timeout: int = 30,
@@ -70,6 +72,7 @@ async def execute_code(
     return await run_op(execute_code_module.execute_code_tool, code=code, timeout=timeout, dependencies=dependencies)
 
 @mcp.tool()
+@trace_io()
 async def dataframe_ops(
     operation: str,
     data: str = None,
@@ -84,6 +87,7 @@ async def dataframe_ops(
     return await run_op(dataframe_ops_module.dataframe_ops_tool, operation=operation, data=data, params=params)
 
 @mcp.tool()
+@trace_io()
 async def sql_query(
     query: str,
     data_sources: Dict[str, Any] = None

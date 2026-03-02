@@ -303,7 +303,7 @@ async def run_confidence_calibration(
             },
         )
 
-        log.info(
+        log.notice(
             "Confidence calibrated",
             stated=round(stated_confidence, 3),
             calibrated=round(calibrated.calibrated_confidence, 3),

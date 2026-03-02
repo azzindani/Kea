@@ -320,7 +320,7 @@ async def extract_entities(
             tags={"entity_count": str(len(validated))},
         )
 
-        log.info(
+        log.debug(
             "Entity extraction complete",
             entity_count=len(validated),
             span_count=len(candidate_spans),

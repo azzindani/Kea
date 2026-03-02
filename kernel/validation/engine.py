@@ -312,7 +312,7 @@ async def validate(
             trace_id="",
         )
 
-        log.info("Validation passed", gates=len(gates_passed), duration_ms=round(elapsed, 2))
+        log.debug("Validation passed", gates=len(gates_passed), duration_ms=round(elapsed, 2))
         return ok(signals=[signal], metrics=metrics)
 
     except Exception as exc:
@@ -341,7 +341,7 @@ def _validation_result(ref: ModuleRef, start: float, error_resp: ErrorResponse) 
         detail=error_resp.model_dump(),
     )
     
-    log.info(
+    log.debug(
         "Validation failed",
         gate=error_resp.gate.value,
         message=error_resp.message,

@@ -186,7 +186,7 @@ async def orient(
     # Merge with RAG context
     enriched: dict[str, Any] = dict(context_slice.cached_entities)
     if context_slice.cached_entities:
-        log.info("🧠 OODA Orient: Pulling artifacts (Layer 3 Context)", count=len(context_slice.cached_entities), keys=list(context_slice.cached_entities.keys())[:5])
+        log.debug("🧠 OODA Orient: Pulling artifacts (Layer 3 Context)", count=len(context_slice.cached_entities), keys=list(context_slice.cached_entities.keys())[:5])
     
     if rag_context:
         enriched.update(rag_context)
@@ -208,7 +208,7 @@ async def orient(
         state_changes=state_changes,
     )
 
-    log.info(
+    log.debug(
         "🧠 OODA Orient: Processed environment signals",
         is_blocked=is_blocked,
         state_changes=len(state_changes),
@@ -319,7 +319,7 @@ async def decide(
             reasoning=f"Continuing DAG execution with nodes: {', '.join(next_batch)}",
             target_node_ids=next_batch,
         )
-        log.info("🎯 OODA Decide: Next action determined", action=decision.action.value, target_nodes=decision.target_node_ids, reasoning=decision.reasoning)
+        log.debug("🎯 OODA Decide: Next action determined", action=decision.action.value, target_nodes=decision.target_node_ids, reasoning=decision.reasoning)
         return decision
 
     # No pending nodes — DAG should be complete
@@ -415,7 +415,7 @@ async def act(
                 )
                 user_msg = LLMMessage(role="user", content=node.instruction.description)
                 
-                log.info(
+                log.debug(
                     "🤖 OODA Act: LLM Request (In-Node)", 
                     node_id=node_id, 
                     messages=[{"role": system_msg.role, "content": system_msg.content[:200]}, {"role": user_msg.role, "content": user_msg.content[:200]}]
@@ -423,7 +423,7 @@ async def act(
                 
                 resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
                 node_outputs["answer"] = resp.content.strip()
-                log.info(
+                log.debug(
                     "🚀 OODA Act: LLM inference result received", 
                     node_id=node_id, 
                     content_preview=node_outputs["answer"][:100]
@@ -444,7 +444,7 @@ async def act(
             tool_name = tool_name or "unknown_tool"
             arguments = node.instruction.parameters.get("arguments", {})
             
-            log.info(
+            log.debug(
                 "🛠️ OODA Act: JIT Tool Initialization",
                 node_id=node_id,
                 tool_name=tool_name,
@@ -454,22 +454,20 @@ async def act(
             )
             
             # Validation step (simulated)
-            log.info(
+            log.debug(
                 f"🛡️ OODA Act: Pulling MCP schema for {tool_name}", 
                 node_id=node_id, 
                 schema={"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}
             )
-            log.info(f"🛡️ OODA Act: Validating tool call against retrieved schema for {tool_name}", node_id=node_id, status="PASS")
+            log.debug(f"🛡️ OODA Act: Validating tool call against retrieved schema for {tool_name}", node_id=node_id, status="PASS")
             
             # In kernel simulator, we simulate success for registered tools
             node_outputs["arguments"] = arguments
             node_outputs["answer"] = f"Simulated output from {tool_name} for task: {node.instruction.description[:50]}"
-            log.info("🚀 OODA Act: Tool executed successfully", node_id=node_id, tool=tool_name, success=True)
             
         else:
             # Fallback for 'general' or 'data_transform' nodes
             node_outputs["answer"] = f"Processed {len(node.input_keys)} inputs into {len(node.output_keys)} outputs."
-            log.info("🚀 OODA Act: Generic task completed", node_id=node_id)
         
         elapsed_ms = (time.perf_counter() - start) * 1000
         
@@ -593,9 +591,9 @@ async def run_ooda_cycle(
     if action_results:
         produced_ids = [r.node_id for r in action_results if r.success]
         if produced_ids:
-            log.info("📥 OODA Cycle: Artifacts stored in STM (Tier 4 Persisted)", count=len(produced_ids), ids=produced_ids)
+            log.debug("📥 OODA Cycle: Artifacts stored in STM (Tier 4 Persisted)", count=len(produced_ids), ids=produced_ids)
 
-    log.info(
+    log.notice(
         "OODA cycle complete",
         cycle=cycle_num,
         decision=decision.action.value,
@@ -704,7 +702,7 @@ async def run_ooda_loop(
             },
         )
 
-        log.info(
+        log.notice(
             "OODA loop terminated",
             agent_id=state.agent_id,
             cycles=state.cycle_count,
