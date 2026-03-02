@@ -524,7 +524,13 @@ def log_mcp_message(source: str, level: LogLevel, data: Any, logger_name: Option
     get_logger("io").info(f"📢 MCP LOG [{level.value}] from {source}", io=env.model_dump())
 
 def success(self, event, **kw): return self._proxy_to_logger("info", event, **{**kw, "level": "success"})
+def notice(self, event, **kw): return self._proxy_to_logger("info", event, **{**kw, "level": "notice"})
+def alert(self, event, **kw): return self._proxy_to_logger("error", event, **{**kw, "level": "alert"})
+def emergency(self, event, **kw): return self._proxy_to_logger("critical", event, **{**kw, "level": "emergency"})
 structlog.stdlib.BoundLogger.success = success
+structlog.stdlib.BoundLogger.notice = notice
+structlog.stdlib.BoundLogger.alert = alert
+structlog.stdlib.BoundLogger.emergency = emergency
 
 
 # ============================================================================
