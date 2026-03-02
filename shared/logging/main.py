@@ -160,6 +160,42 @@ class JSONRPCLog(BaseModel):
     error: Optional[Dict[str, Any]] = None
 
 # ============================================================================
+# ⚙️ Internal Helpers
+# ============================================================================
+
+def _truncate_data(data: Any, max_len: int = 2000, max_depth: int = 3, current_depth: int = 0) -> Any:
+    """Recursively truncate nested data structures to prevent log bloat and OOM."""
+    if current_depth > max_depth:
+        return "[Depth Limit Exceeded]"
+    
+    if isinstance(data, str):
+        if len(data) > max_len:
+            return data[:max_len] + f"\n[... truncated {len(data) - max_len} chars]"
+        return data
+    
+    if isinstance(data, list):
+        if not data: return []
+        # Support for list truncation
+        limit = 20 # Max items in a list for logging
+        truncated = [_truncate_data(item, max_len, max_depth, current_depth + 1) for item in data[:limit]]
+        if len(data) > limit:
+            truncated.append(f"[... truncated {len(data) - limit} items]")
+        return truncated
+    
+    if isinstance(data, dict):
+        if not data: return {}
+        # Support for dict truncation
+        res = {}
+        for i, (k, v) in enumerate(data.items()):
+            if i >= 30: # Max keys in a dict for logging
+                res["[... truncated keys]"] = f"{len(data) - 30} more"
+                break
+            res[k] = _truncate_data(v, max_len, max_depth, current_depth + 1)
+        return res
+    
+    return data
+
+# ============================================================================
 # 🖥️ Rendering & Configuration
 # ============================================================================
 
@@ -384,16 +420,23 @@ except ImportError:
 
 def bind_contextvars(**kwargs): structlog.contextvars.bind_contextvars(**kwargs)
 def clear_contextvars(): structlog.contextvars.clear_contextvars()
+
 def get_logger(name: str) -> structlog.stdlib.BoundLogger: 
-    # Lazy sync of default flags if they are still unknown
+    """Get a standardized logger with Kea metadata."""
+    # Note: We avoid importing from shared.config at module level to prevent circular deps
+    # We only sync flags if they are still unknown, using a safe lazy import
     if DEFAULT_FLAGS["env"] == "unknown":
         try:
-            from shared.config import get_settings
-            settings = get_settings()
-            DEFAULT_FLAGS["env"] = settings.app.environment
-            DEFAULT_FLAGS["version"] = settings.app.version
+            import sys
+            # Check if shared.config is already loaded to avoid triggering a new load during bootstrap
+            if "shared.config" in sys.modules:
+                from shared.config import get_settings
+                settings = get_settings()
+                DEFAULT_FLAGS["env"] = str(settings.app.environment.value if hasattr(settings.app.environment, "value") else settings.app.environment)
+                DEFAULT_FLAGS["version"] = settings.app.version
         except Exception:
             pass
+            
     return structlog.get_logger(name).bind(**DEFAULT_FLAGS)
 
 def log_input(source: str, data: Any, **kw):
@@ -478,9 +521,12 @@ def log_llm_request(logger: Any, messages: List[Union[Dict[str, Any], Any]], mod
                 role = str(m.get("role", "unknown"))
                 content = str(m.get("content", ""))
             
+            # STABILIZATION: Truncate large prompt content
+            truncated_content = _truncate_data(content, max_len=1500)
+            
             role_style = "bold magenta" if role == "system" else "bold green" if role == "user" else "bold cyan"
             # Escape content to prevent rich markup issues
-            escaped_content = str(content).replace("[", "\\[")
+            escaped_content = str(truncated_content).replace("[", "\\[")
             lines.append(f"[{role_style}]{role.upper():<9}[/] {escaped_content}")
         lines.append("[bold cyan]" + "━" * 88 + "[/]")
         console.print("\n".join(lines))
@@ -511,11 +557,15 @@ def log_llm_response(logger: Any, content: str, model: str, reasoning: Optional[
         except Exception:
             pass
 
+        # STABILIZATION: Truncate large response content
+        truncated_content = _truncate_data(content, max_len=2000)
+        truncated_reasoning = _truncate_data(reasoning, max_len=1000) if reasoning else None
+
         # Escape content to prevent rich markup issues
-        escaped_content = display_content.replace("[", "\\[")
+        escaped_content = str(truncated_content).replace("[", "\\[")
         lines.append(escaped_content)
-        if reasoning:
-            lines.append(f"\n[bold yellow]Reasoning:[/] [cyan]{str(reasoning).replace('[', '\\[')}[/]")
+        if truncated_reasoning:
+            lines.append(f"\n[bold yellow]Reasoning:[/] [cyan]{str(truncated_reasoning).replace('[', '\\[')}[/]")
         lines.append("[bold cyan]" + "━" * 88 + "[/]")
         console.print("\n".join(lines))
 
@@ -534,9 +584,11 @@ def log_node_assembly(logger: Any, node_id: str, type: str, layers: List[str], i
             lines.append(f"  • [bold magenta]Logic Layers:[/] [green]{' → '.join(layers)}[/]")
             
             if input_schema:
-                lines.append(f"  • [bold magenta]Input Schema:[/] [yellow]{str(input_schema)[:200]}[/]")
+                truncated_in = _truncate_data(str(input_schema), max_len=300)
+                lines.append(f"  • [bold magenta]Input Schema:[/] [yellow]{truncated_in}[/]")
             if output_schema:
-                lines.append(f"  • [bold magenta]Output Schema:[/] [yellow]{str(output_schema)[:200]}[/]")
+                truncated_out = _truncate_data(str(output_schema), max_len=300)
+                lines.append(f"  • [bold magenta]Output Schema:[/] [yellow]{truncated_out}[/]")
                 
             lines.append("[bold cyan]" + "┄" * 88 + "[/]")
             console.print("\n".join(lines))
@@ -562,9 +614,10 @@ def log_dag_blueprint(logger: Any, dag_id: str, objective: str, nodes: List[Dict
                 nid = n.get("id", "??")
                 ntype = n.get("type", "??").upper()
                 desc = n.get("description", "??")
+                truncated_desc = desc[:100] + "..." if len(desc) > 100 else desc
                 tool = n.get("tool", "")
                 tool_str = f" [bold blue](Tool: {tool})[/]" if tool else ""
-                lines.append(f"  • [bold cyan][{nid}][/] [{ntype}]{tool_str} {desc[:80]}...")
+                lines.append(f"  • [bold cyan][{nid}][/] [{ntype}]{tool_str} {truncated_desc}...")
                 
                 inputs = n.get("inputs", [])
                 outputs = n.get("outputs", [])
@@ -604,9 +657,9 @@ def log_node_execution_start(logger: Any, node_id: str, description: str, inputs
             lines = [f"\n\\[[bold blue]{timestamp}[/]] 🚀 [bold yellow]EXECUTING NODE:[/] [bold cyan]{node_id}[/]"]
             lines.append(f"  • [bold magenta]Task:[/] {description}")
             
-            # Show resolved input data
+            # STABILIZATION: Robust TRUNCATION of input data
             if input_data:
-                clean_input = {k: (str(v)[:100] + "...") if isinstance(v, str) and len(str(v)) > 100 else v for k, v in input_data.items()}
+                clean_input = _truncate_data(input_data, max_len=200, max_depth=2)
                 lines.append(f"  • [bold magenta]Inputs Resolved:[/] [yellow]{json.dumps(clean_input, indent=2).replace('[', '\\[')}[/]")
             else:
                 lines.append("  • [bold magenta]Inputs Resolved:[/] [dim]None (Initial state or fallback)[/]")
@@ -630,26 +683,22 @@ def log_tool_execution(logger: Any, node_id: str, tool_name: str, arguments: Dic
             lines = [f"\n\\[[bold blue]{timestamp}[/]] ✨ [bold cyan]NODE COMPLETED: {node_id}[/] (via {tool_name})"]
             lines.append(f"  • [bold magenta]Status:[/] {status_sym} [dim]({round(duration_ms, 2)}ms)[/]")
             
-            # Format arguments (limit size)
+            # STABILIZATION: Truncate arguments
             if arguments:
-                arg_json = json.dumps(arguments, indent=2)
-                if len(arg_json) > 1000:
-                    arg_json = arg_json[:1000] + "... (truncated)"
+                clean_args = _truncate_data(arguments, max_len=500, max_depth=2)
+                arg_json = json.dumps(clean_args, indent=2)
                 lines.append(f"  • [bold magenta]Arguments:[/] [yellow]{arg_json.replace('[', '\\[')}[/]")
             
-            # Format outputs (limit size)
+            # STABILIZATION: Robust truncation of outputs
             if outputs:
-                # If there's a primary 'answer' or 'content', show it prominently
                 main_content = outputs.get("answer") or outputs.get("content") or outputs.get("result")
                 if main_content and isinstance(main_content, str):
-                    content_escaped = main_content.replace("[", "\\[")
-                    if len(content_escaped) > 2000:
-                        content_escaped = content_escaped[:2000] + "\n[bold red](Content truncated for log visibility)...[/]"
+                    truncated_content = _truncate_data(main_content, max_len=3000)
+                    content_escaped = truncated_content.replace("[", "\\[")
                     lines.append(f"  • [bold magenta]Output Content:[/]\n[green]{content_escaped}[/]")
                 else:
-                    out_json = json.dumps(outputs, indent=2)
-                    if len(out_json) > 4000:
-                        out_json = out_json[:4000] + "... (truncated)"
+                    clean_outputs = _truncate_data(outputs, max_len=1000, max_depth=2)
+                    out_json = json.dumps(clean_outputs, indent=2)
                     lines.append(f"  • [bold magenta]Outputs Raw (JSON):[/] [green]{out_json.replace('[', '\\[')}[/]")
             
             lines.append("[bold cyan]" + "━" * 88 + "[/]")
@@ -672,8 +721,9 @@ def log_final_result(logger: Any, objective: str, content: str, artifacts_count:
             lines.append(f"[bold cyan]Trace ID:[/] [magenta]{trace_id}[/]")
             lines.append("[bold cyan]" + "━" * 88 + "[/]")
             
-            # Handle potential markdown content
-            content_escaped = str(content).replace("[", "\\[")
+            # STABILIZATION: Truncate final deliverable content
+            truncated_content = _truncate_data(content, max_len=10000)
+            content_escaped = str(truncated_content).replace("[", "\\[")
             lines.append(f"[bold yellow]FINAL DELIVERABLE:[/]\n{content_escaped}")
             
             lines.append(f"\n[bold cyan]Artifacts produced:[/] [bold magenta]{artifacts_count}[/]")
