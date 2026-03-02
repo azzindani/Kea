@@ -187,12 +187,15 @@ def _colorize_message(msg: str) -> str:
             
         return f"\\[[bold cyan]{k}[/]=[green]{v}[/]]"
 
-    # Regex: Boundary -> Word -> optional space -> = or : -> optional space -> NoSpacesOrQuotesOrBrackets
-    m = re.sub(r'\b([A-Za-z_][A-Za-z0-9_]*)\s*[:=]\s*([^\s\\[\\]\'\"]+)', kv_replacer, m)
     
-    # Colorize any single or double quoted strings
-    m = re.sub(r"('[^']*')", r"[yellow]\1[/]", m)
-    m = re.sub(r'("[^"]*")', r"[yellow]\1[/]", m)
+    # regex for key-value pairs (e.g. key=value or key: value)
+    # Optimized to avoid backtracking on large strings
+    m = re.sub(r'\b([A-Za-z_][A-Za-z0-9_]*)\s*[=]\s*([^\s\\[\\]\'\"]{1,500})', kv_replacer, m)
+    m = re.sub(r'\b([A-Za-z_][A-Za-z0-9_]*)\s*[:]\s*([^\s\\[\\]\'\"]{1,500})', kv_replacer, m)
+    
+    # Colorize any single or double quoted strings (limit length to prevent regex explosion)
+    m = re.sub(r"('[^']{1,500}')", r"[yellow]\1[/]", m)
+    m = re.sub(r'("[^"]{1,500}")', r"[yellow]\1[/]", m)
     
     return m
 
@@ -429,11 +432,20 @@ structlog.stdlib.BoundLogger.success = success
 # 🤖 LLM Interaction Helpers (Premium Test Mode Visibility)
 # ============================================================================
 
+# Global singleton console to prevent resource leaks and initialization overhead
+_GLOBAL_RICH_CONSOLE: Optional[Any] = None
+
 def _get_rich_console():
-    """Get a shared rich console for test rendering."""
+    """Get a shared rich console singleton for optimized rendering."""
+    global _GLOBAL_RICH_CONSOLE
+    if _GLOBAL_RICH_CONSOLE is not None:
+        return _GLOBAL_RICH_CONSOLE
+        
     try:
         from rich.console import Console
-        return Console(theme=_get_rich_theme(), stderr=True)
+        # width=None allows the console to detect terminal width automatically
+        _GLOBAL_RICH_CONSOLE = Console(theme=_get_rich_theme(), stderr=True, width=140)
+        return _GLOBAL_RICH_CONSOLE
     except ImportError:
         return None
 
@@ -511,79 +523,95 @@ def log_dag_blueprint(logger: Any, dag_id: str, objective: str, nodes: List[Dict
     """Log a structured, architect-level blueprint of the DAG."""
     logger.info("DAG Blueprint generated", dag_id=dag_id, node_count=len(nodes), edge_count=len(edges))
     
-    if os.getenv("TEST_MODE") == "1" or True: # Always show for now to satisfy USER
+    if os.getenv("TEST_MODE") == "1" or os.getenv("VERBOSE_LOGGING") == "1":
         console = _get_rich_console()
         if not console: return
 
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        lines = [f"\n\\[[bold blue]{timestamp}[/]] 🏗️  [bold yellow]DAG BLUEPRINT: {dag_id}[/]"]
-        lines.append(f"[bold cyan]Objective:[/] [green]{objective}[/]")
-        lines.append("[bold cyan]" + "━" * 88 + "[/]")
-        
-        lines.append("[bold magenta]NODES:[/]")
-        for n in nodes:
-            nid = n.get("id", "??")
-            ntype = n.get("type", "??").upper()
-            desc = n.get("description", "??")
-            tool = n.get("tool", "")
-            tool_str = f" [bold blue](Tool: {tool})[/]" if tool else ""
-            lines.append(f"  • [bold cyan][{nid}][/] [{ntype}]{tool_str} {desc[:80]}...")
+        try:
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            lines = [f"\n\\[[bold blue]{timestamp}[/]] 🏗️  [bold yellow]DAG BLUEPRINT: {dag_id}[/]"]
+            lines.append(f"[bold cyan]Objective:[/] [green]{objective}[/]")
+            lines.append("[bold cyan]" + "━" * 88 + "[/]")
             
-            inputs = n.get("inputs", [])
-            outputs = n.get("outputs", [])
-            if inputs or outputs:
-                lines.append(f"    [dim]↳ Inputs: {inputs} | Outputs: {outputs}[/]")
+            lines.append("[bold magenta]NODES:[/]")
+            for n in nodes[:50]: # Limit node count in blueprint to prevent hang
+                nid = n.get("id", "??")
+                ntype = n.get("type", "??").upper()
+                desc = n.get("description", "??")
+                tool = n.get("tool", "")
+                tool_str = f" [bold blue](Tool: {tool})[/]" if tool else ""
+                lines.append(f"  • [bold cyan][{nid}][/] [{ntype}]{tool_str} {desc[:80]}...")
+                
+                inputs = n.get("inputs", [])
+                outputs = n.get("outputs", [])
+                if inputs or outputs:
+                    lines.append(f"    [dim]↳ Inputs: {inputs} | Outputs: {outputs}[/]")
 
-        if edges:
-            lines.append("\n[bold magenta]EDGES (Data Flow):[/]")
-            for e in edges:
-                u = e.get("from", "??")
-                v = e.get("to", "??")
-                key = e.get("key", "??")
-                lines.append(f"  • [bold cyan]{u}[/] [yellow]──({key})──>[/] [bold cyan]{v}[/]")
-        else:
-            lines.append("\n[bold magenta]EDGES:[/] [dim]None (Parallel execution batching)[/]")
+            if len(nodes) > 50:
+                lines.append(f"  ... and {len(nodes) - 50} more nodes.")
 
-        lines.append("[bold cyan]" + "━" * 88 + "[/]")
-        console.print("\n".join(lines))
+            if edges:
+                lines.append("\n[bold magenta]EDGES (Data Flow):[/]")
+                for e in edges[:100]: # Limit edge count
+                    u = e.get("from", "??")
+                    v = e.get("to", "??")
+                    key = e.get("key", "??")
+                    lines.append(f"  • [bold cyan]{u}[/] [yellow]──({key})──>[/] [bold cyan]{v}[/]")
+                if len(edges) > 100:
+                    lines.append(f"  ... and {len(edges) - 100} more edges.")
+            else:
+                lines.append("\n[bold magenta]EDGES:[/] [dim]None (Parallel execution batching)[/]")
+
+            lines.append("[bold cyan]" + "━" * 88 + "[/]")
+            console.print("\n".join(lines))
+        except Exception as e:
+            logger.warning(f"Failed to render DAG blueprint: {e}")
 
 def log_node_assembly(logger: Any, node_id: str, node_type: str, layers: List[str], input_schema: str, output_schema: str):
     """Log detailed node assembly information."""
     logger.info("Node assembled", node_id=node_id, type=node_type, layers=layers, input_schema=input_schema, output_schema=output_schema)
     
-    if os.getenv("TEST_MODE") == "1" or True: # Always show for now to satisfy USER
+    if os.getenv("TEST_MODE") == "1" or os.getenv("VERBOSE_LOGGING") == "1":
         console = _get_rich_console()
         if not console: return
 
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        lines = [f"\n\\[[bold blue]{timestamp}[/]] ⚙️  [bold cyan]NODE ASSEMBLED: {node_id}[/]"]
-        lines.append(f"  • [bold magenta]Type:[/] {node_type.upper()}")
-        lines.append(f"  • [bold magenta]Layers:[/] [green]{', '.join(layers)}[/]")
-        lines.append(f"  • [bold magenta]Schemas:[/] [yellow]In: {input_schema}[/] | [yellow]Out: {output_schema}[/]")
-        console.print("\n".join(lines))
+        try:
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            lines = [f"\n\\[[bold blue]{timestamp}[/]] ⚙️  [bold cyan]NODE ASSEMBLED: {node_id}[/]"]
+            lines.append(f"  • [bold magenta]Type:[/] {node_type.upper()}")
+            lines.append(f"  • [bold magenta]Layers:[/] [green]{', '.join(layers)}[/]")
+            lines.append(f"  • [bold magenta]Schemas:[/] [yellow]In: {input_schema}[/] | [yellow]Out: {output_schema}[/]")
+            console.print("\n".join(lines))
+        except Exception as e:
+            logger.warning(f"Failed to render node assembly log: {e}")
 
 def log_tool_execution(logger: Any, node_id: str, tool_name: str, arguments: Dict[str, Any], outputs: Dict[str, Any], success: bool, duration_ms: float):
     """Log premium tool execution details for test visibility."""
     logger.info("Tool execution metrics", node_id=node_id, tool=tool_name, success=success, duration_ms=duration_ms)
     
-    if os.getenv("TEST_MODE") == "1" or True: # Always show for now to satisfy USER
+    if os.getenv("TEST_MODE") == "1" or os.getenv("VERBOSE_LOGGING") == "1":
         console = _get_rich_console()
         if not console: return
 
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        status_sym = "[bold green]✅ SUCCESS[/]" if success else "[bold red]❌ FAILED[/]"
-        lines = [f"\n\\[[bold blue]{timestamp}[/]] 🛠️  [bold cyan]TOOL EXECUTION: {tool_name}[/] ({node_id})"]
-        lines.append(f"  • [bold magenta]Status:[/] {status_sym} [dim]({round(duration_ms, 2)}ms)[/]")
-        
-        # Format arguments
-        arg_str = json.dumps(arguments, indent=2).replace("[", "\\[")
-        lines.append(f"  • [bold magenta]Arguments:[/] [yellow]{arg_str}[/]")
-        
-        # Format outputs
-        out_str = json.dumps(outputs, indent=2).replace("[", "\\[")
-        if len(out_str) > 1000:
-             out_str = out_str[:1000] + "... (truncated)"
-        lines.append(f"  • [bold magenta]Outputs:[/] [green]{out_str}[/]")
-        
-        lines.append("[bold cyan]" + "━" * 88 + "[/]")
-        console.print("\n".join(lines))
+        try:
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            status_sym = "[bold green]✅ SUCCESS[/]" if success else "[bold red]❌ FAILED[/]"
+            lines = [f"\n\\[[bold blue]{timestamp}[/]] 🛠️  [bold cyan]TOOL EXECUTION: {tool_name}[/] ({node_id})"]
+            lines.append(f"  • [bold magenta]Status:[/] {status_sym} [dim]({round(duration_ms, 2)}ms)[/]")
+            
+            # Format arguments (limit size)
+            arg_json = json.dumps(arguments, indent=2)
+            if len(arg_json) > 2000:
+                arg_json = arg_json[:2000] + "... (truncated)"
+            lines.append(f"  • [bold magenta]Arguments:[/] [yellow]{arg_json.replace('[', '\\[')}[/]")
+            
+            # Format outputs (limit size)
+            out_json = json.dumps(outputs, indent=2)
+            if len(out_json) > 5000:
+                 out_json = out_json[:5000] + "... (truncated)"
+            lines.append(f"  • [bold magenta]Outputs:[/] [green]{out_json.replace('[', '\\[')}[/]")
+            
+            lines.append("[bold cyan]" + "━" * 88 + "[/]")
+            console.print("\n".join(lines))
+        except Exception as e:
+            logger.warning(f"Failed to render premium tool log: {e}")
