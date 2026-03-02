@@ -21,6 +21,7 @@ from shared.id_and_hash import generate_id
 from shared.inference_kit import InferenceKit
 from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -336,6 +337,7 @@ def _infer_tools(sub_goal: SubGoal) -> list[str]:
 # ============================================================================
 
 
+@trace_io(logger_name="kernel.task_decomposition.decompose_goal")
 async def decompose_goal(context: WorldState, kit: InferenceKit | None = None) -> Result:
     """Top-level goal decomposition orchestrator.
 

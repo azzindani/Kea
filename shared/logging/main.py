@@ -193,7 +193,28 @@ def _truncate_data(data: Any, max_len: int = 2000, max_depth: int = 3, current_d
             res[k] = _truncate_data(v, max_len, max_depth, current_depth + 1)
         return res
     
-    return data
+    if isinstance(data, (int, float, bool, type(None))):
+        return data
+        
+    if hasattr(data, "model_dump") and callable(getattr(data, "model_dump")):
+        try:
+            # Prevent infinite recursion if model_dump() returns the same object
+            dumped = data.model_dump()
+            if not isinstance(dumped, type(data)):
+                return _truncate_data(dumped, max_len, max_depth, current_depth)
+        except Exception:
+            pass
+            
+    if hasattr(data, "dict") and callable(getattr(data, "dict")):
+        try:
+            dumped = data.dict()
+            if not isinstance(dumped, type(data)):
+                return _truncate_data(dumped, max_len, max_depth, current_depth)
+        except Exception:
+            pass
+            
+    # Fallback to string representation for safe JSON serialization downstream
+    return _truncate_data(repr(data), max_len, max_depth, current_depth)
 
 # ============================================================================
 # 🖥️ Rendering & Configuration
@@ -448,7 +469,8 @@ def log_output(source: str, data: Any, **kw):
     get_logger("io").info(f"📤 OUTPUT from {source}", io=env.model_dump())
 
 def log_error(source: str, err: Any, **kw):
-    env = IOEnvelope(type=IOType.ERROR, source=source, data=str(err), **kw)
+    error_data = err if isinstance(err, (dict, list)) else str(err)
+    env = IOEnvelope(type=IOType.ERROR, source=source, data=error_data, **kw)
     get_logger("io").error(f"❌ ERROR in {source}", io=env.model_dump())
 
 def log_rpc_call(source: str, target: str, method: str, params: Any, rpc_id: Optional[Union[str, int]] = None, **kw):
