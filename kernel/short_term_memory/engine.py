@@ -21,6 +21,7 @@ from shared.config import get_settings
 from shared.id_and_hash import generate_id
 from shared.inference_kit import InferenceKit
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 
 from .types import (
     CachedEntity,
@@ -70,6 +71,7 @@ class ShortTermMemory:
     # 1. DAG State Tracking
     # ========================================================================
 
+    @trace_io()
     def update_dag_state(
         self,
         dag_id: str,
@@ -92,6 +94,7 @@ class ShortTermMemory:
 
         return self._build_dag_snapshot(dag_id)
 
+    @trace_io()
     def register_dag(self, dag_id: str, node_ids: list[str]) -> DagStateSnapshot:
         """Register a new DAG with all its node IDs as PENDING."""
         self._dag_states[dag_id] = {
@@ -146,6 +149,7 @@ class ShortTermMemory:
     # 2. Event History (LRU)
     # ========================================================================
 
+    @trace_io()
     def push_event(self, event: ObservationEvent) -> None:
         """Add an observation event to the LRU history.
 
@@ -185,6 +189,7 @@ class ShortTermMemory:
     # 3. Entity Cache (TTL-based)
     # ========================================================================
 
+    @trace_io()
     def cache_entity(
         self,
         key: str,
@@ -246,6 +251,7 @@ class ShortTermMemory:
     # 4. Context Slice (read for Orient)
     # ========================================================================
 
+    @trace_io()
     async def read_context(self, query: str | None = None, kit: InferenceKit | None = None) -> ContextSlice:
         """Build a context slice for the OODA Orient phase.
 
@@ -326,6 +332,7 @@ class ShortTermMemory:
     # 5. Epoch Flush
     # ========================================================================
 
+    @trace_io()
     def flush_to_summarizer(self) -> EpochSummary:
         """Compress and clear all STM contents for Tier 5 persistence.
 

@@ -30,6 +30,7 @@ from shared.id_and_hash import generate_id
 from shared.inference_kit import InferenceKit
 from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger, log_tool_execution, log_node_execution_start
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -70,6 +71,7 @@ def _ref(fn: str) -> ModuleRef:
 # ============================================================================
 
 
+@trace_io()
 async def observe(
     event_stream: EventStream,
     stm: ShortTermMemory,
@@ -106,6 +108,7 @@ async def observe(
 # ============================================================================
 
 
+@trace_io()
 async def orient(
     observations: list[ObservationEvent],
     stm: ShortTermMemory,
@@ -221,6 +224,7 @@ async def orient(
 # ============================================================================
 
 
+@trace_io()
 async def decide(
     oriented_state: OrientedState,
     current_objectives: list[MacroObjective],
@@ -330,6 +334,7 @@ async def decide(
 # ============================================================================
 
 
+@trace_io()
 async def act(
     decision: Decision,
     active_dag: ExecutableDAG | None,
@@ -516,6 +521,7 @@ async def act(
 # ============================================================================
 
 
+@trace_io()
 async def run_ooda_cycle(
     state: AgentState,
     stm: ShortTermMemory,
@@ -605,6 +611,7 @@ async def run_ooda_cycle(
 # ============================================================================
 
 
+@trace_io()
 async def run_ooda_loop(
     initial_state: AgentState,
     stm: ShortTermMemory | None = None,

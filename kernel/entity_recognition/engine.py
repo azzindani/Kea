@@ -18,6 +18,7 @@ from pydantic import BaseModel
 from shared.inference_kit import InferenceKit
 from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -51,6 +52,7 @@ _ENTITY_RULES = load_system_knowledge("entity_rules.yaml")
 # ============================================================================
 
 
+@trace_io()
 def tokenize_and_parse(raw_text: str) -> list[Token]:
     """Split raw text into a token stream.
 
@@ -117,6 +119,7 @@ def _guess_pos(word: str) -> str:
 # ============================================================================
 
 
+@trace_io()
 def generate_candidate_spans(tokens: list[Token]) -> list[EntitySpan]:
     """Generate candidate entity spans from token stream.
 
@@ -177,6 +180,7 @@ def generate_candidate_spans(tokens: list[Token]) -> list[EntitySpan]:
 # ============================================================================
 
 
+@trace_io()
 def match_spans_to_schema(
     spans: list[EntitySpan],
     expected_schema: type[BaseModel],
@@ -242,6 +246,7 @@ def _try_coerce(text: str, target_type: Any) -> Any | None:
 # ============================================================================
 
 
+@trace_io()
 async def extract_entities(
     raw_text: str,
     expected_schema: type[BaseModel],

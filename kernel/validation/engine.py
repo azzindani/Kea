@@ -17,6 +17,7 @@ from shared.config import get_settings
 from shared.inference_kit import InferenceKit
 from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -54,6 +55,7 @@ def _ref(fn: str) -> ModuleRef:
 # ============================================================================
 
 
+@trace_io()
 def check_syntax(raw_data: Any) -> SyntaxResult:
     """Verify that the raw data is parseable.
 
@@ -92,6 +94,7 @@ def check_syntax(raw_data: Any) -> SyntaxResult:
 # ============================================================================
 
 
+@trace_io()
 def check_structure(
     parsed_data: dict[str, Any],
     expected_schema: type[BaseModel],
@@ -122,6 +125,7 @@ def check_structure(
 # ============================================================================
 
 
+@trace_io()
 def check_types(
     parsed_data: dict[str, Any],
     expected_schema: type[BaseModel],
@@ -162,6 +166,7 @@ def check_types(
 # ============================================================================
 
 
+@trace_io()
 def check_bounds(
     parsed_data: dict[str, Any],
     expected_schema: type[BaseModel],
@@ -207,6 +212,7 @@ def package_validation_error(
 # ============================================================================
 
 
+@trace_io()
 async def validate(
     raw_data: Any,
     expected_schema: type[BaseModel],

@@ -21,6 +21,7 @@ from kernel.self_model.types import (
 )
 from shared.config import get_settings
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -55,6 +56,7 @@ _domain_curves: dict[str, CalibrationCurve] = {}
 # ============================================================================
 
 
+@trace_io()
 def calibrate_confidence(
     stated_confidence: float,
     grounding_score: float,
@@ -185,6 +187,7 @@ def detect_underconfidence(stated: float, calibrated: float) -> bool:
 # ============================================================================
 
 
+@trace_io()
 def update_calibration_curve(
     predicted: float,
     actual_accuracy: float,
@@ -263,6 +266,7 @@ def get_calibration_curve(domain: str = "general") -> CalibrationCurve:
 # ============================================================================
 
 
+@trace_io()
 async def run_confidence_calibration(
     stated_confidence: float,
     grounding_score: float,

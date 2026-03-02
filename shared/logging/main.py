@@ -201,7 +201,7 @@ def _truncate_data(data: Any, max_len: int = 2000, max_depth: int = 3, current_d
             # Prevent infinite recursion if model_dump() returns the same object
             dumped = data.model_dump()
             if not isinstance(dumped, type(data)):
-                return _truncate_data(dumped, max_len, max_depth, current_depth)
+                return _truncate_data(dumped, max_len, max_depth, current_depth + 1)
         except Exception:
             pass
             
@@ -209,12 +209,12 @@ def _truncate_data(data: Any, max_len: int = 2000, max_depth: int = 3, current_d
         try:
             dumped = data.dict()
             if not isinstance(dumped, type(data)):
-                return _truncate_data(dumped, max_len, max_depth, current_depth)
+                return _truncate_data(dumped, max_len, max_depth, current_depth + 1)
         except Exception:
             pass
             
     # Fallback to string representation for safe JSON serialization downstream
-    return _truncate_data(repr(data), max_len, max_depth, current_depth)
+    return _truncate_data(repr(data), max_len, max_depth, current_depth + 1)
 
 # ============================================================================
 # 🖥️ Rendering & Configuration

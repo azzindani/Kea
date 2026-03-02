@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 import re
 import time
-from typing import Any, List, Dict
+from typing import Any
 
 from kernel.noise_gate.types import ToolOutput
 from shared.config import get_settings
@@ -22,6 +22,7 @@ from shared.id_and_hash import generate_id
 from shared.inference_kit import InferenceKit
 from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -115,6 +116,7 @@ _REASONING_MARKERS = frozenset({
 # ============================================================================
 
 
+@trace_io()
 async def classify_claims(output_text: str, kit: InferenceKit | None = None) -> list[Claim]:
     """Decompose output text into atomic, classified claims.
 
@@ -190,6 +192,7 @@ async def classify_claims(output_text: str, kit: InferenceKit | None = None) -> 
 # ============================================================================
 
 
+@trace_io()
 async def grade_claim(
     claim: Claim,
     evidence: list[Origin],
@@ -321,6 +324,7 @@ async def grade_claim(
 # ============================================================================
 
 
+@trace_io()
 def calculate_grounding_score(grades: list[ClaimGrade]) -> float:
     """Compute overall grounding score as a weighted average.
 
@@ -400,6 +404,7 @@ def trace_evidence_chain(
 # ============================================================================
 
 
+@trace_io()
 async def verify_grounding(
     output: ToolOutput,
     evidence: list[Origin],

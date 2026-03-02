@@ -21,6 +21,7 @@ from kernel.short_term_memory.types import EpochSummary
 from shared.config import get_settings
 from shared.id_and_hash import generate_id
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -64,6 +65,7 @@ def _now_utc() -> str:
 # ============================================================================
 
 
+@trace_io()
 async def initialize_agent(spawn_request: SpawnRequest) -> AgentIdentity:
     """Create a new agent instance.
 
@@ -94,6 +96,7 @@ async def initialize_agent(spawn_request: SpawnRequest) -> AgentIdentity:
 # ============================================================================
 
 
+@trace_io()
 async def load_cognitive_profile(profile_id: str) -> CognitiveProfile:
     """Retrieve the agent's cognitive profile.
 
@@ -128,6 +131,7 @@ async def load_cognitive_profile(profile_id: str) -> CognitiveProfile:
 # ============================================================================
 
 
+@trace_io()
 def set_identity_constraints(
     agent_id: str,
     profile: CognitiveProfile,
@@ -163,6 +167,7 @@ def set_identity_constraints(
 # ============================================================================
 
 
+@trace_io()
 def track_macro_objective(
     objective: MacroObjective,
     stm: ShortTermMemory | None = None,
@@ -271,6 +276,7 @@ async def control_sleep_wake(
 # ============================================================================
 
 
+@trace_io()
 async def commit_epoch_memory(
     stm: ShortTermMemory,
 ) -> EpochSummary:
@@ -296,6 +302,7 @@ async def commit_epoch_memory(
 # ============================================================================
 
 
+@trace_io()
 async def run_lifecycle(spawn_request: SpawnRequest) -> Result:
     """Top-level lifecycle runner.
 

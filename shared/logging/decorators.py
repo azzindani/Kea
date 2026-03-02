@@ -4,12 +4,7 @@ import time
 import asyncio
 from typing import Any, Callable, Optional
 
-from shared.logging.main import (
-    log_input, 
-    log_output, 
-    log_error, 
-    _truncate_data
-)
+# Imports will be lazy to prevent circular dependencies at bootstrap time
 
 def trace_io(logger_name: Optional[str] = None):
     """
@@ -22,6 +17,8 @@ def trace_io(logger_name: Optional[str] = None):
         async def generate_plan(user_id: str, context: dict) -> Plan:
             ...
     """
+    from shared.logging.main import log_input, log_output, log_error, _truncate_data
+
     def decorator(func: Callable) -> Callable:
         # Resolve the function name or use the override logger_name for source tracking
         source = logger_name or f"{func.__module__}.{func.__qualname__}"

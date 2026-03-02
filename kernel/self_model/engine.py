@@ -20,6 +20,7 @@ from shared.config import get_settings
 from shared.inference_kit import InferenceKit
 from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -67,6 +68,7 @@ _cognitive_state: AgentCognitiveState = AgentCognitiveState()
 # ============================================================================
 
 
+@trace_io()
 async def assess_capability(
     signal_tags: SignalTags,
     identity: IdentityContext,
@@ -120,6 +122,7 @@ async def assess_capability(
 # ============================================================================
 
 
+@trace_io()
 def get_current_state() -> AgentCognitiveState:
     """Return a snapshot of the agent's current cognitive state.
 
@@ -227,6 +230,7 @@ def get_calibration_history() -> CalibrationHistory:
 # ============================================================================
 
 
+@trace_io()
 async def detect_capability_gap(
     signal_tags: SignalTags,
     identity: IdentityContext | None = None,
@@ -381,6 +385,7 @@ async def refresh_capability_map(
 # ============================================================================
 
 
+@trace_io()
 async def run_self_model(
     signal_tags: SignalTags,
     identity: IdentityContext,

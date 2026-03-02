@@ -17,6 +17,7 @@ import time
 from shared.config import get_settings
 from shared.inference_kit import InferenceKit
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.normalization import min_max_scale
 from shared.standard_io import (
     Metrics,
@@ -45,6 +46,7 @@ def _ref(fn: str) -> ModuleRef:
 # ============================================================================
 
 
+@trace_io()
 async def compute_semantic_similarity(
     content: str,
     query: str,
@@ -94,6 +96,7 @@ async def compute_semantic_similarity(
 # ============================================================================
 
 
+@trace_io()
 async def compute_precision_score(
     content: str,
     query: str,
@@ -145,6 +148,7 @@ async def compute_precision_score(
 # ============================================================================
 
 
+@trace_io()
 def evaluate_reward_compliance(
     content: str,
     constraints: list[Constraint],
@@ -202,6 +206,7 @@ def _check_constraint(content: str, constraint: Constraint) -> bool:
 # ============================================================================
 
 
+@trace_io()
 def aggregate_scores(
     semantic: float,
     precision: float,
@@ -245,6 +250,7 @@ def aggregate_scores(
 # ============================================================================
 
 
+@trace_io()
 async def score(
     content: str,
     query: str,

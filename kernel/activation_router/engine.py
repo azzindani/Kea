@@ -22,6 +22,7 @@ from shared.inference_kit import InferenceKit
 from shared.knowledge import load_system_knowledge
 from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -146,6 +147,7 @@ def _build_pipeline_templates() -> dict[ComplexityLevel, PipelineConfig]:
 _ROUTER_ANCHOR_CACHE: dict[str, list[float]] = {}
 
 
+@trace_io()
 async def classify_signal_complexity(
     signal_tags: SignalTags,
     text: str | None = None,
@@ -252,6 +254,7 @@ async def classify_signal_complexity(
 # ============================================================================
 
 
+@trace_io()
 def select_pipeline(
     complexity: ComplexityLevel,
     pressure: float,
@@ -345,6 +348,7 @@ def cache_decision(
 # ============================================================================
 
 
+@trace_io()
 async def compute_activation_map(
     signal_tags: SignalTags,
     capability: CapabilityAssessment,

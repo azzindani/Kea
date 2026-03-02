@@ -27,6 +27,7 @@ from shared.id_and_hash import generate_id
 from shared.inference_kit import InferenceKit
 from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -65,6 +66,7 @@ def _ref(fn: str) -> ModuleRef:
 # ============================================================================
 
 
+@trace_io()
 async def evaluate_consensus(
     dag_candidates: list[ExecutableDAG],
     kit: InferenceKit | None = None,
@@ -128,6 +130,7 @@ async def evaluate_consensus(
 # ============================================================================
 
 
+@trace_io()
 async def check_value_guardrails(dag: ExecutableDAG, kit: InferenceKit | None = None) -> GuardrailResult:
     """The final ethical/security/corporate gate before execution.
 
@@ -215,6 +218,7 @@ async def check_value_guardrails(dag: ExecutableDAG, kit: InferenceKit | None = 
 # ============================================================================
 
 
+@trace_io()
 async def run_pre_execution_check(dag: ExecutableDAG, kit: InferenceKit | None = None) -> Result:
     """Top-level pre-execution orchestrator (The Conscience).
 
@@ -305,6 +309,7 @@ async def run_pre_execution_check(dag: ExecutableDAG, kit: InferenceKit | None =
 # ============================================================================
 
 
+@trace_io()
 def critique_execution(
     result: ExecutionResult,
     expected: list[ExpectedOutcome],
@@ -388,6 +393,7 @@ def critique_execution(
 # ============================================================================
 
 
+@trace_io()
 def optimize_loop(critique: CritiqueReport) -> list[OptimizationSuggestion]:
     """Generate actionable optimization suggestions from critique.
 
@@ -444,6 +450,7 @@ def optimize_loop(critique: CritiqueReport) -> list[OptimizationSuggestion]:
 # ============================================================================
 
 
+@trace_io()
 async def commit_policy_update(
     suggestions: list[OptimizationSuggestion],
     critique: CritiqueReport,
@@ -481,6 +488,7 @@ async def commit_policy_update(
 # ============================================================================
 
 
+@trace_io()
 async def run_post_execution_reflection(
     result: ExecutionResult,
     expected: list[ExpectedOutcome],

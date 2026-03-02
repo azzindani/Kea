@@ -57,6 +57,7 @@ def _ref(fn: str) -> ModuleRef:
 # ============================================================================
 
 
+@trace_io()
 async def analyze_goal_complexity(
     context: WorldState,
     intent: IntentLabel,
@@ -111,6 +112,7 @@ async def analyze_goal_complexity(
 # ============================================================================
 
 
+@trace_io()
 def split_into_sub_goals(assessment: ComplexityAssessment) -> list[SubGoal]:
     """Decompose the assessed goal into logical sub-goals.
 
@@ -165,6 +167,7 @@ def split_into_sub_goals(assessment: ComplexityAssessment) -> list[SubGoal]:
 # ============================================================================
 
 
+@trace_io()
 def build_dependency_array(sub_goals: list[SubGoal]) -> DependencyGraph:
     """Analyze input/output relationships for execution ordering.
 
@@ -261,6 +264,7 @@ def _find_parallel_groups(
 # ============================================================================
 
 
+@trace_io()
 def map_required_skills(
     sub_goals: list[SubGoal],
     dependency_graph: DependencyGraph,

@@ -20,6 +20,7 @@ from shared.id_and_hash import generate_id
 from shared.inference_kit import InferenceKit
 from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -52,6 +53,7 @@ def _ref(fn: str) -> ModuleRef:
 # ============================================================================
 
 
+@trace_io()
 def detect_missing_variables(
     task_state: WorldState,
     validation_result: ErrorResponse,
@@ -98,6 +100,7 @@ def detect_missing_variables(
 # ============================================================================
 
 
+@trace_io()
 async def formulate_questions(
     gaps: list[KnowledgeGap],
     kit: InferenceKit | None = None,
@@ -182,6 +185,7 @@ _STRATEGY_SERVICES: dict[ExplorationStrategy, str] = {
 }
 
 
+@trace_io()
 def route_exploration_strategy(
     queries: list[ExplorationQuery],
 ) -> list[ExplorationTask]:
@@ -213,6 +217,7 @@ def route_exploration_strategy(
 # ============================================================================
 
 
+@trace_io()
 async def explore_gaps(
     task_state: WorldState,
     validation_result: ErrorResponse | None = None,

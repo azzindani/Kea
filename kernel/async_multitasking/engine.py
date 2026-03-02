@@ -21,6 +21,7 @@ from kernel.short_term_memory.types import NodeExecutionStatus
 from shared.config import get_settings
 from shared.id_and_hash import generate_id
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -57,6 +58,7 @@ def _ref(fn: str) -> ModuleRef:
 # ============================================================================
 
 
+@trace_io()
 def check_async_requirement(node_result: ActionResult) -> bool:
     """Inspect the action result to determine if async waiting is needed.
 
@@ -77,6 +79,7 @@ def check_async_requirement(node_result: ActionResult) -> bool:
 # ============================================================================
 
 
+@trace_io()
 async def park_dag_state(
     dag: ExecutableDAG,
     stm: ShortTermMemory,
@@ -125,6 +128,7 @@ async def park_dag_state(
 # ============================================================================
 
 
+@trace_io()
 async def register_wait_listener(
     parking_ticket: ParkingTicket,
     node_result: ActionResult,
@@ -170,6 +174,7 @@ async def register_wait_listener(
 # ============================================================================
 
 
+@trace_io()
 async def switch_context(dag_queue: DAGQueue) -> str | None:
     """Load the next highest-priority DAG from the queue.
 
@@ -205,6 +210,7 @@ async def switch_context(dag_queue: DAGQueue) -> str | None:
 # ============================================================================
 
 
+@trace_io()
 async def request_deep_sleep(
     parked_tickets: list[ParkingTicket],
 ) -> SleepToken:
@@ -239,6 +245,7 @@ async def request_deep_sleep(
 # ============================================================================
 
 
+@trace_io()
 async def manage_async_tasks(
     node_result: ActionResult,
     dag: ExecutableDAG,

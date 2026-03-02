@@ -83,6 +83,7 @@ from shared.config import get_settings
 from shared.id_and_hash import generate_id
 from shared.inference_kit import InferenceKit
 from shared.logging.main import get_logger, log_final_result
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -478,6 +479,7 @@ class ConsciousObserver:
     # Public Entry Point
     # ------------------------------------------------------------------
 
+    @trace_io()
     async def process(
         self,
         raw_input: RawInput,
@@ -651,6 +653,7 @@ class ConsciousObserver:
     # Phase 1: Gate-In
     # ------------------------------------------------------------------
 
+    @trace_io()
     async def _phase_gate_in(
         self,
         raw_input: RawInput,
@@ -788,6 +791,7 @@ class ConsciousObserver:
     # Phase 2: Execute (pipeline dispatcher)
     # ------------------------------------------------------------------
 
+    @trace_io()
     async def _phase_plan(
         self,
         gate: GateInResult,
@@ -815,6 +819,7 @@ class ConsciousObserver:
             origin=_ref("_phase_plan")
         )])
 
+    @trace_io()
     async def _phase_execute(
         self,
         gate: GateInResult,
@@ -1481,6 +1486,7 @@ class ConsciousObserver:
     # Phase 3: Gate-Out
     # ------------------------------------------------------------------
 
+    @trace_io()
     async def _phase_gate_out(
         self,
         gate: GateInResult,
@@ -1675,6 +1681,7 @@ def _default_confidence() -> CalibratedConfidence:
 # ============================================================================
 
 
+@trace_io()
 async def run_conscious_observer(
     raw_input: RawInput,
     spawn_request: SpawnRequest,

@@ -16,6 +16,7 @@ from shared.config import get_settings
 from shared.inference_kit import InferenceKit
 from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.normalization import min_max_scale, softmax_transform
 from shared.standard_io import (
     Metrics,
@@ -129,6 +130,7 @@ def detect_intent(text: str) -> IntentLabel:
         candidates=candidates,
     )
 
+@trace_io()
 async def detect_intent_async(text: str, kit: InferenceKit | None = None) -> IntentLabel:
     """Async intent detector — strict Lexical + Semantic only (No LLM)."""
     label = detect_intent(text)
@@ -246,6 +248,7 @@ def analyze_sentiment(text: str) -> SentimentLabel:
         valence=valence,
     )
 
+@trace_io()
 async def analyze_sentiment_async(text: str, kit: InferenceKit | None = None) -> SentimentLabel:
     """Async sentiment analyzer — strict Lexical + Semantic only (No LLM)."""
     label = analyze_sentiment(text)
@@ -359,6 +362,7 @@ def score_urgency(text: str) -> UrgencyLabel:
         temporal_pressure=temporal_pressure,
     )
 
+@trace_io()
 async def score_urgency_async(text: str, kit: InferenceKit | None = None) -> UrgencyLabel:
     """Async urgency scorer — strict Lexical + Semantic only (No LLM)."""
     label = score_urgency(text)
@@ -410,6 +414,7 @@ async def score_urgency_async(text: str, kit: InferenceKit | None = None) -> Urg
 # ============================================================================
 
 
+@trace_io()
 async def run_primitive_scorers(text: str, kit: InferenceKit | None = None) -> Result:
     """Top-level orchestrator — runs all three scorers in parallel.
 

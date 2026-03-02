@@ -23,6 +23,7 @@ from shared.id_and_hash import generate_id
 from shared.inference_kit import InferenceKit
 from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger, log_dag_blueprint
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -58,6 +59,7 @@ def _ref(fn: str) -> ModuleRef:
 # ============================================================================
 
 
+@trace_io()
 async def map_subtasks_to_nodes(subtasks: list[SubTaskItem], kit: InferenceKit | None = None) -> list[ExecutableNode]:
     """Translate each SubTaskItem into an ExecutableNode.
 
@@ -125,6 +127,7 @@ def _infer_action_type(task: SubTaskItem) -> str:
 # ============================================================================
 
 
+@trace_io()
 def calculate_dependency_edges(nodes: list[ExecutableNode]) -> list[Edge]:
     """Determine execution ordering from input/output dependencies.
 
@@ -167,6 +170,7 @@ def calculate_dependency_edges(nodes: list[ExecutableNode]) -> list[Edge]:
 # ============================================================================
 
 
+@trace_io()
 def compile_dag(
     nodes: list[ExecutableNode],
     edges: list[Edge],
@@ -363,6 +367,7 @@ async def review_dag_with_simulation(dag: ExecutableDAG) -> SimulationVerdict:
 # ============================================================================
 
 
+@trace_io()
 async def synthesize_plan(
     objective: str,
     context: WorldState | None = None,

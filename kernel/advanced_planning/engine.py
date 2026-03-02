@@ -20,6 +20,7 @@ from shared.id_and_hash import generate_id
 from shared.inference_kit import InferenceKit
 from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -57,6 +58,7 @@ def _ref(fn: str) -> ModuleRef:
 # ============================================================================
 
 
+@trace_io()
 async def sequence_and_prioritize(
     subtasks: list[SubTaskItem],
     constraints: PlanningConstraints,
@@ -175,6 +177,7 @@ def _estimate_duration(task: SubTaskItem) -> float:
 # ============================================================================
 
 
+@trace_io()
 async def bind_tools(
     sequenced_tasks: list[SequencedTask],
     mcp_registry: MCPToolRegistry,
@@ -256,6 +259,7 @@ def _find_best_tool(
 # ============================================================================
 
 
+@trace_io()
 def generate_hypotheses(bound_tasks: list[BoundTask]) -> list[ExpectedOutcome]:
     """Generate expected output hypotheses for each task.
 
@@ -301,6 +305,7 @@ def generate_hypotheses(bound_tasks: list[BoundTask]) -> list[ExpectedOutcome]:
 # ============================================================================
 
 
+@trace_io()
 def inject_progress_tracker(
     tasks: list[BoundTask],
     hypotheses: list[ExpectedOutcome],
@@ -342,6 +347,7 @@ def inject_progress_tracker(
 # ============================================================================
 
 
+@trace_io()
 async def plan_advanced(
     subtasks: list[SubTaskItem],
     constraints: PlanningConstraints | None = None,
