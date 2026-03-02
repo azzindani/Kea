@@ -82,7 +82,7 @@ from kernel.what_if_scenario.engine import simulate_outcomes
 from shared.config import get_settings
 from shared.id_and_hash import generate_id
 from shared.inference_kit import InferenceKit
-from shared.logging.main import get_logger
+from shared.logging.main import get_logger, log_final_result
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -1558,16 +1558,12 @@ class ConsciousObserver:
             )
             # Log the FINAL result that will be returned to Tier 8 / User
             # This ensures the 'real output' is visible in logs as requested.
-            log.info(
-                f"\n{'='*60}\n"
-                f"FINAL MISSION OUTPUT [GATE-OUT]\n"
-                f"Objective: {exec_res.objective or 'unknown'}\n"
-                f"Trace ID: {trace_id}\n"
-                f"{'='*60}\n"
-                f"{verdict.content}\n"
-                f"{'='*60}",
-                output_id=tool_output.output_id,
-                objective=exec_res.objective or "unknown"
+            log_final_result(
+                logger=log,
+                objective=exec_res.objective or "unknown",
+                content=verdict.content,
+                artifacts_count=len(exec_res.loop_result.artifacts_produced),
+                trace_id=trace_id
             )
             return ConsciousObserverResult(
                 trace_id=trace_id,

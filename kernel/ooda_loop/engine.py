@@ -29,7 +29,7 @@ from shared.config import get_settings
 from shared.id_and_hash import generate_id
 from shared.inference_kit import InferenceKit
 from shared.llm.provider import LLMMessage
-from shared.logging.main import get_logger, log_tool_execution
+from shared.logging.main import get_logger, log_tool_execution, log_node_execution_start
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -369,6 +369,21 @@ async def act(
             )
             continue
 
+        # JIT Initialization: Resolve inputs and log start
+        node_input_data = {}
+        if agent_state and agent_state.context:
+            for key in node.input_keys:
+                if key in agent_state.context:
+                    node_input_data[key] = agent_state.context[key]
+        
+        log_node_execution_start(
+            logger=log,
+            node_id=node_id,
+            description=node.instruction.description,
+            inputs=node.input_keys,
+            input_data=node_input_data
+        )
+
         # Mark as running
         node.status = NodeStatus.RUNNING
         stm.update_dag_state(
@@ -408,17 +423,6 @@ async def act(
                     node_id=node_id, 
                     content_preview=node_outputs["answer"][:100]
                 )
-                
-                # NEW: Premium LLM Result visibility
-                log_tool_execution(
-                    logger=log,
-                    node_id=node_id,
-                    tool_name="LLM_Inference",
-                    arguments={"description": node.instruction.description},
-                    outputs=node_outputs,
-                    success=True,
-                    duration_ms=(time.perf_counter() - start) * 1000
-                )
             except Exception as e:
                 log.warning("OODA Act: LLM inference failed, fallback to echo", error=str(e))
 
@@ -456,29 +460,23 @@ async def act(
             node_outputs["arguments"] = arguments
             node_outputs["answer"] = f"Simulated output from {tool_name} for task: {node.instruction.description[:50]}"
             log.info("🚀 OODA Act: Tool executed successfully", node_id=node_id, tool=tool_name, success=True)
-
-            # NEW: Premium Tool Result visibility
-            log_tool_execution(
-                logger=log,
-                node_id=node_id,
-                tool_name=tool_name,
-                arguments=arguments,
-                outputs=node_outputs,
-                success=True,
-                duration_ms=(time.perf_counter() - start) * 1000
-            )
+            
+        else:
+            # Fallback for 'general' or 'data_transform' nodes
+            node_outputs["answer"] = f"Processed {len(node.input_keys)} inputs into {len(node.output_keys)} outputs."
+            log.info("🚀 OODA Act: Generic task completed", node_id=node_id)
         
         elapsed_ms = (time.perf_counter() - start) * 1000
         
-        log.info(
-            "📦 OODA Act: execution result captured", 
-            node_id=node_id, 
-            type=node.instruction.action_type,
-            parameters=node.instruction.parameters,
-            inputs=node.input_keys,
+        # Universal premium visibility for ALL node types
+        log_tool_execution(
+            logger=log,
+            node_id=node_id,
+            tool_name=node.instruction.action_type,
+            arguments=node.instruction.parameters.get("arguments", node.instruction.parameters),
             outputs=node_outputs,
             success=True,
-            duration_ms=round(elapsed_ms, 2)
+            duration_ms=elapsed_ms
         )
 
         result = ActionResult(

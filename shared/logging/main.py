@@ -567,9 +567,9 @@ def log_dag_blueprint(logger: Any, dag_id: str, objective: str, nodes: List[Dict
         except Exception as e:
             logger.warning(f"Failed to render DAG blueprint: {e}")
 
-def log_node_assembly(logger: Any, node_id: str, node_type: str, layers: List[str], input_schema: str, output_schema: str):
-    """Log detailed node assembly information."""
-    logger.info("Node assembled", node_id=node_id, type=node_type, layers=layers, input_schema=input_schema, output_schema=output_schema)
+def log_node_execution_start(logger: Any, node_id: str, description: str, inputs: List[str], input_data: Dict[str, Any]):
+    """Log the start of a node execution with n8n-style visibility."""
+    logger.info("Node execution starting", node_id=node_id, inputs=inputs)
     
     if os.getenv("TEST_MODE") == "1" or os.getenv("VERBOSE_LOGGING") == "1":
         console = _get_rich_console()
@@ -577,13 +577,20 @@ def log_node_assembly(logger: Any, node_id: str, node_type: str, layers: List[st
 
         try:
             timestamp = datetime.now().strftime("%H:%M:%S")
-            lines = [f"\n\\[[bold blue]{timestamp}[/]] ⚙️  [bold cyan]NODE ASSEMBLED: {node_id}[/]"]
-            lines.append(f"  • [bold magenta]Type:[/] {node_type.upper()}")
-            lines.append(f"  • [bold magenta]Layers:[/] [green]{', '.join(layers)}[/]")
-            lines.append(f"  • [bold magenta]Schemas:[/] [yellow]In: {input_schema}[/] | [yellow]Out: {output_schema}[/]")
+            lines = [f"\n\\[[bold blue]{timestamp}[/]] 🚀 [bold yellow]EXECUTING NODE:[/] [bold cyan]{node_id}[/]"]
+            lines.append(f"  • [bold magenta]Task:[/] {description}")
+            
+            # Show resolved input data
+            if input_data:
+                clean_input = {k: (str(v)[:100] + "...") if isinstance(v, str) and len(str(v)) > 100 else v for k, v in input_data.items()}
+                lines.append(f"  • [bold magenta]Inputs Resolved:[/] [yellow]{json.dumps(clean_input, indent=2).replace('[', '\\[')}[/]")
+            else:
+                lines.append("  • [bold magenta]Inputs Resolved:[/] [dim]None (Initial state or fallback)[/]")
+            
+            lines.append("[bold blue]" + "┄" * 40 + "[/]")
             console.print("\n".join(lines))
         except Exception as e:
-            logger.warning(f"Failed to render node assembly log: {e}")
+            logger.warning(f"Failed to render node start log: {e}")
 
 def log_tool_execution(logger: Any, node_id: str, tool_name: str, arguments: Dict[str, Any], outputs: Dict[str, Any], success: bool, duration_ms: float):
     """Log premium tool execution details for test visibility."""
@@ -596,22 +603,57 @@ def log_tool_execution(logger: Any, node_id: str, tool_name: str, arguments: Dic
         try:
             timestamp = datetime.now().strftime("%H:%M:%S")
             status_sym = "[bold green]✅ SUCCESS[/]" if success else "[bold red]❌ FAILED[/]"
-            lines = [f"\n\\[[bold blue]{timestamp}[/]] 🛠️  [bold cyan]TOOL EXECUTION: {tool_name}[/] ({node_id})"]
+            lines = [f"\n\\[[bold blue]{timestamp}[/]] ✨ [bold cyan]NODE COMPLETED: {node_id}[/] (via {tool_name})"]
             lines.append(f"  • [bold magenta]Status:[/] {status_sym} [dim]({round(duration_ms, 2)}ms)[/]")
             
             # Format arguments (limit size)
-            arg_json = json.dumps(arguments, indent=2)
-            if len(arg_json) > 2000:
-                arg_json = arg_json[:2000] + "... (truncated)"
-            lines.append(f"  • [bold magenta]Arguments:[/] [yellow]{arg_json.replace('[', '\\[')}[/]")
+            if arguments:
+                arg_json = json.dumps(arguments, indent=2)
+                if len(arg_json) > 1000:
+                    arg_json = arg_json[:1000] + "... (truncated)"
+                lines.append(f"  • [bold magenta]Arguments:[/] [yellow]{arg_json.replace('[', '\\[')}[/]")
             
             # Format outputs (limit size)
-            out_json = json.dumps(outputs, indent=2)
-            if len(out_json) > 5000:
-                 out_json = out_json[:5000] + "... (truncated)"
-            lines.append(f"  • [bold magenta]Outputs:[/] [green]{out_json.replace('[', '\\[')}[/]")
+            if outputs:
+                # If there's a primary 'answer' or 'content', show it prominently
+                main_content = outputs.get("answer") or outputs.get("content") or outputs.get("result")
+                if main_content and isinstance(main_content, str):
+                    content_escaped = main_content.replace("[", "\\[")
+                    if len(content_escaped) > 2000:
+                        content_escaped = content_escaped[:2000] + "\n[bold red](Content truncated for log visibility)...[/]"
+                    lines.append(f"  • [bold magenta]Output Content:[/]\n[green]{content_escaped}[/]")
+                else:
+                    out_json = json.dumps(outputs, indent=2)
+                    if len(out_json) > 4000:
+                        out_json = out_json[:4000] + "... (truncated)"
+                    lines.append(f"  • [bold magenta]Outputs Raw (JSON):[/] [green]{out_json.replace('[', '\\[')}[/]")
             
             lines.append("[bold cyan]" + "━" * 88 + "[/]")
             console.print("\n".join(lines))
         except Exception as e:
-            logger.warning(f"Failed to render premium tool log: {e}")
+            logger.warning(f"Failed to render node completion log: {e}")
+
+def log_final_result(logger: Any, objective: str, content: str, artifacts_count: int, trace_id: str):
+    """Log a premium, high-fidelity final mission output."""
+    logger.info("Mission final results ready", objective=objective, artifacts=artifacts_count)
+    
+    if os.getenv("TEST_MODE") == "1" or os.getenv("VERBOSE_LOGGING") == "1":
+        console = _get_rich_console()
+        if not console: return
+
+        try:
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            lines = [f"\n\\[[bold blue]{timestamp}[/]] 🏆 [bold green]MISSION COMPLETE[/]"]
+            lines.append(f"[bold cyan]Objective:[/] [green]{objective}[/]")
+            lines.append(f"[bold cyan]Trace ID:[/] [magenta]{trace_id}[/]")
+            lines.append("[bold cyan]" + "━" * 88 + "[/]")
+            
+            # Handle potential markdown content
+            content_escaped = str(content).replace("[", "\\[")
+            lines.append(f"[bold yellow]FINAL DELIVERABLE:[/]\n{content_escaped}")
+            
+            lines.append(f"\n[bold cyan]Artifacts produced:[/] [bold magenta]{artifacts_count}[/]")
+            lines.append("[bold cyan]" + "━" * 88 + "[/]")
+            console.print("\n".join(lines))
+        except Exception as e:
+            logger.warning(f"Failed to render final result log: {e}")
