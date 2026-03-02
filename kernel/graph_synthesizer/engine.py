@@ -70,7 +70,7 @@ async def map_subtasks_to_nodes(subtasks: list[SubTaskItem], kit: InferenceKit |
         instruction = ActionInstruction(
             task_id=task.id,
             description=task.description,
-            action_type=_infer_action_type(task),
+            action_type=getattr(task, "action_type", None) or _infer_action_type(task),
             required_skills=task.required_skills,
             required_tools=task.required_tools,
             parameters={
@@ -79,25 +79,6 @@ async def map_subtasks_to_nodes(subtasks: list[SubTaskItem], kit: InferenceKit |
                 "domain": task.domain,
             },
         )
-
-        if kit and kit.has_llm:
-            try:
-                system_msg = LLMMessage(
-                    role="system",
-                    content="Infer the exact action_type for this node (e.g. tool_call, llm_inference, data_transform, general). Respond exactly with JSON: {\"action_type\": \"...\"}"
-                )
-                user_msg = LLMMessage(role="user", content=instruction.description)
-                resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
-
-                content = resp.content.strip()
-                if content.startswith("```json"):
-                    content = content[7:-3].strip()
-                elif content.startswith("```"):
-                    content = content[3:-3].strip()
-                data = json.loads(content)
-                instruction.action_type = data.get("action_type", instruction.action_type)
-            except Exception:
-                pass
 
         node = ExecutableNode(
             node_id=generate_id("node"),

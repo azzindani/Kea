@@ -932,15 +932,27 @@ class ConsciousObserver:
         spawn_request: SpawnRequest,
         rag_context: dict[str, Any] | None,
     ) -> ObserverExecuteResult:
-        """STANDARD: T2 decompose → T4. For MODERATE signals."""
+        """STANDARD: T2 decompose → T3 Synthesize → T4. For MODERATE signals."""
         start = time.perf_counter()
 
         world_state = _build_world_state(spawn_request, gate.identity_context, rag_context, gate.rag_enrichment)
         subtasks_result = await decompose_goal(world_state, self._kit)
-        # subtasks intentionally ignored for standard path as we don't synthesize a DAG here (standard mapping)
-        _ = _extract_subtasks(subtasks_result)
+        subtasks = _extract_subtasks(subtasks_result)
+
+        active_dag: ExecutableDAG | None = None
+        if subtasks:
+            plan_res = await synthesize_plan(
+                objective=spawn_request.objective,
+                context=world_state,
+                kit=self._kit,
+                subtasks=subtasks,
+            )
+            active_dag = _extract_dag(plan_res)
 
         agent_state = _build_agent_state(gate.identity_context, spawn_request)
+        if active_dag:
+            agent_state.active_dag_id = active_dag.dag_id
+
         stm = ShortTermMemory()
 
         loop_result, decisions, outputs, simplified, escalated, aborted = (
@@ -949,7 +961,7 @@ class ConsciousObserver:
                 spawn_request=spawn_request,
                 agent_state=agent_state,
                 stm=stm,
-                active_dag=None,
+                active_dag=active_dag,
                 objective=spawn_request.objective,
                 activation_map=gate.activation_map,
                 rag_context=rag_context,

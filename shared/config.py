@@ -332,8 +332,8 @@ class KnowledgeSettings(BaseModel):
     skill_limit: int = 3
     rule_limit: int = 2
     procedure_limit: int = 3
-    timeout_search: float = 30.0
-    timeout_raw: float = 30.0
+    timeout_search: float = 60.0
+    timeout_raw: float = 60.0
     timeout_health: float = 3.0
     
     # Registry & Backend

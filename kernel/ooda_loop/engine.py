@@ -397,7 +397,7 @@ async def act(
         # Other types (tool_call) are still delegated to the service layer.
         node_outputs = {"instruction": node.instruction.description}
         
-        if kit and kit.has_llm and node.instruction.action_type == "llm_inference":
+        if kit and kit.has_llm and node.instruction.action_type in ("llm_inference", "general", "data_transform"):
             try:
                 # Build context-aware prompt
                 ctx_summary = ""
