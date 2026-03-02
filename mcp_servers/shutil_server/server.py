@@ -90,7 +90,13 @@ def copy_file(src: str, dst: str) -> str:
     """COPIES a file (content + permissions). [ACTION]
     
     [RAG Context]
-    Like `cp`.
+    A robust "Super Tool" for file duplication. It copies the entire content of a source file to a destination file, while also attempting to preserve the original permission bits (mode).
+    
+    How to Use:
+    - If 'dst' is a directory, the file will be copied into that directory with the original filename.
+    - If 'dst' exists, it will be overwritten.
+    
+    Keywords: duplicate file, cp command, file cloning, content replication.
     """
     return file_ops.copy_file(src, dst)
 
@@ -171,7 +177,14 @@ def copy_tree(src: str, dst: str) -> str:
     """COPIES a directory tree efficiently. [ACTION]
     
     [RAG Context]
-    Recursively copies an entire directory tree rooted at src to a directory named dst and returns the destination directory.
+    A heavy-duty "Super Tool" for recursive directory duplication. It clones an entire directory structure, including all subdirectories and files, from 'src' to 'dst'.
+    
+    How to Use:
+    - 'dst' must not exist prior to calling this tool.
+    - Preserves file permissions and metadata throughout the entire tree.
+    - Ideal for creating full backups or deploying folder templates.
+    
+    Keywords: recursive copy, cp -R, folder cloning, directory replication.
     """
     return dir_ops.copy_tree(src, dst)
 
@@ -250,6 +263,13 @@ def make_archive(base_name: str, format: str, root_dir: str) -> str:
     """CREATES an archive file. [ACTION]
     
     [RAG Context]
+    A high-level "Super Tool" for creating compressed archives. It supports multiple formats (zip, tar, gztar, bztar, xztar) and bundles an entire directory into a single file.
+    
+    How to Use:
+    - 'format': One of 'zip', 'tar', 'gztar', etc.
+    - 'root_dir': The directory that will be the root of the archive.
+    
+    Keywords: compression utility, zip creator, tarball, archive generator.
     """
     return archive_ops.make_archive(base_name, format, root_dir)
 
@@ -380,6 +400,13 @@ def synchronize_directories(src: str, dst: str) -> Dict[str, Any]:
     """SYNCS two directories (rsync-like). [ACTION]
     
     [RAG Context]
+    An advanced "Super Tool" for maintaining parity between two locations. It intelligently identifies differences (missing files, updated timestamps) and synchronizes 'dst' to match 'src'.
+    
+    How to Use:
+    - Ideal for mirroring a local project to a shared network drive or cloud-mounted folder.
+    - Minimizes data transfer by only copying changed or missing items.
+    
+    Keywords: directory mirror, rsync tool, folder sync, data parity.
     """
     return super_ops.synchronize_directories(src, dst)
 

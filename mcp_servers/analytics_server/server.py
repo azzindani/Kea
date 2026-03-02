@@ -69,8 +69,13 @@ async def eda_auto(
     """ANALYZES data (EDA). [ACTION]
     
     [RAG Context]
-    Perform automatic Exploratory Data Analysis.
-    Returns analysis report.
+    An automated "Super Tool" for Exploratory Data Analysis. It scans the dataset to detect types, distributions, and initial correlations.
+    
+    How to Use:
+    - Provide 'data_url' (path to CSV/Parquet) or a raw 'data' dict.
+    - 'target_column' helps focus the analysis on predictive patterns for that specific field.
+    
+    Keywords: auto eda, dataset profile, initial scan, discovery phase.
     """
     return await run_op(eda.eda_auto, data_url=data_url, data=data, target_column=target_column)
 
@@ -98,8 +103,13 @@ async def data_cleaner(
     """CLEANS data. [ACTION]
     
     [RAG Context]
-    Clean dataset: handle missing values, outliers, duplicates.
-    Returns cleaned data summary.
+    A robust "Super Tool" for dataset sanitization. Essential for preparing data for machine learning or reporting.
+    
+    How to Use:
+    - 'handle_missing': 'mean', 'median', 'mode', or 'drop'.
+    - 'handle_outliers': 'z-score' (removes items >3 std dev) or 'iqr' (inter-quartile range).
+    
+    Keywords: dataset scrub, outlier removal, missing value fix, deduplication.
     """
     return await run_op(cleaning.data_cleaner, data_url=data_url, handle_missing=handle_missing, handle_outliers=handle_outliers, remove_duplicates=remove_duplicates)
 

@@ -70,8 +70,15 @@ def image_to_string(image_input: str, lang: Optional[str] = None, config: str = 
     """EXTRACTS text (OCR). [ACTION]
     
     [RAG Context]
-    Convert image to text string.
-    Returns string.
+    The primary "Super Tool" for legacy data digitization. It uses the Tesseract OCR engine to identify text within images (scanned documents, screenshots, photos) and returns the characters as a plain text string.
+    
+    How to Use:
+    - 'image_input': Path to the image or base64 encoded payload.
+    - 'lang': Specify a custom language code (e.g., 'eng', 'fra').
+    - 'config': Custom Tesseract flags (like '--psm 6' for single-block).
+    - Returns a raw text blob of the detected content.
+    
+    Keywords: text recognizer, image to string, optical char recognition, document scanner.
     """
     return text_ops.image_to_string(image_input, lang, config)
 
@@ -453,8 +460,13 @@ def auto_ocr_pipeline(image_input: str) -> Dict[str, Any]:
     """RUNS auto OCR. [ACTION]
     
     [RAG Context]
-    Preprocessing + OCR + Postprocessing.
-    Returns JSON dict.
+    An intelligent "Super Tool" for high-accuracy OCR. It automatically applies a sequence of advanced preprocessing steps (grayscale, thresholding, denoising) before running the Tesseract engine, significantly increasing the success rate for low-quality or noisy images.
+    
+    How to Use:
+    - Best for real-world photos or old document scans where standard OCR often fails.
+    - Returns the extracted text along with confidence metrics.
+    
+    Keywords: smart ocr, image pre-processing, noise removal, high accuracy ocr.
     """
     return super_ops.auto_ocr_pipeline(image_input)
 
@@ -473,8 +485,13 @@ def extract_receipt_data(image_input: str) -> Dict[str, Any]:
     """EXTRACTS receipt data. [ACTION]
     
     [RAG Context]
-    Extract key-value pairs from receipts.
-    Returns JSON dict.
+    A specialized "Super Tool" for financial automation. It uses custom heuristics to identify vendor names, dates, and total amounts from scanned receipts or transaction invoices.
+    
+    How to Use:
+    - Ideal for expense management workflows and automated bookkeeping.
+    - Returns a structured dictionary of the most critical receipt metadata.
+    
+    Keywords: receipt scanner, financial extractor, expense automation, invoice ocr.
     """
     return super_ops.extract_receipt_data(image_input)
 

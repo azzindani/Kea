@@ -61,8 +61,13 @@ async def text_coding(text: str, codes: List[str] = [], auto_code: bool = True) 
     """CODES text. [ACTION]
     
     [RAG Context]
-    Code qualitative text with categories/themes.
-    Returns coded text string.
+    An advanced "Super Tool" for qualitative data analysis (QDA). It classifies raw unstructured text—such as interview transcripts, emails, or news articles—into specific categories or "codes" to identify recurring patterns and insights.
+    
+    How to Use:
+    - 'codes': Provide a list of predefined themes you are looking for (e.g., ["profitability", "risk", "innovation"]).
+    - 'auto_code': If True, the tool uses NLP to suggest additional relevant codes not in your initial list.
+    
+    Keywords: qualitative coding, theme tagging, thematic analysis, pattern identification.
     """
     return await run_op(coding.text_coding, text=text, codes=codes, auto_code=auto_code)
 

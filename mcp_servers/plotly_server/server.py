@@ -61,8 +61,13 @@ async def plot_line(data: DataInput, x: Optional[str] = None, y: Optional[str] =
     """PLOTS line chart. [ACTION]
     
     [RAG Context]
-    Interactive line plot.
-    Returns path to saved image.
+    A versatile "Super Tool" for dynamic data exploration. It builds interactive line plots where users can zoom, pan, and hover for specific point metadata.
+    
+    How to Use:
+    - Best for identifying inflection points and cross-categorical comparisons in time-series data.
+    - 'format' can be 'png', 'svg', or the default high-resolution image output.
+    
+    Keywords: interactive line chart, dynamic trend, zoomable graph, web ready plot.
     """
     from mcp_servers.plotly_server.tools import basic_ops
     return await basic_ops.plot_line(data, x, y, color, markers, title, format)
@@ -155,8 +160,13 @@ async def plot_candlestick(data: DataInput, x: str, open: str, high: str, low: s
     """PLOTS candlestick. [ACTION]
     
     [RAG Context]
-    Financial candlestick chart.
-    Returns path to saved image.
+    The definitive "Super Tool" for trading and technical analysis. It renders OHLC price action over time, identifying market sentiment through green/red body colors and wicks.
+    
+    How to Use:
+    - Input keys for time (x), open, high, low, and close columns.
+    - Captures complex market dynamics (volatility, momentum) in a single dense visual representation.
+    
+    Keywords: financial chart, price action plot, trading candles, market technicals.
     """
     from mcp_servers.plotly_server.tools import finance_ops
     return await finance_ops.plot_candlestick(data, x, open, high, low, close, title, format)
@@ -224,8 +234,13 @@ async def plot_choropleth(data: DataInput, locations: str, color: str, locationm
     """PLOTS choropleth. [ACTION]
     
     [RAG Context]
-    Geographic heat map (choropleth).
-    Returns path to saved image.
+    A specialized "Super Tool" for geopolitical data analysis. It colors geographic regions (countries, states) based on a numeric variable to reveal spatial disparities.
+    
+    How to Use:
+    - 'locationmode': Supports 'ISO-3' codes (e.g., USA, CAN) or country names.
+    - Essential for socio-economic mapping, supply chain logistics, and global market research.
+    
+    Keywords: geographic heatmap, world map color, regional disparity, heat map geo.
     """
     from mcp_servers.plotly_server.tools import map_ops
     return await map_ops.plot_choropleth(data, locations, color, locationmode, hover_name, title, format)
@@ -440,8 +455,13 @@ async def auto_plot(data: DataInput, x: str, y: Optional[str] = None, color: Opt
     """PLOTS automatically. [ACTION]
     
     [RAG Context]
-    Infers best plotly chart type from data.
-    Returns path to saved image.
+    A high-speed "Super Tool" for zero-configuration plotting. It inspects the dataset for numeric vs categorical variables and selects the most effective Plotly Express primitive.
+    
+    How to Use:
+    - Takes raw data and target axes.
+    - Bypasses manual chart selection to deliver instant visual insights from data frames.
+    
+    Keywords: fast viz, automated plotly, heuristic chart gen, data to plot engine.
     """
     from mcp_servers.plotly_server.tools import super_ops
     return await super_ops.auto_plot(data, x, y, color, format)

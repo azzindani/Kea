@@ -40,8 +40,13 @@ async def get_all_indicators(data: list[dict]) -> str:
     """CALCULATES all indicators. [ACTION]
     
     [RAG Context]
-    Runs 100+ technical analysis indicators (All Strategies).
-    Returns JSON string of results.
+    A heavy-duty quantitative analysis tool that executes the entire pandas-ta library (130+ indicators) on a single dataset.
+    
+    How to Use:
+    - Input 'data' must be an OHLCV list of dicts.
+    - Performance Warning: This is resource-intensive. For specific needs, use 'calculate_any_indicator' or themed suites.
+    
+    Keywords: quantitative suite, indicator batch, alpha generation, feature engineering.
     """
     return await bulk.get_all_indicators(data)
 
@@ -50,8 +55,13 @@ async def get_momentum_suite(data: list[dict]) -> str:
     """CALCULATES momentum suite. [ACTION]
     
     [RAG Context]
-    Runs all Momentum indicators (RSI, MACD, etc).
-    Returns JSON string of results.
+    A robust "Super Tool" for analyzing price velocity and strength. It runs a batch of indicators including RSI, MACD, AO, BOP, and Stochastic in a single high-performance operation.
+    
+    How to Use:
+    - Best for identifying overextended markets where a reversal is imminent.
+    - Input OHLCV data.
+    
+    Keywords: momentum analysis, price velocity, trade strength, divergence suite.
     """
     return await bulk.get_momentum_suite(data)
 
@@ -60,8 +70,13 @@ async def get_trend_suite(data: list[dict]) -> str:
     """CALCULATES trend suite. [ACTION]
     
     [RAG Context]
-    Runs all Trend indicators (SMA, EMA, ADX, etc).
-    Returns JSON string of results.
+    A comprehensive "Super Tool" for structural market analysis. It calculates the prevailing direction and strength of the price movement using SMAs, EMAs, ADX, and Supertrend.
+    
+    How to Use:
+    - Essential for determining if a market is in a sustained Bull or Bear run.
+    - Used to filter out entries that go against the primary market flow.
+    
+    Keywords: trend recognition, moving average batch, market flow, structural analysis.
     """
     return await bulk.get_trend_suite(data)
 
@@ -90,8 +105,13 @@ async def get_candle_patterns_suite(data: list[dict]) -> str:
     """IDENTIFIES candle patterns. [ACTION]
     
     [RAG Context]
-    Recognizes 60+ candlestick patterns (Doji, Engulfing, etc).
-    Returns JSON string of results.
+    A specialized pattern recognition engine that identifies 60+ distinct Japanese Candlestick formations.
+    
+    How to Use:
+    - Patterns include: Doji, Hammer, Shooting Star, Morning Star, Three White Soldiers, etc.
+    - Returns a boolean structure indicating where patterns were detected in the time series.
+    
+    Keywords: pattern recognition, candlestick signals, price action, chart patterns.
     """
     return await bulk.get_candle_patterns_suite(data)
 
@@ -111,8 +131,9 @@ async def calculate_any_indicator(data: list[dict], indicator: str, params: dict
     """CALCULATES specific indicator. [ACTION]
     
     [RAG Context]
-    Calculates any supported indicator by name (e.g. 'rsi', 'cmf').
-    Returns JSON string of results.
+    The primary entry point for granular analysis. Allows calling any individual pandas-ta indicator by its abbreviated string name (e.g., 'rsi', 'macd', 'stoch', 'cci').
+    
+    Keywords: technical study, indicator factory, custom analysis, alpha factor.
     """
     return await universal.calculate_indicator(data, indicator, params)
 
@@ -121,8 +142,13 @@ async def generate_signals_from_logic(data: list[dict], condition: str) -> str:
     """GENERATES trading signals. [ACTION]
     
     [RAG Context]
-    Evaluates logical conditions on data (e.g. 'RSI_14 < 30').
-    Returns boolean series or signal events.
+    An intelligent "Super Tool" that translates human-readable trading rules into actionable Buy/Sell events. It evaluates any custom logical expression against the time-series data.
+    
+    How to Use:
+    - 'condition': A string expression using indicator names (e.g., 'RSI_14 < 30 and CLOSE > EMA_200').
+    - Returns a list of timestamps and signal values (+1 for Buy, -1 for Sell).
+    
+    Keywords: algorithmic signal, rule engine, trade triggers, logic evaluator.
     """
     return await signals.generate_signals(data, condition)
 
@@ -203,8 +229,13 @@ async def calculate_supertrend(data: list[dict], params: dict = None) -> str:
     """CALCULATES Supertrend. [ACTION]
     
     [RAG Context]
-    Trend following indicator.
-    Returns JSON string of results.
+    A versatile "Super Tool" for trend following. It uses ATR-based volatility channels to define support and resistance levels that trail the price action.
+    
+    How to Use:
+    - Returns the trend direction (up/down) and the current stop-loss level.
+    - Widely used by retail and institutional traders for robust trend captures.
+    
+    Keywords: automated trend, volatility trail, trend switch, dynamic support.
     """
     return await trend.calculate_supertrend(data, params)
 
@@ -265,8 +296,13 @@ async def simple_backtest_strategy(data: list[dict], entry_signal: str, exit_sig
     """RUNS backtest. [ACTION]
     
     [RAG Context]
-    Simulates a strategy based on entry/exit signals.
-    Returns backtest performance metrics.
+    Simulates a historical trading strategy by mapping entry and exit conditions onto the provided dataset. 
+    
+    How to Use:
+    - Returns summary metrics: Win Rate, Total Return, Max Drawdown, and Sharpe Ratio.
+    - Essential for validating a hypothesis before going live.
+    
+    Keywords: strategy testing, performance audit, win rate, historical simulation.
     """
     return await backtest.simple_backtest(data, entry_signal, exit_signal)
 
@@ -275,8 +311,9 @@ async def construct_ml_features(data: list[dict], lags: list[int] = [1, 2, 3, 5]
     """CONSTRUCTS ML features. [ACTION]
     
     [RAG Context]
-    Generates lagged features and targets for ML models.
-    Returns JSON string of dataset.
+    A pre-processing tool for machine learning. Transforms a raw time series into a supervised learning dataset by creating lagged features and a target variable.
+    
+    Keywords: feature engineering, dataset prep, lag variables, supervised learning.
     """
     return await ml.construct_ml_dataset(data, lags)
 

@@ -42,8 +42,13 @@ async def get_article_text(url: str) -> str:
     """FETCHES article text. [ACTION]
     
     [RAG Context]
-    Extract body text from news article URL.
-    Returns string.
+    A specialized "Super Tool" for news consumption. It scrapes a generic URL, identifies the main article body through advanced heuristics, and extracts the clean text without navigation menus, ads, or sidebars.
+    
+    How to Use:
+    - Input any news URL (e.g., from NYT, CNN, or personal blogs).
+    - Perfect for feeding high-quality, relevant text into an RAG pipeline or summary engine.
+    
+    Keywords: news extraction, clean text scraper, article body, content distilling.
     """
     return await article_single.get_article_text(url)
 
@@ -82,8 +87,13 @@ async def get_article_nlp(url: str) -> Dict[str, Any]:
     """ANALYZES article NLP. [ACTION]
     
     [RAG Context]
-    Get summary and keywords from article.
-    Returns JSON dict.
+    A high-level "Super Tool" for rapid comprehension. It performs lightweight NLP on a scrapped article to generate a paragraph-length summary and a list of weighted keywords.
+    
+    How to Use:
+    - 'url': The target article link.
+    - Essential for trend analysis, automated news categorization, and quickly gauging an article's relevance before deep-reading.
+    
+    Keywords: nlp summary, news analysis, keyword extractor, fast reading.
     """
     return await article_single.get_article_nlp(url)
 
@@ -145,8 +155,13 @@ async def analyze_news_source(url: str, limit: int = 100000) -> Dict[str, Any]:
     """ANALYZES news source. [ACTION]
     
     [RAG Context]
-    Comprehensive analysis of a news source.
-    Returns JSON dict.
+    A massive "Super Tool" for organizational intelligence. It maps the structure of a news domain, discovering categories, RSS feeds, and all recently published article URLs.
+    
+    How to Use:
+    - Target a homepage or root domain (e.g., 'https://qz.com').
+    - Critical for building automated news monitors, competitor tracking, or large-scale dataset creation.
+    
+    Keywords: source mapping, site discovery, news structure, domain crawler.
     """
     return await bulk_processor.analyze_news_source(url, limit)
 

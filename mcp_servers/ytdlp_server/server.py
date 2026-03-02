@@ -117,8 +117,13 @@ def get_video_info(url: str) -> Dict[str, Any]:
     """FETCHES video info. [ACTION]
     
     [RAG Context]
-    Get comprehensive metadata for video.
-    Returns JSON dict.
+    A robust "Super Tool" for online video identification. It scrapes any supported URL (YouTube, Vimeo, Twitter) to retrieve a comprehensive metadata dictionary containing titles, views, dates, formats, and subtitles.
+    
+    How to Use:
+    - Best for identifying if a video is worth downloading or for populating a media database.
+    - Does not consume bandwidth for the video stream itself, only the metadata JSON.
+    
+    Keywords: web video scraper, yt metadata, url identifier, format discovery.
     """
     return info_ops.get_video_info(url)
 
@@ -306,8 +311,13 @@ def download_audio_only(url: str, format: str = "mp3") -> str:
     """DOWNLOADS audio. [ACTION]
     
     [RAG Context]
-    Download audio track only (mp3/m4a).
-    Returns output path.
+    A streamlined "Super Tool" for audio harvesting. It downloads the best available video stream, strips the video component, and transcodes the audio into a target format (e.g., MP3/WAV) with high fidelity.
+    
+    How to Use:
+    - Ideal for collecting podcasts, music, and voice notes from video platforms.
+    - Automatically handles the post-processing and tagging for most audio formats.
+    
+    Keywords: audio ripper, podcast downloader, yt to mp3, sound extractor.
     """
     return download_ops.download_audio_only(url, format)
 
@@ -462,8 +472,13 @@ def archive_channel(url: str, download_archive_path: str = "archive.txt") -> str
     """ARCHIVES channel. [ACTION]
     
     [RAG Context]
-    Download entire channel, skipping already downloaded.
-    Returns report string.
+    A high-reliability "Super Tool" for digital preservation. It performs a complete, incremental backup of all videos on a YouTube/Vimeo channel, using a persistent 'archive.txt' to track and skip already-downloaded items across multiple runs.
+    
+    How to Use:
+    - Point to the channel's main URL.
+    - Critical for building offline libraries and ensuring permanent access to content that may be deleted later.
+    
+    Keywords: channel backup, sync folder, digital archive, youtube saver.
     """
     return super_ops.archive_channel(url, download_archive_path)
 

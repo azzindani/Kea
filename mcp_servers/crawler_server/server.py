@@ -34,9 +34,14 @@ async def web_crawler(start_url: str = None, url: str = None, max_depth: int = 1
     """CRAWLS website recursively. [ACTION]
     
     [RAG Context]
-    Args:
-        max_depth: Depth limit
-        same_domain: Restrict to domain
+    A powerful "Super Tool" for deep-site mapping. It follows links recursively from a starting point to discover and index all reachable pages within a domain.
+    
+    How to Use:
+    - 'max_depth': Limits how many clicks away from the home page the crawler goes.
+    - 'same_domain': If True, it won't follow links to external sites (essential for focused audits).
+    - 'delay': Throttles requests to avoid overloading the target server.
+    
+    Keywords: site mapping, recursive fetch, domain audit, link harvesting.
     """
     target = start_url or url
     if not target:
@@ -48,6 +53,13 @@ async def sitemap_parser(url: str, filter_pattern: Optional[str] = None) -> str:
     """PARSES sitemap for URLs. [DATA]
     
     [RAG Context]
+    An efficient "Super Tool" for discovering all public URLs on a website by reading its XML sitemap. Faster and less intrusive than recursive crawling.
+    
+    How to Use:
+    - 'filter_pattern': Optional regex to return only specific paths (e.g. '/blog/.*').
+    - Returns a clean list of absolute URLs found in the sitemap index or files.
+    
+    Keywords: url discovery, sitemap.xml, site structure, indexing helper.
     """
     return await crawl_ops.sitemap_parser(url, filter_pattern)
 

@@ -35,8 +35,13 @@ async def pubmed_search(query: str, max_results: int = 100000, sort: str = "rele
     """SEARCHES PubMed. [ACTION]
     
     [RAG Context]
-    Search PubMed/NCBI for medical and biomedical research papers.
-    Returns results string.
+    Accesses the National Center for Biotechnology Information (NCBI) database to retrieve peer-reviewed biomedical and life sciences literature.
+    
+    How to Use:
+    - Supports Boolean operators (AND, OR, NOT) in the query.
+    - 'min_date' and 'max_date' should be in YYYY/MM/DD format.
+    
+    Keywords: medical research, biology papers, ncbi, healthcare literature.
     """
     return await pubmed_ops.pubmed_search(query, max_results, sort, min_date, max_date)
 
@@ -45,8 +50,13 @@ async def arxiv_search(query: str, max_results: int = 100000, category: Optional
     """SEARCHES arXiv. [ACTION]
     
     [RAG Context]
-    Search arXiv for physics, math, CS, and other research papers.
-    Returns results string.
+    Retrieves pre-prints and research papers from the arXiv open-access archive, covering Physics, Mathematics, Computer Science, and Quantitative Finance.
+    
+    How to Use:
+    - 'category': Use codes like 'cs.AI' (Artificial Intelligence) or 'quant-ph' (Quantum Physics).
+    - Returns metadata including abstract, authors, and PDF links.
+    
+    Keywords: pre-print search, cs papers, physics research, open access.
     """
     return await arxiv_ops.arxiv_search(query, max_results, category, sort_by)
 
@@ -85,8 +95,13 @@ async def paper_downloader(doi: Optional[str] = None, arxiv_id: Optional[str] = 
     """DOWNLOADS paper. [ACTION]
     
     [RAG Context]
-    Download paper PDF if available (tries multiple sources).
-    Returns output path.
+    A robust "Super Tool" for fetching full-text PDFs of research papers. It automatically checks multiple repositories (Unpaywall, arXiv, PubMed Central) to find legal open-access copies.
+    
+    How to Use:
+    - Provide either a 'doi' (Digital Object Identifier) or an 'arxiv_id'.
+    - Returns the local file path to the downloaded PDF in the Vault or temporary storage.
+    
+    Keywords: pdf fetcher, full-text download, academic retrieval, paper access.
     """
     return await scholar_ops.paper_downloader(doi, arxiv_id)
 

@@ -69,8 +69,13 @@ async def analyze_workbook_file(file_path: str) -> str:
     """ANALYZES workbook. [ACTION]
     
     [RAG Context]
-    Inspect structure, sheets, ranges, and stats of Excel file.
-    Returns text report.
+    A diagnostic "Super Tool" that performs a comprehensive audit of an Excel (.xlsx) file. It reports on sheet names, active ranges, cell counts, and identifies potential structural issues.
+    
+    How to Use:
+    - Use this as a first step when dealing with an unknown Excel file to understand its scale and complexity.
+    - Returns a summary including sheet titles, row/column dimensions, and a list of named ranges.
+    
+    Keywords: inspect excel, workbook audit, sheet reporter, metadata scan.
     """
     return await run_op(workbook_ops.analyze_workbook_file, file_path=file_path)
 
@@ -80,8 +85,14 @@ async def create_new_workbook(file_path: str, overwrite: bool = False) -> str:
     """CREATES workbook. [ACTION]
     
     [RAG Context]
-    Create a new empty .xlsx file.
-    Returns status string.
+    Initializes a new, empty Microsoft Excel (.xlsx) document.
+    
+    How to Use:
+    - 'file_path': The destination for the new file.
+    - 'overwrite': If True, existing files at that path will be deleted first. Use with caution.
+    - Perfect for starting automated report generation or data export tasks.
+    
+    Keywords: new excel, workbook creation, xlsx init, empty spreadsheet.
     """
     return await run_op(workbook_ops.create_new_workbook, file_path=file_path, overwrite=overwrite)
 
@@ -213,8 +224,14 @@ async def read_range_values(file_path: str, range_string: str, sheet_name: str =
     """READS range values. [ACTION]
     
     [RAG Context]
-    Get values from a specific range (e.g., 'A1:B10').
-    Returns JSON string (list of lists).
+    A precision "Super Tool" for harvesting data from a specific block of cells in an Excel sheet. 
+    
+    How to Use:
+    - 'range_string': Use standard A1 notation (e.g., 'A1:C5' or 'Sheet1!A1:B10').
+    - Returns a 2D array (list of lists) representing the values in the grid.
+    - Efficient for targeted data extraction without loading the whole sheet.
+    
+    Keywords: range fetcher, grid reader, data selection, cell block extraction.
     """
     return await run_op(read_ops.read_range_values, file_path=file_path, range_string=range_string, sheet_name=sheet_name)
 
@@ -235,8 +252,14 @@ async def write_range_values(file_path: str, data: list, start_cell: str = "A1",
     """WRITES range. [ACTION]
     
     [RAG Context]
-    Write 2D list of data starting at cell.
-    Returns status string.
+    An efficient "Super Tool" for bulk-populating an Excel sheet with structured data. It maps a 2D list directly onto the spreadsheet grid.
+    
+    How to Use:
+    - 'data': A list of lists representing rows and columns.
+    - 'start_cell': The top-left corner where the operation begins (e.g., 'B2').
+    - Ideal for exporting dataframes or lists of items from logic into a report.
+    
+    Keywords: bulk write, range population, data export, grid filler.
     """
     return await run_op(write_ops.write_range_values, file_path=file_path, data=data, start_cell=start_cell, sheet_name=sheet_name)
 
@@ -658,8 +681,14 @@ async def render_template(file_path: str, replacements: dict, sheet_name: str = 
     """RENDERS template. [ACTION]
     
     [RAG Context]
-    Replace {{variables}} in cells with values.
-    Returns status string.
+    A powerful "Super Tool" for document automation within Excel. It scans cells for placeholders in the {{key}} format and replaces them with dynamic data.
+    
+    How to Use:
+    - Create a 'master' .xlsx file with styled headers and formulas, using {{labels}} for values.
+    - This tool will find and replace all instances across the sheet.
+    - Excellent for generating customized quotes, dashboards, or tracking sheets.
+    
+    Keywords: excel template, placeholder replacement, dynamic dashboard, report automation.
     """
     return await run_op(template_ops.render_template, file_path=file_path, replacements=replacements, sheet_name=sheet_name)
 

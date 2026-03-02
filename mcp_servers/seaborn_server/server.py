@@ -43,8 +43,14 @@ async def relplot(data: DataInput, x: Optional[str] = None, y: Optional[str] = N
     """PLOTS relational chart. [ACTION]
     
     [RAG Context]
-    High-level interface for scatter and line plots.
-    Returns path to saved image.
+    A high-level "Super Tool" for multi-dimensional relationship discovery. It provides a unified interface for creating scatter and line plots, with built-in support for categorical faceting and semantic mapping.
+    
+    How to Use:
+    - 'hue', 'style', 'size': Map variables to visual attributes.
+    - 'col', 'row': Facet the chart across multiple subplots based on categorical variables.
+    - Perfect for complex datasets where relationships change across groups.
+    
+    Keywords: relational plot, multi-axis scatter, faceted line chart, semantic mapping.
     """
     from mcp_servers.seaborn_server.tools import relational_ops
     return await relational_ops.relplot(data, x, y, hue, style, size, col, row, kind, height, aspect)
@@ -79,8 +85,13 @@ async def displot(data: DataInput, x: Optional[str] = None, y: Optional[str] = N
     """PLOTS distribution chart. [ACTION]
     
     [RAG Context]
-    High-level interface for histograms and KDEs.
-    Returns path to saved image.
+    A robust "Super Tool" for statistical distribution modeling. It offers a facetable interface for visualizing the distribution of numeric data through histograms, KDEs, or ECDF plots.
+    
+    How to Use:
+    - 'kind': Choose 'hist' (histogram), 'kde' (kernel density), or 'ecdf'.
+    - Ideal for comparing distributions across multiple categories using 'row' or 'col' faceting.
+    
+    Keywords: distribution analysis, data density, statistical freq, comparative histogram.
     """
     from mcp_servers.seaborn_server.tools import distribution_ops
     return await distribution_ops.displot(data, x, y, hue, row, col, kind, height, aspect)
@@ -231,8 +242,14 @@ async def heatmap(data: DataInput, annot: bool = False, cmap: str = 'viridis', t
     """PLOTS heatmap. [ACTION]
     
     [RAG Context]
-    Heatmap of rectangular data.
-    Returns path to saved image.
+    A specialized "Super Tool" for matrix and correlation visualization. It renders rectangular data as a color-encoded grid, identifying magnitude and clusters in dense numerical tables.
+    
+    How to Use:
+    - 'annot': If True, writes the numeric value into each cell.
+    - 'cmap': Controls the color progression (e.g., 'magma', 'coolwarm' for correlations).
+    - Perfect for visualizing correlation matrices, confusion matrices, or time-series intensity.
+    
+    Keywords: intensity grid, matrix plot, correlation heatmap, color coded table.
     """
     from mcp_servers.seaborn_server.tools import matrix_ops
     return await matrix_ops.heatmap(data, annot, cmap, title)
@@ -298,8 +315,13 @@ async def auto_plot(data: DataInput, x: str, y: Optional[str] = None) -> str:
     """PLOTS automatically. [ACTION]
     
     [RAG Context]
-    Infers best plot type from data.
-    Returns path to saved image.
+    An intelligent "Super Tool" for rapid prototyping. It analyzes the data types of the provided features and automatically chooses the most statistically appropriate Seaborn chart type.
+    
+    How to Use:
+    - Simply provide a Dataset and the column names 'x' (and optionally 'y').
+    - Returns a publication-quality chart (e.g., Histogram for univariate, Scatter/Box for bivariate).
+    
+    Keywords: automated graphing, smart plotter, heuristic chart select, fast EDA.
     """
     from mcp_servers.seaborn_server.tools import super_ops
     return await super_ops.auto_plot(data, x, y)

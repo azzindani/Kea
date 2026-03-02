@@ -66,8 +66,24 @@ async def execute_code(
     """EXECUTES python code. [ACTION]
     
     [RAG Context]
-    Execute Python code in a sandboxed environment.
-    Returns stdout, variables, and any errors.
+    Runs arbitrary Python 3.12+ code in a secure, isolated sandboxed environment. This is the primary tool for custom logic, data transformation, and complex algorithmic processing that isn't covered by other specialized tools.
+    
+    How to Use:
+    - Provide raw Python code as a string.
+    - If you need external libraries (e.g., 'scikit-learn', 'requests'), list them in the 'dependencies' argument. The system will install them JIT.
+    - Captures all standard output (print statements) and returns it alongside the final state of local variables.
+    - Handles timeouts (default 30s) to prevent runaway processes.
+    
+    Arguments:
+    - code (str): The Python script to run.
+    - timeout (int): Maximum execution time in seconds.
+    - dependencies (List[str]): List of PyPI packages to install before running.
+    
+    Example:
+    - Input: code="import math; print(math.sqrt(144))"
+    - Output: "12.0"
+    
+    Keywords: run script, python sandbox, custom logic, code execution, jit dependencies.
     """
     return await run_op(execute_code_module.execute_code_tool, code=code, timeout=timeout, dependencies=dependencies)
 
@@ -81,8 +97,25 @@ async def dataframe_ops(
     """MANIPULATES DataFrame. [ACTION]
     
     [RAG Context]
-    Perform Pandas DataFrame operations (load, filter, aggregate).
-    Returns result string.
+    High-level interface for Pandas-style data manipulation. Designed for non-programmatic data scientists to perform common table operations.
+    
+    Operations Supported:
+    - 'load': Read CSV/JSON data into a DataFrame.
+    - 'filter': Select rows based on conditions.
+    - 'aggregate': Compute group-by statistics (mean, sum, count).
+    - 'sort': Order data by one or more columns.
+    - 'merge': Join two datasets.
+    
+    How to Use:
+    - Pass the operation name and the data source (either raw string or a reference to a previous output).
+    - Use 'params' to specify columns, conditions, and sorting orders.
+    
+    Arguments:
+    - operation (str): One of the supported verbs.
+    - data (str): The raw input data string.
+    - params (Dict): Configuration for the operation.
+    
+    Keywords: pandas, data processing, filtering, aggregation, table manipulation.
     """
     return await run_op(dataframe_ops_module.dataframe_ops_tool, operation=operation, data=data, params=params)
 
@@ -95,8 +128,21 @@ async def sql_query(
     """EXECUTES SQL. [ACTION]
     
     [RAG Context]
-    Execute SQL query on in-memory data using DuckDB.
-    Returns result table.
+    Executes standard SQL queries against in-memory datasets using the DuckDB engine. This is ideal for querying large CSV/JSON extracts without loading them into a full database.
+    
+    How to Use:
+    - Write standard SQL (SELECT, JOIN, GROUP BY).
+    - Provide 'data_sources' as a mapping of table names to raw data strings. DuckDB will automatically parse them.
+    - Returns a formatted table result.
+    
+    Arguments:
+    - query (str): The SQL query string.
+    - data_sources (Dict): e.g., {"users": "id,name\n1,Alice"}
+    
+    Example:
+    - Input: query="SELECT * FROM data WHERE price > 100"
+    
+    Keywords: duckdb, in-memory sql, relational query, table search, data analysis.
     """
     return await run_op(sql_query_module.sql_query_tool, query=query, data_sources=data_sources)
 

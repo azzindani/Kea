@@ -62,8 +62,13 @@ async def analyze_company_profile(ticker: str) -> str:
     """ANALYZES profile. [ACTION]
     
     [RAG Context]
-    Get company facts and recent filings.
-    Returns JSON string.
+    A deep-intelligence "Super Tool" for corporate discovery. It scrapes the SEC EDGAR database to construct a comprehensive profile of a public company, including its official name, CIK (Central Index Key), recent filing history, and core business facts.
+    
+    How to Use:
+    - Input a stock ticker (e.g., 'AAPL', 'TSLA').
+    - Essential first step for any regulatory analysis or fundamental research to confirm identity and filing frequency.
+    
+    Keywords: edgar profile, company facts, cik lookup, sec discovery.
     """
     return await run_op(discovery.analyze_company_profile, ticker=ticker)
 
@@ -83,8 +88,13 @@ async def get_filing_text(ticker: str, form: str) -> str:
     """FETCHES filing text. [ACTION]
     
     [RAG Context]
-    Get full markdown content of a filing.
-    Returns text content.
+    A high-fidelity "Super Tool" for regulatory reading. It retrieves the latest specified SEC form (e.g., '10-K', '10-Q', '8-K') and converts the complex HTML/XBRL source into a clean, markdown-formatted text block for easy processing.
+    
+    How to Use:
+    - Specify the 'ticker' and the 'form' type.
+    - Ideal for feeding disclosure text into an LLM for sentiment analysis, risk factor extraction, or management discussion review (MD&A).
+    
+    Keywords: sec filing text, 10-k markdown, 8-k extractor, edgar content.
     """
     return await run_op(content.get_filing_text, ticker=ticker, form=form)
 

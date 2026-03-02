@@ -53,7 +53,13 @@ async def describe_data(data: Union[List[float], str]) -> Dict[str, Any]:
     """CALCULATES descriptive statistics. [DATA]
     
     [RAG Context]
-    Mean, variance, skewness, kurtosis.
+    A bedrock "Super Tool" for data characterization. It computes the essential statistical moments—mean, variance, skewness, and kurtosis—of a numerical dataset, providing an instant snapshot of its distribution and central tendencies.
+    
+    How to Use:
+    - Input 'data' as a list of raw numbers.
+    - Resulting 'Skewness' helps identify asymmetric tails, while 'Kurtosis' indicates the presence of outliers (heavy tails).
+    
+    Keywords: distribution summary, variance analysis, moment calculator, data snapshot.
     """
     from mcp_servers.scipy_server.tools import stats_ops
     return await stats_ops.describe_data(data)
@@ -72,7 +78,13 @@ async def get_zscore(data: Union[List[float], str]) -> List[float]:
     """CALCULATES Z-scores. [DATA]
     
     [RAG Context]
-    Standardizes data to mean=0, std=1.
+    A critical "Super Tool" for data standardization. It rescales a dataset so its mean becomes 0 and its standard deviation becomes 1, allowing for the direct comparison of values from different distributions or scales.
+    
+    How to Use:
+    - Transform a list of numbers into their relative distances from the mean.
+    - Essential preprocessing step for many machine learning algorithms that are sensitive to feature magnitude.
+    
+    Keywords: standardization, data scaling, normal score, outlier detection.
     """
     from mcp_servers.scipy_server.tools import stats_ops
     return await stats_ops.get_zscore(data)
@@ -110,7 +122,13 @@ async def test_normality(data: Union[List[float], str]) -> Dict[str, Any]:
     """TESTS for normal distribution. [ACTION]
     
     [RAG Context]
-    Shapiro-Wilk or Kolmogorov-Smirnov.
+    Performs rigorous statistical tests (Shapiro-Wilk) to determine if a sample came from a normally distributed population.
+    
+    How to Use:
+    - If p-value < 0.05: The null hypothesis of normality is rejected (data is NOT normal).
+    - If p-value > 0.05: We fail to reject normality (safe to assume Gaussian for most tests).
+    
+    Keywords: normality check, gaussian test, shapiro-wilk, p-value.
     """
     from mcp_servers.scipy_server.tools import stats_ops
     return await stats_ops.test_normality(data)
@@ -120,7 +138,13 @@ async def ttest_ind(data1: Union[List[float], str], data2: Union[List[float], st
     """PERFORMS T-test (independent). [ACTION]
     
     [RAG Context]
-    Compares means of two independent samples.
+    A standard hypothesis test for comparing the means of two independent groups (e.g., Control group vs Treatment group).
+    
+    How to Use:
+    - Assumes the samples are independent and approximately normal.
+    - Low p-value (<0.05) indicates a significant difference between the means.
+    
+    Keywords: mean comparison, group difference, hypothesis testing, t-statistic.
     """
     from mcp_servers.scipy_server.tools import stats_ops
     return await stats_ops.ttest_ind(data1, data2)
@@ -318,7 +342,13 @@ async def curve_fit(func_str: str, x_data: Union[List[float], str], y_data: Unio
     """FITS a function to data. [ACTION]
     
     [RAG Context]
-    Non-linear least squares.
+    Uses non-linear least squares to fit a mathematical function to a set of X,Y data points.
+    
+    How to Use:
+    - 'func_str': A Python-formatted function string (e.g., 'lambda x, a, b: a*x + b' for linear fitting).
+    - Returns optimized parameters (popt) and their covariance (pcov).
+    
+    Keywords: function fitting, curve tracing, param optimization, regression model.
     """
     from mcp_servers.scipy_server.tools import opt_ops
     return await opt_ops.curve_fit(func_str, x_data, y_data)
@@ -338,7 +368,13 @@ async def linprog(c: List[float], A_ub: List[List[float]] = None, b_ub: List[flo
     """SOLVES linear programming problem. [ACTION]
     
     [RAG Context]
-    Minimizes c^T * x.
+    A bedrock optimization tool for resource allocation. It minimizes a linear objective function subject to linear equality and inequality constraints.
+    
+    How to Use:
+    - Minimizes 'c^T * x'.
+    - Used in logistics, finance, and manufacturing for finding optimal output levels within constraints.
+    
+    Keywords: constrained optimization, linear programming, simplex method, resource allocation.
     """
     from mcp_servers.scipy_server.tools import opt_ops
     return await opt_ops.linprog(c, A_ub, b_ub, A_eq, b_eq, bounds)
@@ -420,6 +456,13 @@ async def find_peaks(data: Union[List[float], str], height: Optional[float] = No
     """FINDS peaks in signal. [DATA]
     
     [RAG Context]
+    Scans a 1D dataset (signal) to find local maxima based on various criteria.
+    
+    How to Use:
+    - 'height': Minimum threshold for peak recognition.
+    - 'distance': Minimum horizontal distance (in indices) between neighboring peaks.
+    
+    Keywords: spike detection, local maxima, signal processing, event finding.
     """
     from mcp_servers.scipy_server.tools import signal_ops
     return await signal_ops.find_peaks(data, height, distance)
@@ -619,7 +662,13 @@ async def analyze_distribution(data: List[float]) -> Dict[str, Any]:
     """ANALYZES data distribution. [ENTRY]
     
     [RAG Context]
-    Fits multiple distributions and finds best fit.
+    A robust "Super Tool" that attempts to fit over 80 different continuous probability distributions to the input data and ranks them by goodness of fit (RSS).
+    
+    How to Use:
+    - Crucial for identifying the underlying stochastic process of variables in finance, engineering, or social sciences.
+    - Automatically discovers if your data is Normal, Log-normal, Cauchy, Exponential, etc.
+    
+    Keywords: distribution fitting, best fit, probability model, stochastic discovery.
     """
     from mcp_servers.scipy_server.tools import super_ops
     return await super_ops.analyze_distribution(data)
@@ -629,7 +678,9 @@ async def signal_dashboard(data: List[float]) -> Dict[str, Any]:
     """GENERATES signal analysis dashboard. [ENTRY]
     
     [RAG Context]
-    Peaks, FFT, trend, statistics.
+    A comprehensive "Super Tool" for analyzing time-varying signals. Combines statistical moments, spectral decomposition (FFT), and peak detection into a single results object.
+    
+    Keywords: signal overview, spectrogram info, spike analysis, frequency profile.
     """
     from mcp_servers.scipy_server.tools import super_ops
     return await super_ops.signal_dashboard(data)

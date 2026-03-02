@@ -119,7 +119,13 @@ def extract_text_layout(path: str, page_number: int, layout: bool = True, x_tole
     """EXTRACTS text preserving layout. [DATA]
     
     [RAG Context]
-    Tries to maintain physical layout.
+    A specialized "Super Tool" for parsing PDF documents while maintaining their physical visual structure. Unlike simple text extraction, it respects columns, headers, and spacing.
+    
+    How to Use:
+    - Excellent for documents with complex multi-column layouts where reading order is critical.
+    - 'x_tolerance' and 'y_tolerance' can be tuned to group characters into words/sentences more or less aggressively.
+    
+    Keywords: layout-aware ocr, column preservation, structured text extraction, pdf layout reader.
     """
     return text_ops.extract_text_layout(path, page_number, layout, x_tolerance, y_tolerance)
 
@@ -203,7 +209,13 @@ def extract_tables(path: str, page_number: int) -> List[List[List[Optional[str]]
     """EXTRACTS all tables from page. [DATA]
     
     [RAG Context]
-    Returns list of tables, each table is list of rows.
+    A high-fidelity "Super Tool" for identifying and extracting tabular data from PDF pages. It uses advanced geometric heuristics to detect table boundaries and cell grids.
+    
+    How to Use:
+    - Returns a list of tables. Each table is a 2D list (rows containing cell values).
+    - Perfect for financial statements, technical datasheets, and schedules.
+    
+    Keywords: pdf table scraper, grid extraction, data extraction, tabular pdf to list.
     """
     return table_ops.extract_tables(path, page_number)
 
@@ -418,7 +430,13 @@ def auto_extract_all(path: str, page_number: int) -> Dict[str, Any]:
     """EXTRACTS everything from page. [DATA]
     
     [RAG Context]
-    Text, tables, images.
+    An automated "Super Tool" that performs a complete sweep of a PDF page. It concurrently extracts text, detects all tables, and harvests all embedded images.
+    
+    How to Use:
+    - Returns a master dictionary containing 'text', 'tables', 'images', and 'metadata'.
+    - Use this for a "one-shot" understanding of a document's page content.
+    
+    Keywords: full page audit, document digitizer, multi-modal extraction, batch page processing.
     """
     return super_ops.auto_extract_all(path, page_number)
 

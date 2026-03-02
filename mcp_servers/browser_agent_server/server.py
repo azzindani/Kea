@@ -34,9 +34,13 @@ async def human_like_search(query: str, max_sites: int = 5, min_delay: float = 1
     """SEARCHES like a human. [ACTION]
     
     [RAG Context]
-    Args:
-        min_delay: Minimum delay between requests
-        max_delay: Maximum delay (randomized)
+    A sophisticated "Super Tool" for web searching that mimics human browsing behavior to avoid anti-bot detection. It randomizes delays and interacts with search engine result pages (SERPs) realistically.
+    
+    How to Use:
+    - 'min_delay' and 'max_delay': Range in seconds to wait between actions.
+    - 'focus_domains': Restrict search results to specific trusted sites (e.g., ['wikipedia.org', 'reuters.com']).
+    
+    Keywords: stealth search, bot-evasion, web scraping, human mimicry.
     """
     return await browser_ops.human_like_search(query, max_sites, min_delay, max_delay, focus_domains)
 
@@ -78,7 +82,13 @@ async def multi_site_browse(urls: List[str], extract: str = "summary", max_concu
     """BROWSES multiple sites. [ACTION]
     
     [RAG Context]
-    Parallel browsing with rate limiting.
+    A high-throughput "Super Tool" for parallel web exploration. It fetches content from multiple URLs simultaneously using asynchronous collectors.
+    
+    How to Use:
+    - 'extract': Choose 'summary' (AI-generated TL;DR), 'raw' (full text), or 'metadata'.
+    - 'max_concurrent': Controls the number of simultaneous browser instances (default 10).
+    
+    Keywords: mass browsing, parallel extraction, web crawler, batch reading.
     """
     return await browser_ops.multi_site_browse(urls, extract, max_concurrent)
 

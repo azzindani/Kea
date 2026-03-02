@@ -114,8 +114,13 @@ async def get_10k(ticker: str, amount: int = 1) -> str:
     """DOWNLOADS 10-K. [ACTION]
     
     [RAG Context]
-    Download Annual Report (10-K).
-    Returns path string.
+    The definitive "Super Tool" for annual corporate disclosure. It downloads the official SEC Form 10-K for a public company, which provides a comprehensive overview of the business, its audited financial statements, and its risk factors from the past fiscal year.
+    
+    How to Use:
+    - 'amount': Specify how many years of historical 10-Ks to retrieve (e.g., set to 5 for a long-term trend analysis).
+    - Essential for performing deep-dive fundamental analysis and verifying officially reported financials.
+    
+    Keywords: annual report, sec filing, financial disclosure, corporate audit.
     """
     result = await download_10k({"ticker": ticker, "amount": amount})
     return _extract_text(result)

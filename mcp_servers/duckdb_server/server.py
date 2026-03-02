@@ -46,8 +46,14 @@ def connect_db(path: str = "project_data.duckdb") -> str:
     """CONNECTS to database. [ACTION]
     
     [RAG Context]
-    Connect to DuckDB database file.
-    Returns status string.
+    The foundational "Super Tool" for high-performance analytical storage. It initializes or connects to a DuckDB database instance, which is optimized for fast OLAP (On-line Analytical Processing) queries on large datasets.
+    
+    How to Use:
+    - Use ':memory:' for transient, lightning-fast scratchpad analysis.
+    - Use a filename (e.g., 'vault_data.duckdb') for persistent storage that survives session restarts.
+    - Enables SQL-based manipulation of data fetched from other MCP tools.
+    
+    Keywords: analytical database, sql engine, olap storage, data warehouse.
     """
     return core_ops.connect_db(path)
 
@@ -129,8 +135,14 @@ def execute_query(query: str) -> str:
     """EXECUTES SQL query. [ACTION]
     
     [RAG Context]
-    Execute SQL query and return result as string.
-    Returns table string.
+    The primary tool for interacting with the database using standard SQL.
+    
+    How to Use:
+    - Supports SELECT, INSERT, UPDATE, DELETE, and DDL statements.
+    - Result is returned as a formatted ASCII table string for easy reading.
+    - Use this for quick checks and debugging.
+    
+    Keywords: sql executor, run command, database query, raw sql.
     """
     return query_ops.execute_query(query)
 
@@ -139,8 +151,13 @@ def fetch_all(query: str) -> List[Dict[str, Any]]:
     """FETCHES all rows. [ACTION]
     
     [RAG Context]
-    Execute SQL and return all rows as dicts.
-    Returns list of dicts.
+    Executes a SELECT query and returns the entire result set as a machine-readable list of dictionaries.
+    
+    How to Use:
+    - Best for tools that need to process data programmatically after retrieval.
+    - Be careful with very large datasets; use LIMIT to prevent memory overflow.
+    
+    Keywords: data retrieval, json results, row fetch, set download.
     """
     return query_ops.fetch_all(query)
 
@@ -328,8 +345,13 @@ def import_csv(file_path: str, table_name: str, auto_detect: bool = True) -> str
     """IMPORTS CSV. [ACTION]
     
     [RAG Context]
-    Load CSV file into a table.
-    Returns status string.
+    Fast, efficient data ingestion engine for CSV files. Directly loads data into DuckDB's native format.
+    
+    How to Use:
+    - 'auto_detect': Automatically discovers column names, types, and delimiters.
+    - DuckDB's CSV reader is highly optimized and can handle millions of rows in seconds.
+    
+    Keywords: csv loader, data ingest, import rows, text file database.
     """
     return io_ops.import_csv(file_path, table_name, auto_detect)
 
@@ -484,8 +506,13 @@ def summarize_table(table_name: str) -> str:
     """SUMMARIZES table. [ACTION]
     
     [RAG Context]
-    Get comprehensive table summary.
-    Returns text report.
+    A deep-analysis "Super Tool" for exploring a table's structure and contents.
+    
+    How to Use:
+    - Automatically calculates count, mean, std, min, max, and distinct counts for every column.
+    - Crucial for initial EDA (Exploratory Data Analysis).
+    
+    Keywords: data profiling, eda, table summary, statistics overview.
     """
     return analysis_ops.summarize_table(table_name)
 
@@ -510,8 +537,14 @@ def etl_pipeline_csv(input_csv: str, output_parquet: str, filter_sql: str = "1=1
     """RUNS ETL pipeline. [ACTION]
     
     [RAG Context]
-    Extract CSV, Transform (filter), Load Parquet.
-    Returns status string.
+    A multi-stage "Super Tool" that performs Extract, Transform, and Load operations in one pass.
+    
+    How to Use:
+    - 1. Extract: Reads from 'input_csv'.
+    - 2. Transform: Applies 'filter_sql'.
+    - 3. Load: Saves directly to the highly-optimized 'output_parquet' format.
+    
+    Keywords: etl job, data conversion, csv to parquet, batch processing.
     """
     return super_ops.etl_pipeline_csv(input_csv, output_parquet, filter_sql)
 
@@ -530,8 +563,13 @@ def query_remote_file(url: str, query_sql: str) -> str:
     """QUERIES remote file. [ACTION]
     
     [RAG Context]
-    Query a remote Parquet/CSV/JSON file directly.
-    Returns table string.
+    A high-level "Super Tool" that allows running SQL directly against files hosted on the web (S3, HTTP, HTTPS) without downloading them manually first.
+    
+    How to Use:
+    - Supports remote Parquet, CSV, and JSON files.
+    - DuckDB uses HTTP range requests to only download necessary chunks of data (Zero-Copy).
+    
+    Keywords: remote sql, s3 query, cloud data access, zero copy.
     """
     return super_ops.query_remote_file(url, query_sql)
 

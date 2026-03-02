@@ -75,8 +75,13 @@ async def search_pypi(query: str, max_results: int = 100000) -> str:
     """SEARCHES PyPI. [ACTION]
     
     [RAG Context]
-    Search PyPI for Python packages.
-    Returns package list.
+    A critical "Super Tool" for software supply chain discovery. It queries the Python Package Index (PyPI) to find libraries, frameworks, and utilities that can extend the Kea system's capabilities in areas like data science, web scraping, or financial modeling.
+    
+    How to Use:
+    - 'query': Use specific keywords for functionalities (e.g., "async postgres orm" or "natural language processing").
+    - Essential for JIT (Just-In-Time) tool development where Kea needs to find a library to solve a specific engineering problem.
+    
+    Keywords: python packages, library search, software discovery, developer tools.
     """
     return await run_op(search.search_pypi, query=query, max_results=max_results)
 

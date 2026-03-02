@@ -172,8 +172,13 @@ def ef_max_sharpe(prices_input: str, risk_free_rate: float = 0.02) -> Dict[str, 
     """OPTIMIZES Sharpe. [ACTION]
     
     [RAG Context]
-    Optimize portfolio for maximum Sharpe ratio.
-    Returns dict of weights.
+    A premier "Super Tool" for Modern Portfolio Theory (MPT). It identifies the specific asset weights that maximize the Sharpe ratio, effectively finding the "Tangency Portfolio" on the Efficient Frontier.
+    
+    How to Use:
+    - Input the historical price data for your asset universe.
+    - Resulting weights provide the best historical risk-adjusted return configuration.
+    
+    Keywords: optimal portfolio, tangency portfolio, sharp ratio max, mean variance.
     """
     return frontier_ops.ef_max_sharpe(prices_input, risk_free_rate)
 
@@ -255,8 +260,13 @@ def bl_weights(prices_input: str, absolute_views: Dict[str, float]) -> Dict[str,
     """OPTIMIZES BL weights. [ACTION]
     
     [RAG Context]
-    Optimize portfolio using Black-Litterman model.
-    Returns dict of weights.
+    An advanced "Super Tool" for semi-active management. The Black-Litterman model combines market equilibrium returns with specific investor "views" to produce more stable and balanced asset weights than traditional mean-variance optimization.
+    
+    How to Use:
+    - 'absolute_views': A dictionary of expected returns for specific assets (e.g., {'AAPL': 0.15, 'TSLA': -0.05}).
+    - Prevents the extreme, concentrated weights often seen in pure Markowitz models.
+    
+    Keywords: black litterman, investor views, equilibrium returns, stable optimization.
     """
     return bl_ops.bl_weights(prices_input, absolute_views)
 
@@ -268,8 +278,13 @@ def hrp_optimize(prices_input: str) -> Dict[str, float]:
     """OPTIMIZES HRP. [ACTION]
     
     [RAG Context]
-    Optimize using Hierarchical Risk Parity.
-    Returns dict of weights.
+    A modern "Super Tool" for robust risk management. Hierarchical Risk Parity (HRP) uses machine learning (hierarchical clustering) to build a diversified portfolio that does not require a covariance matrix inversion, making it highly stable.
+    
+    How to Use:
+    - Ideal for portfolios with many assets where traditional optimization might fail or produce unstable results.
+    - No expected return input is required; it focuses solely on the diversification of risk.
+    
+    Keywords: hierarchical risk parity, machine learning portfolio, stable weights, cluster-based diversification.
     """
     return hrp_ops.hrp_optimize(prices_input)
 
@@ -370,8 +385,14 @@ def optimize_portfolio_pipeline(prices_input: str, strategy: str = "max_sharpe",
     """PIPELINE: Optimize. [ACTION]
     
     [RAG Context]
-    End-to-end portfolio optimization and allocation.
-    Returns comprehensive result dict.
+    The ultimate "Super Tool" for automated wealth management. It runs an end-to-end process: cleaning data, calculating a risk model, optimizing weights per strategy, and performing discrete share allocation.
+    
+    How to Use:
+    - 'strategy': Choose from 'max_sharpe', 'min_volatility', 'hrp'.
+    - 'investment_amount': Your total capital to allocate.
+    - Returns exactly how many shares of each asset to buy and the expected portfolio performance.
+    
+    Keywords: robo advisor, automated trading, end to end portfolio, share allocation.
     """
     return super_ops.optimize_portfolio_pipeline(prices_input, strategy, investment_amount)
 

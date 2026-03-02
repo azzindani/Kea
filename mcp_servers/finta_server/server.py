@@ -41,8 +41,14 @@ async def get_all_indicators(data: list[dict]) -> str:
     """CALCULATES all indicators. [ACTION]
     
     [RAG Context]
-    Runs 80+ technical analysis indicators.
-    Returns JSON string of results.
+    A comprehensive analysis tool that runs the entire finta library (80+ indicators) on a single OHLCV dataset. 
+    
+    How to Use:
+    - Input 'data' must be a list of dicts with keys: 'open', 'high', 'low', 'close', 'volume'.
+    - Returns a massive JSON object where each key is an indicator name and the value is a list of results.
+    - Ideal for batch processing and preliminary feature engineering.
+    
+    Keywords: full technical analysis, indicator batch, quant suite.
     """
     return await bulk.get_all_indicators(data)
 
@@ -51,8 +57,13 @@ async def get_momentum_suite(data: list[dict]) -> str:
     """CALCULATES momentum suite. [ACTION]
     
     [RAG Context]
-    Runs all Momentum indicators.
-    Returns JSON string of results.
+    A specialized "Super Tool" for analyzing the speed and strength of price movements. It calculates RSI, MACD, Stochastic, ROC, and several other velocity indicators in a single call.
+    
+    How to Use:
+    - Input OHLCV data.
+    - Used to detect overbought/oversold conditions and divergence between price and momentum.
+    
+    Keywords: momentum dashboard, velocity studies, rsi macd batch, strength analysis.
     """
     return await bulk.get_momentum_suite(data)
 
@@ -61,8 +72,12 @@ async def get_trend_suite(data: list[dict]) -> str:
     """CALCULATES trend suite. [ACTION]
     
     [RAG Context]
-    Runs all Trend indicators.
-    Returns JSON string of results.
+    A high-level "Super Tool" for identifying the prevailing market direction. It aggregates results from SMA, EMA, ADX, Parabolic SAR, and other trend-following metrics.
+    
+    How to Use:
+    - Helps determine if the market is trending (bullish/bearish) or range-bound (sideways).
+    
+    Keywords: market direction, trend following, ma suite, directional movement.
     """
     return await bulk.get_trend_suite(data)
 
@@ -92,8 +107,13 @@ async def calculate_indicator(data: list[dict], indicator: str, params: dict = N
     """CALCULATES specific indicator. [ACTION]
     
     [RAG Context]
-    Calculates any supported indicator by name (e.g. 'RSI', 'SMA').
-    Returns JSON string of results.
+    A universal entry point for the finta library. Allows calling any supported indicator by string name.
+    
+    How to Use:
+    - Supported indicators: 'RSI', 'MACD', 'SMA', 'EMA', 'BBANDS', 'OBV', 'ATR', etc.
+    - 'params' should be a dict of arguments for the specific finta function (e.g., {'period': 14}).
+    
+    Keywords: technical study, indicator factory, custom analysis.
     """
     return await universal.calculate_indicator(data, indicator, params)
 
@@ -103,8 +123,14 @@ async def calculate_rsi(data: list[dict], params: dict = None) -> str:
     """CALCULATES RSI. [ACTION]
     
     [RAG Context]
-    Relative Strength Index.
-    Returns JSON string of results.
+    The Relative Strength Index (RSI) is a momentum oscillator that measures the speed and change of price movements. 
+    
+    How to Use:
+    - Typically oscillates between 0 and 100.
+    - Readings above 70 are traditionally considered 'Overbought'.
+    - Readings below 30 are traditionally considered 'Oversold'.
+    
+    Keywords: momentum oscillator, overbought oversold, strength index.
     """
     return await momentum.calculate_rsi(data, params)
 
@@ -113,8 +139,14 @@ async def calculate_macd(data: list[dict], params: dict = None) -> str:
     """CALCULATES MACD. [ACTION]
     
     [RAG Context]
-    Moving Average Convergence Divergence.
-    Returns JSON string of results.
+    Moving Average Convergence Divergence (MACD) is a trend-following momentum indicator that shows the relationship between two moving averages of an asset's price.
+    
+    How to Use:
+    - Provides a MACD line, a Signal line, and a Histogram.
+    - Bullish cross: MACD crosses above Signal.
+    - Bearish cross: MACD crosses below Signal.
+    
+    Keywords: trend following, convergence divergence, signal line crossover.
     """
     return await momentum.calculate_macd(data, params)
 
@@ -258,8 +290,12 @@ async def calculate_sma(data: list[dict], params: dict = None) -> str:
     """CALCULATES SMA. [ACTION]
     
     [RAG Context]
-    Simple Moving Average.
-    Returns JSON string of results.
+    Simple Moving Average (SMA). A fundamental trend indicator that smooths out price variations by calculating the average of the last 'N' periods.
+    
+    How to Use:
+    - 50-day and 200-day SMAs are key benchmarks for long-term trends (Golden Cross/Death Cross).
+    
+    Keywords: average price, moving average, trend identifier, smoothing filter.
     """
     return await trend.calculate_sma(data, params)
 
@@ -268,8 +304,12 @@ async def calculate_ema(data: list[dict], params: dict = None) -> str:
     """CALCULATES EMA. [ACTION]
     
     [RAG Context]
-    Exponential Moving Average.
-    Returns JSON string of results.
+    Exponential Moving Average (EMA). A trend indicator that places a greater weight and significance on the most recent data points, making it more responsive to new information than a simple moving average.
+    
+    How to Use:
+    - Often used as a fast-acting signal line in crossover strategies.
+    
+    Keywords: exponential average, responsive ma, fast signal, weight-based smoothing.
     """
     return await trend.calculate_ema(data, params)
 
@@ -338,8 +378,13 @@ async def calculate_adx(data: list[dict], params: dict = None) -> str:
     """CALCULATES ADX. [ACTION]
     
     [RAG Context]
-    Average Directional Index.
-    Returns JSON string of results.
+    Average Directional Index (ADX). A non-directional trend strength indicator. It measures how strong a trend is (either up or down) without indicating the direction itself.
+    
+    How to Use:
+    - Values above 25 generally indicate a strong trend.
+    - Values below 20 suggest a weak or sideways market.
+    
+    Keywords: trend strength, directional index, market momentum, non-directional filter.
     """
     return await trend.calculate_adx(data, params)
 
@@ -378,8 +423,12 @@ async def calculate_sar(data: list[dict], params: dict = None) -> str:
     """CALCULATES SAR. [ACTION]
     
     [RAG Context]
-    Parabolic SAR (Stop and Reverse).
-    Returns JSON string of results.
+    Parabolic SAR (Stop and Reverse) is used to find potential reversals in the market price direction.
+    
+    How to Use:
+    - Trailing stop-loss tool. When price touches the SAR dots, a reversal is likely occurring.
+    
+    Keywords: parabolic sar, reversal signal, trailing stop, trend switch.
     """
     return await trend.calculate_sar(data, params)
 
@@ -389,8 +438,13 @@ async def calculate_atr(data: list[dict], params: dict = None) -> str:
     """CALCULATES ATR. [ACTION]
     
     [RAG Context]
-    Average True Range.
-    Returns JSON string of results.
+    Average True Range (ATR). Measures market volatility by decomposing the entire range of an asset price for that period.
+    
+    How to Use:
+    - Higher ATR signifies higher volatility.
+    - Used to set dynamic stop-losses (e.g., set SL at 2x ATR).
+    
+    Keywords: range size, volatility measure, dynamic stops, true range.
     """
     return await volatility.calculate_atr(data, params)
 
@@ -399,8 +453,13 @@ async def calculate_bbands(data: list[dict], params: dict = None) -> str:
     """CALCULATES Bollinger Bands. [ACTION]
     
     [RAG Context]
-    Bollinger Bands (Upper, Middle, Lower).
-    Returns JSON string of results.
+    Bollinger Bands consist of a middle SMA line and two outer bands representing standard deviations. 
+    
+    How to Use:
+    - Measures relative high and low of price based on recent volatility.
+    - Tightening of the bands ('Squeeze') often precedes a major breakout.
+    
+    Keywords: volatility bands, price extremes, bb squeeze, overbought oversold.
     """
     return await volatility.calculate_bbands(data, params)
 
@@ -490,8 +549,12 @@ async def calculate_obv(data: list[dict], params: dict = None) -> str:
     """CALCULATES OBV. [ACTION]
     
     [RAG Context]
-    On-Balance Volume.
-    Returns JSON string of results.
+    On-Balance Volume (OBV). A momentum indicator that uses volume flow to predict changes in stock price.
+    
+    How to Use:
+    - If OBV is rising, buy pressure is high. If falling, sell pressure is high.
+    
+    Keywords: volume accum, smart money, flow indicator.
     """
     return await volume.calculate_obv(data, params)
 
@@ -500,8 +563,12 @@ async def calculate_mfi(data: list[dict], params: dict = None) -> str:
     """CALCULATES MFI. [ACTION]
     
     [RAG Context]
-    Money Flow Index.
-    Returns JSON string of results.
+    Money Flow Index (MFI). A technical oscillator that uses both price and volume for identifying overbought or oversold signals. 
+    
+    How to Use:
+    - Often considered as "Volume-weighted RSI".
+    
+    Keywords: money flow, volume rsi, overbought oversold volume.
     """
     return await volume.calculate_mfi(data, params)
 
@@ -682,8 +749,12 @@ async def calculate_ichimoku(data: list[dict], params: dict = None) -> str:
     """CALCULATES Ichimoku. [ACTION]
     
     [RAG Context]
-    Ichimoku Cloud.
-    Returns JSON string of results.
+    Ichimoku Kinko Hyo (Cloud). A "one-look" comprehensive technical indicator for support, resistance, and trend.
+    
+    How to Use:
+    - Focus on the 'Kumo Cloud' (Senkou Span A/B crossover) and the price position relative to the cloud.
+    
+    Keywords: ichimoku cloud, japanese charts, one-look trend.
     """
     return await clouds.calculate_ichimoku(data, params)
 
@@ -762,8 +833,12 @@ async def calculate_vwap_finta(data: list[dict], params: dict = None) -> str:
     """CALCULATES VWAP. [ACTION]
     
     [RAG Context]
-    Volume Weighted Average Price.
-    Returns JSON string of results.
+    Volume Weighted Average Price (VWAP). A trading benchmark that represents the average price a stock has traded at throughout the session.
+    
+    How to Use:
+    - Often used by institutional traders as an execution benchmark.
+    
+    Keywords: average price, trading benchmark, volume weight.
     """
     return await weighted.calculate_vwap(data, params)
 

@@ -43,8 +43,14 @@ async def plot_line(x: VectorInput, y: VectorInput, title: Optional[str] = None,
     """PLOTS line chart. [ACTION]
     
     [RAG Context]
-    Standard line plot. Best for time series or continuous data.
-    Returns path to saved image.
+    A foundational "Super Tool" for temporal and sequential data visualization. It renders a 2D line plot connecting data points to reveal trends, cycles, and patterns in continuous variables.
+    
+    How to Use:
+    - 'x', 'y': Arrays of data or column names if a dataframe context is implied.
+    - 'color', 'linestyle', 'marker': Visual attributes for precision styling.
+    - Returns the absolute path to the generated PNG image.
+    
+    Keywords: line graph, trend visualization, time series plot, continuous data chart.
     """
     from mcp_servers.matplotlib_server.tools import basic_ops
     return await basic_ops.plot_line(x, y, title, xlabel, ylabel, color, linestyle, marker, label, figsize)
@@ -112,8 +118,13 @@ async def plot_hist(x: VectorInput, bins: int = 10, title: Optional[str] = None,
     """PLOTS histogram. [ACTION]
     
     [RAG Context]
-    Standard histogram. Best for distribution analysis.
-    Returns path to saved image.
+    A critical "Super Tool" for exploratory data analysis (EDA). It partitions data into bins to visualize the distribution, skewness, and frequency of a single numeric variable.
+    
+    How to Use:
+    - 'bins': Number of intervals to group the data.
+    - Ideal for identifying normal distributions, outliers, or bimodal clusters in raw datasets.
+    
+    Keywords: frequency distribution, data density, binning plot, univariate analysis.
     """
     from mcp_servers.matplotlib_server.tools import stats_ops
     return await stats_ops.plot_hist(x, bins, title, xlabel, color, figsize)
@@ -239,8 +250,13 @@ async def plot_surface(X: DataInput, Y: DataInput, Z: DataInput, title: Optional
     """PLOTS 3D surface. [ACTION]
     
     [RAG Context]
-    3D surface plot. Best for smooth 3-variable data.
-    Returns path to saved image.
+    An advanced "Super Tool" for multi-dimensional modeling. It generates a smooth 3D surface plot representing the relationship between three variables (X, Y mapped to coordinates, Z to elevation).
+    
+    How to Use:
+    - Expects 2D arrays (meshgrids) for X, Y, and Z.
+    - Essential for visualizing complex functions, terrains, or surface response models.
+    
+    Keywords: 3d surface, mesh plot, topographical visualization, xyz modeling.
     """
     from mcp_servers.matplotlib_server.tools import three_d_ops
     return await three_d_ops.plot_surface(X, Y, Z, title, figsize)
@@ -370,8 +386,14 @@ async def create_dashboard(plots: List[Dict[str, Any]], layout: List[int] = [2, 
     """CREATES dashboard. [ACTION]
     
     [RAG Context]
-    Combines multiple plots into a single dashboard image.
-    Returns path to saved image.
+    The ultimate "Super Tool" for comprehensive data reporting. It orchestrates multiple independent Matplotlib charts into a single cohesive grid layout.
+    
+    How to Use:
+    - 'plots': A list of dictionaries, each specifying the tool name and arguments for a sub-plot.
+    - 'layout': [rows, columns] grid configuration.
+    - Ideal for summarising an entire analysis in one visual snapshot.
+    
+    Keywords: multi-plot grid, visual summary, analytical dashboard, report generator.
     """
     from mcp_servers.matplotlib_server.tools import super_ops
     return await super_ops.create_dashboard(plots, layout, figsize)

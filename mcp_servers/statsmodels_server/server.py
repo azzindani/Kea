@@ -57,8 +57,13 @@ async def ols_model(y: DataInput, x: DataInput, formula: Optional[str] = None) -
     """CALCULATES OLS regression. [ACTION]
     
     [RAG Context]
-    Ordinary Least Squares regression.
-    Returns JSON dict.
+    Ordinary Least Squares (OLS) regression. A fundamental statistical method for modeling the linear relationship between a dependent variable and one or more independent variables.
+    
+    How to Use:
+    - Returns a comprehensive summary including R-squared, Adj. R-squared, F-statistic, and P-values for each coefficient.
+    - If 'formula' is provided (R-style syntax like 'y ~ x1 + x2'), it uses patsy for model specification.
+    
+    Keywords: linear model, statistical inference, p-value analysis, coefficient estimation, r-squared.
     """
     return await regression_ops.ols_model(y, x, formula)
 
@@ -67,8 +72,13 @@ async def wls_model(y: DataInput, x: DataInput, weights: DataInput) -> Dict[str,
     """CALCULATES WLS regression. [ACTION]
     
     [RAG Context]
-    Weighted Least Squares regression.
-    Returns JSON dict.
+    A robust "Super Tool" for handling heteroscedasticity. Unlike standard OLS, Weighted Least Squares (WLS) allows you to assign varying levels of importance (weights) to different observations based on their precision or variance.
+    
+    How to Use:
+    - 'weights' should be a vector of positive values (typically inversely proportional to the variance of the error term).
+    - Returns a full statistical summary of the fitted model.
+    
+    Keywords: weighted regression, non-constant variance, robust modeling, error weighting.
     """
     return await regression_ops.wls_model(y, x, weights)
 
@@ -97,8 +107,13 @@ async def quant_reg(y: DataInput, x: DataInput, q: float = 0.5) -> Dict[str, Any
     """CALCULATES QuantReg. [ACTION]
     
     [RAG Context]
-    Quantile Regression.
-    Returns JSON dict.
+    Quantile Regression models the relationship between variables at specific quantiles (e.g., median, 90th percentile) rather than the mean.
+    
+    How to Use:
+    - 'q': The quantile to estimate (0.1 to 0.9). 'q=0.5' is Median Regression.
+    - Useful when the data has non-constant variance (heteroscedasticity) or when you care about the tails of the distribution.
+    
+    Keywords: median regression, tail analysis, robust regression, quantile fit.
     """
     return await regression_ops.quant_reg(y, x, q)
 
@@ -130,8 +145,13 @@ async def adfuller_test(x: VectorInput, autolag: str = 'AIC') -> Dict[str, Any]:
     """PERFORMS ADF test. [ACTION]
     
     [RAG Context]
-    Augmented Dickey-Fuller unit root test.
-    Returns JSON dict.
+    The Augmented Dickey-Fuller (ADF) test is used to check for the presence of a "unit root", which indicates that the time series is non-stationary and has a stochastic trend.
+    
+    How to Use:
+    - If p-value < 0.05: The series is stationary.
+    - Stationary data is mandatory for applying ARIMA models.
+    
+    Keywords: stationarity test, unit root, time series prep, adf test.
     """
     return await tsa_ops.adfuller_test(x, autolag)
 
@@ -180,8 +200,15 @@ async def arima_model(endog: VectorInput, order: List[int] = [1, 0, 0]) -> Dict[
     """CALCULATES ARIMA. [ACTION]
     
     [RAG Context]
-    AutoRegressive Integrated Moving Average model.
-    Returns JSON dict.
+    Classic AutoRegressive Integrated Moving Average (ARIMA) model for time series forecasting.
+    
+    How to Use:
+    - 'order': Requires 3 integers (p, d, q). 
+    - p: Lag order (autoregressive).
+    - d: Degree of differencing.
+    - q: Order of moving average.
+    
+    Keywords: ts forecasting, arima model, lag variables, statistical prediction.
     """
     return await tsa_ops.arima_model(endog, order)
 
@@ -210,8 +237,13 @@ async def granger_test(data: DataInput, maxlag: int = 4) -> Dict[str, Any]:
     """PERFORMS Granger test. [ACTION]
     
     [RAG Context]
-    Granger Causality test.
-    Returns JSON dict.
+    The Granger Causality test determines if one time series is useful in forecasting another. 
+    
+    How to Use:
+    - If series X 'Granger-causes' series Y, then past values of X provide statistically significant information about future values of Y.
+    - Crucial for lead-lag analysis in economics and finance.
+    
+    Keywords: causality, lead-lag analysis, predictive relationship, granger test.
     """
     return await tsa_ops.granger_test(data, maxlag)
 
@@ -451,8 +483,9 @@ async def automl_regression(y: DataInput, x: DataInput) -> Dict[str, Any]:
     """PERFORMS AutoML Regression. [ACTION]
     
     [RAG Context]
-    Automatically try multiple regression models and select best.
-    Returns JSON dict.
+    A "Super Tool" that automatically searches across multiple statistical models (OLS, WLS, GLS, QuantReg) and uses information criteria (AIC/BIC) to select the most parsimonious model.
+    
+    Keywords: automatic statistics, model competition, aic bic, optimal fit stats.
     """
     return await super_ops.automl_regression(y, x)
 
@@ -461,8 +494,12 @@ async def tsa_dashboard(y: DataInput, period: int = 12) -> Dict[str, Any]:
     """GENERATES TSA Dashboard. [ACTION]
     
     [RAG Context]
-    Comprehensive Time Series Analysis report.
-    Returns JSON dict.
+    A comprehensive "Super Tool" for time series forensics. Performs stationarity tests, seasonal decomposition, and autocorrelation checks in a single pass.
+    
+    How to Use:
+    - 'period': The expected seasonality (e.g., 12 for monthly, 7 for daily).
+    
+    Keywords: time series profile, stationary audit, seasonal check, autocorrelation report.
     """
     return await super_ops.tsa_dashboard(y, period)
 

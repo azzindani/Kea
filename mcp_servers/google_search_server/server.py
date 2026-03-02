@@ -47,7 +47,13 @@ async def search_google(query: str, num: int = 10, lang: str = "en", region: str
     """SEARCHES Google. [ACTION]
     
     [RAG Context]
-    Standard Google Search. Returns titles, snippets, and URLs.
+    The gold-standard "Super Tool" for global information retrieval. It leverages the Google Search Engine to find high-authority sources, documents, and news articles based on complex natural language queries.
+    
+    How to Use:
+    - Best for finding authoritative corporate filings, industry reports, and verified news.
+    - 'num' determines the depth of the search; use higher values for broad landscape analysis.
+    
+    Keywords: google search, web indexing, authority lookup, documentation finder.
     """
     return await core_ops.search_google(query, num, lang, region)
 

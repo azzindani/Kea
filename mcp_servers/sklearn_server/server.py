@@ -59,8 +59,14 @@ async def fit_transform_scaler(data: DataInput, method: str = 'standard') -> Dic
     """SCALES data features. [ACTION]
     
     [RAG Context]
-    Standardizes or normalizes features (StandardScaler, MinMaxScaler).
-    Returns transformed data.
+    Standardizes or normalizes numerical features to a common scale. This is mandatory for many algorithms (SVM, KNN, MLP) that are sensitive to the magnitude of values.
+    
+    How to Use:
+    - method='standard': (StandardScaler) Zero mean and unit variance. Best for bell-curved data.
+    - method='minmax': (MinMaxScaler) Scales to [0, 1]. Best for preserving sparsity.
+    - method='robust': (RobustScaler) Best for data with outliers.
+    
+    Keywords: feature scaling, normalization, standardization, data prep.
     """
     from mcp_servers.sklearn_server.tools import preprocess_ops
     return await preprocess_ops.fit_transform_scaler(data, method)
@@ -106,8 +112,13 @@ async def split_data(X: DataInput, y: Optional[VectorInput] = None, test_size: f
     """SPLITS dataset. [ACTION]
     
     [RAG Context]
-    Splits data into train and test sets.
-    Returns dictionary with split data keys.
+    Divides a dataset into two subsets: "Training" (to learn patterns) and "Testing" (to evaluate performance). 
+    
+    How to Use:
+    - Default 'test_size'=0.2 (20% test, 80% train).
+    - 'random_state' ensures reproducibility.
+    
+    Keywords: train test split, validation data, curriculum divison, shuffle split.
     """
     from mcp_servers.sklearn_server.tools import model_selection_ops
     return await model_selection_ops.split_data(X, y, test_size, random_state)
@@ -117,8 +128,13 @@ async def calculate_metrics(y_true: VectorInput, y_pred: VectorInput, task: str 
     """CALCULATES metrics. [ACTION]
     
     [RAG Context]
-    Computes accuracy, precision, recall, f1, mse, r2, etc.
-    Returns dictionary of metrics.
+    A critical "Super Tool" for statistical evaluation of model performance. It compares predicted values against actual ground truth labels to quantify accuracy and error.
+    
+    How to Use:
+    - 'task': 'classification' (gives Accuracy, Precision, Recall, F1) or 'regression' (gives MSE, MAE, R2).
+    - Always use this after 'predict' to verify if the model is learning effectively before deployment.
+    
+    Keywords: model performance, error analysis, accuracy check, f1 score, precision recall.
     """
     from mcp_servers.sklearn_server.tools import model_selection_ops
     return await model_selection_ops.calculate_metrics(y_true, y_pred, task)
@@ -131,8 +147,13 @@ async def logistic_regression(X: DataInput, y: VectorInput, C: float = 1.0, max_
     """TRAINS Logistic Regression. [ACTION]
     
     [RAG Context]
-    Linear classification model.
-    Returns trained model metadata.
+    A robust baseline classifier for binary or multi-class problems. Despite its name, it's used for classification, not regression.
+    
+    How to Use:
+    - 'C': Inverse regularization strength. Smaller values specify stronger regularization.
+    - Returns model coefficients and intercepted likelihoods.
+    
+    Keywords: logreg, probability classifier, linear boundary, baseline model.
     """
     from mcp_servers.sklearn_server.tools import classification_ops
     return await classification_ops.logistic_regression(X, y, C, max_iter)
@@ -142,8 +163,13 @@ async def svc(X: DataInput, y: VectorInput, C: float = 1.0, kernel: str = 'rbf')
     """TRAINS SVM Classifier. [ACTION]
     
     [RAG Context]
-    Support Vector Classification (SVC).
-    Returns trained model metadata.
+    Support Vector Classification (SVC). A highly versatile "Super Tool" for finding optimal decision boundaries (hyperplanes) in high-dimensional space.
+    
+    How to Use:
+    - 'C': Regularization parameter. Trade-off between smooth boundary and classifying training points correctly.
+    - 'kernel': 'linear', 'poly', 'rbf', 'sigmoid'. 'rbf' is the default and usually handles non-linear data best.
+    
+    Keywords: support vector machine, svm, high-dimensional classifier, kernel trick.
     """
     from mcp_servers.sklearn_server.tools import classification_ops
     return await classification_ops.svc(X, y, C, kernel)
@@ -164,8 +190,13 @@ async def decision_tree_clf(X: DataInput, y: VectorInput, max_depth: Optional[in
     """TRAINS Decision Tree Classifier. [ACTION]
     
     [RAG Context]
-    Non-linear classification model.
-    Returns trained model metadata.
+    A white-box "Super Tool" that learns hierarchical decision rules from feature data. Extremely easy to interpret and visualize.
+    
+    How to Use:
+    - 'max_depth': Limits tree growth to prevent over-fitting.
+    - Does not require feature scaling, making it robust for rapid prototyping.
+    
+    Keywords: decision tree, cart algorithm, classification tree, rule-based model.
     """
     from mcp_servers.sklearn_server.tools import classification_ops
     return await classification_ops.decision_tree_clf(X, y, max_depth)
@@ -211,8 +242,9 @@ async def linear_regression(X: DataInput, y: VectorInput) -> Dict[str, Any]:
     """TRAINS Linear Regression. [ACTION]
     
     [RAG Context]
-    Standard OLS linear regression.
-    Returns trained model metadata.
+    Classic Ordinary Least Squares (OLS) regression. Fits a linear model by minimizing the sum of the squares of the errors.
+    
+    Keywords: linear fit, regression line, ols, trend prediction.
     """
     from mcp_servers.sklearn_server.tools import regression_ops
     return await regression_ops.linear_regression(X, y)
@@ -222,8 +254,13 @@ async def ridge_regression(X: DataInput, y: VectorInput, alpha: float = 1.0) -> 
     """TRAINS Ridge Regression. [ACTION]
     
     [RAG Context]
-    Linear regression with L2 regularization.
-    Returns trained model metadata.
+    Linear regression with L2 regularization. A stabilized "Super Tool" that penalizes the size of coefficients to prevent over-fitting in cases of multi-collinearity.
+    
+    How to Use:
+    - 'alpha': Regularization strength. Large values compress coefficients towards zero.
+    - Excellent when many features are highly correlated.
+    
+    Keywords: tikhonov regularization, l2 penalty, ridge fit, shrunk regression.
     """
     from mcp_servers.sklearn_server.tools import regression_ops
     return await regression_ops.ridge_regression(X, y, alpha)
@@ -302,8 +339,12 @@ async def kmeans(X: DataInput, n_clusters: int = 8) -> Dict[str, Any]:
     """TRAINS KMeans. [ACTION]
     
     [RAG Context]
-    Centroid-based clustering.
-    Returns trained model metadata.
+    Clusters data into 'N' groups by minimizing the distance between points and their group's center (Centroid).
+    
+    How to Use:
+    - Essential for customer segmentation, image compression, and anomaly detection.
+    
+    Keywords: cluster analysis, grouping, unsupervised learning, customer segments.
     """
     from mcp_servers.sklearn_server.tools import clustering_ops
     return await clustering_ops.kmeans(X, n_clusters)
@@ -349,8 +390,13 @@ async def pca(X: DataInput, n_components: int = 2) -> Dict[str, Any]:
     """PERFORMS PCA. [ACTION]
     
     [RAG Context]
-    Principal Component Analysis (dimensionality reduction).
-    Returns transformed data.
+    Principal Component Analysis (PCA) reduces the dimensionality of a dataset by projecting it onto the directions of maximum variance.
+    
+    How to Use:
+    - Use 'n_components' to set target dimensions.
+    - Crucial for data visualization and speeding up downstream algorithms.
+    
+    Keywords: dimensionality reduction, feature compression, eigenvector, variance projection.
     """
     from mcp_servers.sklearn_server.tools import decomposition_ops
     return await decomposition_ops.pca(X, n_components)
@@ -399,8 +445,13 @@ async def random_forest_clf(X: DataInput, y: VectorInput, n_estimators: int = 10
     """TRAINS Random Forest Classifier. [ACTION]
     
     [RAG Context]
-    Ensemble of Decision Trees (Bagging).
-    Returns trained model metadata.
+    A powerful ensemble of Decision Trees that uses bagging to improve accuracy and control over-fitting.
+    
+    How to Use:
+    - Highly resilient to outliers and does not requires feature scaling.
+    - Excellent for both small and large datasets.
+    
+    Keywords: ensemble learning, bootstrap aggregation, forest model, decision committee.
     """
     from mcp_servers.sklearn_server.tools import ensemble_ops
     return await ensemble_ops.random_forest_clf(X, y, n_estimators)
@@ -410,8 +461,13 @@ async def random_forest_reg(X: DataInput, y: VectorInput, n_estimators: int = 10
     """TRAINS Random Forest Regressor. [ACTION]
     
     [RAG Context]
-    Ensemble of Decision Trees (Bagging).
-    Returns trained model metadata.
+    A robust ensemble "Super Tool" for numerical prediction. It averages decisions from multiple trees to reduce variance and provide stable forecasts.
+    
+    How to Use:
+    - Excellent for complex tabular data with non-linear relationships.
+    - 'n_estimators': Number of trees. More trees generally improve accuracy up to a point of diminishing returns.
+    
+    Keywords: forest regression, bagged trees, ensemble regressor, non-linear reg.
     """
     from mcp_servers.sklearn_server.tools import ensemble_ops
     return await ensemble_ops.random_forest_reg(X, y, n_estimators)
@@ -640,8 +696,9 @@ async def automl_classifier(X: DataInput, y: VectorInput) -> Dict[str, Any]:
     """RUNS AutoML Classifier. [ACTION]
     
     [RAG Context]
-    Automatically selects and trains the best classification model.
-    Returns trained model metadata.
+    A "Super Tool" that automatically searches across a suite of classifiers (Logistic Regression, Random Forest, SVM) and uses cross-validation to find the best performing model for the data.
+    
+    Keywords: automatic ml, search models, model contest, ease of use.
     """
     from mcp_servers.sklearn_server.tools import super_ops
     return await super_ops.automl_classifier(X, y)
@@ -651,8 +708,13 @@ async def pipeline_runner(X: DataInput, y: VectorInput, steps: List[str] = ['sca
     """RUNS Pipeline. [ACTION]
     
     [RAG Context]
-    Executes a sequence of data processing and modeling steps.
-    Returns pipeline results.
+    A specialized "Super Tool" for orchestrating a multi-stage machine learning workflow. Bundles preprocessing (scaling/imputation) and modeling into an atomic execution block.
+    
+    How to Use:
+    - 'steps': Provide an ordered list (e.g., ['imputer', 'scaler', 'logistic_regression']).
+    - Prevents data leakage between training and testing folds.
+    
+    Keywords: ml workflow, action chain, atomic modeling, automated pipe.
     """
     from mcp_servers.sklearn_server.tools import super_ops
     return await super_ops.pipeline_runner(X, y, steps)

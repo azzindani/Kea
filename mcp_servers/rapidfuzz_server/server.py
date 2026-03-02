@@ -500,8 +500,14 @@ def deduplicate_list(items: List[str], threshold: float = 90.0) -> List[str]:
     """DEDUPLICATES list. [ACTION]
     
     [RAG Context]
-    Remove near-duplicate strings.
-    Returns list of unique strings.
+    A powerful "Super Tool" for data hygiene. It identifies and removes near-identical strings in a list (e.g., "Apple Inc." vs "Apple Incorporated") using high-speed fuzzy matching, returning a cleaned set of unique representative entries.
+    
+    How to Use:
+    - 'items': The raw list of strings (company names, addresses, etc.).
+    - 'threshold': Sensitivity level (90.0 means "very similar").
+    - Critical for merging datasets from multiple sources where naming conventions vary.
+    
+    Keywords: fuzzy deduplication, data cleaning, string merging, record linkage.
     """
     return super_ops.deduplicate_list(items, threshold)
 

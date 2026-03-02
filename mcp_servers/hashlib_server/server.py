@@ -115,8 +115,13 @@ def sha256_string(text: str) -> str:
     """HASHES SHA256. [ACTION]
     
     [RAG Context]
-    Calculate SHA256 hash of string.
-    Returns hex string.
+    A core "Super Tool" for cryptographic data integrity. It generates a unique 256-bit (64 character hex) signature for any input string. 
+    
+    How to Use:
+    - Input the text you want to represent as a secure digest.
+    - Used for checking if two strings are identical without comparing the full text, or for generating fixed-length identifiers.
+    
+    Keywords: crypto hash, data signature, secure digest, fixed length id.
     """
     return string_ops.sha256_string(text)
 
@@ -261,8 +266,13 @@ def sha256_file(file_path: str) -> str:
     """HASHES file SHA256. [ACTION]
     
     [RAG Context]
-    Calculate SHA256 hash of file.
-    Returns hex string.
+    A high-level "Super Tool" for verifying file integrity on disk. It reads the entire file content and calculates its SHA256 checksum.
+    
+    How to Use:
+    - Pass the absolute path to the file.
+    - Essential for detecting file corruption after transmission or for identifying duplicate files with different names.
+    
+    Keywords: file checksum, integrity check, corruption detector, file signature.
     """
     return file_ops.sha256_file(file_path)
 
@@ -413,8 +423,13 @@ def verify_file_checksum(file_path: str, expected_hash: str, algo: str = "sha256
     """VERIFIES checksum. [ACTION]
     
     [RAG Context]
-    Verify file matches expected hash.
-    Returns boolean.
+    An automated "Super Tool" for validation. It calculates the hash of a file and compares it against a provided "known-good" hash string in a single operation.
+    
+    How to Use:
+    - 'expected_hash': The hash you expect the file to have.
+    - Returns 'True' if they match exactly, 'False' otherwise.
+    
+    Keywords: validation tool, checksum matcher, integrity auditor, verify download.
     """
     return super_ops.verify_file_checksum(file_path, expected_hash, algo)
 
@@ -543,8 +558,13 @@ def create_merkle_root(items: List[str], algo: str = "sha256") -> str:
     """CREATES Merkle root. [ACTION]
     
     [RAG Context]
-    Calculate Merkle Root for list of items.
-    Returns hex string.
+    A specialized "Super Tool" for building hierarchical data proofs. It recursively hashes pairs of items to produce a single 'Root' hash that represents the entire set.
+    
+    How to Use:
+    - Input a list of strings (e.g., transaction IDs or file signatures).
+    - Perfect for blockchain-style integrity checks and distributed data validation.
+    
+    Keywords: hash tree, data proof, merkle tree, hierarchical hash.
     """
     return super_ops.create_merkle_root(items, algo)
 

@@ -45,8 +45,14 @@ async def search_text(query: str, region: str = "wt-wt", safe_search: str = "mod
     """SEARCHES text. [ACTION]
     
     [RAG Context]
-    General DuckDuckGo text search.
-    Returns list of results.
+    The primary "Super Tool" for live web intelligence via DuckDuckGo. It performs broad-spectrum keyword searches across the public internet, returning snippets, titles, and URLs for real-time fact-checking and discovery.
+    
+    How to Use:
+    - 'query': Be specific (e.g., "latest quarterly earnings for NVIDIA 2024").
+    - 'time': Use 'd' (day), 'w' (week), 'm' (month), or 'y' (year) to filter for recent data.
+    - Essential for bypassing static knowledge cutoffs and fetching up-to-the-minute information.
+    
+    Keywords: web search, live intelligence, fact checking, internet browser, ddg lookup.
     """
     return await text_ops.search_text(query, region, safe_search, time, max_results)
 

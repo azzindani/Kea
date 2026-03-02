@@ -30,9 +30,13 @@ def meta_analysis(data_points: List[Dict[str, Any]], analysis_type: str = "compa
     """PERFORMS meta-analysis across sources. [ENTRY]
     
     [RAG Context]
-    Aggregates and compares data from multiple inputs.
-    Args:
-        analysis_type: "comparison", "consensus", "variance", "aggregate".
+    A high-level "Super Tool" that aggregates and compares results from multiple independent datasets or agents to find underlying patterns or contradictions.
+    
+    How to Use:
+    - 'analysis_type': Use 'comparison' to find differences, 'consensus' to find commonalities, or 'variance' to see spread.
+    - Input 'data_points' should be a list of results from other tools.
+    
+    Keywords: synthesis, aggregate data, consensus building, comparative analysis.
     """
     return stats_ops.meta_analysis(data_points, analysis_type)
 
@@ -41,9 +45,13 @@ def trend_detection(data: List[Union[Dict, float, int]], metric_name: str = "Val
     """DETECTS trends and anomalies in time-series. [ENTRY]
     
     [RAG Context]
-    Args:
-        data: List of values or dicts with date/value.
-        detect_anomalies: If True, flags outliers.
+    Analyzes historical data sequences to identify significant upward/downward shifts or sudden spikes/dips.
+    
+    How to Use:
+    - 'data': A list of values.
+    - 'detect_anomalies': If True, it uses statistical thresholds (Z-score) to flag outliers in the trend.
+    
+    Keywords: drift analysis, anomaly scan, temporal patterns, trajectory check.
     """
     return stats_ops.trend_detection(data, metric_name, detect_anomalies)
 
@@ -70,7 +78,13 @@ def plot_scatter(file_path: str, x: str, y: str, hue: Optional[str] = None, outp
     """PLOTS Scatter chart. [ACTION]
     
     [RAG Context]
-    XY scatter plot for correlation.
+    Generates a 2D scatter plot to visualize the relationship (correlation or clustering) between two continuous numerical variables.
+    
+    How to Use:
+    - 'hue': Optional categorical column name to color-code points.
+    - Uses Seaborn and Matplotlib for high-quality rendering.
+    
+    Keywords: correlation plot, xy graph, relationship viz, scatter points.
     """
     from mcp_servers.analysis_server.tools import plot_ops
     return plot_ops.plot_scatter(file_path, x, y, hue, output_path)
@@ -174,7 +188,13 @@ def test_ttest_ind(file_path1: str, col1: str, file_path2: str, col2: str) -> Di
     """PERFORMS Independent T-Test. [DATA]
     
     [RAG Context]
-    Compares means of two independent groups.
+    Tests whether the means of two independent samples are significantly different.
+    
+    How to Use:
+    - If p-value < 0.05: The difference between the two groups is statistically significant.
+    - Assumes the data follows a normal distribution (check with 'test_shapiro').
+    
+    Keywords: mean comparison, group difference, hypothesis testing, p-value.
     """
     from mcp_servers.analysis_server.tools import stat_tests
     return stat_tests.test_ttest_ind(file_path1, col1, file_path2, col2)
@@ -194,7 +214,13 @@ def test_pearsonr(file_path: str, col1: str, col2: str) -> Dict[str, Any]:
     """CALCULATES Pearson Correlation. [DATA]
     
     [RAG Context]
-    Linear correlation coefficient.
+    Measures the linear relationship between two continuous variables.
+    
+    How to Use:
+    - Returns 'r' (correlation coefficient) from -1 (perfect negative) to +1 (perfect positive).
+    - Also returns 'p-value' (significance).
+    
+    Keywords: linear relationship, correlation strength, dependency check.
     """
     from mcp_servers.analysis_server.tools import stat_tests
     return stat_tests.test_pearsonr(file_path, col1, col2)
@@ -247,7 +273,13 @@ def model_arima(file_path: str, value_col: str, order: List[int], date_col: str 
     """RUNS ARIMA Model. [DATA]
     
     [RAG Context]
-    AutoRegressive Integrated Moving Average.
+    Applies the AutoRegressive Integrated Moving Average model for time series forecasting.
+    
+    How to Use:
+    - 'order': List of 3 ints (p, d, q). 
+    - Automatically handles data loading and model fitting.
+    
+    Keywords: time series prediction, arima forecasting, lag model.
     """
     from mcp_servers.analysis_server.tools import time_series_ops
     return time_series_ops.model_arima(file_path, value_col, order, date_col)

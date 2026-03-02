@@ -46,8 +46,14 @@ def download_returns(ticker: str, period: str = "max") -> str:
     """FETCHES returns. [ACTION]
     
     [RAG Context]
-    Downloads historical returns for a ticker.
-    Returns JSON string.
+    A data acquisition "Super Tool" for quantitative finance. It retrieves historical price data for a given ticker and automatically transforms it into a daily returns time-series.
+    
+    How to Use:
+    - 'ticker': Ticker symbol (e.g., 'AAPL', 'BTC-USD', 'GC=F').
+    - 'period': Valid Yahoo Finance periods (e.g., '1y', '5y', 'max').
+    - Returns a JSON string representing a pandas Series of percent changes.
+    
+    Keywords: returns fetcher, price to returns, quant data, ticker history.
     """
     return core_ops.download_returns(ticker, period)
 
@@ -89,8 +95,14 @@ def stats_sharpe(returns_input: str, risk_free: float = 0.0) -> float:
     """CALCULATES Sharpe Ratio. [ACTION]
     
     [RAG Context]
-    Sharpe Ratio (Return/Risk).
-    Returns float.
+    A core "Super Tool" for risk-adjusted performance evaluation. It calculates the Sharpe Ratio, representing the excess return per unit of volatility.
+    
+    How to Use:
+    - 'returns_input': JSON string of daily returns.
+    - 'risk_free': The annual risk-free rate (e.g., 0.02 for 2%).
+    - A higher Sharpe ratio indicates better risk-adjusted performance.
+    
+    Keywords: sharpe metric, risk adjust, portfolio efficiency, volatility reward.
     """
     return stats_ops.stats_sharpe(returns_input, risk_free)
 
@@ -232,8 +244,13 @@ def risk_max_drawdown(returns_input: str) -> float:
     """CALCULATES Max Drawdown. [ACTION]
     
     [RAG Context]
-    Maximum loss from peak to trough.
-    Returns float.
+    A critical "Super Tool" for risk assessment. It identifies the "worst-case scenario" by calculating the maximum peak-to-trough decline in a portfolio's equity curve.
+    
+    How to Use:
+    - Input the daily returns data.
+    - Essential for understanding the historical depth of losses a strategy has endured.
+    
+    Keywords: peak to trough, worst loss, drawdown depth, risk tolerance.
     """
     return risk_ops.risk_max_drawdown(returns_input)
 
@@ -560,8 +577,13 @@ def super_tearsheet(returns_input: str, benchmark_input: str = "SPY", title: str
     """GENERATES Super Tearsheet. [ACTION]
     
     [RAG Context]
-    Complete analysis (Plots + Metrics).
-    Returns JSON dict with base64 images.
+    The ultimate "Super Tool" for portfolio audits. It combines statistical metrics, risk analysis, and comprehensive visualizations into a single high-level data structure.
+    
+    How to Use:
+    - Compares your 'returns_input' against a 'benchmark_input' (e.g., S&P 500).
+    - Returns a dictionary containing key metrics (Alpha, Beta, Sharpe) and multiple base64-encoded plots (Cumulative Returns, Drawdown heatmap).
+    
+    Keywords: performance audit, full tearsheet, strategy deepdive, visual report.
     """
     return super_ops.super_tearsheet(returns_input, benchmark_input, title)
 
