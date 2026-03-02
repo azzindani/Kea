@@ -519,6 +519,30 @@ def log_llm_response(logger: Any, content: str, model: str, reasoning: Optional[
         lines.append("[bold cyan]" + "━" * 88 + "[/]")
         console.print("\n".join(lines))
 
+def log_node_assembly(logger: Any, node_id: str, type: str, layers: List[str], input_schema: Any = None, output_schema: Any = None):
+    """Log the assembly of a kernel node with visibility into its layers and schemas."""
+    logger.info("Node assembly complete", node_id=node_id, type=type, layers_count=len(layers))
+    
+    if os.getenv("TEST_MODE") == "1" or os.getenv("VERBOSE_LOGGING") == "1":
+        console = _get_rich_console()
+        if not console: return
+
+        try:
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            lines = [f"\n\\[[bold blue]{timestamp}[/]] 🏗️  [bold yellow]NODE ASSEMBLED: {node_id}[/]"]
+            lines.append(f"  • [bold magenta]Action Type:[/] [bold cyan]{type.upper()}[/]")
+            lines.append(f"  • [bold magenta]Logic Layers:[/] [green]{' → '.join(layers)}[/]")
+            
+            if input_schema:
+                lines.append(f"  • [bold magenta]Input Schema:[/] [yellow]{str(input_schema)[:200]}[/]")
+            if output_schema:
+                lines.append(f"  • [bold magenta]Output Schema:[/] [yellow]{str(output_schema)[:200]}[/]")
+                
+            lines.append("[bold cyan]" + "┄" * 88 + "[/]")
+            console.print("\n".join(lines))
+        except Exception as e:
+            logger.warning(f"Failed to render node assembly log: {e}")
+
 def log_dag_blueprint(logger: Any, dag_id: str, objective: str, nodes: List[Dict[str, Any]], edges: List[Dict[str, Any]]):
     """Log a structured, architect-level blueprint of the DAG."""
     logger.info("DAG Blueprint generated", dag_id=dag_id, node_count=len(nodes), edge_count=len(edges))
