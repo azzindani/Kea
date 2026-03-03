@@ -262,80 +262,105 @@ class LocalEmbedding(EmbeddingProvider):
         async with LocalEmbedding._shared_execution_lock:
             model, tokenizer = self._load_model()
             loop = asyncio.get_event_loop()
-        
-        from shared.config import get_settings
-        settings = get_settings()
-        
-        # Check VRAM pressure and adjust batch size
-        batch_size = settings.embedding.batch_size  # Default batch size
-        try:
-            from shared.hardware.detector import detect_hardware
-            hw = detect_hardware()
-            if hw.cuda_available:
-                hw.refresh_vram()
-                pressure = hw.vram_pressure()
-                if pressure > settings.hardware.critical_pressure_threshold:
-                    batch_size = settings.embedding.high_pressure_batch_size
-                    logger.warning(f"VRAM pressure high ({pressure*100:.1f}%), reducing batch to {batch_size}")
-                elif pressure > settings.hardware.high_pressure_threshold:
-                    batch_size = settings.embedding.med_pressure_batch_size
-        except Exception:
-            pass
-        
-        def encode_batch(batch_texts: list[str]) -> list[list[float]]:
-            """Encode a batch of texts using official pattern."""
-            # Tokenize with __call__ method (fast path)
-            batch_dict = tokenizer(
-                batch_texts,
-                padding=True,
-                truncation=True,
-                max_length=self.max_length,
-                return_tensors="pt",
-            )
-            batch_dict = {k: v.to(model.device) for k, v in batch_dict.items()}
             
-            with torch.no_grad():
-                outputs = model(**batch_dict)
-                embeddings = self._last_token_pool(
-                    outputs.last_hidden_state,
-                    batch_dict['attention_mask']
+            from shared.config import get_settings
+            settings = get_settings()
+            
+            # Check VRAM pressure and adjust batch size
+            batch_size = settings.embedding.batch_size  # Default batch size
+            try:
+                from shared.hardware.detector import detect_hardware
+                hw = detect_hardware()
+                if hw.cuda_available:
+                    hw.refresh_vram()
+                    pressure = hw.vram_pressure()
+                    if pressure > settings.hardware.critical_pressure_threshold:
+                        batch_size = settings.embedding.high_pressure_batch_size
+                        logger.warning(f"VRAM pressure high ({pressure*100:.1f}%), reducing batch to {batch_size}")
+                    elif pressure > settings.hardware.high_pressure_threshold:
+                        batch_size = settings.embedding.med_pressure_batch_size
+            except Exception:
+                pass
+            
+            def encode_batch(batch_texts: list[str]) -> list[list[float]]:
+                """Encode a batch of texts using official pattern."""
+                # Tokenize with __call__ method (fast path)
+                batch_dict = tokenizer(
+                    batch_texts,
+                    padding=True,
+                    truncation=True,
+                    max_length=self.max_length,
+                    return_tensors="pt",
                 )
-                # Normalize embeddings
-                embeddings = F.normalize(embeddings, p=2, dim=1)
-            
-            return embeddings.cpu().tolist()
-        
-        def process_all():
-            """Process all texts in batches."""
-            all_embeddings = []
-            import sys
-            
-            # CPU heuristics to prevent thrashing
-            actual_batch_size = batch_size
-            if model.device.type == "cpu":
-                actual_batch_size = min(batch_size, 4)
-            
-            for i in range(0, len(texts), actual_batch_size):
-                batch = texts[i:i + actual_batch_size]
-                try:
-                    embs = encode_batch(batch)
-                    all_embeddings.extend(embs)
-                    logger.debug(
-                        f"Embedder progress",
-                        processed=i + len(batch),
-                        total=len(texts),
-                        device=model.device.type
+                batch_dict = {k: v.to(model.device) for k, v in batch_dict.items()}
+                
+                with torch.no_grad():
+                    outputs = model(**batch_dict)
+                    embeddings = self._last_token_pool(
+                        outputs.last_hidden_state,
+                        batch_dict['attention_mask']
                     )
-                except Exception as e:
-                    logger.error(f"Embedder error at offset {i}", error=str(e))
-                    raise
-                # Clear cache after each batch
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-            return all_embeddings
-        
-        embeddings = await loop.run_in_executor(None, process_all)
-        return embeddings
+                    # Normalize embeddings
+                    embeddings = F.normalize(embeddings, p=2, dim=1)
+                
+                return embeddings.cpu().tolist()
+            
+            def process_all():
+                """Process all texts in batches."""
+                all_embeddings = []
+                import sys
+                import math
+                
+                nonlocal batch_size
+                
+                # CPU heuristics to prevent thrashing
+                if model.device.type == "cpu":
+                    batch_size = min(batch_size, 4)
+                
+                i = 0
+                while i < len(texts):
+                    actual_batch_size = min(batch_size, len(texts) - i)
+                    batch = texts[i:i + actual_batch_size]
+                    try:
+                        embs = encode_batch(batch)
+                        all_embeddings.extend(embs)
+                        logger.debug(
+                            f"Embedder progress",
+                            processed=i + len(batch),
+                            total=len(texts),
+                            device=model.device.type
+                        )
+                        i += actual_batch_size
+                    except torch.cuda.OutOfMemoryError as e:
+                        logger.warning(f"OOM error processing batch of size {actual_batch_size}. Halving batch size.")
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
+                        if batch_size > 1:
+                            batch_size = math.ceil(batch_size / 2)
+                        else:
+                            logger.error(f"OOM even with batch size 1! Text length might be too large.")
+                            raise
+                    except Exception as e:
+                        # Some versions of PyTorch throw RuntimeError for CUDA OOM
+                        if "OutOfMemory" in str(type(e).__name__) or "CUDA out of memory" in str(e):
+                            logger.warning(f"OOM error processing batch of size {actual_batch_size}. Halving batch size.")
+                            if torch.cuda.is_available():
+                                torch.cuda.empty_cache()
+                            if batch_size > 1:
+                                batch_size = math.ceil(batch_size / 2)
+                                continue
+                            else:
+                                raise
+                        logger.error(f"Embedder error at offset {i}", error=str(e))
+                        raise
+                    
+                    # Clear cache after each batch
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                return all_embeddings
+            
+            embeddings = await loop.run_in_executor(None, process_all)
+            return embeddings
     
     async def embed_query(self, query: str, task: str | None = None) -> list[float]:
         """Generate embedding for query with instruction (official Qwen3 pattern)."""

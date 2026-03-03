@@ -225,67 +225,86 @@ class LocalReranker(RerankerProvider):
             model, _ = self._load_model()
             
             from shared.config import get_settings
-        settings = get_settings()
-        
-        # Batching configuration (to prevent OOM)
-        BATCH_SIZE = settings.reranker.batch_size 
-        
-        # Check VRAM pressure and adjust batch size
-        try:
-            from shared.hardware.detector import detect_hardware
-            hw = detect_hardware()
-            if hw.cuda_available:
-                hw.refresh_vram()
-                pressure = hw.vram_pressure()
-                if pressure > settings.hardware.critical_pressure_threshold:
-                    BATCH_SIZE = settings.reranker.high_pressure_batch_size
-                    logger.warning(f"Reranker: VRAM pressure high ({pressure*100:.1f}%), reducing batch to {BATCH_SIZE}")
-                elif pressure > settings.hardware.high_pressure_threshold:
-                    BATCH_SIZE = settings.reranker.med_pressure_batch_size
-                    logger.info(f"Reranker: VRAM pressure moderate ({pressure*100:.1f}%), reducing batch to {BATCH_SIZE}")
-                else:
-                    BATCH_SIZE = settings.reranker.low_pressure_batch_size
-        except Exception:
-            pass 
-        BATCH_SIZE = BATCH_SIZE or settings.reranker.batch_size
-        
-        all_scores = []
-        
-        # Process in batches
-        for i in range(0, len(documents), BATCH_SIZE):
-            batch_docs = documents[i : i + BATCH_SIZE]
+            settings = get_settings()
             
-            # Format pairs for this batch
-            pairs = [self._format_instruction(query, doc, instruction) for doc in batch_docs]
+            # Batching configuration (to prevent OOM)
+            BATCH_SIZE = settings.reranker.batch_size 
             
-            # Process in executor (CPU/GPU bound)
+            # Check VRAM pressure and adjust batch size
+            try:
+                from shared.hardware.detector import detect_hardware
+                hw = detect_hardware()
+                if hw.cuda_available:
+                    hw.refresh_vram()
+                    pressure = hw.vram_pressure()
+                    if pressure > settings.hardware.critical_pressure_threshold:
+                        BATCH_SIZE = settings.reranker.high_pressure_batch_size
+                        logger.warning(f"Reranker: VRAM pressure high ({pressure*100:.1f}%), reducing batch to {BATCH_SIZE}")
+                    elif pressure > settings.hardware.high_pressure_threshold:
+                        BATCH_SIZE = settings.reranker.med_pressure_batch_size
+                        logger.info(f"Reranker: VRAM pressure moderate ({pressure*100:.1f}%), reducing batch to {BATCH_SIZE}")
+                    else:
+                        BATCH_SIZE = settings.reranker.low_pressure_batch_size
+            except Exception:
+                pass 
+            BATCH_SIZE = BATCH_SIZE or settings.reranker.batch_size
+            
+                # Process in executor (CPU/GPU bound)
             loop = asyncio.get_event_loop()
             
-            def compute_batch_scores(batch_pairs):
-                # Ensure we handle empty batch (unlikely)
-                if not batch_pairs: return []
+            def compute_all_scores():
+                nonlocal BATCH_SIZE
+                import math
+                out_scores = []
                 
-                inputs = self._process_inputs(batch_pairs)
+                def compute_batch_scores(batch_pairs):
+                    if not batch_pairs: return []
+                    inputs = self._process_inputs(batch_pairs)
+                    with torch.no_grad():
+                        for k, v in inputs.items():
+                            inputs[k] = v.to(model.device)
+                        batch_logits = model(**inputs).logits[:, -1, :]
+                        true_vector = batch_logits[:, LocalReranker._shared_token_true_id]
+                        false_vector = batch_logits[:, LocalReranker._shared_token_false_id]
+                        stacked_scores = torch.stack([false_vector, true_vector], dim=1)
+                        log_probs = torch.nn.functional.log_softmax(stacked_scores, dim=1)
+                        return log_probs[:, 1].exp().tolist()
                 
-                with torch.no_grad():
-                    # Move inputs to device (redundant if process_inputs does it, but safe)
-                    for k, v in inputs.items():
-                        inputs[k] = v.to(model.device)
+                i = 0
+                while i < len(documents):
+                    actual_batch = min(BATCH_SIZE, len(documents) - i)
+                    batch_docs = documents[i : i + actual_batch]
+                    pairs = [self._format_instruction(query, doc, instruction) for doc in batch_docs]
+                    
+                    try:
+                        batch_scores = compute_batch_scores(pairs)
+                        out_scores.extend(batch_scores)
+                        i += actual_batch
+                    except torch.cuda.OutOfMemoryError as e:
+                        logger.warning(f"Reranker OOM error on batch size {actual_batch}. Halving batch size.")
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
+                        if BATCH_SIZE > 1:
+                            BATCH_SIZE = math.ceil(BATCH_SIZE / 2)
+                        else:
+                            raise
+                    except Exception as e:
+                        if "OutOfMemory" in str(type(e).__name__) or "CUDA out of memory" in str(e):
+                            logger.warning(f"Reranker OOM error on batch size {actual_batch}. Halving batch size.")
+                            if torch.cuda.is_available():
+                                torch.cuda.empty_cache()
+                            if BATCH_SIZE > 1:
+                                BATCH_SIZE = math.ceil(BATCH_SIZE / 2)
+                                continue
+                            else:
+                                raise
+                        raise
                         
-                    batch_logits = model(**inputs).logits[:, -1, :]
-                    true_vector = batch_logits[:, LocalReranker._shared_token_true_id]
-                    false_vector = batch_logits[:, LocalReranker._shared_token_false_id]
-                    stacked_scores = torch.stack([false_vector, true_vector], dim=1)
-                    log_probs = torch.nn.functional.log_softmax(stacked_scores, dim=1)
-                    return log_probs[:, 1].exp().tolist()
-            
-            # Run batch
-            batch_scores = await loop.run_in_executor(None, compute_batch_scores, pairs)
-            all_scores.extend(batch_scores)
-            
-            # Optional: Clear cache after every few batches if very large
-            if len(documents) > 100 and i % (BATCH_SIZE * 4) == 0:
-                torch.cuda.empty_cache() if torch.cuda.is_available() else None
+                    if torch.cuda.is_available() and len(documents) > 100 and (i % (BATCH_SIZE * 4) == 0):
+                        torch.cuda.empty_cache()
+                return out_scores
+                
+            all_scores = await loop.run_in_executor(None, compute_all_scores)
         
         # Build results
         results = [
