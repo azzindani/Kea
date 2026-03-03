@@ -14,6 +14,8 @@ class ServiceName(str, Enum):
     VAULT = "vault"
     SWARM_MANAGER = "swarm_manager"
     CHRONOS = "chronos"
+    ML_INFERENCE = "ml_inference"
+    ML_RERANKER = "ml_reranker"
 
 class ServiceRegistry:
     """

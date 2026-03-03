@@ -18,7 +18,7 @@ from pgvector.asyncpg import register_vector
 
 from shared.logging.main import get_logger
 from shared.mcp.protocol import Tool
-from shared.embedding.qwen3_embedding import create_embedding_provider
+from shared.embedding.model_manager import get_embedding_provider
 from shared.database.connection import get_db_pool
 
 logger = get_logger(__name__)
@@ -31,7 +31,7 @@ class PostgresToolRegistry:
     
     def __init__(self, table_name: str = "tool_registry"):
         self.table_name = table_name
-        self.embedder = create_embedding_provider(use_local=True)
+        self.embedder = get_embedding_provider()
         self._initialized = False
             
     async def _ensure_schema(self, pool: asyncpg.Pool):

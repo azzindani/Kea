@@ -23,7 +23,7 @@ Instead of writing linear "To-Do Lists," Kea architects and executes **Directed 
 
 ## 📐 Architecture ("The Fractal Corp")
 
-Kea divides cognition into 7 specialized microservices, centered around the **Human Kernel**—a pure logic recursive processing unit built as a 6-Tier Pyramid. This ensures strict fault isolation, predictable behavior boundaries, and "Brain vs Body" governance.
+Kea divides cognition into 8 specialized microservices, centered around the **Human Kernel**—a pure logic recursive processing unit built as a 6-Tier Pyramid. This ensures strict fault isolation, predictable behavior boundaries, and "Brain vs Body" governance.
 
 ```mermaid
 graph TD
@@ -48,6 +48,7 @@ graph TD
         Orchestrator -->|Execute| Host[MCP Host]
         Orchestrator -->|Learn| RAG[RAG Service]
         Orchestrator -->|Persistence| Vault[(The Vault)]
+        RAG --> ML[ML Inference]
     end
     
     subgraph "The Conscience (Oversight)"
@@ -73,18 +74,19 @@ At the center of Kea sits the **Human Kernel** (`kernel/`), a standardized 6-Tie
 | **Tier 4** | **Execution Engine** | The OODA Loop | Manages rapid Observe-Orient-Decide-Act cycles, async multitasking, and memory caching. |
 | **Tier 3** | **Complex Orchestration** | Planner & Guardrails | Graph/Workflow building, node assembly, and consensus reflection. |
 | **Tier 2** | **Cognitive Engines** | Scenarios & Curiosity | Task decomposition, what-if consequence scenarios, and information gap exploration. |
-| **Tier 1** | **Core Processing** | Primitives | Classification, entity recognition, modality ingestion, and semantic semantic scoring. |
+| **Tier 1** | **Core Processing** | Primitives | Classification, entity recognition, modality ingestion, and semantic scoring. |
 | **Tier 0** | **Base Foundation** | `shared/` API | The bedrock. I/O schemas, LLM/Embedding InferenceKit, and telemetry standards. |
 
 ### 🏙️ Services ("The Fractal Nodes")
 
-Each service acts as a distinct corporate persona with a specific mandate.
+Each service acts as a distinct corporate persona with a specific mandate. These isolated microservices communicate **ONLY** via HTTP/REST APIs.
 
 | Service | Persona | Role | Documentation |
 |:--------|:--------|:-----|:--------------|
 | **Kernel** | The Brain | Isolated Core Reasoning Engine | [🧠 View Doc](kernel/README.md) |
 | **Gateway** | The Front Door | Security, Auth, & Routing | [📖 View Doc](services/api_gateway/README.md) |
 | **Orchestrator** | The Nervous System | Kernel Wrapper & State Machine | [📖 View Doc](services/orchestrator/README.md) |
+| **ML Inference**| **The Cortex** | Universal Model Serving (Embed/Rerank) | [📖 View Doc](services/ml_inference/README.md) |
 | **MCP Host** | The Hands | Tool Execution & JIT Spawning | [📖 View Doc](services/mcp_host/README.md) |
 | **RAG Service** | The Library | Multi-Source Knowledge Controller | [📖 View Doc](services/rag_service/README.md) |
 | **Vault** | The Memory | System Persistence & Context Engine | [📖 View Doc](services/vault/README.md) |

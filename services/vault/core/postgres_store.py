@@ -81,7 +81,7 @@ class PostgresVectorStore(VectorStore):
         self._initialized = True
 
     async def _get_embedding(self, text: str) -> list[float]:
-        """Get embedding for text using Qwen3 embedding provider."""
+        """Get embedding for text using model_manager facade (HTTP → local → API)."""
         if self._embedding_provider is None:
             if self.use_vl_model:
                 from shared.embedding.qwen3_vl_embedding import create_vl_embedding_provider, VLInput
@@ -90,12 +90,10 @@ class PostgresVectorStore(VectorStore):
                 )
             else:
                 from shared.embedding.model_manager import get_embedding_provider
-                # Use global settings from model_manager (don't force self.use_local_embedding default)
+                # Routes through 3-tier cascade: HTTP service → local → API
                 self._embedding_provider = get_embedding_provider()
         
         if self.use_vl_model:
-            # Wrap text in VLInput for consistency if using VL model
-            # Note: Caller might need to update to pass VLInput for images
             from shared.embedding.qwen3_vl_embedding import VLInput
             embeddings = await self._embedding_provider.embed([VLInput(text=text)])
             return embeddings[0]
@@ -103,14 +101,15 @@ class PostgresVectorStore(VectorStore):
         return await self._embedding_provider.embed_query(text)
 
     async def _get_reranker(self):
-        """Lazy load reranker."""
+        """Lazy load reranker via model_manager facade (HTTP → local)."""
         if self._reranker is None:
             if self.use_vl_model:
                 from shared.embedding.qwen3_vl_reranker import create_vl_reranker_provider
                 self._reranker = create_vl_reranker_provider()
             else:
-                from shared.embedding.qwen3_reranker import create_reranker_provider
-                self._reranker = create_reranker_provider()
+                from shared.embedding.model_manager import get_reranker_provider
+                # Routes through 3-tier cascade: HTTP service → local
+                self._reranker = get_reranker_provider()
         return self._reranker
 
     async def add(self, documents: list[Document]) -> list[str]:

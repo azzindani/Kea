@@ -45,6 +45,8 @@ class ServiceSettings(BaseModel):
     vault: str = "http://localhost:8004"
     swarm_manager: str = "http://localhost:8005"
     chronos: str = "http://localhost:8006"
+    ml_inference: str = "http://localhost:8007"
+    ml_reranker: str = "http://localhost:8007"  # Same as ml_inference in single-instance; separate in multi-GPU
 
 
 class LLMModelInfo(BaseModel):
@@ -224,6 +226,26 @@ class VLRerankerSettings(BaseModel):
     """Vision-Language reranker configuration."""
     model_name: str = "Qwen/Qwen3-VL-Reranker-2B"
     instruction: str = "Given a web search query, retrieve relevant passages that answer the query"
+
+
+class MLInferenceSettings(BaseModel):
+    """ML Inference Service settings.
+    
+    Controls the dedicated ML Inference microservice that serves
+    embedding and reranking models behind HTTP APIs.
+    
+    Roles:
+        - 'embedding': Load only embedding model(s)
+        - 'reranker': Load only reranker model(s)
+        - 'both': Load all models (dev/single-instance mode)
+    """
+    role: str = "both"
+    max_batch_size: int = 64
+    request_timeout: float = 60.0
+    model_load_timeout: float = 300.0
+    enable_vl_models: bool = False
+    device: str = "auto"  # auto | cuda | cuda:0 | cuda:1 | cpu
+    use_flash_attention: bool = False
 
 
 class TimeoutSettings(BaseModel):
@@ -921,6 +943,7 @@ class Settings(BaseSettings):
     cache_hierarchy: CacheHierarchySettings = CacheHierarchySettings()
     normalization: NormalizationSettings = NormalizationSettings()
     kernel: KernelSettings = KernelSettings()
+    ml_inference: MLInferenceSettings = MLInferenceSettings()
 
     model_config = SettingsConfigDict(
         env_file=".env",

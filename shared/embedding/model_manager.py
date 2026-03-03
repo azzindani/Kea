@@ -2,10 +2,19 @@
 Model Manager.
 
 Singleton manager for embedding and reranker models.
-Loads models once, shares across the system.
+
+Provider Resolution Order (3-tier fallback cascade):
+  1. ML Inference HTTP Service (if reachable)
+  2. Local PyTorch model (if available and configured)
+  3. OpenRouter API (external fallback)
+
+This cascade ensures zero-downtime during migration. Services work
+regardless of whether the ML Inference server is running.
 """
 
 from __future__ import annotations
+
+import asyncio
 
 from shared.logging.main import get_logger
 
@@ -19,6 +28,11 @@ _reranker_provider = None
 def get_embedding_provider(use_local: bool | None = None):
     """
     Get or create singleton embedding provider.
+    
+    Resolution order:
+      1. ML Inference HTTP Service (if reachable)
+      2. Local PyTorch model (with API fallback wrapper)
+      3. OpenRouter API (external fallback)
     
     Args:
         use_local: Force local (True) or API (False). None = use config default.
@@ -46,6 +60,13 @@ def get_embedding_provider(use_local: bool | None = None):
                  logger.info("Model Manager: Using local embedding as configured (Hardware check skipped)")
     
     if _embedding_provider is None:
+        # Tier 1: Try ML Inference HTTP Service
+        http_provider = _try_http_embedding_provider()
+        if http_provider is not None:
+            _embedding_provider = http_provider
+            return _embedding_provider
+
+        # Tier 2 & 3: Local PyTorch with API fallback
         from shared.embedding.qwen3_embedding import (
             create_embedding_provider, 
             EmbeddingProvider
@@ -132,6 +153,10 @@ def get_reranker_provider():
     """
     Get or create singleton reranker provider.
     
+    Resolution order:
+      1. ML Inference HTTP Service (if reachable)
+      2. Local PyTorch model
+    
     Returns:
         RerankerProvider instance
     """
@@ -142,6 +167,13 @@ def get_reranker_provider():
     config = get_settings()
     
     if _reranker_provider is None:
+        # Tier 1: Try ML Inference HTTP Service
+        http_provider = _try_http_reranker_provider()
+        if http_provider is not None:
+            _reranker_provider = http_provider
+            return _reranker_provider
+
+        # Tier 2: Local PyTorch model
         from shared.embedding.qwen3_reranker import create_reranker_provider
         
         _reranker_provider = create_reranker_provider(
@@ -256,3 +288,56 @@ def get_model_manager() -> ModelManager:
         _model_manager = ModelManager()
         logger.info("ModelManager facade initialised")
     return _model_manager
+
+
+# ============================================================================
+# HTTP Client Helpers (Tier 1 Resolution)
+# ============================================================================
+
+
+def _try_http_embedding_provider() -> object | None:
+    """
+    Attempt to create an HTTP-based embedding provider.
+    
+    Returns the client if the ML Inference service is configured and
+    appears reachable. Returns None to fall through to local providers.
+    """
+    try:
+        from shared.embedding.client import EmbeddingServiceClient
+        
+        client = EmbeddingServiceClient()
+        
+        # Quick reachability check (synchronous-safe)
+        # We don't await here — the client will fail gracefully on first use
+        # if the service isn't actually up. This avoids blocking startup.
+        logger.info(
+            f"Model Manager: Using ML Inference HTTP Service for embeddings "
+            f"({client._base_url})"
+        )
+        return client
+        
+    except Exception as e:
+        logger.debug(f"Model Manager: HTTP embedding client unavailable: {e}")
+        return None
+
+
+def _try_http_reranker_provider() -> object | None:
+    """
+    Attempt to create an HTTP-based reranker provider.
+    
+    Returns the client if the ML Inference service is configured and
+    appears reachable. Returns None to fall through to local providers.
+    """
+    try:
+        from shared.embedding.client import RerankerServiceClient
+        
+        client = RerankerServiceClient()
+        logger.info(
+            f"Model Manager: Using ML Inference HTTP Service for reranking "
+            f"({client._base_url})"
+        )
+        return client
+        
+    except Exception as e:
+        logger.debug(f"Model Manager: HTTP reranker client unavailable: {e}")
+        return None

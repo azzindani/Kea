@@ -18,7 +18,7 @@ from pgvector.asyncpg import register_vector
 
 from shared.database.connection import get_database_pool
 from shared.config import get_settings
-from shared.embedding.qwen3_embedding import create_embedding_provider
+from shared.embedding.model_manager import get_embedding_provider, get_reranker_provider
 from shared.logging.main import get_logger
 
 logger = get_logger(__name__)
@@ -45,10 +45,7 @@ class PostgresKnowledgeRegistry:
         """
         settings = get_settings()
         self.table_name = table_name or settings.knowledge.registry_table
-        self.embedder = create_embedding_provider(
-            model_name=embedding_model or settings.embedding.model_name,
-            use_local=settings.embedding.use_local
-        )
+        self.embedder = get_embedding_provider()
         self.dimension = dimension or settings.embedding.dimension
         self._reranker = None
         self._rerank_lock = asyncio.Lock()
@@ -288,11 +285,9 @@ class PostgresKnowledgeRegistry:
         return total_updated
 
     async def _get_reranker(self):
-        """Lazy load reranker (mirrors Vault's postgres_store pattern)."""
+        """Lazy load reranker via model_manager facade (HTTP → local)."""
         if self._reranker is None:
-            from shared.embedding.qwen3_reranker import create_reranker_provider
-
-            self._reranker = create_reranker_provider()
+            self._reranker = get_reranker_provider()
         return self._reranker
 
     async def search(

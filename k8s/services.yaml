@@ -122,6 +122,23 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
+  name: ml-inference
+  labels:
+    app: project
+    component: ml-inference
+spec:
+  selector:
+    app: project
+    component: ml-inference
+  ports:
+    - port: 8007
+      targetPort: 8007
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
   name: postgres
   labels:
     app: project
