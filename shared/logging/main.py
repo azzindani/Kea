@@ -21,8 +21,66 @@ from structlog import DropEvent
 from pydantic import BaseModel, Field
 
 # ============================================================================
-# 🎭 Level & Symbol standards
+# ── UNIVERSAL LOGGING STABILIZATION ──
 # ============================================================================
+# We apply a recursive monkeypatch to ALL structlog BoundLogger variants.
+# This ensures that even dynamically generated filtering proxies receive our
+# extended log levels (notice, success, alert, emergency).
+def _apply_universal_telemetry_patch():
+    try:
+        import structlog.stdlib
+        
+        def _make_method(name):
+            level_map = {"success": "info", "notice": "info", "alert": "error", "emergency": "critical"}
+            def _method(self, event: str, **kw: Any) -> Any:
+                # 1. Try proxy-to-logger (standard for stdlib loggers)
+                proxy = getattr(self, "_proxy_to_logger", None)
+                if proxy:
+                    return proxy(level_map[name], event, **{**kw, "level": name})
+                # 2. Try direct call on the underlying standard method
+                target = getattr(self, level_map[name], getattr(self, "info", None))
+                if target:
+                    return target(event, **{**kw, "level": name})
+                return None
+            return _method
+
+        # 1. Base Targets
+        bases = [structlog.BoundLogger, structlog.PrintLogger]
+        if hasattr(structlog, "stdlib"):
+            bases.append(structlog.stdlib.BoundLogger)
+
+        # 2. Recursive Patching of all existing subclasses (including dynamic proxies)
+        def _patch_recursive(cls):
+            for m in ["success", "notice", "alert", "emergency"]:
+                if not hasattr(cls, m):
+                    try:
+                        setattr(cls, m, _make_method(m))
+                    except Exception: pass
+            
+            # Recurse into subclasses (this finds BoundLoggerFilteringAtNotset, etc.)
+            try:
+                for sub in cls.__subclasses__():
+                    _patch_recursive(sub)
+            except Exception: pass
+
+        for base in bases:
+            _patch_recursive(base)
+
+        # 3. Factory Hook: Patch any future dynamically created filtering loggers
+        if hasattr(structlog.stdlib, "make_filtering_bound_logger"):
+            orig_factory = structlog.stdlib.make_filtering_bound_logger
+            def patched_factory(*args, **kwargs):
+                cls = orig_factory(*args, **kwargs)
+                for m in ["success", "notice", "alert", "emergency"]:
+                    if not hasattr(cls, m):
+                        setattr(cls, m, _make_method(m))
+                return cls
+            structlog.stdlib.make_filtering_bound_logger = patched_factory
+            
+    except Exception:
+        pass
+
+_apply_universal_telemetry_patch()
 
 class LogLevel(str, Enum):
     """Standard log levels (RFC 5424 / Syslog compliance)."""
@@ -435,29 +493,13 @@ def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optiona
         cache_logger_on_first_use=True,
     )
 
-# ── SAFETY MONKEYPATCH ──
-# To prevent AttributeError on loggers created BEFORE setup_logging (top-level module loggers),
-# we attach the methods to the base BoundLogger only if they don't already exist.
-for method_name in ["success", "notice", "alert", "emergency"]:
-    if not hasattr(structlog.stdlib.BoundLogger, method_name):
-        def _make_method(name):
-            level_map = {"success": "info", "notice": "info", "alert": "error", "emergency": "critical"}
-            def _method(self, event, **kw):
-                # Safely proxy if the method is available, else fallback to info/error
-                proxy_method = getattr(self, "_proxy_to_logger", None)
-                if proxy_method:
-                    return proxy_method(level_map[name], event, **{**kw, "level": name})
-                # Total fallback if not a stdlib logger
-                original_method = getattr(self, level_map[name], self.info)
-                return original_method(event, **{**kw, "level": name})
-            return _method
-        setattr(structlog.stdlib.BoundLogger, method_name, _make_method(method_name))
+_apply_universal_telemetry_patch()
 
-    # Suppress noisy framework / infrastructure loggers
-    _LOGGING_CONFIGURED = True
-    for lib in (
-        "httpx", "httpcore", "asyncio", "urllib3",
-        # Jupyter / IPython kernel internals
+# Suppress noisy framework / infrastructure loggers
+_LOGGING_CONFIGURED = True
+for lib in (
+    "httpx", "httpcore", "asyncio", "urllib3",
+    # Jupyter / IPython kernel internals
         "IPKernelApp", "ipykernel", "jupyter_client", "jupyter_core",
         "traitlets", "tornado", "zmq",
         # ML framework noise
