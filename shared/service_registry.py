@@ -35,7 +35,7 @@ class ServiceRegistry:
         
         if url:
             from shared.logging.main import get_logger
-            get_logger("registry").info(f"ServiceRegistry: Resolved '{service.value}' -> {url}")
+            get_logger("registry").debug(f"ServiceRegistry: Resolved '{service.value}' -> {url}")
             return url
             
         # Fallback to env var override: e.g. SERVICE_URL_VAULT
@@ -46,7 +46,7 @@ class ServiceRegistry:
             raise ValueError(f"Service location for '{service.value}' is not configured in environment variables or shared.config defaults.")
             
         from shared.logging.main import get_logger
-        get_logger("registry").info(f"ServiceRegistry: Resolved '{service.value}' (via ENV) -> {url}")
+        get_logger("registry").debug(f"ServiceRegistry: Resolved '{service.value}' (via ENV) -> {url}")
         return url
 
     @classmethod

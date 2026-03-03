@@ -451,13 +451,21 @@ class UnifiedBoundLogger(structlog.stdlib.BoundLogger):
     def emergency(self, event: str, **kw: Any) -> Any:
         return self._proxy_to_logger("critical", event, **{**kw, "level": "emergency"})
 
+import threading
+_LOGGING_LOCK = threading.Lock()
 _LOGGING_CONFIGURED = False
 
 def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optional[str] = None, force_stderr: bool = True):
     """Standardized logging setup for all codebases."""
     global _LOGGING_CONFIGURED
+    
     if _LOGGING_CONFIGURED:
         return
+
+    with _LOGGING_LOCK:
+        if _LOGGING_CONFIGURED:
+            return
+        _LOGGING_CONFIGURED = True
 
     from shared.config import get_settings
     settings = get_settings()
@@ -507,7 +515,6 @@ def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optiona
 _apply_universal_telemetry_patch()
 
 # Suppress noisy framework / infrastructure loggers
-_LOGGING_CONFIGURED = True
 for lib in (
     "httpx", "httpcore", "asyncio", "urllib3",
     # Jupyter / IPython kernel internals

@@ -193,10 +193,7 @@ class LocalEmbedding(EmbeddingProvider):
             if LocalEmbedding._shared_model is not None:
                 return LocalEmbedding._shared_model, LocalEmbedding._shared_tokenizer
             
-            # Pin to specific device
             device = self.device
-            if device == "cuda":
-                device = "cuda:0"
             
             # Load tokenizer (matches working test code)
             LocalEmbedding._shared_tokenizer = AutoTokenizer.from_pretrained(

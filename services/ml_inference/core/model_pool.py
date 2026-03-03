@@ -42,6 +42,8 @@ class ModelPool:
         self._settings = get_settings()
         self._role = ModelRole(self._settings.ml_inference.role)
         self._device: str = ""
+        self._emb_device: str = ""
+        self._rerank_device: str = ""
         self._embedding_provider: Any | None = None
         self._reranker_provider: Any | None = None
         self._vl_embedding_provider: Any | None = None
@@ -102,6 +104,17 @@ class ModelPool:
 
             self._device = self._resolve_device()
             role = self._role
+            
+            self._emb_device = self._device
+            self._rerank_device = self._device
+            
+            # If "both" models are loaded into a single service, natively split them to free GPUs
+            if role == ModelRole.BOTH and self._device == "cuda":
+                hw = detect_hardware()
+                if hw.gpu_count > 1:
+                    self._emb_device = "cuda:0"
+                    self._rerank_device = "cuda:1"
+                    logger.info("Multi-GPU detected! Auto-distributing embedding (cuda:0) and reranker (cuda:1).")
 
             logger.info(
                 f"Model pool initializing: role={role.value}, device={self._device}"
@@ -134,10 +147,14 @@ class ModelPool:
         try:
             from shared.embedding.qwen3_embedding import create_embedding_provider
 
-            use_local = self._device != "cpu" or self._settings.embedding.use_local
-            self._embedding_provider = create_embedding_provider(use_local=use_local)
+            use_local = self._emb_device != "cpu" or self._settings.embedding.use_local
+            self._embedding_provider = create_embedding_provider(
+                use_local=use_local, 
+                device=self._emb_device,
+                use_flash_attention=self._settings.ml_inference.use_flash_attention
+            )
             logger.info(
-                f"Embedding model loaded: {self._settings.embedding.model_name}"
+                f"Embedding model loaded: {self._settings.embedding.model_name} on {self._emb_device}"
             )
         except Exception as e:
             logger.error(f"Failed to load embedding model: {e}")
@@ -148,9 +165,12 @@ class ModelPool:
         try:
             from shared.embedding.qwen3_reranker import create_reranker_provider
 
-            self._reranker_provider = create_reranker_provider()
+            self._reranker_provider = create_reranker_provider(
+                device=self._rerank_device,
+                use_flash_attention=self._settings.ml_inference.use_flash_attention
+            )
             logger.info(
-                f"Reranker model loaded: {self._settings.reranker.model_name}"
+                f"Reranker model loaded: {self._settings.reranker.model_name} on {self._rerank_device}"
             )
         except Exception as e:
             logger.error(f"Failed to load reranker model: {e}")
