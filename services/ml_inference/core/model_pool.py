@@ -80,9 +80,10 @@ class ModelPool:
         hw = detect_hardware()
         if hw.can_use_gpu_embedding():
             device = "cuda"
+            gpu_label = hw.gpu_names[0] if hw.gpu_names else "Unknown"
             logger.info(
-                f"Auto-detected GPU: {hw.gpu_name}, "
-                f"VRAM: {hw.gpu_vram_gb:.1f} GB — using {device}"
+                f"Auto-detected GPU: {gpu_label}, "
+                f"VRAM: {hw.vram_total_gb:.1f} GB — using {device}"
             )
         else:
             device = "cpu"
