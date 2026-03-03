@@ -121,7 +121,18 @@ class EmbeddingServiceClient:
             "/v1/embed",
             json={"texts": texts},
         )
+        if response.status_code != 200:
+            error_msg = f"ML Inference Service Error ({response.status_code}) at {self._base_url}/v1/embed"
+            try:
+                detail = response.json().get("detail", "No detail provided")
+                error_msg += f": {detail}"
+            except Exception:
+                pass
+            raise RuntimeError(error_msg)
+
         data = response.json()
+        if "embeddings" not in data:
+            raise KeyError(f"Expected 'embeddings' key in response from {self._base_url}/v1/embed, but got: {list(data.keys())}")
         return data["embeddings"]
 
     async def embed_query(self, query: str) -> list[float]:
@@ -139,7 +150,18 @@ class EmbeddingServiceClient:
             "/v1/embed/query",
             json={"text": query},
         )
+        if response.status_code != 200:
+            error_msg = f"ML Inference Service Error ({response.status_code}) at {self._base_url}/v1/embed/query"
+            try:
+                detail = response.json().get("detail", "No detail provided")
+                error_msg += f": {detail}"
+            except Exception:
+                pass
+            raise RuntimeError(error_msg)
+
         data = response.json()
+        if "embedding" not in data:
+            raise KeyError(f"Expected 'embedding' key in response from {self._base_url}/v1/embed/query, but got: {list(data.keys())}")
         return data["embedding"]
 
     async def is_available(self) -> bool:
@@ -261,7 +283,18 @@ class RerankerServiceClient:
             "/v1/rerank",
             json=payload,
         )
+        if response.status_code != 200:
+            error_msg = f"ML Inference Service Error ({response.status_code}) at {self._base_url}/v1/rerank"
+            try:
+                detail = response.json().get("detail", "No detail provided")
+                error_msg += f": {detail}"
+            except Exception:
+                pass
+            raise RuntimeError(error_msg)
+
         data = response.json()
+        if "results" not in data:
+            raise KeyError(f"Expected 'results' key in response from {self._base_url}/v1/rerank, but got: {list(data.keys())}")
         return data["results"]
 
     async def is_available(self) -> bool:

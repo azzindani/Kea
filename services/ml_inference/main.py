@@ -78,10 +78,15 @@ async def lifespan(_app: FastAPI):
         logger.error(f"Failed to load models during startup: {e}")
         # Service starts in degraded mode — /health will report the issue
 
-    # Log registered routes for debugging
+    # Log registered routes for debugging (INFO level to ensure visibility)
     for route in _app.routes:
         if hasattr(route, "path"):
-            logger.debug(f"Registered route: {route.path}")
+            methods = getattr(route, "methods", {"GET"})
+            logger.info(f"Registered route: {list(methods)} {route.path}")
+
+    # Log the exact port we are supposed to be on (via settings/registry)
+    port = ServiceRegistry.get_port(ServiceName.ML_INFERENCE)
+    logger.info(f"ML Inference service configured on port: {port}")
 
     yield
 
@@ -101,6 +106,21 @@ app = FastAPI(
 )
 app.add_middleware(RequestLoggingMiddleware)
 app.mount("/metrics", make_asgi_app())
+
+
+@app.get("/")
+async def root():
+    """Service information and discovery."""
+    pool = get_model_pool()
+    return {
+        "service": "ml_inference",
+        "description": "Dedicated ML Inference Microservice",
+        "version": settings.app.version,
+        "endpoints": ["/health", "/v1/models", "/v1/embed", "/v1/embed/query", "/v1/rerank"],
+        "status": "online" if pool.is_loaded else "initializing",
+        "role": pool.role.value,
+        "device": pool.device or "detecting",
+    }
 
 
 # ---------------------------------------------------------------------------

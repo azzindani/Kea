@@ -299,45 +299,63 @@ def _try_http_embedding_provider() -> object | None:
     """
     Attempt to create an HTTP-based embedding provider.
     
-    Returns the client if the ML Inference service is configured and
-    appears reachable. Returns None to fall through to local providers.
+    Returns the client ONLY if the ML Inference service is configured and
+    responds to a health check. This prevents 404/Connection errors from
+    hijacking the provider chain when the service is down or misconfigured.
     """
     try:
         from shared.embedding.client import EmbeddingServiceClient
+        from shared.service_registry import ServiceRegistry, ServiceName
+        import httpx
         
+        url = ServiceRegistry.get_url(ServiceName.ML_INFERENCE)
+        
+        # 0.4.0: Rigorous reachability check
+        # We use a sync client with a very short timeout to verify the service is actually there.
+        # This avoids the "Ghost Client" problem where we return a client that always 404s.
+        try:
+            with httpx.Client(timeout=0.5) as client:
+                # Try root or health
+                resp = client.get(f"{url}/health")
+                if resp.status_code != 200:
+                    logger.debug(f"Model Manager: ML Inference at {url} returned {resp.status_code}, falling back.")
+                    return None
+        except httpx.RequestError:
+            logger.debug(f"Model Manager: ML Inference at {url} unreachable, falling back.")
+            return None
+
         client = EmbeddingServiceClient()
-        
-        # Quick reachability check (synchronous-safe)
-        # We don't await here — the client will fail gracefully on first use
-        # if the service isn't actually up. This avoids blocking startup.
-        logger.info(
-            f"Model Manager: Using ML Inference HTTP Service for embeddings "
-            f"({client._base_url})"
-        )
+        logger.info(f"Model Manager: Connected to ML Inference HTTP Service ({url})")
         return client
         
     except Exception as e:
-        logger.debug(f"Model Manager: HTTP embedding client unavailable: {e}")
+        logger.debug(f"Model Manager: HTTP embedding client initialization failed: {e}")
         return None
 
 
 def _try_http_reranker_provider() -> object | None:
     """
     Attempt to create an HTTP-based reranker provider.
-    
-    Returns the client if the ML Inference service is configured and
-    appears reachable. Returns None to fall through to local providers.
     """
     try:
         from shared.embedding.client import RerankerServiceClient
+        from shared.service_registry import ServiceRegistry, ServiceName
+        import httpx
         
+        url = ServiceRegistry.get_url(ServiceName.ML_INFERENCE)
+        
+        try:
+            with httpx.Client(timeout=0.5) as client:
+                resp = client.get(f"{url}/health")
+                if resp.status_code != 200:
+                    return None
+        except httpx.RequestError:
+            return None
+
         client = RerankerServiceClient()
-        logger.info(
-            f"Model Manager: Using ML Inference HTTP Service for reranking "
-            f"({client._base_url})"
-        )
+        logger.info(f"Model Manager: Connected to ML Inference HTTP Service ({url})")
         return client
         
     except Exception as e:
-        logger.debug(f"Model Manager: HTTP reranker client unavailable: {e}")
+        logger.debug(f"Model Manager: HTTP reranker client initialization failed: {e}")
         return None
