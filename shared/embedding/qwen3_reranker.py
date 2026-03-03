@@ -56,7 +56,8 @@ class LocalReranker(RerankerProvider):
     _shared_suffix_tokens = None
     _shared_token_true_id = None
     _shared_token_false_id = None
-    _shared_execution_lock = None # Asyncio lock for inference
+    _shared_execution_lock_DEBUG_REMOVED = None # REMOVED
+    _shared_inference_lock = None # Threading lock for multi-service cross-thread inference
     
     def __init__(
         self,
@@ -73,14 +74,7 @@ class LocalReranker(RerankerProvider):
         self.max_length = max_length or settings.reranker.max_length
         self.use_flash_attention = use_flash_attention
         
-        if LocalReranker._shared_execution_lock is None:
-            import asyncio
-            try:
-                loop = asyncio.get_running_loop()
-                LocalReranker._shared_execution_lock = asyncio.Lock()
-            except RuntimeError:
-                # No loop running yet, that's okay, we'll initialize on first use
-                LocalReranker._shared_execution_lock = None
+        self._exec_lock = None
     
     def _has_cuda(self) -> bool:
         try:
@@ -92,11 +86,12 @@ class LocalReranker(RerankerProvider):
     async def load(self) -> None:
         """Force the model to load into memory/GPU now."""
         import asyncio
-        if LocalReranker._shared_execution_lock is None:
-            LocalReranker._shared_execution_lock = asyncio.Lock()
+        if self._exec_lock is None:
+            self._exec_lock = asyncio.Lock()
             
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, self._load_model)
+        async with self._exec_lock:
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, self._load_model)
 
     def _load_model(self):
         """Lazy load model and tokenizer with thread safety (class-level singleton)."""
@@ -108,6 +103,9 @@ class LocalReranker(RerankerProvider):
         if LocalReranker._shared_model is not None:
             return LocalReranker._shared_model, LocalReranker._shared_tokenizer
         
+        if LocalReranker._shared_inference_lock is None:
+            LocalReranker._shared_inference_lock = threading.Lock()
+            
         if LocalReranker._shared_lock is None:
             LocalReranker._shared_lock = threading.Lock()
         
@@ -217,10 +215,10 @@ class LocalReranker(RerankerProvider):
         if not documents:
             return []
         
-        if LocalReranker._shared_execution_lock is None:
-            LocalReranker._shared_execution_lock = asyncio.Lock()
+        if self._exec_lock is None:
+            self._exec_lock = asyncio.Lock()
             
-        async with LocalReranker._shared_execution_lock:
+        async with self._exec_lock:
             model, _ = self._load_model()
             
             from shared.config import get_settings
@@ -239,13 +237,15 @@ class LocalReranker(RerankerProvider):
                 def compute_batch_scores(batch_pairs):
                     if not batch_pairs: return []
                     inputs = self._process_inputs(batch_pairs)
-                    with torch.no_grad():
-                        batch_logits = model(**inputs).logits[:, -1, :]
-                        true_vector = batch_logits[:, LocalReranker._shared_token_true_id]
-                        false_vector = batch_logits[:, LocalReranker._shared_token_false_id]
-                        stacked_scores = torch.stack([false_vector, true_vector], dim=1)
-                        log_probs = torch.nn.functional.log_softmax(stacked_scores, dim=1)
-                        return log_probs[:, 1].exp().tolist()
+                    # Thread-safe model call
+                    with LocalReranker._shared_inference_lock:
+                        with torch.no_grad():
+                            batch_logits = model(**inputs).logits[:, -1, :]
+                            true_vector = batch_logits[:, LocalReranker._shared_token_true_id]
+                            false_vector = batch_logits[:, LocalReranker._shared_token_false_id]
+                            stacked_scores = torch.stack([false_vector, true_vector], dim=1)
+                            log_probs = torch.nn.functional.log_softmax(stacked_scores, dim=1)
+                            return log_probs[:, 1].exp().tolist()
                 
                 i = 0
                 while i < len(documents):

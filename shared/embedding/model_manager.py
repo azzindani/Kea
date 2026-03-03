@@ -325,7 +325,7 @@ def _try_http_embedding_provider() -> object | None:
         # We use a sync client with retries to wait for the service to finish loading models.
         # This prevents the "Cold Start Fallback Collision" where other services boot Local Torch
         # while the ML service is still initializing its own Local Torch.
-        max_attempts = 5
+        max_attempts = 30
         attempt_timeout = 1.0
         
         logger.debug(f"Model Manager: Checking ML Inference health at {url}...")
@@ -365,7 +365,7 @@ def _try_http_reranker_provider() -> object | None:
         url = ServiceRegistry.get_url(ServiceName.ML_INFERENCE)
         
         # Reuse logic for reranker
-        max_attempts = 5
+        max_attempts = 30
         for _ in range(max_attempts):
             try:
                 with httpx.Client(timeout=1.0) as client:

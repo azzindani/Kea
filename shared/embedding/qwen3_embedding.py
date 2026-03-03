@@ -154,7 +154,7 @@ class LocalEmbedding(EmbeddingProvider):
     _shared_model = None
     _shared_tokenizer = None
     _shared_lock = None  # Threading lock for model loading
-    _shared_execution_lock = None # Asyncio lock for inference
+    _shared_inference_lock = None # Threading lock for multi-service cross-thread inference
     _shared_device = None
     
     def __init__(
@@ -174,22 +174,17 @@ class LocalEmbedding(EmbeddingProvider):
         self.use_flash_attention = use_flash_attention
         self.max_length = max_length or settings.embedding.max_length
         
-        if LocalEmbedding._shared_execution_lock is None:
-            import asyncio
-            try:
-                loop = asyncio.get_running_loop()
-                LocalEmbedding._shared_execution_lock = asyncio.Lock()
-            except RuntimeError:
-                LocalEmbedding._shared_execution_lock = None
+        self._exec_lock = None
             
     async def load(self) -> None:
         """Force the model to load into memory/GPU now."""
         import asyncio
-        if LocalEmbedding._shared_execution_lock is None:
-            LocalEmbedding._shared_execution_lock = asyncio.Lock()
+        if self._exec_lock is None:
+            self._exec_lock = asyncio.Lock()
             
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, self._load_model)
+        async with self._exec_lock:
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, self._load_model)
     
     def _has_cuda(self) -> bool:
         try:
@@ -210,7 +205,9 @@ class LocalEmbedding(EmbeddingProvider):
         if not _TRANSFORMERS_AVAILABLE:
             raise ImportError("transformers library is required for local embedding")
         
-        # Create class-level lock if not exists
+        if LocalEmbedding._shared_inference_lock is None:
+            LocalEmbedding._shared_inference_lock = threading.Lock()
+            
         if LocalEmbedding._shared_lock is None:
             LocalEmbedding._shared_lock = threading.Lock()
         
@@ -282,10 +279,10 @@ class LocalEmbedding(EmbeddingProvider):
         import torch
         import torch.nn.functional as F
         
-        if LocalEmbedding._shared_execution_lock is None:
-            LocalEmbedding._shared_execution_lock = asyncio.Lock()
+        if self._exec_lock is None:
+            self._exec_lock = asyncio.Lock()
             
-        async with LocalEmbedding._shared_execution_lock:
+        async with self._exec_lock:
             model, tokenizer = self._load_model()
             loop = asyncio.get_event_loop()
             
@@ -320,14 +317,16 @@ class LocalEmbedding(EmbeddingProvider):
                 )
                 batch_dict = {k: v.to(model.device) for k, v in batch_dict.items()}
                 
-                with torch.no_grad():
-                    outputs = model(**batch_dict)
-                    embeddings = self._last_token_pool(
-                        outputs.last_hidden_state,
-                        batch_dict['attention_mask']
-                    )
-                    # Normalize embeddings
-                    embeddings = F.normalize(embeddings, p=2, dim=1)
+                # Thread-safe model call
+                with LocalEmbedding._shared_inference_lock:
+                    with torch.no_grad():
+                        outputs = model(**batch_dict)
+                        embeddings = self._last_token_pool(
+                            outputs.last_hidden_state,
+                            batch_dict['attention_mask']
+                        )
+                        # Normalize embeddings
+                        embeddings = F.normalize(embeddings, p=2, dim=1)
                 
                 return embeddings.cpu().tolist()
             
