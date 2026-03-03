@@ -257,9 +257,10 @@ def detect_hardware() -> HardwareProfile:
             total_vram = 0
             free_vram = 0
             for i in range(profile.gpu_count):
-                props = torch.cuda.get_device_properties(i)
-                total_vram += props.total_memory
-                free_vram += torch.cuda.memory_reserved(i) - torch.cuda.memory_allocated(i)
+                # Query actual total and free memory from the device
+                free, total = torch.cuda.mem_get_info(i)
+                total_vram += total
+                free_vram += free
             profile.vram_total_gb = total_vram / (1024**3)
             profile.vram_available_gb = free_vram / (1024**3)
     except ImportError:

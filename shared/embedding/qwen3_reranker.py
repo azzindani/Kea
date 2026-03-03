@@ -92,6 +92,9 @@ class LocalReranker(RerankerProvider):
     async def load(self) -> None:
         """Force the model to load into memory/GPU now."""
         import asyncio
+        if LocalReranker._shared_execution_lock is None:
+            LocalReranker._shared_execution_lock = asyncio.Lock()
+            
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self._load_model)
 

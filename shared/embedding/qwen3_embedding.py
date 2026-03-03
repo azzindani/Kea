@@ -20,6 +20,9 @@ from shared.logging.main import get_logger
 # Pre-import transformers to avoid threading issues in Colab/Kaggle
 # These imports happen at module load time, before any threads spawn
 try:
+    os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+    os.environ["USE_TF"] = "0"
+    os.environ["USE_JAX"] = "0"
     from transformers import AutoTokenizer, AutoModel
     _TRANSFORMERS_AVAILABLE = True
 except ImportError:
@@ -279,6 +282,9 @@ class LocalEmbedding(EmbeddingProvider):
         import torch
         import torch.nn.functional as F
         
+        if LocalEmbedding._shared_execution_lock is None:
+            LocalEmbedding._shared_execution_lock = asyncio.Lock()
+            
         async with LocalEmbedding._shared_execution_lock:
             model, tokenizer = self._load_model()
             loop = asyncio.get_event_loop()
