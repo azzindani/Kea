@@ -614,7 +614,7 @@ def str_replace(file_path: str, column: str, pat: str, repl: str, regex: bool = 
 
 @mcp.tool()
 def str_extract(file_path: str, column: str, pat: str, output_path: str = "") -> str:
-    """EXTRACTS regex groups from text. [ACTION]
+    r"""EXTRACTS regex groups from text. [ACTION]
     
     [RAG Context]
     A precision "Super Tool" for information mining from unstructured text data. Many columns contain semi-structured patterns—such as item codes, email addresses, or specific product IDs—embedded within longer text strings. This tool uses Regular Expressions (RegEx) with capture groups `()` to pinpoint and pull these specific substrings into their own dedicated columns. It is the primary method for transforming raw, multi-part strings (e.g., a "Log" entry) into clear, structured features (e.g., just the "Error Code").
