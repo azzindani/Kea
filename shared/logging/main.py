@@ -40,24 +40,35 @@ def _get_telemetry_method(name: str):
     return _method
 
 def _apply_universal_telemetry_patch():
-    """Recursively patches all structlog logger variants with unified levels."""
+    """Recursively patches all structlog logger base classes and dynamic proxies."""
     try:
         import structlog.stdlib
         
-        # 1. Base Targets for recursive discovery
+        # 1. Base Targets: Start with the most foundational bases
+        # We target structlog._base.BoundLoggerBase as it's the root of all dynamic filtered loggers
         bases = [structlog.BoundLogger, structlog.PrintLogger]
-        if hasattr(structlog, "stdlib"):
+        
+        # Access internal base directly for deepest possible patching
+        try:
+            import structlog._base
+            if hasattr(structlog._base, "BoundLoggerBase"):
+                bases.append(structlog._base.BoundLoggerBase)
+        except (ImportError, AttributeError):
+            pass
+
+        if hasattr(structlog, "stdlib") and hasattr(structlog.stdlib, "BoundLogger"):
             bases.append(structlog.stdlib.BoundLogger)
 
-        # 2. Recursive Patching of all existing subclasses (including dynamic proxies)
+        # 2. Recursive Patching of all existing subclasses (including live dynamic proxies)
         def _patch_recursive(cls):
+            # Apply to this class
             for m in ["success", "notice", "alert", "emergency"]:
                 if not hasattr(cls, m):
                     try:
                         setattr(cls, m, _get_telemetry_method(m))
                     except Exception: pass
             
-            # Recurse into subclasses (finds BoundLoggerFilteringAtNotset, etc.)
+            # Recurse into all discovered subclasses
             try:
                 for sub in cls.__subclasses__():
                     _patch_recursive(sub)
@@ -66,7 +77,7 @@ def _apply_universal_telemetry_patch():
         for base in bases:
             _patch_recursive(base)
 
-        # 3. Factory Hook: Patch any future dynamically created filtering loggers
+        # 3. Factory Hook: Catch any FUTURE dynamically created filtering loggers
         if hasattr(structlog.stdlib, "make_filtering_bound_logger"):
             orig_factory = structlog.stdlib.make_filtering_bound_logger
             def patched_factory(*args, **kwargs):
@@ -574,17 +585,24 @@ def get_logger(name: str) -> structlog.stdlib.BoundLogger:
             
     logger = structlog.get_logger(name)
     
-    # --- LAZY ON-THE-FLY PATCHING ---
+    # --- RIGOROUS ON-THE-FLY PATCHING ---
     # Final safety layer: If structlog generated a class we missed during startup scan
-    # (common in dynamic test environments), we patch it immediately upon first use.
-    cls = logger.__class__
-    for m in ["success", "notice", "alert", "emergency"]:
-        if not hasattr(cls, m):
-             try:
-                 setattr(cls, m, _get_telemetry_method(m))
-             except Exception: pass
+    # (common in dynamic environments like Pytest), we patch both the instance class 
+    # and the result of .bind() to ensure total coverage.
+    def _ensure_telemetry(obj):
+        if not obj: return
+        cls = obj.__class__
+        for m in ["success", "notice", "alert", "emergency"]:
+            if not hasattr(cls, m):
+                 try:
+                     setattr(cls, m, _get_telemetry_method(m))
+                 except Exception: pass
 
-    return logger.bind(**DEFAULT_FLAGS)
+    _ensure_telemetry(logger)
+    bound_logger = logger.bind(**DEFAULT_FLAGS)
+    _ensure_telemetry(bound_logger)
+
+    return bound_logger
 
 def log_input(source: str, data: Any, **kw):
     env = IOEnvelope(type=IOType.INPUT, source=source, data=data, **kw)
