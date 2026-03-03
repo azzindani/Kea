@@ -47,7 +47,13 @@ class ModelPool:
         self._vl_embedding_provider: Any | None = None
         self._vl_reranker_provider: Any | None = None
         self._loaded = False
-        self._load_lock = asyncio.Lock()
+        self._load_lock: asyncio.Lock | None = None
+
+    def _get_load_lock(self) -> asyncio.Lock:
+        """Get or create the initialization lock, ensuring it's bound to the current loop."""
+        if self._load_lock is None:
+            self._load_lock = asyncio.Lock()
+        return self._load_lock
 
     @property
     def role(self) -> ModelRole:
@@ -90,7 +96,7 @@ class ModelPool:
 
         Thread-safe via async lock. Idempotent — safe to call multiple times.
         """
-        async with self._load_lock:
+        async with self._get_load_lock():
             if self._loaded:
                 return
 

@@ -18,7 +18,8 @@ import sys
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from prometheus_client import make_asgi_app
 
 from shared.config import get_settings
@@ -77,6 +78,11 @@ async def lifespan(_app: FastAPI):
         logger.error(f"Failed to load models during startup: {e}")
         # Service starts in degraded mode — /health will report the issue
 
+    # Log registered routes for debugging
+    for route in _app.routes:
+        if hasattr(route, "path"):
+            logger.debug(f"Registered route: {route.path}")
+
     yield
 
     logger.info("ML Inference shutting down")
@@ -111,6 +117,7 @@ async def health():
 
     return HealthResponse(
         status=status,
+        service="ml_inference",
         role=pool.role.value,
         models_loaded=pool.loaded_model_count,
         device=pool.device or "unknown",
@@ -161,6 +168,21 @@ async def list_models():
     return ModelsResponse(
         models=models,
         service_role=pool.role.value,
+    )
+
+
+@app.exception_handler(404)
+async def custom_404_handler(request: Request, _exc: Exception):
+    """Custom 404 handler to help debug missing routes."""
+    logger.warning(f"404 Not Found: {request.method} {request.url.path}")
+    return JSONResponse(
+        status_code=404,
+        content={
+            "detail": "ML Inference endpoint not found",
+            "method": request.method,
+            "path": request.url.path,
+            "suggestion": "Check ServiceRegistry port and prefix (expected: /v1/embed, /v1/rerank)",
+        },
     )
 
 
@@ -331,7 +353,6 @@ def main():
         host=settings.api.host,
         port=ServiceRegistry.get_port(ServiceName.ML_INFERENCE),
         reload=False,
-        loop="asyncio",
     )
 
 

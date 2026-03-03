@@ -58,10 +58,10 @@ class PostgresKnowledgeRegistry:
             return self._pool
 
         if PostgresKnowledgeRegistry._init_lock is None:
+            # Thread-safe initialization of the lock itself
             PostgresKnowledgeRegistry._init_lock = asyncio.Lock()
 
-        lock = PostgresKnowledgeRegistry._init_lock
-        async with lock:
+        async with PostgresKnowledgeRegistry._init_lock:
             if self._pool is not None and self._initialized:
                 return self._pool
 

@@ -47,14 +47,21 @@ class EmbeddingServiceClient:
         self._max_retries = settings.circuit_breaker.failure_threshold
         self._retry_delay: float = 1.0
         self._client: httpx.AsyncClient | None = None
+        self._loop: asyncio.AbstractEventLoop | None = None
 
     async def _get_client(self) -> httpx.AsyncClient:
-        """Get or create the persistent HTTP client."""
-        if self._client is None or self._client.is_closed:
+        """Get or create the persistent HTTP client, ensuring it matches the current loop."""
+        current_loop = asyncio.get_running_loop()
+        
+        if self._client is None or self._client.is_closed or self._loop != current_loop:
+            if self._client and not self._client.is_closed:
+                await self._client.aclose()
+            
             self._client = httpx.AsyncClient(
                 base_url=self._base_url,
                 timeout=self._timeout,
             )
+            self._loop = current_loop
         return self._client
 
     async def close(self) -> None:
@@ -91,7 +98,8 @@ class EmbeddingServiceClient:
                 if attempt < self._max_retries:
                     delay = self._retry_delay * (2 ** attempt)
                     logger.warning(
-                        f"ML Inference request failed (attempt {attempt + 1}): {e}. "
+                        f"ML Inference request failed (attempt {attempt + 1}) "
+                        f"at {self._base_url}{path}: {e}. "
                         f"Retrying in {delay:.1f}s..."
                     )
                     await asyncio.sleep(delay)
@@ -140,7 +148,10 @@ class EmbeddingServiceClient:
             client = await self._get_client()
             response = await client.get("/health")
             return response.status_code == get_settings().status_codes.ok
-        except Exception:
+        except (httpx.HTTPError, asyncio.TimeoutError):
+            return False
+        except Exception as e:
+            logger.debug(f"Unexpected error checking ML Inference availability: {e}")
             return False
 
 
@@ -162,14 +173,21 @@ class RerankerServiceClient:
         self._max_retries = settings.circuit_breaker.failure_threshold
         self._retry_delay: float = 1.0
         self._client: httpx.AsyncClient | None = None
+        self._loop: asyncio.AbstractEventLoop | None = None
 
     async def _get_client(self) -> httpx.AsyncClient:
-        """Get or create the persistent HTTP client."""
-        if self._client is None or self._client.is_closed:
+        """Get or create the persistent HTTP client, ensuring it matches the current loop."""
+        current_loop = asyncio.get_running_loop()
+        
+        if self._client is None or self._client.is_closed or self._loop != current_loop:
+            if self._client and not self._client.is_closed:
+                await self._client.aclose()
+                
             self._client = httpx.AsyncClient(
                 base_url=self._base_url,
                 timeout=self._timeout,
             )
+            self._loop = current_loop
         return self._client
 
     async def close(self) -> None:
@@ -206,7 +224,8 @@ class RerankerServiceClient:
                 if attempt < self._max_retries:
                     delay = self._retry_delay * (2 ** attempt)
                     logger.warning(
-                        f"ML Reranker request failed (attempt {attempt + 1}): {e}. "
+                        f"ML Reranker request failed (attempt {attempt + 1}) "
+                        f"at {self._base_url}{path}: {e}. "
                         f"Retrying in {delay:.1f}s..."
                     )
                     await asyncio.sleep(delay)
@@ -251,7 +270,10 @@ class RerankerServiceClient:
             client = await self._get_client()
             response = await client.get("/health")
             return response.status_code == get_settings().status_codes.ok
-        except Exception:
+        except (httpx.HTTPError, asyncio.TimeoutError):
+            return False
+        except Exception as e:
+            logger.debug(f"Unexpected error checking ML Reranker availability: {e}")
             return False
 
 
