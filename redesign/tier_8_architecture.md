@@ -1,29 +1,78 @@
-# Tier 8: Corporate Operations (Workforce & Coordination)
+# Tier 8: Corporate Operations — v2 (Composition-First Architecture)
 
 ## Overview
 
-**Tier 8** is the operational backbone of the Corporation Kernel. While Tier 7 (Conscious Observer) is the apex of a _single_ Human Kernel, Tier 8 is the machinery that manages _many_ Human Kernels as a coordinated workforce.
+**Tier 8** is the operational backbone of the Corporation Kernel. It manages the workforce of Human Kernels (Tier 7) through **composition of existing lower-tier modules**, not reimplementation.
 
-Think of Tier 8 as the **Operations Floor** of a corporation: it decomposes enterprise goals into assignable missions, spawns and manages the workforce, routes work to the right specialists, coordinates inter-agent workflows, enables communication between agents, and resolves conflicts when agents disagree.
+**Design Principle**: _"Reuse existing functions in the lower tier and make them more complex without creating new ones."_ Every Tier 8 module is a **thin orchestration layer** that composes functions from Tiers 1-6 at corporate scale. No kernel logic is duplicated.
 
-**CRITICAL RULE**: Tier 8 never reaches into the internals of any Human Kernel. It communicates with Tier 7 exclusively through the `ConsciousObserver.process()` entry point and the `ConsciousObserverResult` output. Each Human Kernel is a black box with a standardized Gate-In / Gate-Out interface.
+**CRITICAL RULE**: Tier 8 never reaches into the internals of any Human Kernel. It communicates with Tier 7 exclusively through `ConsciousObserver.process()` and `ConsciousObserverResult`. Each Human Kernel is a black box with a standardized Gate-In / Gate-Out interface.
 
-**Tier 8 is called by Tier 9** (Corporate Executive) and **calls into Tier 7** (Human Kernel). It also leverages Tier 0 primitives (schemas, config, logging, hardware) and selectively reuses lower-tier kernel modules (T1 classification, T2 task decomposition, T3 graph synthesizer, T5 lifecycle controller, T6 activation router, T6 self model) for corporate-level cognition.
-
-**Location**: `kernel/` — six new modules, each following the standard `engine.py` / `types.py` / `__init__.py` pattern.
+**Location**: `kernel/` — four modules, each following the standard `engine.py` / `types.py` / `__init__.py` pattern.
 
 ---
 
-## Modules
+## Modules (v1 → v2 Consolidation)
 
-| Module | Purpose | Analogy |
-|--------|---------|---------|
-| **mission_decomposer** | Break enterprise goals into agent-assignable missions | The Project Manager who reads the brief and writes the work breakdown structure |
-| **workforce_manager** | Spawn, scale, hire/fire Human Kernels | HR Department + Resource Allocation |
-| **mission_router** | Assign missions to agents by skill, load, and priority | The Dispatch Center that decides who works on what |
-| **team_orchestrator** | Coordinate inter-agent workflows, sequencing, dependencies | The Operations Director who keeps the assembly line moving |
-| **artifact_exchange** | Inter-agent pub/sub communication and shared workspace | The Corporate Watercooler + Shared Drive |
-| **conflict_resolver** | Consensus building, voting, arbitration, escalation | The Mediator / Conflict Resolution Board |
+The v1 architecture had **6 modules** (Mission Decomposer, Workforce Manager, Mission Router, Team Orchestrator, Artifact Exchange, Conflict Resolver). The v2 consolidates to **4 modules** by absorbing redundant modules into compositions of existing lower-tier functions.
+
+| v2 Module | What It Absorbed | Lower-Tier Composition |
+|-----------|-----------------|----------------------|
+| **workforce_manager** | + Mission Router (skill matching) | T5 lifecycle_controller, T5 energy_and_interrupts, T6 self_model, T1 scoring, shared/hardware |
+| **team_orchestrator** | + Sprint Manager (project methodology) | T3 graph_synthesizer, T3 advanced_planning, T3 node_assembler, T4 OODA pattern, T4 ShortTermMemory, T6 cognitive_load_monitor |
+| **shared_ledger** | Replaces Artifact Exchange + Memory Cortex | Vault Service API (thin bridge) |
+| **quality_resolver** | + Conflict Resolver | T3 reflection_and_guardrails, T1 scoring, T2 attention_and_plausibility, T6 noise_gate, T6 hallucination_monitor |
+
+**What was removed entirely**:
+- ~~Mission Decomposer~~ → T2 `decompose_goal()` called directly by Corporate Gateway
+- ~~Mission Router~~ → T6 `activation_router` + T1 `scoring` folded into Workforce Manager
+- ~~Artifact Exchange~~ → Replaced by Vault Service (shared_ledger is a thin bridge)
+- ~~Conflict Resolver~~ → T3 `evaluate_consensus()` + T1 `scoring` folded into Quality Resolver
+
+---
+
+## Complete Lower-Tier Reuse Map
+
+This table shows **every existing function** reused by Tier 8, proving that corporate operations are compositions, not reimplementations.
+
+| Existing Function | Source | Corporate Reuse | Replaces (v1) |
+|-------------------|--------|-----------------|---------------|
+| `classify()` | T1 classification | Domain detection for mission chunks | Mission Decomposer domain analysis |
+| `score()` | T1 scoring | Skill matching, conflict evaluation, proposal ranking | Mission Router + Conflict Resolver scoring |
+| `validate()` | T1 validation | Corporate input validation | (new) |
+| `run_cognitive_filters()` | T2 attention_and_plausibility | Contradiction detection between agent outputs | Conflict Resolver detection |
+| `decompose_goal()` | T2 task_decomposition | Mission decomposition into chunks | **Entire Mission Decomposer module** |
+| `analyze_goal_complexity()` | T2 task_decomposition | Scope assessment (SOLO/TEAM/SWARM sizing) | Mission Decomposer scope logic |
+| `synthesize_plan()` | T3 graph_synthesizer | Sprint workflow DAG building | Team Orchestrator DAG construction |
+| `compile_dag()` | T3 graph_synthesizer | Compile sprint nodes into executable DAG | Team Orchestrator DAG compilation |
+| `sequence_and_prioritize()` | T3 advanced_planning | Sprint planning, parallel/sequential ordering | **Sprint Manager (new concept)** |
+| `inject_progress_tracker()` | T3 advanced_planning | Milestone tracking per sprint | Corporate Monitor progress |
+| `bind_tools()` | T3 advanced_planning | Bind MCP tools to sprint nodes | Team Orchestrator tool binding |
+| `assemble_node()` | T3 node_assembler | Wrap each agent mission as a composable DAG node | **Node-based design (new concept)** |
+| `wrap_in_standard_io()` | T3 node_assembler | Ensure corporate nodes use Signal → Result protocol | Node-based design |
+| `evaluate_consensus()` | T3 reflection_and_guardrails | Resolve conflicts between agent outputs | **Entire Conflict Resolver module** |
+| `run_pre_execution_check()` | T3 reflection_and_guardrails | Conscience gate before sprint dispatch | Team Orchestrator pre-dispatch |
+| `critique_execution()` | T3 reflection_and_guardrails | Post-sprint retrospective, quality evaluation | Quality Resolver sprint review |
+| `run_ooda_cycle()` pattern | T4 ooda_loop | Corporate monitoring loop (observe agents → orient → decide → act) | Team Orchestrator monitoring |
+| `ShortTermMemory` | T4 short_term_memory | Corporate working memory (sprint state, events, entity cache) | Team Orchestrator state tracking |
+| `initialize_agent()` | T5 lifecycle_controller | JIT agent genesis | Workforce Manager spawn |
+| `load_cognitive_profile()` | T5 lifecycle_controller | Specialist profile loading from Vault | Workforce Manager hire |
+| `set_identity_constraints()` | T5 lifecycle_controller | Agent identity + budget constraints | Workforce Manager identity |
+| `control_sleep_wake()` | T5 lifecycle_controller | Agent lifecycle signals (TERMINATE=fire, SLEEP=idle, WAKE=resume) | Workforce Manager fire/wake |
+| `track_budget()` | T5 energy_and_interrupts | Corporate budget tracking across all agents | Corporate Monitor budget |
+| `check_budget_exhaustion()` | T5 energy_and_interrupts | Detect when mission/agent exceeds budget | Workforce Manager fire decision |
+| `handle_interrupt()` | T5 energy_and_interrupts | Client interrupt handling during execution | Corporate Gateway interrupt |
+| `classify_signal_complexity()` | T6 activation_router | Scaling mode selection (TRIVIAL→SOLO, COMPLEX→TEAM, etc.) | **Entire Strategic Planner module** |
+| `compute_activation_map()` | T6 activation_router | Which corporate modules to activate for this mission | Strategic Planner approach |
+| `assess_capability()` | T6 self_model | Corporate capacity self-assessment (can we handle this?) | Strategic Planner capability |
+| `monitor_cognitive_load()` | T6 cognitive_load_monitor | Stall/loop/drift detection at corporate level | **Entire Corporate Monitor module** |
+| `detect_stall()` | T6 cognitive_load_monitor | Detect stalled agents or sprints | Corporate Monitor stall detection |
+| `detect_goal_drift()` | T6 cognitive_load_monitor | Detect when agents drift from objective | Corporate Monitor quality |
+| `filter_output()` | T6 noise_gate | Corporate quality gate on agent outputs | Quality Resolver filtering |
+| `verify_grounding()` | T6 hallucination_monitor | Verify agent output grounding | Quality Resolver grounding |
+| `ConsciousObserver.process()` | T7 conscious_observer | Human Kernel interface (THE black box API) | Workforce Manager + Team Orchestrator |
+
+**Count: 33 existing functions reused** — zero core logic reimplemented.
 
 ---
 
@@ -36,1144 +85,835 @@ config:
 ---
 flowchart TB
     %% Tier 9 Input
-    subgraph sTier9["Tier 9: Corporate Executive"]
-        nGateway["Corporate Gateway<br>(Dispatches Missions)"]
+    subgraph sTier9["Tier 9: Corporate Gateway"]
+        nGateIn["Gate-In Phase<br>(T1 classify + T2 decompose_goal + T6 activation_router)"]
     end
 
-    %% Tier 8: Corporate Operations
+    %% Tier 8
     subgraph sTier8["Tier 8: Corporate Operations"]
         direction TB
 
-        subgraph sDecompose["Mission Decomposer"]
-            nDecompose["decompose_mission()<br>(Enterprise Goal -> Mission Chunks)"]
+        subgraph sWM["workforce_manager/ (T5 lifecycle + T5 energy + shared/hardware)"]
+            nSpawn["hire_specialist()<br>→ T5 initialize_agent()"]
+            nFire["fire_specialist()<br>→ T5 control_sleep_wake(TERMINATE)"]
+            nScale["scale_workforce()<br>→ shared/hardware.safe_parallel_limit()"]
         end
 
-        subgraph sWorkforce["Workforce Manager"]
-            nSpawn["spawn_agent()<br>(JIT Agent Creation)"]
-            nScale["scale_workforce()<br>(Dynamic Sizing)"]
-            nFire["fire_agent()<br>(Performance-Based Removal)"]
+        subgraph sTO["team_orchestrator/ (T3 graph + T3 planning + T4 OODA + T6 CLM)"]
+            nSprint["plan_sprint()<br>→ T3 sequence_and_prioritize()"]
+            nDAG["build_sprint_dag()<br>→ T3 synthesize_plan() + compile_dag()"]
+            nNode["wrap_as_node()<br>→ T3 assemble_node()"]
+            nLoop["run_corporate_ooda()<br>→ T4 OODA pattern + T6 CLM"]
+            nHandoff["execute_handoff()<br>→ shared_ledger + T5 wake signal"]
         end
 
-        subgraph sRouter["Mission Router"]
-            nRoute["route_mission()<br>(Skill + Load Matching)"]
+        subgraph sSL["shared_ledger/ (Vault Service bridge)"]
+            nWrite["write_artifact() → Vault POST"]
+            nRead["read_artifacts() → Vault semantic search"]
+            nCheckpoint["write_checkpoint() → Vault persistence"]
         end
 
-        subgraph sOrchestrator["Team Orchestrator"]
-            nOrchestrate["orchestrate_team()<br>(Workflow DAG Execution)"]
-            nSequence["sequence_handoff()<br>(Agent -> Agent Chaining)"]
+        subgraph sQR["quality_resolver/ (T3 reflection + T1 scoring + T6 noise_gate)"]
+            nConsensus["resolve_conflict()<br>→ T3 evaluate_consensus()"]
+            nQuality["audit_sprint()<br>→ T3 critique_execution() + T6 filter_output()"]
         end
 
-        subgraph sExchange["Artifact Exchange"]
-            nPublish["publish_artifact()"]
-            nConsume["consume_artifacts()"]
-            nSearch["search_artifacts()"]
-        end
-
-        subgraph sConflict["Conflict Resolver"]
-            nDetect["detect_conflict()"]
-            nResolve["resolve_conflict()"]
-        end
-
-        nDecompose --> nSpawn
-        nSpawn --> nRoute
-        nRoute --> nOrchestrate
-        nOrchestrate <--> nPublish
-        nOrchestrate <--> nConsume
-        nOrchestrate --> nDetect
-        nDetect --> nResolve
-        nOrchestrate --> nScale
-        nScale --> nFire
+        nSprint --> nDAG --> nNode
+        nNode --> nLoop
+        nLoop --> nHandoff
+        nSpawn --> nSprint
+        nLoop --> nConsensus
+        nLoop --> nQuality
+        nHandoff --> nWrite
+        nRead --> nLoop
+        nLoop --> nCheckpoint
+        nLoop --> nFire
+        nLoop --> nScale
     end
 
-    %% Tier 7: Human Kernels
-    subgraph sTier7["Tier 7: Human Kernels (Conscious Observers)"]
+    %% Tier 7
+    subgraph sTier7["Tier 7: Human Kernels (JIT Specialists)"]
         direction LR
-        nAgent1["Agent A<br>(Role: Researcher)"]
-        nAgent2["Agent B<br>(Role: Developer)"]
-        nAgent3["Agent C<br>(Role: Reviewer)"]
-        nAgentN["Agent N<br>(Role: ...)"]
+        nHK1["Sprint 1 Specialist<br>ConsciousObserver.process()"]
+        nHK2["Sprint 2 Specialist A<br>ConsciousObserver.process()"]
+        nHK3["Sprint 2 Specialist B<br>ConsciousObserver.process()"]
+        nHKN["Sprint N Specialist<br>ConsciousObserver.process()"]
     end
 
     %% Connections
-    nGateway --> nDecompose
-    nOrchestrate == "process() calls" ==> sTier7
-    sTier7 == "ConsciousObserverResult" ==> nOrchestrate
-    sTier7 -- "publish_artifact()" --> nPublish
-    nConsume -- "consume_artifacts()" --> sTier7
+    nGateIn --> sWM
+    nGateIn --> sTO
+    nLoop == "process() calls" ==> sTier7
+    sTier7 == "ConsciousObserverResult" ==> nLoop
+    sTier7 -- "write_artifact()" --> nWrite
+    nRead -- "read_artifacts()" --> sTier7
 
     %% Styling
     classDef t9 fill:#064E3B,stroke:#34D399,stroke-width:2px,color:#fff
     classDef t8 fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#fff
     classDef t7 fill:#7C2D12,stroke:#FB923C,stroke-width:1px,color:#fff
 
-    class sTier9,nGateway t9
-    class sTier8,sDecompose,sWorkforce,sRouter,sOrchestrator,sExchange,sConflict t8
-    class nDecompose,nSpawn,nScale,nFire,nRoute,nOrchestrate,nSequence,nPublish,nConsume,nSearch,nDetect,nResolve t8
-    class sTier7,nAgent1,nAgent2,nAgent3,nAgentN t7
+    class sTier9,nGateIn t9
+    class sTier8,sWM,sTO,sSL,sQR t8
+    class nSpawn,nFire,nScale,nSprint,nDAG,nNode,nLoop,nHandoff,nWrite,nRead,nCheckpoint,nConsensus,nQuality t8
+    class sTier7,nHK1,nHK2,nHK3,nHKN t7
 ```
 
 ---
 
 ## Dependency Graph
 
-| Tier | Imports From | Role |
-|------|-------------|------|
-| **T9** | T0 (schemas, config), **T8** (all modules) | Corporate Executive — single entry point |
-| **T8** | T0 (schemas, config, hardware, logging), T1 (classification), T2 (task_decomposition), T3 (graph_synthesizer), T5 (lifecycle_controller), T6 (self_model, activation_router), T7 (ConsciousObserver) | Corporate Operations — workforce & coordination |
-| **T7** | T0, T1-T6 | Human Kernel apex — individual agent |
-
-**Strict Rule**: T8 never imports from T9. T7 never imports from T8 or T9. Information flows downward through function calls and upward through return values.
+| Tier | Imports From | Never Imports |
+|------|-------------|---------------|
+| **T9** | T0, T1, T2, T6, **T8** | T3, T4, T5, T7 (accessed via T8) |
+| **T8** | T0, T1, T2, T3, T4, T5, T6, T7 | T9 (never reverse) |
+| **T7** | T0, T1-T6 | T8, T9 (never upward) |
 
 ---
 
 ## Configuration Requirements
 
-All settings live in `shared/config.py` under a new `CorporateSettings` section:
+All settings in `shared/config.py` under `CorporateSettings`:
 
 ```python
 class CorporateSettings(BaseModel):
     """Tier 8-9 Corporation Kernel settings."""
-
-    # --- Mission Decomposer ---
-    max_mission_chunks: int = 50
-    decomposition_max_depth: int = 3
-    min_chunk_granularity: float = 0.1  # Minimum work unit (fraction of total)
 
     # --- Workforce Manager ---
     max_concurrent_agents: int = 100
     agent_spawn_timeout_ms: float = 5000.0
     agent_idle_timeout_ms: float = 30000.0
     agent_fire_quality_threshold: float = 0.3
-    agent_fire_stall_cycles: int = 10
-    spawn_batch_size: int = 10  # For SWARM mode batch spawning
-    workforce_scale_check_interval_ms: float = 5000.0
-
-    # --- Mission Router ---
-    routing_strategy: str = "skill_first"  # skill_first | load_balanced | priority
-    max_missions_per_agent: int = 3
-    load_rebalance_threshold: float = 0.8  # Rebalance when agent load > 80%
+    spawn_batch_size: int = 10
 
     # --- Team Orchestrator ---
-    orchestration_poll_interval_ms: float = 1000.0
-    max_workflow_depth: int = 10
+    sprint_max_parallel_tasks: int = 10
+    sprint_review_enabled: bool = True
+    corporate_ooda_poll_interval_ms: float = 1000.0
     handoff_timeout_ms: float = 60000.0
-    max_retry_on_agent_failure: int = 2
+    max_sprints_per_mission: int = 20
+    checkpoint_interval_sprints: int = 1
 
-    # --- Artifact Exchange ---
-    artifact_max_size_bytes: int = 10_485_760  # 10 MB
-    artifact_ttl_seconds: int = 3600
-    max_subscriptions_per_agent: int = 20
-    artifact_search_limit: int = 50
+    # --- Shared Ledger ---
+    artifact_max_size_bytes: int = 10_485_760
+    artifact_ttl_seconds: int = 86400
+    checkpoint_ttl_seconds: int = 604800       # 7 days
+    session_ttl_seconds: int = 86400           # 24 hours
 
-    # --- Conflict Resolver ---
-    conflict_detection_threshold: float = 0.7  # Semantic similarity threshold
-    consensus_quorum_pct: float = 0.5  # >50% for majority
+    # --- Quality Resolver ---
+    conflict_similarity_threshold: float = 0.7
+    consensus_quorum_pct: float = 0.5
     arbitration_timeout_ms: float = 30000.0
-    max_escalation_attempts: int = 2
+    quality_gate_threshold: float = 0.6
+
+    # --- Hardware-Aware Scaling ---
+    high_pressure_threshold: float = 0.8
+    swarm_min_agents: int = 10
+    swarm_max_agents_per_core: int = 2
 ```
 
 ---
 
-## Module 1: Mission Decomposer
-
-**Location**: `kernel/mission_decomposer/`
-
-### Overview
-
-The Mission Decomposer is the entry point for Tier 8. When the Corporate Executive (Tier 9) receives a client request, the Mission Decomposer breaks the enterprise objective into **mission chunks** — discrete, agent-assignable units of work.
-
-Each mission chunk specifies: what needs to be done, which skill domain is required, estimated resource budget, and dependencies on other chunks. The decomposition is recursive (up to `config.decomposition_max_depth`) for complex objectives.
-
-**Reuses**: T2 `task_decomposition.decompose_goal()` for goal analysis, T1 `classification.classify()` for domain detection.
-
-### Architecture & Flow
-
-```mermaid
-flowchart TB
-    nInput["MasterObjective<br>(from Tier 9)"]
-    nScope["assess_mission_scope()"]
-    nPartition["partition_by_domain()"]
-    nBudget["estimate_resource_budget()"]
-    nManifest["create_mission_manifest()"]
-    nOutput["MissionManifest<br>(to Workforce Manager)"]
-
-    nInput --> nScope --> nPartition --> nBudget --> nManifest --> nOutput
-
-    classDef t8 fill:#0f172a,stroke:#38bdf8,stroke-width:1px,color:#fff
-    class nScope,nPartition,nBudget,nManifest t8
-```
-
-### Function Decomposition
-
-#### `decompose_mission`
-- **Signature**: `async decompose_mission(objective: MasterObjective, kit: InferenceKit | None = None) -> Result`
-- **Returns**: `Result` containing `MissionManifest`
-- **Description**: Top-level entry point. Assesses the scope of the enterprise objective, partitions it into domain-specific mission chunks, estimates resource budgets for each, and assembles the final manifest. The manifest tells the Workforce Manager exactly what agents to spawn and what each should do.
-- **Calls**: `assess_mission_scope()`, `partition_by_domain()`, `estimate_resource_budget()`, `create_mission_manifest()`
-
-#### `assess_mission_scope`
-- **Signature**: `async assess_mission_scope(objective: MasterObjective, kit: InferenceKit | None = None) -> MissionScope`
-- **Description**: Analyzes the enterprise objective to determine its complexity, domain breadth, estimated workforce size, and recommended scaling mode (SOLO/TEAM/SWARM). Uses T1 classification for domain detection and T2 task decomposition for complexity analysis.
-- **Calls**: T1 `classify()`, T2 `decompose_goal()`, T6 `classify_signal_complexity()`
-
-#### `partition_by_domain`
-- **Signature**: `async partition_by_domain(objective: MasterObjective, scope: MissionScope, kit: InferenceKit | None = None) -> list[MissionChunk]`
-- **Description**: Splits the objective into domain-specific chunks. Each chunk represents a coherent body of work for a single role (e.g., frontend development, data analysis, code review). Respects dependency ordering — if chunk B depends on chunk A's output, this is captured in the `depends_on` field.
-- **Calls**: T2 `decompose_goal()` for sub-task extraction
-
-#### `estimate_resource_budget`
-- **Signature**: `estimate_resource_budget(chunks: list[MissionChunk], scope: MissionScope) -> list[MissionChunk]`
-- **Description**: Enriches each mission chunk with estimated resource budgets (token budget, cost budget, time budget). Uses the scope assessment to distribute the overall budget proportionally. Returns the same chunks with budget fields populated.
-- **Calls**: Config-driven budget allocation formulas
-
-#### `create_mission_manifest`
-- **Signature**: `create_mission_manifest(objective: MasterObjective, scope: MissionScope, chunks: list[MissionChunk]) -> MissionManifest`
-- **Description**: Assembles the final manifest that bundles the objective, scope assessment, and all mission chunks into a single document. The manifest is the contract between Mission Decomposer and Workforce Manager.
-- **Calls**: Pure assembly, no external calls
-
-### Types
-
-```python
-class ScalingMode(StrEnum):
-    """How many agents the corporation should deploy."""
-    SOLO = "solo"       # 1 agent — simple tasks, conversations
-    TEAM = "team"       # 2-10 agents — multi-domain projects
-    SWARM = "swarm"     # 10-100K agents — volume/repetitive work
-
-class MissionScope(BaseModel):
-    """Assessment of an enterprise objective's scale and requirements."""
-    objective_id: str
-    complexity: ComplexityLevel         # TRIVIAL/SIMPLE/MODERATE/COMPLEX/CRITICAL (from T6)
-    domain_breadth: int                 # Number of distinct skill domains needed
-    estimated_agent_count: int          # Recommended workforce size
-    scaling_mode: ScalingMode           # SOLO/TEAM/SWARM
-    is_repetitive: bool                 # Same pipeline, different data?
-    requires_sequential: bool           # Must chunks execute in order?
-    estimated_total_tokens: int         # Total token budget estimate
-    estimated_total_cost: float         # Total cost budget estimate
-    domains_detected: list[str]         # e.g. ["backend", "frontend", "devops"]
-
-class MissionChunk(BaseModel):
-    """A discrete, agent-assignable unit of work."""
-    chunk_id: str
-    parent_objective_id: str
-    domain: str                         # Skill domain (e.g., "backend_development")
-    sub_objective: str                  # What this agent should accomplish
-    required_skills: list[str]          # Skills needed (maps to CognitiveProfile)
-    required_tools: list[str]           # MCP tool categories needed
-    depends_on: list[str]              # chunk_ids that must complete first
-    priority: int                       # 0 = highest priority
-    token_budget: int                   # Allocated tokens
-    cost_budget: float                  # Allocated cost
-    time_budget_ms: float              # Allocated wall-clock time
-    is_parallelizable: bool            # Can run concurrently with peers?
-    pipeline_template_id: str | None   # For SWARM mode: shared pipeline reference
-    input_data: dict[str, Any] | None  # For SWARM mode: partition-specific data
-
-class MissionManifest(BaseModel):
-    """Complete work breakdown for an enterprise objective."""
-    manifest_id: str
-    objective: MasterObjective
-    scope: MissionScope
-    chunks: list[MissionChunk]
-    execution_order: list[list[str]]   # Topologically sorted chunk_ids (parallel groups)
-    total_estimated_cost: float
-    total_estimated_tokens: int
-    created_utc: str
-
-class MasterObjective(BaseModel):
-    """Enterprise-level goal submitted by a client or Tier 9."""
-    objective_id: str
-    description: str                    # Natural language description of the goal
-    client_id: str                      # Who requested this
-    session_id: str                     # Conversation session
-    constraints: list[str]             # Hard constraints (e.g., "must use Python")
-    deadline_utc: str | None           # Optional deadline
-    budget_limit: float | None         # Optional cost cap
-    context: dict[str, Any] | None     # Additional context from Memory Cortex
-```
-
----
-
-## Module 2: Workforce Manager
+## Module 1: Workforce Manager
 
 **Location**: `kernel/workforce_manager/`
 
 ### Overview
 
-The Workforce Manager is the HR Department of the Corporation Kernel. It handles the full lifecycle of Human Kernels: spawning new agents, monitoring their performance, scaling the workforce up or down, and terminating underperforming or idle agents.
+The Workforce Manager handles the full lifecycle of Human Kernels through **JIT specialist hiring**. Unlike traditional agent pools with general-purpose agents, the Workforce Manager hires domain specialists on-demand, gets the job done, fires them, and hires the next specialist.
 
-**Key Innovation — Hire/Fire System**: Unlike static agent pools, the Workforce Manager continuously evaluates agent performance (quality scores from Gate-Out, latency, resource consumption, conflict rate) and makes dynamic staffing decisions:
-- **Hire**: When workload exceeds capacity, a new skill domain is needed, or an agent fails and needs replacement
-- **Fire**: When an agent is idle beyond threshold, consistently produces low-quality output, exceeds its budget, or gets stuck (CLM ABORT)
-- **Reassign**: When priorities shift, agents can be reassigned to higher-priority missions
+**Composition**: T5 `lifecycle_controller` (genesis/termination), T5 `energy_and_interrupts` (budget), T6 `self_model` (capability), T1 `scoring` (skill matching), `shared/hardware` (resource limits).
 
-**Reuses**: T5 `lifecycle_controller.initialize_agent()` for agent genesis, T0 `shared.hardware` for resource detection.
-
-### Architecture & Flow
+### JIT Specialist Lifecycle
 
 ```mermaid
-flowchart TB
-    nManifest["MissionManifest<br>(from Mission Decomposer)"]
+sequenceDiagram
+    participant TO as Team Orchestrator
+    participant WM as Workforce Manager
+    participant T5 as T5 lifecycle_controller
+    participant T5E as T5 energy_and_interrupts
+    participant HW as shared/hardware
+    participant HK as Human Kernel (T7)
+    participant SL as Shared Ledger (Vault)
 
-    subgraph sWorkforce["Workforce Manager"]
-        direction TB
-        nCheck["check_resources()<br>(Hardware capacity)"]
-        nSpawn["spawn_agent()<br>(Create Human Kernel)"]
-        nPool["WorkforcePool<br>(Active agent registry)"]
-        nMonitor["evaluate_performance()<br>(Quality tracking)"]
-        nScale["scale_workforce()<br>(Dynamic sizing)"]
-        nFire["fire_agent()<br>(Terminate underperformer)"]
-        nReassign["reassign_agent()<br>(Shift priorities)"]
+    Note over WM: === HIRE ===
+    TO->>WM: hire_specialist(chunk, profile_id)
+    WM->>HW: get_hardware_profile()
+    HW-->>WM: ResourceProfile (RAM, CPU, GPU)
+    WM->>WM: can_spawn?(pool, resources) → check limits
+    WM->>T5: initialize_agent(spawn_request)
+    T5->>T5: load_cognitive_profile(profile_id)
+    T5->>T5: set_identity_constraints(objective, budget)
+    T5-->>WM: AgentHandle (initialized, not started)
 
-        nCheck --> nSpawn --> nPool
-        nPool --> nMonitor
-        nMonitor --> nScale
-        nScale --> nSpawn
-        nScale --> nFire
-        nMonitor --> nReassign
-    end
+    Note over WM: === TASK ===
+    TO->>HK: ConsciousObserver.process(raw_input, spawn_request)
+    HK-->>TO: ConsciousObserverResult
 
-    nManifest --> nCheck
-    nPool --> nOutput["list[AgentHandle]<br>(to Mission Router)"]
+    Note over WM: === FIRE ===
+    TO->>WM: fire_specialist(handle, reason=MISSION_COMPLETE)
+    WM->>HK: Collect partial output (if any)
+    WM->>SL: write_artifact(agent_output) → persist to Vault
+    WM->>T5: control_sleep_wake(handle, TERMINATE)
+    WM->>WM: pool.remove(handle)
 
-    classDef t8 fill:#0f172a,stroke:#38bdf8,stroke-width:1px,color:#fff
-    class sWorkforce,nCheck,nSpawn,nPool,nMonitor,nScale,nFire,nReassign t8
+    Note over WM: === HANDOFF ===
+    Note over SL: Artifacts now in Vault for next specialist
+    TO->>WM: hire_specialist(next_chunk, next_profile_id)
+    Note over WM: New specialist reads predecessor's artifacts from Vault
 ```
 
 ### Function Decomposition
 
-#### `spawn_agent`
-- **Signature**: `async spawn_agent(chunk: MissionChunk, profile: CognitiveProfile, pool: WorkforcePool, kit: InferenceKit | None = None) -> AgentHandle`
-- **Description**: Creates a new Human Kernel (Tier 7 Conscious Observer instance) with the specified cognitive profile and mission assignment. Each agent is fully isolated — its own identity context, short-term memory, and resource budget. Returns an `AgentHandle` for lifecycle management. The agent is initialized but NOT started — the Team Orchestrator dispatches it.
-- **Calls**: T5 `initialize_agent()`, T5 `load_cognitive_profile()`, T5 `set_identity_constraints()`
+#### `hire_specialist`
+- **Signature**: `async hire_specialist(chunk: MissionChunk, profile_id: str, pool: WorkforcePool, kit: InferenceKit | None = None) -> AgentHandle`
+- **Description**: JIT hiring of a domain specialist. Checks hardware resources via `shared/hardware.get_hardware_profile()`, then delegates to T5 `initialize_agent()` + `load_cognitive_profile()` + `set_identity_constraints()`. The agent is created with a specific mission, budget, and identity — NOT a general-purpose agent.
+- **Composes**: T5 `initialize_agent()`, T5 `load_cognitive_profile()`, T5 `set_identity_constraints()`, `shared/hardware`
 
-#### `spawn_batch`
-- **Signature**: `async spawn_batch(chunks: list[MissionChunk], profiles: list[CognitiveProfile], pool: WorkforcePool, kit: InferenceKit | None = None) -> list[AgentHandle]`
-- **Description**: Batch spawning for SWARM mode. Creates N identical agents from the same cognitive profile but with different input data partitions. Uses hardware-aware concurrency to avoid overwhelming the system. Spawns in batches of `config.spawn_batch_size`.
-- **Calls**: `spawn_agent()` in parallel batches, `check_resources()` between batches
+#### `fire_specialist`
+- **Signature**: `async fire_specialist(handle: AgentHandle, reason: TerminationReason, pool: WorkforcePool) -> TerminationReport`
+- **Description**: Graceful termination. Collects any partial output, persists work artifacts to Vault via Shared Ledger, sends TERMINATE signal via T5 `control_sleep_wake()`, removes from pool. Freed resources are immediately available for next specialist.
+- **Composes**: T5 `control_sleep_wake(TERMINATE)`, `shared_ledger.write_artifact()`
 
-#### `fire_agent`
-- **Signature**: `async fire_agent(handle: AgentHandle, reason: TerminationReason, pool: WorkforcePool) -> TerminationReport`
-- **Description**: Gracefully terminates a Human Kernel. Collects any partial output before shutdown, persists the agent's work to Vault, removes from pool, and frees resources. If the agent was mid-mission, the mission is returned to the routing queue for reassignment.
-- **Calls**: T5 `control_sleep_wake()` with TERMINATE signal, Vault persistence
+#### `hire_batch`
+- **Signature**: `async hire_batch(chunks: list[MissionChunk], profile_ids: list[str], pool: WorkforcePool, kit: InferenceKit | None = None) -> list[AgentHandle]`
+- **Description**: SWARM mode batch hiring. Spawns N identical specialists in batches of `config.spawn_batch_size`, checking hardware pressure between batches via `shared/hardware.memory_pressure()`. If pressure exceeds threshold, queues remaining for sequential spawning.
+- **Composes**: `hire_specialist()` in parallel batches, `shared/hardware.memory_pressure()`
 
 #### `scale_workforce`
-- **Signature**: `async scale_workforce(pool: WorkforcePool, manifest: MissionManifest, performance: list[PerformanceReport]) -> list[ScaleDecision]`
-- **Description**: Evaluates whether the workforce needs to grow or shrink. Considers: pending mission queue depth, agent utilization rates, quality trends, resource availability, and budget remaining. Returns a list of scale decisions (SPAWN_MORE, TERMINATE_IDLE, REASSIGN, NO_CHANGE).
-- **Calls**: `check_resources()`, config-driven scaling thresholds
+- **Signature**: `async scale_workforce(pool: WorkforcePool, pending_chunks: list[MissionChunk], performance: list[PerformanceSnapshot]) -> list[ScaleDecision]`
+- **Description**: Dynamic scaling decisions. Checks: pending work queue, agent utilization, hardware resources, budget remaining. Returns decisions: HIRE_MORE (queue growing), FIRE_IDLE (agent idle > threshold), REASSIGN (priority shift), HOLD (stable). Uses T5 `check_budget_exhaustion()` for budget awareness.
+- **Composes**: `shared/hardware.safe_parallel_limit()`, T5 `check_budget_exhaustion()`, config thresholds
+
+#### `match_specialist`
+- **Signature**: `match_specialist(chunk: MissionChunk, available_profiles: list[CognitiveProfile]) -> ProfileMatch`
+- **Description**: Finds the best specialist profile for a mission chunk. Uses T1 `scoring.score()` to evaluate skill overlap between chunk requirements and profile capabilities. Returns the highest-scoring match. If no match exceeds threshold, returns `requires_new_profile = True`.
+- **Composes**: T1 `scoring.score()` for skill evaluation
 
 #### `evaluate_performance`
-- **Signature**: `evaluate_performance(handle: AgentHandle, results: list[ConsciousObserverResult]) -> PerformanceReport`
-- **Description**: Calculates an agent's performance score from its Gate-Out results. Tracks: average quality score (from noise gate), average confidence (from calibrator), grounding rate (from hallucination monitor), latency, resource consumption, and conflict participation rate. The report drives hire/fire decisions.
-- **Calls**: Pure computation over `ConsciousObserverResult` fields
-
-#### `check_resources`
-- **Signature**: `async check_resources(required_agents: int) -> ResourceAvailability`
-- **Description**: Queries T0 hardware detection to determine if the system can support spawning additional agents. Checks RAM, CPU cores, GPU availability, and config-driven limits. Returns availability status and recommended batch size.
-- **Calls**: T0 `shared.hardware` detection
-
-#### `reassign_agent`
-- **Signature**: `async reassign_agent(handle: AgentHandle, new_chunk: MissionChunk, pool: WorkforcePool) -> AgentHandle`
-- **Description**: Reassigns an active agent to a different mission. Preserves the agent's identity but updates its objective, budget, and mission context. Used when priorities shift or when an agent completes its mission and can be reused for another.
-- **Calls**: T7 `ConsciousObserver.process()` with updated `SpawnRequest`
-
-#### `get_pool_status`
-- **Signature**: `get_pool_status(pool: WorkforcePool) -> PoolStatusReport`
-- **Description**: Returns a real-time snapshot of the entire workforce: how many agents are active, idle, completed, failed; aggregate quality metrics; resource utilization; and budget consumption. Used by Corporate Monitor (Tier 9) for progress reporting.
-- **Calls**: Pure aggregation over pool state
+- **Signature**: `evaluate_performance(handle: AgentHandle, result: ConsciousObserverResult) -> PerformanceSnapshot`
+- **Description**: Extracts performance metrics from a Human Kernel's Gate-Out result. Quality score (from noise gate), confidence (from calibrator), grounding rate (from hallucination monitor), latency, cost. Pure extraction — no new computation logic.
+- **Composes**: Direct field access on `ConsciousObserverResult`
 
 ### Types
 
 ```python
+class MissionChunk(BaseModel):
+    """A discrete, agent-assignable unit of work."""
+    chunk_id: str
+    parent_objective_id: str
+    domain: str                         # Skill domain (e.g., "backend_development")
+    sub_objective: str                  # What this specialist should accomplish
+    required_skills: list[str]          # Maps to CognitiveProfile.skills
+    required_tools: list[str]           # MCP tool categories needed
+    depends_on: list[str]              # chunk_ids that must complete first
+    sprint_number: int                  # Which sprint this chunk belongs to
+    priority: int                       # 0 = highest
+    token_budget: int
+    cost_budget: float
+    time_budget_ms: float
+    is_parallelizable: bool
+    pipeline_template_id: str | None   # For SWARM: shared pipeline reference
+    input_data: dict[str, Any] | None  # For SWARM: partition-specific data
+    predecessor_artifact_ids: list[str] # Vault artifact IDs from prior sprints
+
 class AgentHandle(BaseModel):
-    """Reference to a spawned Human Kernel with lifecycle metadata."""
+    """Reference to a hired specialist."""
     agent_id: str
     profile_id: str
-    role_name: str
-    mission_chunk_id: str
+    role_name: str                      # e.g., "Backend Developer"
+    chunk_id: str
     status: AgentStatus
-    spawn_utc: str
-    last_heartbeat_utc: str
-    resource_usage: ResourceUsage
-    quality_score: float               # Rolling average from Gate-Out
-    total_cycles: int
+    hired_utc: str
+    quality_score: float
     total_cost: float
 
 class AgentStatus(StrEnum):
     INITIALIZING = "initializing"
-    IDLE = "idle"
     ACTIVE = "active"
-    BLOCKED = "blocked"
     COMPLETED = "completed"
     FAILED = "failed"
     TERMINATED = "terminated"
 
 class WorkforcePool(BaseModel):
-    """Registry of all active and recently terminated agents."""
+    """Registry of all active and terminated specialists."""
     pool_id: str
-    mission_manifest_id: str
-    agents: dict[str, AgentHandle]     # agent_id -> handle
-    pending_missions: list[MissionChunk]
-    completed_missions: list[str]      # chunk_ids
-    total_spawned: int
-    total_terminated: int
-    total_cost_consumed: float
+    mission_id: str
+    agents: dict[str, AgentHandle]     # agent_id → handle
+    total_hired: int
+    total_fired: int
+    total_cost: float
     budget_remaining: float
 
 class TerminationReason(StrEnum):
-    MISSION_COMPLETE = "mission_complete"
-    IDLE_TIMEOUT = "idle_timeout"
-    LOW_QUALITY = "low_quality"
-    BUDGET_EXCEEDED = "budget_exceeded"
-    STALLED = "stalled"
-    RESOURCE_PRESSURE = "resource_pressure"
-    MANUAL_TERMINATION = "manual_termination"
-    REPLACED = "replaced"
-
-class TerminationReport(BaseModel):
-    """Record of an agent termination for audit trail."""
-    agent_id: str
-    reason: TerminationReason
-    partial_output: str | None
-    total_cycles: int
-    total_cost: float
-    quality_score: float
-    terminated_utc: str
-
-class PerformanceReport(BaseModel):
-    """Performance metrics for a single agent."""
-    agent_id: str
-    avg_quality_score: float           # From noise gate (0.0 - 1.0)
-    avg_confidence: float              # From confidence calibrator
-    grounding_rate: float              # From hallucination monitor (0.0 - 1.0)
-    avg_cycle_latency_ms: float
-    total_cost: float
-    conflict_count: int
-    missions_completed: int
-    is_underperforming: bool           # Below config.agent_fire_quality_threshold
-
-class ResourceAvailability(BaseModel):
-    """Hardware resource check result."""
-    can_spawn: bool
-    max_additional_agents: int
-    ram_available_mb: float
-    cpu_cores_available: int
-    gpu_available: bool
-    recommended_batch_size: int
-    reason: str | None                 # If can_spawn is False
-
-class ResourceUsage(BaseModel):
-    """Per-agent resource consumption."""
-    tokens_consumed: int
-    cost_consumed: float
-    ram_mb: float
-    cpu_time_ms: float
-    wall_clock_ms: float
+    MISSION_COMPLETE = "mission_complete"    # Normal: task done
+    IDLE_TIMEOUT = "idle_timeout"            # Idle too long
+    LOW_QUALITY = "low_quality"              # Below threshold
+    BUDGET_EXCEEDED = "budget_exceeded"      # Over budget
+    STALLED = "stalled"                      # CLM detected stall
+    REPLACED = "replaced"                    # Better specialist available
+    MISSION_ABORTED = "mission_aborted"      # Client cancelled
 
 class ScaleDecision(BaseModel):
-    """Workforce scaling decision."""
     action: ScaleAction
-    target_agent_id: str | None        # For TERMINATE/REASSIGN
-    target_chunk_id: str | None        # For SPAWN/REASSIGN
+    target_agent_id: str | None
+    target_chunk_id: str | None
     reason: str
 
 class ScaleAction(StrEnum):
-    SPAWN_MORE = "spawn_more"
-    TERMINATE_IDLE = "terminate_idle"
+    HIRE_MORE = "hire_more"
+    FIRE_IDLE = "fire_idle"
     REASSIGN = "reassign"
-    NO_CHANGE = "no_change"
-
-class PoolStatusReport(BaseModel):
-    """Aggregate workforce status for monitoring."""
-    pool_id: str
-    total_agents: int
-    active_agents: int
-    idle_agents: int
-    completed_agents: int
-    failed_agents: int
-    avg_quality_score: float
-    total_cost_consumed: float
-    budget_remaining: float
-    missions_completed: int
-    missions_pending: int
-    missions_in_progress: int
-    resource_utilization_pct: float
-```
-
----
-
-## Module 3: Mission Router
-
-**Location**: `kernel/mission_router/`
-
-### Overview
-
-The Mission Router is the Dispatch Center of the corporation. Once agents are spawned and missions defined, the Router decides _which agent gets which mission_. It matches mission requirements to agent capabilities using three routing strategies:
-
-1. **Skill-First** (default): Best skill match takes priority. A mission requiring "backend_development" goes to the agent with the strongest backend profile.
-2. **Load-Balanced**: Distribute work evenly across agents to prevent bottlenecks.
-3. **Priority**: High-priority missions are assigned first to the most capable available agents.
-
-The Router also handles **rebalancing** — when an agent becomes overloaded or fails, it redistributes that agent's missions to others.
-
-**Reuses**: T6 `self_model.assess_capability()` for capability matching.
-
-### Function Decomposition
-
-#### `route_mission`
-- **Signature**: `async route_mission(chunk: MissionChunk, pool: WorkforcePool, strategy: RoutingStrategy | None = None) -> MissionAssignment`
-- **Description**: Assigns a single mission chunk to the best available agent. Evaluates all agents in the pool against the mission's skill requirements, current load, and priority. Returns a `MissionAssignment` binding the chunk to a specific agent. If no suitable agent exists, returns an assignment with `requires_new_spawn = True`.
-- **Calls**: `match_profile()`, `select_agent()`, config for default strategy
-
-#### `route_all`
-- **Signature**: `async route_all(manifest: MissionManifest, pool: WorkforcePool) -> list[MissionAssignment]`
-- **Description**: Routes all mission chunks from a manifest to agents in the pool, respecting dependency ordering (chunks in the same parallel group can be assigned concurrently). For SWARM mode, uses round-robin distribution across identical workers.
-- **Calls**: `route_mission()` per chunk, respecting `execution_order`
-
-#### `match_profile`
-- **Signature**: `match_profile(chunk: MissionChunk, handle: AgentHandle) -> ProfileMatch`
-- **Description**: Calculates a compatibility score between a mission chunk's requirements and an agent's cognitive profile. Considers skill overlap, tool availability, domain expertise, and current workload. Returns a score (0.0-1.0) and a breakdown of matching criteria.
-- **Calls**: Pure computation
-
-#### `select_agent`
-- **Signature**: `select_agent(matches: list[ProfileMatch], strategy: RoutingStrategy) -> AgentHandle | None`
-- **Description**: Given a list of profile matches, selects the best agent according to the routing strategy. Skill-first picks the highest skill match. Load-balanced picks the least-loaded agent above a minimum skill threshold. Priority picks the agent that can start soonest.
-- **Calls**: Pure selection logic
-
-#### `rebalance_load`
-- **Signature**: `async rebalance_load(pool: WorkforcePool, threshold: float | None = None) -> list[MissionAssignment]`
-- **Description**: Checks all agents for load imbalance (any agent above `config.load_rebalance_threshold`). If imbalance detected, redistributes pending missions from overloaded agents to underloaded ones. Returns new assignment list for redistributed missions.
-- **Calls**: `route_mission()` for each redistributed chunk
-
-### Types
-
-```python
-class RoutingStrategy(StrEnum):
-    SKILL_FIRST = "skill_first"
-    LOAD_BALANCED = "load_balanced"
-    PRIORITY = "priority"
-
-class MissionAssignment(BaseModel):
-    """Binding of a mission chunk to a specific agent."""
-    assignment_id: str
-    chunk_id: str
-    agent_id: str
-    profile_match_score: float
-    assigned_utc: str
-    requires_new_spawn: bool           # True if no suitable agent exists
+    HOLD = "hold"
 
 class ProfileMatch(BaseModel):
-    """Compatibility score between a mission and an agent."""
-    agent_id: str
+    agent_profile_id: str
     chunk_id: str
-    skill_overlap_score: float         # 0.0-1.0
-    tool_availability_score: float     # 0.0-1.0
-    domain_match_score: float          # 0.0-1.0
-    current_load_pct: float            # Agent's current utilization
-    composite_score: float             # Weighted combination
+    skill_score: float                  # From T1 scoring
+    composite_score: float
+    requires_new_profile: bool
+
+class PerformanceSnapshot(BaseModel):
+    agent_id: str
+    quality_score: float               # From noise gate
+    confidence: float                  # From calibrator
+    grounding_rate: float              # From hallucination monitor
+    latency_ms: float
+    cost: float
 ```
 
 ---
 
-## Module 4: Team Orchestrator
+## Module 2: Team Orchestrator
 
 **Location**: `kernel/team_orchestrator/`
 
 ### Overview
 
-The Team Orchestrator is the Operations Director. Once missions are assigned to agents, the Orchestrator manages the _execution flow_: dispatching work, tracking progress, sequencing handoffs between agents (e.g., Developer finishes -> Reviewer starts), handling agent failures, and driving the overall mission to completion.
+The Team Orchestrator is the **project manager** of the corporation. It uses **sprint-based execution** — a project management methodology inspired by Scrum — where work is organized into sprints, each sprint containing a set of parallelizable tasks.
 
-The Orchestrator builds a **Workflow DAG** — a directed acyclic graph where each node is an agent's mission and edges represent dependencies and handoff sequences. It then executes this DAG, monitoring each agent's progress and reacting to events (completion, failure, stall).
+**Key Innovation — Corporate OODA Loop**: The Team Orchestrator runs a monitoring loop modeled after T4's OODA Loop, but at corporate scale:
+- **Observe**: Poll agent statuses via heartbeats
+- **Orient**: Contextualize via corporate ShortTermMemory (sprint state, events)
+- **Decide**: CONTINUE / HANDOFF / FIRE_AND_REPLACE / CHECKPOINT / ABORT
+- **Act**: Execute the decision (fire agent, spawn replacement, advance sprint)
 
-**Key Pattern**: The Orchestrator uses a **controlled monitoring loop** (similar to how Tier 7 uses per-cycle CLM interception). After each poll interval, it checks all agent statuses, handles events, and decides next actions.
+After every cycle, T6 `cognitive_load_monitor.monitor_cognitive_load()` checks for stalls, loops, and goal drift at the corporate level.
 
-**Reuses**: T3 `graph_synthesizer` concepts for DAG construction, T5 lifecycle signals for agent management.
+**Composition**: T3 `graph_synthesizer` (DAG), T3 `advanced_planning` (sprints), T3 `node_assembler` (nodes), T4 OODA pattern (loop), T4 `ShortTermMemory` (state), T6 `cognitive_load_monitor` (health).
 
-### Architecture & Flow
+### Sprint-Based Execution Flow
 
 ```mermaid
 flowchart TB
-    subgraph sOrchestrator["Team Orchestrator"]
-        direction TB
-        nBuild["build_workflow_dag()"]
-        nDispatch["dispatch_missions()"]
-
-        subgraph sLoop["Orchestration Loop"]
-            nPoll["poll_agent_statuses()"]
-            nEvent["handle_event()"]
-            nSequence["sequence_handoff()"]
-            nCheck["check_completion()"]
-
-            nPoll --> nEvent --> nSequence --> nCheck
-            nCheck -- "NOT DONE" --> nPoll
-        end
-
-        nBuild --> nDispatch --> sLoop
-        nCheck -- "ALL DONE" --> nCollect["collect_team_results()"]
+    subgraph sPlan["Sprint Planning (T3 advanced_planning)"]
+        nDecompose["T2 decompose_goal()<br>→ list[SubTaskItem]"]
+        nSequence["T3 sequence_and_prioritize()<br>→ Ordered + grouped by dependency"]
+        nGroup["Group into Sprints<br>(Level 0 = Sprint 1, Level 1 = Sprint 2, ...)"]
     end
 
+    subgraph sBuild["Sprint DAG Building (T3 graph_synthesizer + node_assembler)"]
+        nNodes["T3 assemble_node() per chunk<br>→ ExecutableNode wrapping ConsciousObserver.process()"]
+        nDAG["T3 compile_dag(nodes, edges)<br>→ ExecutableDAG for current sprint"]
+    end
+
+    subgraph sExec["Sprint Execution (Corporate OODA Loop)"]
+        nHire["Workforce Manager: hire_specialist() per node"]
+        nDispatch["Dispatch: ConsciousObserver.process() per agent"]
+
+        subgraph sOODA["Corporate OODA Cycle"]
+            nObserve["Observe: Poll agent statuses"]
+            nOrient["Orient: Corporate STM context"]
+            nDecide["Decide: CONTINUE / HANDOFF / FIRE / CHECKPOINT"]
+            nAct["Act: Execute decision"]
+            nCLM["T6 CLM: monitor_cognitive_load()"]
+
+            nObserve --> nOrient --> nDecide --> nAct --> nCLM
+            nCLM -- "CONTINUE" --> nObserve
+        end
+
+        nHire --> nDispatch --> sOODA
+    end
+
+    subgraph sReview["Sprint Review (T3 reflection_and_guardrails)"]
+        nReview["T3 critique_execution()<br>→ Sprint retrospective"]
+        nCheck["T3 run_pre_execution_check()<br>→ Conscience gate for next sprint"]
+        nCheckpoint["shared_ledger.write_checkpoint()<br>→ Persist state to Vault"]
+    end
+
+    sPlan --> sBuild --> sExec --> sReview
+    sReview -- "Next Sprint" --> sBuild
+    sReview -- "All Sprints Done" --> nComplete["Mission Complete → Gate-Out"]
+
+    nCLM -- "ESCALATE/ABORT" --> sReview
+
     classDef t8 fill:#0f172a,stroke:#38bdf8,stroke-width:1px,color:#fff
-    class sOrchestrator,sLoop,nBuild,nDispatch,nPoll,nEvent,nSequence,nCheck,nCollect t8
+    class sPlan,sBuild,sExec,sOODA,sReview t8
+    class nDecompose,nSequence,nGroup,nNodes,nDAG,nHire,nDispatch,nObserve,nOrient,nDecide,nAct,nCLM,nReview,nCheck,nCheckpoint,nComplete t8
 ```
 
 ### Function Decomposition
 
-#### `orchestrate_team`
-- **Signature**: `async orchestrate_team(assignments: list[MissionAssignment], manifest: MissionManifest, pool: WorkforcePool, exchange: ArtifactExchangeState, kit: InferenceKit | None = None) -> TeamResult`
-- **Description**: Top-level team coordination loop. Builds the workflow DAG from the manifest's execution order, dispatches initial missions, then enters the monitoring loop. Handles completions, failures, handoffs, and dynamic scaling events until all missions are done or the mission is aborted. Returns the aggregated `TeamResult`.
-- **Calls**: `build_workflow_dag()`, `dispatch_missions()`, `poll_agent_statuses()`, `handle_event()`, `sequence_handoff()`, `check_completion()`, `collect_team_results()`
+#### `orchestrate_mission`
+- **Signature**: `async orchestrate_mission(chunks: list[MissionChunk], pool: WorkforcePool, ledger: SharedLedgerClient, kit: InferenceKit | None = None) -> MissionResult`
+- **Description**: Top-level orchestration. Groups chunks into sprints via T3 `sequence_and_prioritize()`, then executes each sprint sequentially. Within each sprint, tasks run in parallel. After each sprint, runs review and checkpoint. Returns aggregated results from all sprints.
+- **Composes**: `plan_sprints()`, `execute_sprint()`, `review_sprint()`, `shared_ledger.write_checkpoint()`
 
-#### `build_workflow_dag`
-- **Signature**: `build_workflow_dag(manifest: MissionManifest, assignments: list[MissionAssignment]) -> WorkflowDAG`
-- **Description**: Constructs the corporate workflow DAG from mission chunks and their dependencies. Each node represents an agent's mission. Edges represent data dependencies (sequential) or independence (parallel). The DAG respects the topological ordering from the manifest.
-- **Calls**: T3 `graph_synthesizer` patterns (reused, not called directly)
+#### `plan_sprints`
+- **Signature**: `async plan_sprints(chunks: list[MissionChunk], kit: InferenceKit | None = None) -> list[Sprint]`
+- **Description**: Groups mission chunks into sprints by dependency level. Uses T3 `sequence_and_prioritize()` for topological ordering. Sprint 1 = chunks with no dependencies (parallel). Sprint 2 = chunks depending on Sprint 1 outputs (parallel). Etc.
+- **Composes**: T3 `advanced_planning.sequence_and_prioritize()`, T2 `decompose_goal()` (if further decomposition needed)
 
-#### `dispatch_missions`
-- **Signature**: `async dispatch_missions(dag: WorkflowDAG, pool: WorkforcePool, exchange: ArtifactExchangeState) -> list[DispatchResult]`
-- **Description**: Kicks off execution for all ready missions (no unmet dependencies). For each dispatched mission, creates the appropriate subscriptions on the Artifact Exchange and invokes the agent's `ConsciousObserver.process()`. Missions with unmet dependencies remain pending until their predecessors complete.
-- **Calls**: T7 `ConsciousObserver.process()` per agent, `artifact_exchange.subscribe_topic()`
+#### `build_sprint_dag`
+- **Signature**: `build_sprint_dag(sprint: Sprint) -> ExecutableDAG`
+- **Description**: Builds a DAG for a single sprint. Each chunk becomes an `ExecutableNode` via T3 `assemble_node()`, wrapping `ConsciousObserver.process()` as the action callable. Nodes within the sprint run in parallel (parallel group). Dependencies to prior sprints are handled via Vault artifacts (not DAG edges).
+- **Composes**: T3 `node_assembler.assemble_node()`, T3 `graph_synthesizer.compile_dag()`
 
-#### `poll_agent_statuses`
-- **Signature**: `async poll_agent_statuses(pool: WorkforcePool) -> list[AgentEvent]`
-- **Description**: Polls all active agents for status updates. Detects completions, failures, stalls, and progress changes. Returns a list of events to be processed by `handle_event()`. Poll interval is config-driven.
-- **Calls**: Agent status inspection, heartbeat checks
+#### `execute_sprint`
+- **Signature**: `async execute_sprint(sprint: Sprint, dag: ExecutableDAG, pool: WorkforcePool, ledger: SharedLedgerClient, kit: InferenceKit | None = None) -> SprintResult`
+- **Description**: Hires specialists, dispatches them, then runs the Corporate OODA Loop until all nodes complete or abort. The OODA loop polls agent statuses, handles events (completion, failure, stall), sequences handoffs, and checks corporate cognitive load via T6 CLM.
+- **Composes**: `workforce_manager.hire_specialist()`, T7 `ConsciousObserver.process()`, `run_corporate_ooda()`, T5 `energy_and_interrupts.track_budget()`
 
-#### `handle_event`
-- **Signature**: `async handle_event(event: AgentEvent, dag: WorkflowDAG, pool: WorkforcePool, exchange: ArtifactExchangeState) -> EventAction`
-- **Description**: Processes a single agent event and decides the appropriate action:
-  - **COMPLETED**: Mark node done in DAG, publish artifacts, check for handoff triggers
-  - **FAILED**: Retry if budget allows, otherwise fire agent and respawn replacement
-  - **STALLED**: Signal agent with CLM recommendation, fire if persistent
-  - **PROGRESS**: Update tracking metrics
-- **Calls**: `sequence_handoff()`, `workforce_manager.fire_agent()`, `workforce_manager.spawn_agent()`, `artifact_exchange.publish_artifact()`
+#### `run_corporate_ooda`
+- **Signature**: `async run_corporate_ooda(dag: ExecutableDAG, pool: WorkforcePool, stm: ShortTermMemory, ledger: SharedLedgerClient, kit: InferenceKit | None = None) -> CorporateOODAResult`
+- **Description**: The corporate monitoring loop, modeled after T4's OODA pattern:
+  - **Observe**: Poll agent heartbeats, collect completion/failure events, push to corporate STM
+  - **Orient**: Contextualize events using STM (which agents completed, which blocked, progress %)
+  - **Decide**: Based on oriented state: CONTINUE (keep waiting), HANDOFF (advance workflow), FIRE_AND_REPLACE (agent failed/stalled), CHECKPOINT (periodic save), ABORT (mission failed)
+  - **Act**: Execute the decision
+  - **CLM Check**: T6 `monitor_cognitive_load()` after every cycle for stall/loop/drift detection
+- **Composes**: T4 `ShortTermMemory`, T6 `cognitive_load_monitor.monitor_cognitive_load()`, T6 `detect_stall()`, T6 `detect_goal_drift()`
 
-#### `sequence_handoff`
-- **Signature**: `async sequence_handoff(completed_chunk_id: str, dag: WorkflowDAG, pool: WorkforcePool, exchange: ArtifactExchangeState) -> list[str]`
-- **Description**: When an agent completes its mission, checks the DAG for downstream dependent chunks. If all prerequisites of a downstream chunk are now satisfied, dispatches that chunk's agent. Returns the list of newly dispatched chunk_ids. This implements the assembly-line pattern (Coder -> Reviewer -> Deployer).
-- **Calls**: `dispatch_missions()` for newly-ready chunks
+#### `execute_handoff`
+- **Signature**: `async execute_handoff(completed_chunk_id: str, sprint: Sprint, pool: WorkforcePool, ledger: SharedLedgerClient) -> list[str]`
+- **Description**: When a specialist completes a task: (1) persist artifacts to Vault via Shared Ledger, (2) fire the specialist, (3) check if downstream chunks in the SAME sprint are unblocked. Returns list of newly-dispatchable chunk_ids.
+- **Composes**: `shared_ledger.write_artifact()`, `workforce_manager.fire_specialist()`
 
-#### `check_completion`
-- **Signature**: `check_completion(dag: WorkflowDAG) -> CompletionStatus`
-- **Description**: Checks if all nodes in the workflow DAG have reached terminal states (completed or failed). Returns completion status with breakdown of completed vs. failed vs. pending.
-- **Calls**: Pure DAG state inspection
+#### `review_sprint`
+- **Signature**: `async review_sprint(sprint: Sprint, result: SprintResult, kit: InferenceKit | None = None) -> SprintReview`
+- **Description**: Post-sprint retrospective. Uses T3 `reflection_and_guardrails.critique_execution()` to evaluate: was the sprint objective met? What quality issues arose? Are there new tasks to add to the backlog? Before the next sprint, uses T3 `run_pre_execution_check()` as a conscience gate.
+- **Composes**: T3 `critique_execution()`, T3 `run_pre_execution_check()`, `quality_resolver.audit_sprint()`
 
-#### `collect_team_results`
-- **Signature**: `async collect_team_results(pool: WorkforcePool, dag: WorkflowDAG, exchange: ArtifactExchangeState) -> TeamResult`
-- **Description**: Aggregates all agent outputs, artifacts, and performance metrics into a unified `TeamResult`. This is the raw material that Tier 9's Synthesis Engine will use to generate the final client response.
-- **Calls**: `artifact_exchange.search_artifacts()`, pool status aggregation
+### Node-Based Design
+
+Every specialist's task is wrapped as a composable node using T3 `node_assembler`:
+
+```python
+# Each MissionChunk becomes an ExecutableNode
+for chunk in sprint.chunks:
+    node = assemble_node(
+        instruction=ActionInstruction(
+            task_id=chunk.chunk_id,
+            description=chunk.sub_objective,
+            action_type="conscious_observer_process",
+            parameters={
+                "profile_id": chunk.matched_profile_id,
+                "token_budget": chunk.token_budget,
+                "predecessor_artifacts": chunk.predecessor_artifact_ids,
+            },
+        ),
+        config=NodeConfig(
+            timeout_ms=chunk.time_budget_ms,
+            retry_count=settings.corporate.max_retry_on_failure,
+        ),
+        kit=kit,
+    )
+    nodes.append(node)
+
+# Compose into sprint DAG
+dag = compile_dag(
+    nodes=nodes,
+    edges=edges,  # Intra-sprint dependencies (usually none — parallel)
+    objective=sprint.sprint_objective,
+)
+```
 
 ### Types
 
 ```python
-class WorkflowDAG(BaseModel):
-    """Directed acyclic graph of agent missions."""
-    dag_id: str
-    nodes: list[WorkflowNode]
-    edges: list[WorkflowEdge]
-    entry_node_ids: list[str]          # Nodes with no dependencies (start here)
-    terminal_node_ids: list[str]       # Nodes with no dependents (end here)
-    parallel_groups: list[list[str]]   # Groups of concurrently executable nodes
+class Sprint(BaseModel):
+    """A group of parallel tasks with a shared dependency level."""
+    sprint_id: str
+    sprint_number: int
+    mission_id: str
+    objective: str
+    chunks: list[MissionChunk]         # All parallelizable within this sprint
+    depends_on_sprint_ids: list[str]   # Prior sprints that must complete
+    estimated_duration_ms: float
 
-class WorkflowNode(BaseModel):
-    """A single mission in the workflow DAG."""
-    node_id: str                       # Same as chunk_id
-    agent_id: str
-    chunk: MissionChunk
-    status: WorkflowNodeStatus
-    result: ConsciousObserverResult | None
-    started_utc: str | None
-    completed_utc: str | None
-    retry_count: int
+class SprintResult(BaseModel):
+    """Outcome of a single sprint."""
+    sprint_id: str
+    completed_chunks: list[str]        # chunk_ids
+    failed_chunks: list[str]
+    agent_results: dict[str, ConsciousObserverResult]  # agent_id → result
+    artifacts_produced: list[str]      # Vault artifact IDs
+    total_cost: float
+    duration_ms: float
+    was_checkpointed: bool
 
-class WorkflowNodeStatus(StrEnum):
-    PENDING = "pending"
-    DISPATCHED = "dispatched"
-    IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    RETRYING = "retrying"
+class SprintReview(BaseModel):
+    """Post-sprint retrospective."""
+    sprint_id: str
+    quality_assessment: str            # From T3 critique_execution()
+    issues_found: list[str]
+    new_backlog_items: list[str]       # Discovered work
+    next_sprint_approved: bool         # From T3 run_pre_execution_check()
 
-class WorkflowEdge(BaseModel):
-    """Dependency between two workflow nodes."""
-    from_node_id: str
-    to_node_id: str
-    edge_type: WorkflowEdgeType
-    artifact_topic: str | None         # Topic to subscribe for data handoff
-
-class WorkflowEdgeType(StrEnum):
-    SEQUENTIAL = "sequential"          # B waits for A to complete
-    ARTIFACT = "artifact"              # B needs A's artifact output
-    REVIEW = "review"                  # B reviews A's work
-
-class AgentEvent(BaseModel):
-    """Status change event from an agent."""
-    agent_id: str
-    chunk_id: str
-    event_type: AgentEventType
-    result: ConsciousObserverResult | None
-    error: str | None
-    timestamp_utc: str
-
-class AgentEventType(StrEnum):
-    COMPLETED = "completed"
-    FAILED = "failed"
-    STALLED = "stalled"
-    PROGRESS = "progress"
-    HEARTBEAT = "heartbeat"
-
-class EventAction(BaseModel):
-    """Response to an agent event."""
-    action_type: EventActionType
-    target_agent_id: str | None
-    target_chunk_id: str | None
-    reason: str
-
-class EventActionType(StrEnum):
-    HANDOFF = "handoff"
-    RETRY = "retry"
-    FIRE_AND_REPLACE = "fire_and_replace"
-    SIGNAL_AGENT = "signal_agent"
-    NO_ACTION = "no_action"
-
-class CompletionStatus(BaseModel):
-    """Overall workflow DAG completion check."""
-    is_complete: bool
-    completed_count: int
-    failed_count: int
-    pending_count: int
-    in_progress_count: int
-    pct_complete: float
-
-class DispatchResult(BaseModel):
-    """Result of dispatching a mission to an agent."""
-    chunk_id: str
-    agent_id: str
-    dispatched_utc: str
-    subscriptions_created: list[str]   # Artifact topics subscribed
-
-class TeamResult(BaseModel):
-    """Aggregated output from all agents in a team."""
-    manifest_id: str
-    completion_status: CompletionStatus
-    agent_results: dict[str, ConsciousObserverResult]  # agent_id -> result
-    artifacts: list[Artifact]
-    performance_reports: list[PerformanceReport]
+class MissionResult(BaseModel):
+    """Aggregated outcome from all sprints."""
+    mission_id: str
+    total_sprints: int
+    completed_sprints: int
+    all_artifacts: list[str]           # All Vault artifact IDs
+    all_agent_results: dict[str, ConsciousObserverResult]
     total_cost: float
     total_duration_ms: float
-    workflow_dag: WorkflowDAG          # Final DAG state for audit
+    completion_pct: float
+    final_review: SprintReview | None
+
+class CorporateOODAResult(BaseModel):
+    """Result of the corporate monitoring loop."""
+    total_cycles: int
+    termination_reason: str            # "all_complete" / "escalated" / "aborted" / "budget_exhausted"
+    events_processed: int
+    handoffs_executed: int
+    agents_fired: int
+    agents_hired: int
+    checkpoints_saved: int
 ```
 
 ---
 
-## Module 5: Artifact Exchange
+## Module 3: Shared Ledger
 
-**Location**: `kernel/artifact_exchange/`
+**Location**: `kernel/shared_ledger/`
 
 ### Overview
 
-The Artifact Exchange is the corporation's shared communication fabric. Since Human Kernels are fully isolated (Zero-Trust boundaries — no shared memory, no direct function calls), they communicate through this pub/sub artifact system.
+The Shared Ledger is a **thin bridge** to the Vault Service. It replaces both the v1 Artifact Exchange (inter-agent pub/sub) and Memory Cortex (session persistence) with direct Vault usage. Agents share data, artifacts, and memory through Vault's persistent storage with `team_id`/`mission_id` metadata and semantic search via pgvector.
 
-When an agent produces work output (code, analysis, report), it publishes an **Artifact** to a named **Topic**. Other agents subscribed to that topic receive the artifact in their next interaction cycle. The Artifact Exchange is backed by the **Vault Service** for persistence, ensuring artifacts survive agent restarts and are available for audit.
-
-**Patterns**:
-- **One-to-Many**: Developer publishes code -> all Reviewers receive it
-- **One-to-One**: Directed artifact with specific recipient
-- **Broadcast**: System-wide announcements (e.g., "Budget warning")
-- **Search**: Semantic search across all workspace artifacts
-
-**Reuses**: Vault Service HTTP API for persistence and semantic search (pgvector).
+**Why Vault instead of custom pub/sub**:
+- **Persistence**: Artifacts survive agent restarts and system failures
+- **Searchability**: pgvector enables semantic search across all artifacts
+- **Audit trail**: Vault's SHA-256 hash chain provides tamper-proof history
+- **Simplicity**: No new infrastructure — reuses existing microservice
+- **Long-running support**: Checkpoints persist for days/weeks
 
 ### Function Decomposition
 
-#### `publish_artifact`
-- **Signature**: `async publish_artifact(agent_id: str, topic: str, artifact: Artifact, exchange: ArtifactExchangeState) -> str`
+#### `write_artifact`
+- **Signature**: `async write_artifact(agent_id: str, team_id: str, content: str, metadata: ArtifactMetadata) -> str`
 - **Returns**: Artifact ID
-- **Description**: Publishes an artifact to the exchange on a named topic. The artifact is stored in the Vault for persistence and indexed for semantic search. All agents subscribed to the topic are notified. Returns the artifact ID for reference.
-- **Calls**: Vault Service API for persistence
+- **Description**: Persist an agent's work output to Vault. Metadata includes `team_id`, `mission_id`, `sprint_id`, `chunk_id`, `content_type`, `topic`. Indexed for semantic search. Returns artifact ID for reference by downstream specialists.
+- **Composes**: Vault Service HTTP API (`POST /vault/persistence/sessions`)
 
-#### `subscribe_topic`
-- **Signature**: `async subscribe_topic(agent_id: str, topic: str, exchange: ArtifactExchangeState) -> Subscription`
-- **Description**: Registers an agent as a subscriber to a topic. Returns a `Subscription` handle used for consuming artifacts. Subscriptions are cleaned up when agents terminate.
-- **Calls**: Exchange state mutation
+#### `read_artifacts`
+- **Signature**: `async read_artifacts(team_id: str, query: str | None = None, topic: str | None = None, limit: int | None = None) -> list[VaultArtifact]`
+- **Description**: Retrieve artifacts for a team. Supports two modes: (1) topic-based filtering (all artifacts with matching topic), (2) semantic search (query text matched via pgvector). Used by agents to read predecessor's work before starting their task.
+- **Composes**: Vault Service HTTP API (`GET /vault/persistence/query`)
 
-#### `consume_artifacts`
-- **Signature**: `async consume_artifacts(subscription: Subscription, exchange: ArtifactExchangeState) -> list[Artifact]`
-- **Description**: Pulls all pending artifacts from a subscription since the last consumption. Called during the agent's OODA Observe phase. Returns empty list if no new artifacts. Auto-acknowledges consumed artifacts.
-- **Calls**: Exchange state query
+#### `write_checkpoint`
+- **Signature**: `async write_checkpoint(mission_id: str, state: CheckpointState) -> str`
+- **Returns**: Checkpoint ID
+- **Description**: Persist mission state for long-running task resumability. Stores: current sprint number, DAG state, pool state, artifacts produced, budget consumed. Called after each sprint or at configured intervals.
+- **Composes**: Vault Service HTTP API
 
-#### `search_artifacts`
-- **Signature**: `async search_artifacts(query: ArtifactQuery, exchange: ArtifactExchangeState) -> list[Artifact]`
-- **Description**: Semantic search across all artifacts in the workspace. Uses pgvector for similarity matching. Supports filtering by topic, agent, time range, and content type. Limited by `config.artifact_search_limit`.
-- **Calls**: Vault Service semantic search API
+#### `read_checkpoint`
+- **Signature**: `async read_checkpoint(mission_id: str) -> CheckpointState | None`
+- **Description**: Load the last checkpoint for a mission. Returns `None` if no checkpoint exists (fresh start). Used by Corporate Gateway to resume interrupted long-running missions.
+- **Composes**: Vault Service HTTP API
 
-#### `get_workspace_state`
-- **Signature**: `get_workspace_state(exchange: ArtifactExchangeState) -> WorkspaceSnapshot`
-- **Description**: Returns a snapshot of the current workspace: all topics, subscriber counts, artifact counts, and recent activity. Used by Corporate Monitor for status reporting.
-- **Calls**: Pure state aggregation
+#### `write_session`
+- **Signature**: `async write_session(session_id: str, state: SessionState) -> None`
+- **Description**: Persist client conversation session to Vault. Called at the end of every interaction for conversation continuity.
+- **Composes**: Vault Service HTTP API
+
+#### `read_session`
+- **Signature**: `async read_session(session_id: str) -> SessionState | None`
+- **Description**: Load client session. Returns `None` if session doesn't exist or expired.
+- **Composes**: Vault Service HTTP API
+
+#### `recall_memory`
+- **Signature**: `async recall_memory(client_id: str, query: str, limit: int | None = None) -> list[VaultArtifact]`
+- **Description**: Semantic search across a client's history. Uses pgvector to find relevant past interactions, mission results, and artifacts. NOT full context reload — precision retrieval.
+- **Composes**: Vault Service HTTP API (semantic search)
 
 ### Types
 
 ```python
-class Artifact(BaseModel):
-    """A unit of work output shared between agents."""
-    artifact_id: str
-    producer_agent_id: str
-    topic: str
-    content_type: ArtifactContentType
-    content: str                        # The actual content (code, text, JSON)
-    summary: str                        # Brief description for search indexing
-    metadata: dict[str, Any]           # Flexible metadata (e.g., file paths, versions)
-    created_utc: str
-    size_bytes: int
-    recipient_agent_id: str | None     # None = broadcast to topic
-
-class ArtifactContentType(StrEnum):
-    CODE = "code"
-    TEXT = "text"
-    ANALYSIS = "analysis"
-    REPORT = "report"
-    REVIEW = "review"
-    DATA = "data"
-    DECISION = "decision"
-
-class Subscription(BaseModel):
-    """An agent's subscription to an artifact topic."""
-    subscription_id: str
+class ArtifactMetadata(BaseModel):
+    """Metadata for a Vault-stored artifact."""
+    team_id: str
+    mission_id: str
+    sprint_id: str | None
+    chunk_id: str | None
     agent_id: str
-    topic: str
+    content_type: str                   # "code" / "analysis" / "report" / "data" / "review"
+    topic: str                          # Semantic category
+    summary: str                        # Brief description for search indexing
+
+class VaultArtifact(BaseModel):
+    """An artifact retrieved from Vault."""
+    artifact_id: str
+    content: str
+    metadata: ArtifactMetadata
     created_utc: str
-    last_consumed_utc: str
-    pending_count: int
 
-class ArtifactQuery(BaseModel):
-    """Query parameters for semantic artifact search."""
-    query_text: str                    # Natural language search query
-    topic: str | None                  # Filter by topic
-    producer_agent_id: str | None      # Filter by producer
-    content_type: ArtifactContentType | None
-    time_range_start: str | None
-    time_range_end: str | None
-    limit: int
+class CheckpointState(BaseModel):
+    """Serializable mission state for persistence."""
+    mission_id: str
+    current_sprint: int
+    total_sprints: int
+    completed_chunk_ids: list[str]
+    failed_chunk_ids: list[str]
+    pool_snapshot: dict[str, Any]       # Serialized WorkforcePool
+    artifact_ids: list[str]
+    total_cost: float
+    elapsed_ms: float
+    checkpointed_utc: str
 
-class ArtifactExchangeState(BaseModel):
-    """In-memory state of the artifact exchange."""
-    exchange_id: str
-    mission_manifest_id: str
-    topics: dict[str, list[Subscription]]  # topic -> subscribers
-    artifacts: dict[str, list[Artifact]]   # topic -> published artifacts
-    total_artifacts_published: int
-    total_artifacts_consumed: int
+class SessionState(BaseModel):
+    """Client conversation session."""
+    session_id: str
+    client_id: str
+    conversation_history: list[ConversationTurn]
+    active_mission_id: str | None
+    compressed_summary: str | None      # Summary of old turns
+    last_interaction_utc: str
+    turn_count: int
 
-class WorkspaceSnapshot(BaseModel):
-    """Point-in-time snapshot of the artifact workspace."""
-    exchange_id: str
-    topic_count: int
-    total_artifacts: int
-    total_subscribers: int
-    topics: list[TopicSummary]
-    recent_activity: list[Artifact]    # Last N artifacts published
-
-class TopicSummary(BaseModel):
-    """Summary of a single artifact topic."""
-    topic: str
-    subscriber_count: int
-    artifact_count: int
-    last_published_utc: str | None
+class ConversationTurn(BaseModel):
+    """A single interaction in a conversation."""
+    turn_id: str
+    role: str                           # "client" / "corporation"
+    content: str
+    intent: str | None
+    timestamp_utc: str
 ```
 
 ---
 
-## Module 6: Conflict Resolver
+## Module 4: Quality Resolver
 
-**Location**: `kernel/conflict_resolver/`
+**Location**: `kernel/quality_resolver/`
 
 ### Overview
 
-When multiple agents work on related tasks, their outputs may **conflict**. A frontend developer might propose a UI pattern that contradicts the backend developer's API design. Two researchers might reach opposing conclusions from different data sources.
+The Quality Resolver handles conflict resolution and quality assurance across the corporation. It detects contradictions between agent outputs, applies resolution strategies, and audits sprint quality.
 
-The Conflict Resolver detects these contradictions and applies resolution strategies:
+**Composition**: T3 `reflection_and_guardrails.evaluate_consensus()` (consensus), T1 `scoring.score()` (evaluation), T2 `attention_and_plausibility.run_cognitive_filters()` (contradiction detection), T6 `noise_gate.filter_output()` (quality gate), T6 `hallucination_monitor.verify_grounding()` (grounding).
 
-1. **Consensus**: All agents agree -> accept (ideal case)
-2. **Majority Vote**: >50% agree -> accept majority view
-3. **Weighted Consensus**: High-confidence agents carry more weight (using `CalibratedConfidence` from each agent's Gate-Out)
-4. **Arbitration**: Spawn a dedicated Judge agent (with a reviewer cognitive profile) to evaluate the conflicting positions
-5. **Escalation**: Unresolvable conflicts -> Human-in-the-Loop via the Swarm Manager service
+### Conflict Resolution Strategy Cascade
 
-**Key Insight**: Conflict detection uses **semantic similarity** (via Vault's pgvector) to find artifacts that address the same topic but with contradictory content. A high similarity score (same topic) combined with contradictory stance (detected via LLM analysis) flags a conflict.
+```
+1. T2 attention_and_plausibility.run_cognitive_filters()
+   → Detect contradictions between agent outputs
+
+2. T3 reflection_and_guardrails.evaluate_consensus()
+   → Attempt consensus (all agree)
+
+3. T1 scoring.score() with confidence weighting
+   → Weighted vote (high-confidence agents win)
+
+4. Spawn Judge specialist (via Workforce Manager)
+   → Arbitration by a reviewer-profile agent
+
+5. Swarm Manager HTTP API
+   → Escalate to Human-in-the-Loop
+```
+
+Each level is attempted only if the previous level fails. No new resolution logic is written — it's a cascade of existing functions.
 
 ### Function Decomposition
 
 #### `detect_conflicts`
-- **Signature**: `async detect_conflicts(artifacts: list[Artifact], kit: InferenceKit | None = None) -> list[Conflict]`
-- **Description**: Scans a collection of artifacts for contradictions. Uses semantic similarity to find artifact pairs addressing the same topic, then uses LLM analysis to determine if their conclusions or recommendations contradict each other. Returns a list of detected conflicts with severity ratings.
-- **Calls**: Vault semantic search, Knowledge-Enhanced Inference for contradiction analysis
+- **Signature**: `async detect_conflicts(artifacts: list[VaultArtifact], kit: InferenceKit | None = None) -> list[Conflict]`
+- **Description**: Scans agent outputs for contradictions. Uses T2 `attention_and_plausibility.run_cognitive_filters()` to detect semantic contradictions. Returns list of detected conflicts with severity.
+- **Composes**: T2 `run_cognitive_filters()`
 
 #### `resolve_conflict`
-- **Signature**: `async resolve_conflict(conflict: Conflict, pool: WorkforcePool, strategy: ResolutionStrategy | None = None, kit: InferenceKit | None = None) -> Resolution`
-- **Description**: Applies the specified resolution strategy to a conflict. Auto-selects strategy based on severity if not specified: LOW -> majority vote, MEDIUM -> weighted consensus, HIGH -> arbitration, CRITICAL -> escalation. Returns the resolution decision with justification.
-- **Calls**: `majority_vote()`, `weighted_consensus()`, `request_arbitration()`, `escalate_to_human()`
+- **Signature**: `async resolve_conflict(conflict: Conflict, pool: WorkforcePool, kit: InferenceKit | None = None) -> Resolution`
+- **Description**: Applies the cascade: consensus → weighted vote → arbitration → escalation. Each level delegates to an existing lower-tier function.
+- **Composes**: T3 `evaluate_consensus()`, T1 `scoring.score()`, `workforce_manager.hire_specialist()` (for judge)
 
-#### `majority_vote`
-- **Signature**: `majority_vote(conflict: Conflict, agent_positions: list[AgentPosition]) -> VoteResult`
-- **Description**: Simple majority voting. Each agent involved in the conflict casts a position. The position with >50% support wins. If no majority, escalates to weighted consensus.
-- **Calls**: Pure computation
+#### `audit_sprint`
+- **Signature**: `async audit_sprint(sprint_result: SprintResult, kit: InferenceKit | None = None) -> QualityAudit`
+- **Description**: Corporate quality assessment of a sprint's output. Applies T6 `noise_gate.filter_output()` to each agent result and T6 `hallucination_monitor.verify_grounding()` for fact-checking. Aggregates into a corporate quality score.
+- **Composes**: T6 `noise_gate.filter_output()`, T6 `hallucination_monitor.verify_grounding()`, T6 `confidence_calibrator.run_confidence_calibration()`
 
-#### `weighted_consensus`
-- **Signature**: `weighted_consensus(conflict: Conflict, agent_positions: list[AgentPosition]) -> VoteResult`
-- **Description**: Weighted voting where each agent's vote weight is proportional to their `CalibratedConfidence` score from their Gate-Out result. A highly confident agent's position carries more influence than an uncertain agent's.
-- **Calls**: Pure computation using `CalibratedConfidence` values
-
-#### `request_arbitration`
-- **Signature**: `async request_arbitration(conflict: Conflict, pool: WorkforcePool, kit: InferenceKit | None = None) -> ArbitrationReport`
-- **Description**: Spawns a dedicated Judge agent (with a reviewer cognitive profile) to evaluate the conflicting positions. The Judge receives both sides' artifacts, analyzes the merits, and renders a binding decision. The Judge is terminated after rendering its verdict.
-- **Calls**: `workforce_manager.spawn_agent()` with reviewer profile, T7 `ConsciousObserver.process()`
-
-#### `escalate_to_human`
-- **Signature**: `async escalate_to_human(conflict: Conflict) -> EscalationTicket`
-- **Description**: For unresolvable conflicts, creates an escalation ticket and sends it to the Swarm Manager service for Human-in-the-Loop resolution. The corporate workflow pauses on the conflicting branches until the human responds.
-- **Calls**: Swarm Manager HTTP API
-
-#### `merge_resolutions`
-- **Signature**: `merge_resolutions(resolutions: list[Resolution], artifacts: list[Artifact]) -> list[Artifact]`
-- **Description**: After all conflicts are resolved, applies the resolution decisions to the artifact set. Removes rejected artifacts, annotates accepted ones with resolution metadata, and returns the conflict-free artifact set for synthesis.
-- **Calls**: Pure artifact manipulation
+#### `audit_final`
+- **Signature**: `async audit_final(mission_result: MissionResult, kit: InferenceKit | None = None) -> FinalQualityReport`
+- **Description**: End-of-mission quality audit. Runs `detect_conflicts()` across ALL artifacts, resolves remaining conflicts, and produces a final quality report with completeness assessment, confidence map, and gap analysis.
+- **Composes**: `detect_conflicts()`, `resolve_conflict()`, T3 `critique_execution()`
 
 ### Types
 
 ```python
 class Conflict(BaseModel):
-    """A detected contradiction between agent outputs."""
-    conflict_id: str
     artifact_a_id: str
     artifact_b_id: str
-    agent_a_id: str
-    agent_b_id: str
-    topic: str                          # The subject of disagreement
-    description: str                    # Natural language description of the conflict
-    severity: ConflictSeverity
-    semantic_similarity: float          # How related the artifacts are (0.0-1.0)
-    detected_utc: str
-
-class ConflictSeverity(StrEnum):
-    LOW = "low"           # Minor style/approach differences
-    MEDIUM = "medium"     # Substantive disagreement on methods
-    HIGH = "high"         # Contradictory conclusions or recommendations
-    CRITICAL = "critical" # Blocking contradiction that halts progress
-
-class ResolutionStrategy(StrEnum):
-    CONSENSUS = "consensus"
-    MAJORITY_VOTE = "majority_vote"
-    WEIGHTED_CONSENSUS = "weighted_consensus"
-    ARBITRATION = "arbitration"
-    ESCALATION = "escalation"
+    description: str
+    severity: str                       # "low" / "medium" / "high" / "critical"
 
 class Resolution(BaseModel):
-    """Outcome of a conflict resolution."""
     conflict_id: str
-    strategy_used: ResolutionStrategy
+    strategy_used: str                  # "consensus" / "weighted_vote" / "arbitration" / "escalation"
     winning_artifact_id: str
-    losing_artifact_id: str
     justification: str
     confidence: float
-    resolved_utc: str
 
-class AgentPosition(BaseModel):
-    """An agent's stance in a conflict."""
-    agent_id: str
-    artifact_id: str
-    position_summary: str
-    confidence: float                   # From CalibratedConfidence
-    supporting_evidence: list[str]
+class QualityAudit(BaseModel):
+    sprint_id: str
+    avg_quality: float                  # From noise gate
+    avg_confidence: float               # From calibrator
+    avg_grounding: float                # From hallucination monitor
+    issues: list[str]
+    overall: str                        # "pass" / "warning" / "fail"
 
-class VoteResult(BaseModel):
-    """Result of a voting-based resolution."""
-    winner_artifact_id: str
-    vote_counts: dict[str, int]        # artifact_id -> vote count
-    total_votes: int
-    margin: float
-    is_decisive: bool                   # Clear majority? Or tie?
-
-class ArbitrationReport(BaseModel):
-    """Judge agent's verdict on a conflict."""
-    judge_agent_id: str
-    conflict_id: str
-    verdict: str                        # Natural language verdict
-    winning_artifact_id: str
-    reasoning: str
-    judge_confidence: float
-    evidence_cited: list[str]
-
-class EscalationTicket(BaseModel):
-    """HITL escalation for unresolvable conflicts."""
-    ticket_id: str
-    conflict: Conflict
-    positions: list[AgentPosition]
-    previous_attempts: list[ResolutionStrategy]
-    created_utc: str
-    status: EscalationStatus
-
-class EscalationStatus(StrEnum):
-    PENDING = "pending"
-    ASSIGNED = "assigned"
-    RESOLVED = "resolved"
+class FinalQualityReport(BaseModel):
+    mission_id: str
+    conflicts_found: int
+    conflicts_resolved: int
+    completeness_pct: float
+    confidence_map: dict[str, float]   # chunk_id → confidence
+    gaps: list[str]
+    overall_quality: float
 ```
 
 ---
 
-## SWARM Mode: Pipeline Template & Map-Reduce
+## SWARM Mode: Template Pipeline Replication
 
-For repetitive/volume work (e.g., "analyze 10,000 customer reviews"), the Corporation creates **one pipeline template** and replicates it across N worker agents. This is the SWARM pattern.
-
-### Flow
+For stress test queries like "Putusan MA Builder" (50K+ documents), "Geopolitical Risk Index" (100K iterations), or "Academic Grant Network" (100K grants):
 
 ```mermaid
 flowchart TB
-    nObjective["Enterprise Objective<br>(Volume/Repetitive)"]
-    nScope["Mission Decomposer<br>scope.is_repetitive = true<br>scope.scaling_mode = SWARM"]
-    nTemplate["Create Pipeline Template<br>(Single ExecutableDAG via T3)"]
-    nPartition["Partition Input Data<br>(Split into N chunks)"]
+    nObjective["Enterprise Objective (Volume/Repetitive)"]
+    nAssess["T6 classify_signal_complexity() → SWARM"]
+    nTemplate["T3 synthesize_plan() → Single ExecutableDAG template"]
+    nPartition["Partition input data into N chunks"]
 
-    subgraph sSwarm["SWARM: N Worker Agents"]
+    subgraph sSwarm["SWARM: N Identical Specialists"]
         direction LR
-        nW1["Worker 1<br>Template + Partition 1"]
-        nW2["Worker 2<br>Template + Partition 2"]
-        nWN["Worker N<br>Template + Partition N"]
+        nW1["Worker 1: Template DAG + Partition 1"]
+        nW2["Worker 2: Template DAG + Partition 2"]
+        nWN["Worker N: Template DAG + Partition N"]
     end
 
-    nReduce["Synthesis Engine (T9)<br>Map-Reduce Collection"]
-    nOutput["Unified Result"]
+    nCollect["shared_ledger: All results in Vault"]
+    nReduce["Gate-Out: Map-reduce synthesis"]
 
-    nObjective --> nScope --> nTemplate --> nPartition
-    nPartition --> sSwarm
-    sSwarm --> nReduce --> nOutput
+    nObjective --> nAssess --> nTemplate --> nPartition --> sSwarm --> nCollect --> nReduce
 
     classDef t8 fill:#0f172a,stroke:#38bdf8,stroke-width:1px,color:#fff
-    classDef t9 fill:#064E3B,stroke:#34D399,stroke-width:2px,color:#fff
-
-    class nScope,nTemplate,nPartition,sSwarm,nW1,nW2,nWN t8
-    class nReduce t9
+    class nAssess,nTemplate,nPartition,sSwarm,nW1,nW2,nWN,nCollect t8
 ```
 
-### How It Works
-
-1. **Mission Decomposer** detects `is_repetitive = True` and sets `scaling_mode = SWARM`
-2. A **single `ExecutableDAG`** is created via T3 Graph Synthesizer as the pipeline template
-3. Input data is **partitioned** into N chunks (one per worker)
-4. **Workforce Manager** spawns N identical agents (same cognitive profile, same pipeline template, different input data)
-5. Each worker runs the template pipeline against its data partition independently
-6. **Synthesis Engine** (Tier 9) collects all outputs and merges via map-reduce
-
-### Key Fields
-
+**Hardware-Aware SWARM Sizing**:
 ```python
-# In MissionChunk:
-pipeline_template_id: str | None   # Shared pipeline reference (all workers get same DAG)
-input_data: dict[str, Any] | None  # Partition-specific input data
+profile = get_hardware_profile()
+max_parallel = profile.safe_parallel_limit()
+total_partitions = len(data_chunks)
+
+# Spawn in waves, not all at once
+wave_size = min(max_parallel, settings.corporate.spawn_batch_size)
+for wave in range(0, total_partitions, wave_size):
+    batch = data_chunks[wave:wave + wave_size]
+    agents = await workforce_manager.hire_batch(batch, profile_ids, pool)
+    # Execute wave, fire completed, spawn next wave
 ```
 
 ---
 
-## Hire/Fire Lifecycle
+## Long-Running Task Persistence
 
 ```mermaid
 sequenceDiagram
-    participant WM as Workforce Manager
-    participant Pool as WorkforcePool
-    participant Agent as Human Kernel
-    participant Monitor as Corporate Monitor (T9)
+    participant Client
+    participant Gateway as Corporate Gateway
+    participant TO as Team Orchestrator
+    participant SL as Shared Ledger (Vault)
 
-    Note over WM: HIRE PHASE
-    WM->>WM: check_resources()
-    WM->>Agent: spawn_agent(profile, mission)
-    Agent-->>Pool: Register AgentHandle
-    WM->>Agent: dispatch via Team Orchestrator
+    Client->>Gateway: "Analyze all FDA drug submissions since 2000"
+    Gateway->>TO: orchestrate_mission() [estimated: 6 hours]
 
-    Note over WM: MONITOR PHASE
-    loop Every poll_interval
-        WM->>Agent: Check heartbeat
-        WM->>WM: evaluate_performance(results)
-        alt Quality < threshold
-            WM->>WM: Flag underperforming
-        end
-        alt Idle > timeout
-            WM->>WM: Flag idle
-        end
-    end
+    Note over TO: Sprint 1: Data collection (2 hours)
+    TO->>SL: write_checkpoint(sprint=1, state)
+    Note over TO: Sprint 2: Analysis (2 hours)
+    TO->>SL: write_checkpoint(sprint=2, state)
 
-    Note over WM: FIRE PHASE
-    alt Underperforming / Idle / Budget Exceeded / Stalled
-        WM->>Agent: fire_agent(reason)
-        Agent-->>WM: Partial output (if any)
-        WM->>Pool: Remove from pool
-        WM->>WM: Reassign mission to queue
-        opt Need replacement
-            WM->>WM: spawn_agent() [replacement]
-        end
-    end
+    Note over TO: ⚡ SYSTEM RESTART ⚡
 
-    Note over WM: SCALE PHASE
-    WM->>WM: scale_workforce(pool, manifest, performance)
-    alt SPAWN_MORE
-        WM->>Agent: spawn_agent() [additional]
-    end
-    alt TERMINATE_IDLE
-        WM->>Agent: fire_agent(IDLE_TIMEOUT)
-    end
+    Client->>Gateway: "What happened to my FDA analysis?"
+    Gateway->>SL: read_checkpoint(mission_id)
+    SL-->>Gateway: CheckpointState (sprint=2, 67% complete)
+    Gateway->>TO: orchestrate_mission(resume_from=checkpoint)
+    Note over TO: Resumes from Sprint 3, skips completed work
+
+    TO->>SL: write_checkpoint(sprint=3, state)
+    TO-->>Gateway: MissionResult (100% complete)
+    Gateway-->>Client: Final report
 ```
 
 ---
 
-## Critical Existing Files to Reuse
+## Stress Test Query Capability Matrix
 
-| File | What to Reuse | Used By |
-|------|---------------|---------|
-| `kernel/conscious_observer/engine.py` | `ConsciousObserver.process()` — THE interface to Human Kernels | Workforce Manager, Team Orchestrator |
-| `kernel/conscious_observer/types.py` | `ConsciousObserverResult`, `GateInResult`, `ProcessingMode` | Workforce Manager (performance), Conflict Resolver (confidence) |
-| `kernel/lifecycle_controller/engine.py` | `initialize_agent()`, `load_cognitive_profile()`, `set_identity_constraints()` | Workforce Manager (agent genesis) |
-| `kernel/task_decomposition/engine.py` | `decompose_goal()`, `analyze_goal_complexity()` | Mission Decomposer |
-| `kernel/classification/engine.py` | `classify()` | Mission Decomposer (domain detection) |
-| `kernel/graph_synthesizer/engine.py` | `synthesize_plan()`, `compile_dag()` | Team Orchestrator (workflow DAG), SWARM (pipeline template) |
-| `kernel/activation_router/engine.py` | `classify_signal_complexity()` | Mission Decomposer (complexity assessment) |
-| `kernel/self_model/engine.py` | `assess_capability()` | Mission Router (capability matching) |
-| `kernel/energy_and_interrupts/engine.py` | `handle_interrupt()` | Team Orchestrator (agent signaling) |
-| `shared/config.py` | `get_settings()` | All modules (config-first mandate) |
-| `shared/logging/main.py` | `get_logger(__name__)` | All modules (structured logging) |
-| `shared/standard_io.py` | `Result`, `ok()`, `fail()`, `Signal`, `Metrics` | All modules (standard I/O) |
-| `shared/id_and_hash.py` | `generate_id()` | All modules (ID generation) |
-| `shared/hardware.py` | Hardware detection, resource limits | Workforce Manager (resource checks) |
+| Query | Scale | Mode | Agents | Key Challenge | Corporate Solution |
+|-------|-------|------|--------|---------------|-------------------|
+| #1 Indonesian Alpha Hunt | 5K iterations | TEAM | 3-5 | Multi-domain (financial + scraping) | Sprint 1: Scrape, Sprint 2: Analyze, Sprint 3: Model |
+| #2 Bryan Johnson Blueprint | 10K iterations | TEAM | 4-6 | Knowledge graph building | Vault-backed graph nodes, specialists per data source |
+| #5 Putusan MA Builder | 50K iterations | SWARM | 50-100 | Volume document processing | Template pipeline, N workers, Vault database |
+| #9 Dark Money Trace | 15K iterations | TEAM | 5-8 | Investigation + cross-referencing | JIT specialists (legal, financial, crypto), Vault shared evidence |
+| #15 Geopolitical Risk Index | 100K iterations | SWARM | 100+ | Massive aggregation | SWARM with hardware-aware wave spawning, checkpointing |
+| #16 Academic Grant Network | 100K iterations | SWARM | 100+ | Database building from scraped data | Template pipeline, map-reduce collection |
+| #17 Startup Due Diligence | 10K iterations | TEAM | 5 | Per-company deep analysis | 1 specialist per company, Vault shared matrix |
+| #19 Competitive Intelligence | 20K iterations | TEAM | 10 | Per-company analysis + cross-comparison | Sprint 1: Per-company (parallel), Sprint 2: Cross-comparison |
+| #20 Research Synthesis Swarm | 5K iterations | TEAM | 6 | Multi-agent synthesis + editor | 5 research specialists + 1 editor/reviewer, Vault artifact sharing |
 
 ---
 
-## Human Corporate Analogy
+## Directory Structure
 
-| Corporate Reality | Tier 8 Implementation |
-|-------------------|----------------------|
-| "Read the brief and write the WBS" | `mission_decomposer.decompose_mission()` |
-| "How many people do we need?" | `mission_decomposer.assess_mission_scope()` |
-| "HR, hire 5 developers" | `workforce_manager.spawn_agent()` |
-| "This person is underperforming, let them go" | `workforce_manager.fire_agent()` |
-| "Do we need more people?" | `workforce_manager.scale_workforce()` |
-| "Assign this task to the best available person" | `mission_router.route_mission()` |
-| "Rebalance workload, Alice is overloaded" | `mission_router.rebalance_load()` |
-| "Make sure the handoff from Dev to QA is smooth" | `team_orchestrator.sequence_handoff()` |
-| "Share your work on the shared drive" | `artifact_exchange.publish_artifact()` |
-| "Check if anyone posted updates" | `artifact_exchange.consume_artifacts()` |
-| "These two reports contradict each other" | `conflict_resolver.detect_conflicts()` |
-| "Let's vote on which approach is better" | `conflict_resolver.majority_vote()` |
-| "Get a senior reviewer to arbitrate" | `conflict_resolver.request_arbitration()` |
-| "We can't resolve this, escalate to the client" | `conflict_resolver.escalate_to_human()` |
+```
+kernel/
+├── (existing Tiers 1-7 modules — unchanged)
+│
+├── workforce_manager/                # Tier 8 — composes T5, shared/hardware
+│   ├── __init__.py
+│   ├── engine.py
+│   └── types.py
+│
+├── team_orchestrator/                # Tier 8 — composes T3, T4, T6
+│   ├── __init__.py
+│   ├── engine.py
+│   └── types.py
+│
+├── shared_ledger/                    # Tier 8 — thin Vault bridge
+│   ├── __init__.py
+│   ├── engine.py
+│   └── types.py
+│
+├── quality_resolver/                 # Tier 8 — composes T1, T2, T3, T6
+│   ├── __init__.py
+│   ├── engine.py
+│   └── types.py
+│
+└── corporate_gateway/                # Tier 9 — THE entry point (see tier_9_architecture.md)
+    ├── __init__.py
+    ├── engine.py
+    └── types.py
+```
 
 ---
 
 ## Implementation Sequence
 
 1. **Types first**: Define all types in each module's `types.py`
-2. **Mission Decomposer**: Foundation — everything starts with decomposition
-3. **Workforce Manager**: Agent lifecycle — needs to exist before routing
-4. **Mission Router**: Requires pool of agents to route to
-5. **Artifact Exchange**: Communication fabric — needed before orchestration
-6. **Team Orchestrator**: The main loop — requires all above
-7. **Conflict Resolver**: Quality layer — runs during and after orchestration
-8. **Config**: Add `CorporateSettings` to `shared/config.py`
-9. **Kernel exports**: Update `kernel/__init__.py` with Tier 8 exports
+2. **Shared Ledger**: Thin Vault bridge (no dependencies on other T8 modules)
+3. **Workforce Manager**: Agent lifecycle (depends on Shared Ledger for artifact persistence)
+4. **Quality Resolver**: Quality + conflicts (depends on Shared Ledger for artifact reading)
+5. **Team Orchestrator**: Sprint management (depends on all above)
+6. **Config**: Add `CorporateSettings` to `shared/config.py`
+7. **Kernel exports**: Update `kernel/__init__.py` with Tier 8 exports
