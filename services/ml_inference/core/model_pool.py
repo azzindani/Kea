@@ -153,6 +153,10 @@ class ModelPool:
                 device=self._emb_device,
                 use_flash_attention=self._settings.ml_inference.use_flash_attention
             )
+            # FORCE LOAD NOW
+            logger.info(f"Model Pool: Pre-loading embedding model on {self._emb_device}...")
+            await self._embedding_provider.load()
+            
             logger.info(
                 f"Embedding model loaded: {self._settings.embedding.model_name} on {self._emb_device}"
             )
@@ -169,6 +173,10 @@ class ModelPool:
                 device=self._rerank_device,
                 use_flash_attention=self._settings.ml_inference.use_flash_attention
             )
+            # FORCE LOAD NOW
+            logger.info(f"Model Pool: Pre-loading reranker model on {self._rerank_device}...")
+            await self._reranker_provider.load()
+            
             logger.info(
                 f"Reranker model loaded: {self._settings.reranker.model_name} on {self._rerank_device}"
             )

@@ -110,6 +110,17 @@ def get_embedding_provider(use_local: bool | None = None):
                     self.using_secondary = True
                     return await self.secondary.embed_query(query)
 
+            async def load(self) -> None:
+                """Pre-load the primary model."""
+                if not self.using_secondary:
+                    try:
+                        await self.primary.load()
+                    except Exception as e:
+                        logger.error(f"Model Manager: Primary (Local) load failed: {e}")
+                        logger.warning("Model Manager: Switching to API fallback.")
+                        self.using_secondary = True
+                        await self.secondary.load()
+
         if use_local:
             # Create BOTH local and API providers
             # We initialize them but local load is lazy, so it won't crash yet.

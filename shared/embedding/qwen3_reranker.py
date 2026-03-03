@@ -37,6 +37,10 @@ class RerankerProvider(ABC):
     ) -> list[RerankResult]:
         """Rerank documents by relevance to query."""
         pass
+        
+    async def load(self) -> None:
+        """Pre-load the model."""
+        pass
 
 
 class LocalReranker(RerankerProvider):
@@ -58,6 +62,12 @@ class LocalReranker(RerankerProvider):
     _shared_lock = None
     _shared_token_true_id = None
     _shared_token_false_id = None
+    
+    async def load(self) -> None:
+        """Force the model to load into memory/GPU now."""
+        import asyncio
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, self._load_model)
     _shared_prefix_tokens = None
     _shared_suffix_tokens = None
     _shared_execution_lock = None # Asyncio lock for inference
@@ -119,7 +129,7 @@ class LocalReranker(RerankerProvider):
                     self.model_name,
                     torch_dtype=torch.float16,
                     attn_implementation="flash_attention_2",
-                ).cuda().eval()
+                ).to(self.device).eval()
             else:
                 # Simple load - exactly like official Qwen3 code
                 LocalReranker._shared_model = AutoModelForCausalLM.from_pretrained(

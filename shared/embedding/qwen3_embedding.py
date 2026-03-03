@@ -44,6 +44,10 @@ class EmbeddingProvider(ABC):
         """Generate embedding for a query (with query prompt)."""
         pass
     
+    async def load(self) -> None:
+        """Explicitly load the model into memory/GPU (optional)."""
+        pass
+    
     @property
     @abstractmethod
     def dimension(self) -> int:
@@ -111,6 +115,10 @@ class OpenRouterEmbedding(EmbeddingProvider):
         
         return embeddings
     
+    async def load(self) -> None:
+        """OpenRouter is an API, no local loading needed."""
+        pass
+    
     async def embed_query(self, query: str) -> list[float]:
         """Generate embedding for query with instruction."""
         # Qwen3 embedding uses instruction prefix for queries
@@ -164,6 +172,12 @@ class LocalEmbedding(EmbeddingProvider):
         if LocalEmbedding._shared_execution_lock is None:
             import asyncio
             LocalEmbedding._shared_execution_lock = asyncio.Lock()
+            
+    async def load(self) -> None:
+        """Force the model to load into memory/GPU now."""
+        import asyncio
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, self._load_model)
     
     def _has_cuda(self) -> bool:
         try:
@@ -208,7 +222,7 @@ class LocalEmbedding(EmbeddingProvider):
                     self.model_name,
                     attn_implementation="flash_attention_2",
                     torch_dtype=torch.float16,
-                ).cuda()
+                ).to(device)
             else:
                 # Simple load - exactly like user's working code
                 LocalEmbedding._shared_model = AutoModel.from_pretrained(self.model_name)
