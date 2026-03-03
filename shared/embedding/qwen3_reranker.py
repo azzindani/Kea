@@ -46,30 +46,16 @@ class RerankerProvider(ABC):
 class LocalReranker(RerankerProvider):
     """
     Qwen3-Reranker-0.6B local inference.
-    
-    Model: Qwen/Qwen3-Reranker-0.6B
-    Max Length: 32768 tokens
-    Requires: transformers>=4.51.0
-    
-    Usage:
-        reranker = LocalReranker()
-        results = await reranker.rerank("query", ["doc1", "doc2"])
     """
     
     # Class-level cache for model singleton (shared across all instances)
     _shared_model = None
     _shared_tokenizer = None
     _shared_lock = None
-    _shared_token_true_id = None
-    _shared_token_false_id = None
-    
-    async def load(self) -> None:
-        """Force the model to load into memory/GPU now."""
-        import asyncio
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, self._load_model)
     _shared_prefix_tokens = None
     _shared_suffix_tokens = None
+    _shared_token_true_id = None
+    _shared_token_false_id = None
     _shared_execution_lock = None # Asyncio lock for inference
     
     def __init__(
@@ -78,6 +64,7 @@ class LocalReranker(RerankerProvider):
         device: str | None = None,
         max_length: int | None = None,
         use_flash_attention: bool = False,
+        **kwargs: Any,
     ) -> None:
         from shared.config import get_settings
         settings = get_settings()
@@ -88,7 +75,12 @@ class LocalReranker(RerankerProvider):
         
         if LocalReranker._shared_execution_lock is None:
             import asyncio
-            LocalReranker._shared_execution_lock = asyncio.Lock()
+            try:
+                loop = asyncio.get_running_loop()
+                LocalReranker._shared_execution_lock = asyncio.Lock()
+            except RuntimeError:
+                # No loop running yet, that's okay, we'll initialize on first use
+                LocalReranker._shared_execution_lock = None
     
     def _has_cuda(self) -> bool:
         try:
@@ -96,34 +88,37 @@ class LocalReranker(RerankerProvider):
             return torch.cuda.is_available()
         except ImportError:
             return False
-    
+
+    async def load(self) -> None:
+        """Force the model to load into memory/GPU now."""
+        import asyncio
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, self._load_model)
+
     def _load_model(self):
         """Lazy load model and tokenizer with thread safety (class-level singleton)."""
         import threading
         import torch
+        from transformers import AutoTokenizer, AutoModelForCausalLM
         
-        # Fast path: model already loaded
+        # Fast path
         if LocalReranker._shared_model is not None:
             return LocalReranker._shared_model, LocalReranker._shared_tokenizer
         
-        # Create class-level lock if not exists
         if LocalReranker._shared_lock is None:
             LocalReranker._shared_lock = threading.Lock()
         
         with LocalReranker._shared_lock:
-            # Double-check pattern
             if LocalReranker._shared_model is not None:
                 return LocalReranker._shared_model, LocalReranker._shared_tokenizer
             
-            from transformers import AutoTokenizer, AutoModelForCausalLM
-            
-            # Load tokenizer - simple like official code
+            # Load tokenizer
             LocalReranker._shared_tokenizer = AutoTokenizer.from_pretrained(
                 self.model_name,
                 padding_side='left',
             )
             
-            # Load model - keep it SIMPLE like official Qwen3 code
+            # Load model
             if self.use_flash_attention:
                 LocalReranker._shared_model = AutoModelForCausalLM.from_pretrained(
                     self.model_name,
@@ -131,14 +126,9 @@ class LocalReranker(RerankerProvider):
                     attn_implementation="flash_attention_2",
                 ).to(self.device).eval()
             else:
-                # Simple load - exactly like official Qwen3 code
                 LocalReranker._shared_model = AutoModelForCausalLM.from_pretrained(
                     self.model_name
-                ).eval()
-                
-                # Move to GPU if requested
-                if self.device.startswith("cuda"):
-                    LocalReranker._shared_model = LocalReranker._shared_model.to(self.device)
+                ).to(self.device).eval()
             
             # Setup token IDs
             LocalReranker._shared_token_false_id = LocalReranker._shared_tokenizer.convert_tokens_to_ids("no")
@@ -156,17 +146,13 @@ class LocalReranker(RerankerProvider):
         return LocalReranker._shared_model, LocalReranker._shared_tokenizer
     
     def move_to_device(self, new_device: str):
-        """
-        Move model to new device (e.g., 'cuda:1', 'cpu').
-        
-        Args:
-            new_device: Target device string
-        """
+        """Move model to new device."""
         if LocalReranker._shared_model:
+            import torch
             LocalReranker._shared_model = LocalReranker._shared_model.to(new_device)
-        self.device = new_device
-        logger.info(f"Model moved to {new_device}")
-    
+            self.device = new_device
+            logger.info(f"Reranker model moved to {new_device}")
+
     def _format_instruction(
         self,
         query: str,
@@ -201,7 +187,6 @@ class LocalReranker(RerankerProvider):
             
             full_texts.append(prefix + pair + suffix)
         
-        # Use __call__ directly (fast path - avoids warning)
         inputs = tokenizer(
             full_texts,
             padding=True,
@@ -229,35 +214,18 @@ class LocalReranker(RerankerProvider):
         if not documents:
             return []
         
+        if LocalReranker._shared_execution_lock is None:
+            LocalReranker._shared_execution_lock = asyncio.Lock()
+            
         async with LocalReranker._shared_execution_lock:
             model, _ = self._load_model()
             
             from shared.config import get_settings
             settings = get_settings()
             
-            # Batching configuration (to prevent OOM)
-            BATCH_SIZE = settings.reranker.batch_size 
+            # Batching configuration
+            BATCH_SIZE = settings.reranker.batch_size or 8
             
-            # Check VRAM pressure and adjust batch size
-            try:
-                from shared.hardware.detector import detect_hardware
-                hw = detect_hardware()
-                if hw.cuda_available:
-                    hw.refresh_vram()
-                    pressure = hw.vram_pressure()
-                    if pressure > settings.hardware.critical_pressure_threshold:
-                        BATCH_SIZE = settings.reranker.high_pressure_batch_size
-                        logger.warning(f"Reranker: VRAM pressure high ({pressure*100:.1f}%), reducing batch to {BATCH_SIZE}")
-                    elif pressure > settings.hardware.high_pressure_threshold:
-                        BATCH_SIZE = settings.reranker.med_pressure_batch_size
-                        logger.info(f"Reranker: VRAM pressure moderate ({pressure*100:.1f}%), reducing batch to {BATCH_SIZE}")
-                    else:
-                        BATCH_SIZE = settings.reranker.low_pressure_batch_size
-            except Exception:
-                pass 
-            BATCH_SIZE = BATCH_SIZE or settings.reranker.batch_size
-            
-                # Process in executor (CPU/GPU bound)
             loop = asyncio.get_event_loop()
             
             def compute_all_scores():
@@ -269,8 +237,6 @@ class LocalReranker(RerankerProvider):
                     if not batch_pairs: return []
                     inputs = self._process_inputs(batch_pairs)
                     with torch.no_grad():
-                        for k, v in inputs.items():
-                            inputs[k] = v.to(model.device)
                         batch_logits = model(**inputs).logits[:, -1, :]
                         true_vector = batch_logits[:, LocalReranker._shared_token_true_id]
                         false_vector = batch_logits[:, LocalReranker._shared_token_false_id]
@@ -288,14 +254,6 @@ class LocalReranker(RerankerProvider):
                         batch_scores = compute_batch_scores(pairs)
                         out_scores.extend(batch_scores)
                         i += actual_batch
-                    except torch.cuda.OutOfMemoryError as e:
-                        logger.warning(f"Reranker OOM error on batch size {actual_batch}. Halving batch size.")
-                        if torch.cuda.is_available():
-                            torch.cuda.empty_cache()
-                        if BATCH_SIZE > 1:
-                            BATCH_SIZE = math.ceil(BATCH_SIZE / 2)
-                        else:
-                            raise
                     except Exception as e:
                         if "OutOfMemory" in str(type(e).__name__) or "CUDA out of memory" in str(e):
                             logger.warning(f"Reranker OOM error on batch size {actual_batch}. Halving batch size.")

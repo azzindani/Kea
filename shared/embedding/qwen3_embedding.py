@@ -72,6 +72,7 @@ class OpenRouterEmbedding(EmbeddingProvider):
         self,
         api_key: str | None = None,
         dimension: int | None = None,
+        **kwargs: Any,
     ) -> None:
         settings = get_settings()
         self.api_key = api_key or settings.llm.openrouter_api_key
@@ -160,6 +161,7 @@ class LocalEmbedding(EmbeddingProvider):
         device: str | None = None,
         use_flash_attention: bool = False,
         max_length: int | None = None,
+        **kwargs: Any,
     ) -> None:
         from shared.config import get_settings
         settings = get_settings()
@@ -171,11 +173,18 @@ class LocalEmbedding(EmbeddingProvider):
         
         if LocalEmbedding._shared_execution_lock is None:
             import asyncio
-            LocalEmbedding._shared_execution_lock = asyncio.Lock()
+            try:
+                loop = asyncio.get_running_loop()
+                LocalEmbedding._shared_execution_lock = asyncio.Lock()
+            except RuntimeError:
+                LocalEmbedding._shared_execution_lock = None
             
     async def load(self) -> None:
         """Force the model to load into memory/GPU now."""
         import asyncio
+        if LocalEmbedding._shared_execution_lock is None:
+            LocalEmbedding._shared_execution_lock = asyncio.Lock()
+            
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self._load_model)
     
@@ -373,11 +382,10 @@ class LocalEmbedding(EmbeddingProvider):
             embeddings = await loop.run_in_executor(None, process_all)
             return embeddings
     
-    async def embed_query(self, query: str, task: str | None = None) -> list[float]:
+    async def embed_query(self, query: str) -> list[float]:
         """Generate embedding for query with instruction (official Qwen3 pattern)."""
-        if task is None:
-            from shared.config import get_settings
-            task = get_settings().embedding.instruction
+        from shared.config import get_settings
+        task = get_settings().embedding.instruction
         
         # Format query with instruction
         formatted_query = self._get_detailed_instruct(task, query)

@@ -325,8 +325,8 @@ def _try_http_embedding_provider() -> object | None:
         # We use a sync client with retries to wait for the service to finish loading models.
         # This prevents the "Cold Start Fallback Collision" where other services boot Local Torch
         # while the ML service is still initializing its own Local Torch.
-        max_attempts = 30
-        attempt_timeout = 2.0
+        max_attempts = 5
+        attempt_timeout = 1.0
         
         logger.debug(f"Model Manager: Checking ML Inference health at {url}...")
         
@@ -335,20 +335,17 @@ def _try_http_embedding_provider() -> object | None:
                 with httpx.Client(timeout=attempt_timeout) as client:
                     resp = client.get(f"{url}/health")
                     if resp.status_code == 200:
-                        client = EmbeddingServiceClient()
+                        provider = EmbeddingServiceClient()
                         logger.info(f"Model Manager: Connected to ML Inference HTTP Service ({url})")
-                        return client
-                    
-                    logger.debug(f"Model Manager: ML Inference at {url} not ready (status {resp.status_code}). Attempt {attempt+1}/{max_attempts}...")
+                        return provider
             except httpx.RequestError:
-                if attempt == 0:
-                    logger.debug(f"Model Manager: ML Inference at {url} unreachable, waiting for boot...")
+                pass
             
-            # If we are in a thread in the same process, we MUST wait
-            import time
-            time.sleep(2.0)
+            if attempt < max_attempts - 1:
+                import time
+                time.sleep(1.0)
             
-        logger.warning(f"Model Manager: ML Inference at {url} failed to respond after {max_attempts} attempts. Falling back to Local/API.")
+        logger.warning(f"Model Manager: ML Inference at {url} not ready. Falling back to Local/API.")
         return None
         
     except Exception as e:
@@ -368,20 +365,20 @@ def _try_http_reranker_provider() -> object | None:
         url = ServiceRegistry.get_url(ServiceName.ML_INFERENCE)
         
         # Reuse logic for reranker
-        max_attempts = 10
+        max_attempts = 5
         for _ in range(max_attempts):
             try:
-                with httpx.Client(timeout=2.0) as client:
+                with httpx.Client(timeout=1.0) as client:
                     resp = client.get(f"{url}/health")
                     if resp.status_code == 200:
-                        client = RerankerServiceClient()
-                        logger.info(f"Model Manager: Connected to ML Inference HTTP Service ({url})")
-                        return client
+                        provider = RerankerServiceClient()
+                        logger.info(f"Model Manager: Connected to Reranker HTTP Service ({url})")
+                        return provider
             except httpx.RequestError:
                 pass
+            
             import time
             time.sleep(1.0)
-
         return None
         
     except Exception as e:
