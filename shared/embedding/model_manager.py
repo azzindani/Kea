@@ -310,23 +310,35 @@ def _try_http_embedding_provider() -> object | None:
         
         url = ServiceRegistry.get_url(ServiceName.ML_INFERENCE)
         
-        # 0.4.0: Rigorous reachability check
-        # We use a sync client with a very short timeout to verify the service is actually there.
-        # This avoids the "Ghost Client" problem where we return a client that always 404s.
-        try:
-            with httpx.Client(timeout=0.5) as client:
-                # Try root or health
-                resp = client.get(f"{url}/health")
-                if resp.status_code != 200:
-                    logger.debug(f"Model Manager: ML Inference at {url} returned {resp.status_code}, falling back.")
-                    return None
-        except httpx.RequestError:
-            logger.debug(f"Model Manager: ML Inference at {url} unreachable, falling back.")
-            return None
-
-        client = EmbeddingServiceClient()
-        logger.info(f"Model Manager: Connected to ML Inference HTTP Service ({url})")
-        return client
+        # 0.4.0: Rigorous reachability check with boot-up patience
+        # We use a sync client with retries to wait for the service to finish loading models.
+        # This prevents the "Cold Start Fallback Collision" where other services boot Local Torch
+        # while the ML service is still initializing its own Local Torch.
+        max_attempts = 30
+        attempt_timeout = 2.0
+        
+        logger.debug(f"Model Manager: Checking ML Inference health at {url}...")
+        
+        for attempt in range(max_attempts):
+            try:
+                with httpx.Client(timeout=attempt_timeout) as client:
+                    resp = client.get(f"{url}/health")
+                    if resp.status_code == 200:
+                        client = EmbeddingServiceClient()
+                        logger.info(f"Model Manager: Connected to ML Inference HTTP Service ({url})")
+                        return client
+                    
+                    logger.debug(f"Model Manager: ML Inference at {url} not ready (status {resp.status_code}). Attempt {attempt+1}/{max_attempts}...")
+            except httpx.RequestError:
+                if attempt == 0:
+                    logger.debug(f"Model Manager: ML Inference at {url} unreachable, waiting for boot...")
+            
+            # If we are in a thread in the same process, we MUST wait
+            import time
+            time.sleep(2.0)
+            
+        logger.warning(f"Model Manager: ML Inference at {url} failed to respond after {max_attempts} attempts. Falling back to Local/API.")
+        return None
         
     except Exception as e:
         logger.debug(f"Model Manager: HTTP embedding client initialization failed: {e}")
@@ -344,17 +356,22 @@ def _try_http_reranker_provider() -> object | None:
         
         url = ServiceRegistry.get_url(ServiceName.ML_INFERENCE)
         
-        try:
-            with httpx.Client(timeout=0.5) as client:
-                resp = client.get(f"{url}/health")
-                if resp.status_code != 200:
-                    return None
-        except httpx.RequestError:
-            return None
+        # Reuse logic for reranker
+        max_attempts = 10
+        for _ in range(max_attempts):
+            try:
+                with httpx.Client(timeout=2.0) as client:
+                    resp = client.get(f"{url}/health")
+                    if resp.status_code == 200:
+                        client = RerankerServiceClient()
+                        logger.info(f"Model Manager: Connected to ML Inference HTTP Service ({url})")
+                        return client
+            except httpx.RequestError:
+                pass
+            import time
+            time.sleep(1.0)
 
-        client = RerankerServiceClient()
-        logger.info(f"Model Manager: Connected to ML Inference HTTP Service ({url})")
-        return client
+        return None
         
     except Exception as e:
         logger.debug(f"Model Manager: HTTP reranker client initialization failed: {e}")

@@ -119,10 +119,17 @@ class PostgresToolRegistry:
         if updates_needed:
             logger.info(f"Registry: Embedding {len(updates_needed)} new/modified tools in batches...")
             
-            # Senior Architect Fix: Batch processing for large toolsets (2K+)
+            # Senior Architect Fix: Dynamic Batch processing for large toolsets
             batch_size = 50
-            for i in range(0, len(updates_needed), batch_size):
-                batch = updates_needed[i : i + batch_size]
+            total_updated = 0
+            
+            from shared.config import get_settings
+            settings = get_settings()
+            
+            i = 0
+            while i < len(updates_needed):
+                actual_batch_size = min(batch_size, len(updates_needed) - i)
+                batch = updates_needed[i : i + actual_batch_size]
                 batch_texts = []
                 for tool, schema, _ in batch:
                     # Build rich embedding text
@@ -149,9 +156,6 @@ class PostgresToolRegistry:
                     batch_texts.append(desc)
                 
                 # Retry loop for the batch
-                from shared.config import get_settings
-                settings = get_settings()
-                
                 for attempt in range(settings.database.max_retries):
                     try:
                         embeddings = await self.embedder.embed(batch_texts)
@@ -170,17 +174,32 @@ class PostgresToolRegistry:
                                             last_seen = CURRENT_TIMESTAMP
                                     """, tool.name, new_hash, json.dumps(schema), embeddings[j])
                                     
-                        logger.info(f"Registry: Committed batch {i//batch_size + 1} ({len(batch)} tools)")
-                        await asyncio.sleep(0.1)
+                        total_updated += len(batch)
+                        logger.info(f"Registry: Committed {len(batch)} tools")
+                        i += actual_batch_size
                         break 
                     except Exception as e:
-                        if attempt < settings.database.max_retries - 1:
+                        error_str = str(e).lower()
+                        if "500" in error_str or "timeout" in error_str or "disconnected" in error_str:
+                            import math
+                            if batch_size > 1:
+                                logger.warning(f"Tool batch OOM/Timeout (attempt {attempt+1}). Halving batch size from {batch_size} to {math.ceil(batch_size/2)}.")
+                                batch_size = math.ceil(batch_size / 2)
+                                await asyncio.sleep(settings.database.retry_delay)
+                                continue # Try same batch again with smaller size
+                            else:
+                                logger.error(f"Tool batch permanently failed. Tool schema too large for embedding model.", error=str(e))
+                                i += 1 # Skip problematic tool
+                                break
+                        elif attempt < settings.database.max_retries - 1:
                             logger.warning(f"Tool batch failed (attempt {attempt+1}): {e}. Retrying...")
                             await asyncio.sleep(settings.database.retry_delay)
                         else:
                             logger.error(f"Tool batch permanently failed at offset {i}: {e}")
+                            i += actual_batch_size
+                            break
 
-            logger.info(f"Registry: Successfully synchronized {len(updates_needed)} tools.")
+            logger.info(f"Registry: Successfully synchronized {total_updated} tools.")
 
         return
 
