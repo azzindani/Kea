@@ -301,8 +301,13 @@ def download_video(url: str) -> str:
     """DOWNLOADS video. [ACTION]
     
     [RAG Context]
-    Download video in best quality.
-    Returns output path.
+    The primary "Super Tool" for video acquisition. It utilizes the powerful yt-dlp engine to fetch and save video content from over 1,000 supported websites (YouTube, Vimeo, Twitter, etc.).
+    
+    How to Use:
+    - Provides a standard, high-quality download by default.
+    - Essential for archiving web content or obtaining local copies of video data for offline analysis or transcription.
+    
+    Keywords: video downloader, save video, yt-dlp scrape, media harvest.
     """
     return download_ops.download_video(url)
 
@@ -396,8 +401,12 @@ def download_with_metadata(url: str) -> str:
     """DOWNLOADS metadata. [ACTION]
     
     [RAG Context]
-    Download video with full metadata embedded.
-    Returns output path.
+    An enterprise-ready "Super Tool" for data archiving. It downloads the video stream while simultaneously embedding full technical and descriptive metadata—such as title, uploader, upload date, and tags—directly into the output file's headers.
+    
+    How to Use:
+    - Best for building local searchable media libraries where metadata must stay attached to the file regardless of filesystem moves.
+    
+    Keywords: metadata embedding, media archiving, structured video, data preservation.
     """
     return download_ops.download_with_metadata(url)
 

@@ -119,7 +119,13 @@ async def get_block_number(rpc_url: str = None) -> str:
     """FETCHES current block number. [ACTION]
     
     [RAG Context]
-    Returns the number of the most recent block.
+    Retrieves the index of the most recent block successfully added to the blockchain. This serves as the system's "heartbeat" and is used to measure the passage of time or the confirmation depth of recent transactions.
+    
+    How to Use:
+    - Useful for determining if the network is stalled or if your local RPC node is synchronized.
+    - Used as a reference point for 'from_block' and 'to_block' in event indexing.
+    
+    Keywords: block height, current block, chain status, network sync.
     """
     return await run_op(rpc.get_block_number, rpc_url=rpc_url)
 
@@ -128,7 +134,13 @@ async def get_transaction_count(address: str, rpc_url: str = None) -> str:
     """FETCHES transaction count (Nonce). [ACTION]
     
     [RAG Context]
-    Required for constructing new transactions (to determine nonce).
+    Retrieves the 'nonce' of an Ethereum address, which represents the number of transactions sent from that account. Every transaction sent MUST have a nonce exactly one higher than the previous one.
+    
+    How to Use:
+    - Critical for transaction construction; if you use the wrong nonce, the transaction will be rejected by the network.
+    - Also used to identify if an account has any outgoing history.
+    
+    Keywords: account nonce, tx sequence, transaction indexing, sender statistics.
     """
     return await run_op(rpc.get_transaction_count, address=address, rpc_url=rpc_url)
 
@@ -137,7 +149,16 @@ async def get_chain_id(rpc_url: str = None) -> str:
     """FETCHES Chain ID. [ACTION]
     
     [RAG Context]
-    E.g., 1 (Mainnet), 137 (Polygon), 42161 (Arbitrum).
+    Identifies the specific blockchain network being queried. This is a security feature that prevents a transaction from being "replayed" on another chain (e.g., a transaction meant for a testnet being valid on Mainnet).
+    
+    How to Use:
+    - 1: Ethereum Mainnet
+    - 137: Polygon
+    - 42161: Arbitrum
+    - 10: Optimism
+    - 8453: Base
+    
+    Keywords: network id, chain identifier, eip-155, replay protection.
     """
     return await run_op(rpc.get_chain_id, rpc_url=rpc_url)
 
@@ -484,17 +505,45 @@ tokens = {
 # Chainlink Shortcuts
 @mcp.tool()
 async def get_chainlink_eth_usd() -> str:
-    """FETCHES ETH/USD price. [ACTION]"""
+    """FETCHES ETH/USD price. [ACTION]
+    
+    [RAG Context]
+    A high-precision "Super Tool" for fetching the definitive ETH/USD exchange rate. It queries the Chainlink decentralized oracle network, which aggregates prices from dozens of high-volume exchanges.
+    
+    How to Use:
+    - Returns the current price of Ethereum in US Dollars. 
+    - Essential for calculating the fiat value of gas fees, portfolio holdings, or DeFi liquidation thresholds.
+    
+    Keywords: eth price, ethereum value, chainlink oracle, market rate.
+    """
     return await run_op(oracle.get_chainlink_price, feed_address="0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419")
 
 @mcp.tool()
 async def get_chainlink_btc_usd() -> str:
-    """FETCHES BTC/USD price. [ACTION]"""
+    """FETCHES BTC/USD price. [ACTION]
+    
+    [RAG Context]
+    A critical "Super Tool" for Bitcoin pricing on-chain. It utilizes the Chainlink network to provide the highly accurate BTC/USD benchmark price used by major DeFi platforms for collateral valuation.
+    
+    How to Use:
+    - Useful for cross-asset analysis or when calculating the BTC-equivalent value of an Ethereum-based portfolio.
+    
+    Keywords: bitcoin price, btc value, crypto oracle, btc market.
+    """
     return await run_op(oracle.get_chainlink_price, feed_address="0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c")
 
 @mcp.tool()
 async def get_chainlink_usdc_usd() -> str:
-    """FETCHES USDC/USD price. [ACTION]"""
+    """FETCHES USDC/USD price. [ACTION]
+    
+    [RAG Context]
+    A stability-monitoring "Super Tool". While USDC is a stablecoin pegged to 1 USD, its on-chain price can fluctuate slightly during market stress. This oracle provides the real-time market value.
+    
+    How to Use:
+    - Essential for verifying that a stablecoin has not "depegged" before using it as collateral in a loan.
+    
+    Keywords: usdc peg, stablecoin price, dollar parity, liquidity check.
+    """
     return await run_op(oracle.get_chainlink_price, feed_address="0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6")
 
 # Register dynamic shortcuts

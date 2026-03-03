@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional, Union, Callable
 from contextlib import contextmanager
 
 import structlog
+from structlog import DropEvent
 from pydantic import BaseModel, Field
 
 # ============================================================================
@@ -334,9 +335,7 @@ class ConsoleRenderer:
             markup = f"{head}{io_hint} {message_colored}{tail}"
             
             self.console.print(markup)
-            
-            import structlog
-            raise structlog.DropEvent
+            raise DropEvent
         else:
             # Fallback pure string for standard logging without rich
             io_hint = ""
@@ -383,8 +382,14 @@ class UnifiedBoundLogger(structlog.stdlib.BoundLogger):
     def emergency(self, event: str, **kw: Any) -> Any:
         return self._proxy_to_logger("critical", event, **{**kw, "level": "emergency"})
 
+_LOGGING_CONFIGURED = False
+
 def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optional[str] = None, force_stderr: bool = True):
     """Standardized logging setup for all codebases."""
+    global _LOGGING_CONFIGURED
+    if _LOGGING_CONFIGURED:
+        return
+
     from shared.config import get_settings
     settings = get_settings()
     
@@ -397,9 +402,10 @@ def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optiona
 
     root_logger = logging.getLogger()
 
-    # ── Purge ALL existing handlers (ours, pytest's, log-cli, etc.) ──
+    # ── Purge ALL existing handlers ──
     root_logger.handlers = []
-    for name in logging.root.manager.loggerDict:
+    # Use list() to avoid "dictionary changed size during iteration" crash
+    for name in list(logging.root.manager.loggerDict.keys()):
         lg = logging.getLogger(name)
         lg.handlers = []
         lg.propagate = True
@@ -429,7 +435,26 @@ def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optiona
         cache_logger_on_first_use=True,
     )
 
+# ── SAFETY MONKEYPATCH ──
+# To prevent AttributeError on loggers created BEFORE setup_logging (top-level module loggers),
+# we attach the methods to the base BoundLogger only if they don't already exist.
+for method_name in ["success", "notice", "alert", "emergency"]:
+    if not hasattr(structlog.stdlib.BoundLogger, method_name):
+        def _make_method(name):
+            level_map = {"success": "info", "notice": "info", "alert": "error", "emergency": "critical"}
+            def _method(self, event, **kw):
+                # Safely proxy if the method is available, else fallback to info/error
+                proxy_method = getattr(self, "_proxy_to_logger", None)
+                if proxy_method:
+                    return proxy_method(level_map[name], event, **{**kw, "level": name})
+                # Total fallback if not a stdlib logger
+                original_method = getattr(self, level_map[name], self.info)
+                return original_method(event, **{**kw, "level": name})
+            return _method
+        setattr(structlog.stdlib.BoundLogger, method_name, _make_method(method_name))
+
     # Suppress noisy framework / infrastructure loggers
+    _LOGGING_CONFIGURED = True
     for lib in (
         "httpx", "httpcore", "asyncio", "urllib3",
         # Jupyter / IPython kernel internals

@@ -57,22 +57,36 @@ async def plot_line(x: VectorInput, y: VectorInput, title: Optional[str] = None,
 
 @mcp.tool()
 async def plot_scatter(x: VectorInput, y: VectorInput, s: Optional[VectorInput] = None, c: Optional[VectorInput] = None, title: Optional[str] = None, xlabel: Optional[str] = None, ylabel: Optional[str] = None, alpha: float = 1.0, figsize: List[int] = [10, 6]) -> str: 
-    """PLOTS scatter chart. [ACTION]
+    """GENERATES a scatter plot to visualize the relationship and correlation between two variables. [ACTION]
     
     [RAG Context]
-    Standard scatter plot. Best for correlation analysis.
-    Returns path to saved image.
+    An essential "Correlation Discovery Super Tool" for exploratory data analysis. Unlike line charts which imply a sequence, a scatter plot reveals the raw density and distribution of data points across a Cartesian plane. It is the primary tool for identifying "Clusters" (groups of similar data), "Outliers" (anomalous points), and "Correlations" (positive or negative trends). It allows the system to visually confirm whether Variable A is a driver for Variable B, which is a mandatory requirement before training predictive machine learning models.
+    
+    How to Use:
+    - 'x' & 'y': The independent and dependent variables.
+    - 's': Marker size, which can be linked to a third variable (Bubble Chart).
+    - 'c': Marker color, perfect for category-based coloring or heat-mapping density.
+    - Resulting image is saved as a PNG artifact for use in reports or user presentations.
+    
+    Keywords: scatter plot, correlation chart, bubble chart, relationship visualization, outlier detection, data distribution.
     """
     from mcp_servers.matplotlib_server.tools import basic_ops
     return await basic_ops.plot_scatter(x, y, s, c, title, xlabel, ylabel, alpha, figsize)
 
 @mcp.tool()
 async def plot_bar(x: VectorInput, height: VectorInput, title: Optional[str] = None, xlabel: Optional[str] = None, ylabel: Optional[str] = None, color: str = 'blue', figsize: List[int] = [10, 6]) -> str: 
-    """PLOTS bar chart. [ACTION]
+    """CREATES a standard bar chart for comparing discrete categories or qualitative data. [ACTION]
     
     [RAG Context]
-    Standard bar chart. Best for categorical comparison.
-    Returns path to saved image.
+    A fundamental "Comparative Intelligence Super Tool" used for high-level business reporting. Bar charts are the superior choice when comparing distinct groups—such as "Sales by Region," "Inventory by Warehouse," or "Energy Consumption by Month." Unlike line charts, bar charts emphasize the individual magnitude of each category, making it easy for the system to spot high-performers and under-performers at a glance. It is the mandatory tool for transforming raw aggregate data (from 'value_counts' or 'groupby') into a persuasive visual presentation.
+    
+    How to Use:
+    - 'x': Categorical labels (strings).
+    - 'height': Numerical values representing the magnitude of each bar.
+    - Use 'color' to differentiate categories or highlight specific data points for the user.
+    - Essential for executive summaries and operational dashboards.
+    
+    Keywords: bar chart, category comparison, qualitative plot, business reporting, frequency chart, magnitude visualization.
     """
     from mcp_servers.matplotlib_server.tools import basic_ops
     return await basic_ops.plot_bar(x, height, title, xlabel, ylabel, color, figsize)
@@ -131,22 +145,34 @@ async def plot_hist(x: VectorInput, bins: int = 10, title: Optional[str] = None,
 
 @mcp.tool()
 async def plot_boxplot(data: DataInput, labels: Optional[List[str]] = None, title: Optional[str] = None, figsize: List[int] = [10, 6]) -> str: 
-    """PLOTS boxplot. [ACTION]
+    """RENDERS a Box-and-Whisker plot to summarize the statistical distribution of numeric data. [ACTION]
     
     [RAG Context]
-    Standard boxplot. Best for statistical summary (quartiles, outliers).
-    Returns path to saved image.
+    An elite "Statistical Diagnostic Super Tool" commonly used for data quality and variance analysis. A boxplot provides a five-number summary in a single graphic: (1) Minimum, (2) First Quartile, (3) Median, (4) Third Quartile, and (5) Maximum. Crucially, it highlights "Outliers" as individual points beyond the whiskers. This makes it the primary tool for the Kea system to compare the "Spread" and "Skewness" of different datasets—for example, comparing sensor precision across different machines or salary distributions across different corporate departments.
+    
+    How to Use:
+    - 'data': A list of numerical datasets.
+    - 'labels': Names for each column/dataset being compared.
+    - Mandatory for "Statistical Profiling" and identifying hidden data anomalies that a simple 'mean' calculation would miss.
+    
+    Keywords: boxplot, whisker plot, quartile analysis, distribution summary, outlier identification, variance comparison.
     """
     from mcp_servers.matplotlib_server.tools import stats_ops
     return await stats_ops.plot_boxplot(data, labels, title, figsize)
 
 @mcp.tool()
 async def plot_violin(data: DataInput, labels: Optional[List[str]] = None, title: Optional[str] = None, figsize: List[int] = [10, 6]) -> str: 
-    """PLOTS violin plot. [ACTION]
+    """CREATES a violin plot combining boxplot features with a kernel density estimation. [ACTION]
     
     [RAG Context]
-    Standard violin plot. Combines boxplot and KDE.
-    Returns path to saved image.
+    A sophisticated "Density Discovery Super Tool" for deep statistical analysis. While a boxplot shows quartiles, a violin plot shows the actual "Shape" of the data's probability density—revealing if a dataset is bimodal (has two "humps") or has complex peaks that a boxplot would hide. It is the premium choice for comparing the internal structure of large populations, such as "Customer Behavior Peaks" or "Network Latency Distributions." It allows the reasoning kernel to see not just the extremes, but where the "Bulk" of the action is happening.
+    
+    How to Use:
+    - 'data': A list of numerical arrays to compare.
+    - Best used when the dataset size is large enough to support a meaningful density estimation.
+    - Provides a more "Information-Rich" visual than a standard boxplot for scientific or technical reporting.
+    
+    Keywords: violin plot, density estimation, probability distribution, shape analysis, advanced statistics, multimodal discovery.
     """
     from mcp_servers.matplotlib_server.tools import stats_ops
     return await stats_ops.plot_violin(data, labels, title, figsize)
@@ -178,33 +204,51 @@ async def plot_hexbin(x: VectorInput, y: VectorInput, gridsize: int = 50, title:
 # ==========================================
 @mcp.tool()
 async def plot_contour(X: DataInput, Y: DataInput, Z: DataInput, levels: int = 10, title: Optional[str] = None, figsize: List[int] = [10, 8]) -> str: 
-    """PLOTS contour chart. [ACTION]
+    """PLOTS a contour line chart to represent a 3D surface on a 2D coordinate system. [ACTION]
     
     [RAG Context]
-    Standard contour plot. Best for 3D surface representation in 2D.
-    Returns path to saved image.
+    A specialized "Scientific Topology Super Tool" used for visualizing isolines (lines of constant value). Unlike filled contours, a regular contour plot uses distinct lines to show where the Z-value is the same—similar to a topographic elevation map. This is essential for precision engineering, meteorology (isobars/isotherms), and optimization problems where you need to identify the "Paths" of least resistance or the "Boundaries" of specific value ranges. It provides a clean, professional visual that doesn't overwhelm the user with solid color bands.
+    
+    How to Use:
+    - 'X', 'Y': The grid coordinates.
+    - 'Z': The magnitude at each grid point.
+    - Resulting image highlights the "Skeleton" of the data's surface, making it easy to overlay with other scatter or line plots.
+    
+    Keywords: contour lines, isolines, topographic map, 2d surface skeleton, mathematical visualization, gradient paths.
     """
     from mcp_servers.matplotlib_server.tools import scientific_ops
     return await scientific_ops.plot_contour(X, Y, Z, levels, title, figsize)
 
 @mcp.tool()
 async def plot_contourf(X: DataInput, Y: DataInput, Z: DataInput, levels: int = 10, title: Optional[str] = None, figsize: List[int] = [10, 8]) -> str: 
-    """PLOTS filled contour. [ACTION]
+    """GENERATES a filled contour plot for visualizing 3D surfaces in a 2D plane. [ACTION]
     
     [RAG Context]
-    Standard filled contour plot.
-    Returns path to saved image.
+    A high-level "Scientific Mapping Super Tool" for representing complex multi-variable gradients. It uses color-filled bands to show levels of a third variable (Z) over a horizontal grid (X, Y). This is the industry standard for visualizing topographic maps, temperature gradients, or probability heat-maps in theoretical physics. In the corporate kernel, it's used for "Optimal Service Coverage" maps or "Risk Intensity Gradients" where two factors (like Latitude/Longitude or Age/Income) interact to create a varying level of intensity.
+    
+    How to Use:
+    - 'X', 'Y', 'Z': 2D meshgrid arrays (refer to NumPy documentation for meshgrid creation).
+    - 'levels': The number of color bands; higher levels create a "Smoother" appearance but take longer to render.
+    - Provides a clear, intuitive way to see "Peaks" and "Valleys" in complex relational data.
+    
+    Keywords: contour plot, filled contour, gradient map, 2d surface mapping, intensity plot, topography visualization.
     """
     from mcp_servers.matplotlib_server.tools import scientific_ops
     return await scientific_ops.plot_contourf(X, Y, Z, levels, title, figsize)
 
 @mcp.tool()
 async def plot_heatmap(data: DataInput, title: Optional[str] = None, cmap: str = 'viridis', figsize: List[int] = [10, 8]) -> str: 
-    """PLOTS heatmap. [ACTION]
+    """RENDERS a color-coded heatmap to visualize matrix data and cross-correlations. [ACTION]
     
     [RAG Context]
-    Standard heatmap. Best for matrix visualization.
-    Returns path to saved image.
+    The absolute "Matrix Intelligence Super Tool" for identifying patterns in multi-dimensional arrays. A heatmap transforms a sea of numbers into a visual "Color Map" where high values are hot and low values are cold. It is most famously used for "Correlation Matrices" (seeing which features move together), "Confusion Matrices" (evaluating machine learning model errors), and "Customer Journey Heatmaps" (identifying high-traffic areas on a website). It allows the reasoning kernel to instantly spot "Hotspots" and anomalies in massive spreadsheets that would be impossible to see in raw text.
+    
+    How to Use:
+    - 'data': A 2D array or matrix.
+    - 'cmap': The color scheme (e.g., 'magma', 'coolwarm', 'RdYlGn').
+    - Essential for financial risk modeling, genomic heatmaps, and identifying seasonal spikes in time-series grids.
+    
+    Keywords: heatmap, matrix visualization, correlation map, hotspot discovery, color grid, intensity visualization.
     """
     from mcp_servers.matplotlib_server.tools import scientific_ops
     return await scientific_ops.plot_heatmap(data, title, cmap, figsize)
@@ -236,11 +280,17 @@ async def plot_quiver(X: DataInput, Y: DataInput, U: DataInput, V: DataInput, ti
 # ==========================================
 @mcp.tool()
 async def plot_scatter3d(x: VectorInput, y: VectorInput, z: VectorInput, title: Optional[str] = None, figsize: List[int] = [10, 8]) -> str: 
-    """PLOTS 3D scatter. [ACTION]
+    """CREATES a true 3D scatter plot to visualize the interaction between three independent variables. [ACTION]
     
     [RAG Context]
-    3D scatter plot. Best for 3-variable correlation.
-    Returns path to saved image.
+    An elite "Multi-Variable Analysis Super Tool" that breaks the 2D barrier. By adding a Z-axis, this plot allows the system to identify "Spatial Clusters" and "Complex Planes" that are invisible in flat 2D scatter plots. It is the primary tool for "3D Anomaly Detection" (identification of points that are outliers across three metrics simultaneously) and "3D Segmentation" (grouping users based on Age, Income, and Spending). It provides a high-fidelity visual experience that effectively communicates the complexity of high-dimensional data relationships.
+    
+    How to Use:
+    - 'x', 'y', 'z': Three numerical arrays of equal length.
+    - Yields a PNG image showing the 3D projection, helping the user understand "Depth" in their data.
+    - Ideal for physical modeling, cluster validation, and advanced demographic research.
+    
+    Keywords: 3d scatter, xyz plot, spatial visualization, multi-variable clustering, depth analysis, 3d relationship mapping.
     """
     from mcp_servers.matplotlib_server.tools import three_d_ops
     return await three_d_ops.plot_scatter3d(x, y, z, title, figsize)
@@ -263,11 +313,17 @@ async def plot_surface(X: DataInput, Y: DataInput, Z: DataInput, title: Optional
 
 @mcp.tool()
 async def plot_wireframe(X: DataInput, Y: DataInput, Z: DataInput, title: Optional[str] = None, figsize: List[int] = [10, 8]) -> str: 
-    """PLOTS 3D wireframe. [ACTION]
+    """DRAWS a 3D wireframe mesh representing a mathematical surface or structural grid. [ACTION]
     
     [RAG Context]
-    3D wireframe plot. Faster than surface plot.
-    Returns path to saved image.
+    A high-speed "3D structural Super Tool" for visualizing the framework of a surface. Unlike a solid 'plot_surface', the wireframe only shows the connecting lines of the grid, making it much more computationally efficient and often easier to interpret when looking at multiple overlapping surfaces. It is the primary tool for "Structural Engineering Visualization," "Network Latency Grids," and "Surface Trend Modeling" where seeing the underlying mesh structure is more important than the surface color alone.
+    
+    How to Use:
+    - Requires 2D meshgrids (X, Y) and a 2D data array (Z).
+    - Lightweight and fast to render compared to shaded surfaces.
+    - Excellent for showing the "Skeleton" of complex functions or predictive surface models.
+    
+    Keywords: wireframe plot, 3d mesh, structural grid, surface framework, xyz skeleton, grid visualization.
     """
     from mcp_servers.matplotlib_server.tools import three_d_ops
     return await three_d_ops.plot_wireframe(X, Y, Z, title, figsize)
@@ -310,23 +366,34 @@ async def plot_stair(y: VectorInput, title: Optional[str] = None, figsize: List[
 # ==========================================
 @mcp.tool()
 async def create_mosaic(layout: str, plots: Dict[str, Dict[str, Any]], figsize: List[int] = [12, 8], title: Optional[str] = None) -> str: 
-    """CREATES mosaic layout. [ACTION]
+    """CREATES a custom multi-chart mosaic layout using semantic positioning. [ACTION]
     
     [RAG Context]
-    Complex subplot layout.
-    Args:
-        layout: Semantic layout string (e.g. "AAB;CCD").
+    A specialized "Layout Orchestration Super Tool" for building complex infographics and scientific posters. Unlike simple grids, a mosaic allows the system to define "Areas" of different sizes using a simple string map (e.g., 'AAB;CCD'). This tool allows the AI to design a custom dashboard where a main 'Summary' chart takes up the top half, while multiple smaller 'Detail' charts are arranged below. It is the primary way the Kea system organizes its visual findings into a professional, easy-to-read narrative.
+    
+    How to Use:
+    - 'layout': A string representation of the grid (e.g., `"AA;BC"`).
+    - 'plots': A dictionary mapping the labels in the layout ('A', 'B', 'C') to the function calls and data needed for those sub-plots.
+    - Yields a single high-resolution image containing the entire orchestrated layout.
+    
+    Keywords: mosaic layout, dashboard design, subplot orchestration, grid mapping, visual narrative, infographics builder.
     """
     from mcp_servers.matplotlib_server.tools import layout_ops
     return await layout_ops.create_mosaic(layout, plots, figsize, title)
 
 @mcp.tool()
 async def create_animation(frames_data: List[DataInput], plot_type: str = 'line', x: Optional[DataInput] = None, title: Optional[str] = None, interval: int = 200, figsize: List[int] = [10, 6]) -> str: 
-    """CREATES animation. [ACTION]
+    """GENERATES a dynamic video or GIF animation to visualize time-evolving datasets. [ACTION]
     
     [RAG Context]
-    Generates GIF/MP4 animation from frames.
-    Returns path to video file.
+    An elite "Temporal Dynamics Super Tool" used for demonstrating change over time in a way that static charts cannot. It essentially creates a "Movie" of your data, allowing the system to show how a stock price fluctuated, how a heat-map shifted across a warehouse floor, or how a machine learning model converged during training. In the corporate kernel, this is used for high-impact presentations and for auditing high-frequency sensor data where the "Flow" of data is as important as its final state.
+    
+    How to Use:
+    - 'frames_data': A list of datasets, one for each frame of the animation.
+    - 'interval': Time in milliseconds between each frame.
+    - Result is returned as a path to an MP4 or GIF file which can be embedded in reports.
+    
+    Keywords: data animation, temporal video, dynamic visualization, time-lapse chart, series flow, gif generator.
     """
     from mcp_servers.matplotlib_server.tools import animation_ops
     return await animation_ops.create_animation(frames_data, plot_type, x, title, interval, figsize)
@@ -347,11 +414,17 @@ async def draw_shapes(shapes: List[Dict[str, Any]], title: Optional[str] = None,
 
 @mcp.tool()
 async def plot_sankey(flows: VectorInput, labels: Optional[VectorInput] = None, orientations: Optional[VectorInput] = None, title: Optional[str] = None, figsize: List[int] = [10, 6]) -> str: 
-    """PLOTS Sankey diagram. [ACTION]
+    """RENDERS a Sankey diagram to visualize the flow of energy, money, or materials through a system. [ACTION]
     
     [RAG Context]
-    Sankey diagram for flow visualization.
-    Returns path to saved image.
+    The ultimate "Flow Intelligence Super Tool" for supply chain and financial auditing. A Sankey diagram uses lines of varying widths to show the magnitude of transfer between entities. It is the primary tool for "Budget Auditing" (seeing how revenue is split into different departments), "Supply Chain Logistics" (mapping the flow of goods from factory to customer), and "Energy Audits" (visualizing losses in a power system). It allows the reasoning kernel to instantly identify "Bottlenecks" and "Leaks" in any corporate process that involves the movement of resources.
+    
+    How to Use:
+    - 'flows': A list of numerical values where positive values represent inputs and negative values represent outputs (e.g., `[100, -50, -30, -20]`).
+    - 'labels': Names for each flow branch.
+    - Essential for understanding the "Life Cycle" of capital and materials within the corporation.
+    
+    Keywords: sankey diagram, flow visualization, resource mapping, budget audit, supply chain flow, transfer diagram.
     """
     from mcp_servers.matplotlib_server.tools import advanced_ops
     return await advanced_ops.plot_sankey(flows, labels, orientations, title, figsize)
@@ -400,10 +473,16 @@ async def create_dashboard(plots: List[Dict[str, Any]], layout: List[int] = [2, 
 
 @mcp.tool()
 async def set_style(style: str) -> str: 
-    """SETS plot style. [ACTION]
+    """APPLIES a global aesthetic theme to all subsequent plots for professional consistency. [ACTION]
     
     [RAG Context]
-    Sets global matplotlib style (e.g. 'seaborn', 'ggplot').
+    A vital "Brand & Clarity Super Tool" for ensuring that all visual artifacts match the corporate design standards. Matplotlib can look "clinical" by default; this tool allows the system to switch to high-quality themes like 'seaborn' (for soft, modern statistical plots), 'ggplot' (for academic-grade aesthetics), or 'dark_background' (for high-contrast dashboards). This is a mandatory requirement for generating "Investor-Ready" reports where the visual professionalism of the data is as important as the data itself.
+    
+    How to Use:
+    - 'style': A valid style string (use 'get_styles' to see the full list of available themes on this machine).
+    - Affects colors, fonts, gridlines, and backgrounds for all following chart generation calls.
+    
+    Keywords: plotting style, visual theme, chart aesthetics, seaborn theme, ggplot style, dashboard design.
     """
     from mcp_servers.matplotlib_server.tools import super_ops
     return await super_ops.set_style(style)

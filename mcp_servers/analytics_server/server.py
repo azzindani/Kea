@@ -66,16 +66,17 @@ async def eda_auto(
     data: Dict[str, Any] = None, 
     target_column: str = None
 ) -> str:
-    """ANALYZES data (EDA). [ACTION]
+    """PERFORMS a high-speed, automated Exploratory Data Analysis (EDA) on a target dataset. [ACTION] [SUPER TOOL]
     
     [RAG Context]
-    An automated "Super Tool" for Exploratory Data Analysis. It scans the dataset to detect types, distributions, and initial correlations.
+    The absolute "Discovery Phase Super Tool" for any data-driven project. This tool acts as the "Intelligence Scout," scanning raw datasets to automatically identify data types, detect skewed distributions, calculate initial correlations, and flag obvious quality issues. In the Kea corporate kernel, it is the mandatory first step before building any model or drafting any report. It converts "Raw Data" into "Insights," allowing the agent to understand the "Statistical Landscape" and identify potential pitfalls or opportunities for deeper analysis.
     
     How to Use:
-    - Provide 'data_url' (path to CSV/Parquet) or a raw 'data' dict.
-    - 'target_column' helps focus the analysis on predictive patterns for that specific field.
+    - 'data_url': The path to a CSV or Parquet file.
+    - 'target_column': If specified, the tool will prioritize finding relationships that influence this specific metric, identifying key drivers and potential predictors.
+    - Returns a comprehensive text summary of the dataset's shape, feature importance, and outlier density.
     
-    Keywords: auto eda, dataset profile, initial scan, discovery phase.
+    Keywords: auto eda, dataset profile, initial scan, discovery phase, statistical scouting, data overview.
     """
     return await run_op(eda.eda_auto, data_url=data_url, data=data, target_column=target_column)
 
@@ -84,11 +85,16 @@ async def data_profiler(
     data_url: str, 
     minimal: bool = True
 ) -> str:
-    """PROFILES data. [ACTION]
+    """GENERATES a deep-dive, technical "Data Profile Report" for a dataset. [ACTION]
     
     [RAG Context]
-    Generate detailed data profile report.
-    Returns profile string.
+    An elite "Dataset Audit Super Tool" powered by industry-standard profiling logic. While `eda_auto` provides high-level insights, `data_profiler` creates an exhaustive, variable-by-variable breakdown. It calculates missingness, distinctness, monotonicity, and identifies common data pathologies like "High Correlation" or "Constant Values." It is the mandatory tool for "Pre-Flight Data Verification," ensuring that a dataset is structurally sound and mathematically clean before being ingested into critical enterprise dashboards or machine learning trainers.
+    
+    How to Use:
+    - 'data_url': Path to the remote or local data source.
+    - 'minimal': If True (default), it creates a fast summary. If False, it performs a much more intensive analysis, including interaction matrices and detailed histograms for every column.
+    
+    Keywords: data profiling, dataset audit, structural integrity, technical report, pre-flight check, variable breakdown.
     """
     return await run_op(eda.data_profiler, data_url=data_url, minimal=minimal)
 
@@ -100,16 +106,18 @@ async def data_cleaner(
     handle_outliers: str = "none",
     remove_duplicates: bool = False
 ) -> str:
-    """CLEANS data. [ACTION]
+    """EXECUTES professional-grade data scrubbing and sanitization procedures. [ACTION] [SUPER TOOL]
     
     [RAG Context]
-    A robust "Super Tool" for dataset sanitization. Essential for preparing data for machine learning or reporting.
+    The definitive "Scrubbing Super Tool" for corporate data hygiene. Raw enterprise data is almost always "Dirty"—containing missing fields, duplicate entries, and extreme outliers that can corrupt mathematical analysis. This tool provides an automated, multi-tier cleaning pipeline to rectify these issues. It is the mandatory tool for "Reliability Assurance," ensuring that every downstream tool in the Kea system receives a consistent, sanitized, and high-fidelity dataset.
     
     How to Use:
-    - 'handle_missing': 'mean', 'median', 'mode', or 'drop'.
-    - 'handle_outliers': 'z-score' (removes items >3 std dev) or 'iqr' (inter-quartile range).
+    - 'handle_missing': Specify the strategy ('mean', 'median', 'mode' for imputation, or 'drop' to remove empty rows).
+    - 'handle_outliers': Use 'z-score' for Gaussian-based removal or 'iqr' for robust median-based removal.
+    - 'remove_duplicates': Set to True to ensure every record in the dataset is unique.
+    - Returns a summary of the operations performed and the final health of the cleaned dataset.
     
-    Keywords: dataset scrub, outlier removal, missing value fix, deduplication.
+    Keywords: data cleaning, dataset scrubbing, outlier removal, missing value imputation, deduplication, reliability assurance.
     """
     return await run_op(cleaning.data_cleaner, data_url=data_url, handle_missing=handle_missing, handle_outliers=handle_outliers, remove_duplicates=remove_duplicates)
 
@@ -118,11 +126,16 @@ async def feature_engineer(
     data_url: str, 
     operations: List[str] = []
 ) -> str:
-    """ENGINEERS features. [ACTION]
+    """TRANSFORMS raw columns into high-value predictive features. [ACTION]
     
     [RAG Context]
-    Create derived features from existing columns.
-    Returns modified data summary.
+    An elite "Feature Synthesis Super Tool" used to extract the maximum amount of "Predictive Power" from a dataset. In machine learning, the "Raw" data (like 'Purchase Date') is often less useful than a "Synthesized" feature (like 'Days Since Last Purchase'). This tool automates the creation of these higher-order columns through mathematical operations, categorical encoding, and interaction generation. It is the mandatory tool for "Performance Boosting," allowing the Kea system to refine the data for 10x better model accuracy.
+    
+    How to Use:
+    - 'operations': A list of desired transformations (e.g., 'one_hot_encode', 'log_transform', 'delta_creation').
+    - Result includes a summary of the new feature landscape and its expected contribution to predictive model strength.
+    
+    Keywords: feature engineering, variable synthesis, predictive power, data transformation, encoding, performance boost.
     """
     return await run_op(cleaning.feature_engineer, data_url=data_url, operations=operations)
 
@@ -134,11 +147,16 @@ async def correlation_matrix(
     method: str = "pearson", 
     threshold: float = 0.0
 ) -> str:
-    """CALCULATES correlations. [ACTION]
+    """CALCULATES a comprehensive correlation matrix across all numerical variables in a dataset. [ACTION]
     
     [RAG Context]
-    Compute correlation matrix for numeric columns.
-    Returns correlation table.
+    A vital "Relational Mapping Super Tool" for identifying the inter-dependencies between disparate business metrics. By calculating the correlation between every pair of columns, the tool reveals "Hidden Redundancies" and "Strategic Lever" relationships (e.g., how strongly 'Social Media Reach' actually correlates with 'Conversion Rate'). It is the mandatory tool for "Feature Selection" and "Relationship Auditing," providing the blueprint for building any multi-variable model.
+    
+    How to Use:
+    - 'method': Use 'pearson' for linear relationships or 'spearman' for more robust, non-linear monotonic associations.
+    - 'threshold': Filter out weak correlations to focus only on significant business relationships (e.g., set to 0.7 for strong links only).
+    
+    Keywords: correlation matrix, relationship mapping, feature selection, dependency audit, business drivers, statistical inter-links.
     """
     return await run_op(stats.correlation_matrix, data_url=data_url, data=data, method=method, threshold=threshold)
 
@@ -150,11 +168,17 @@ async def statistical_test(
     column2: str = None, 
     group_column: str = None
 ) -> str:
-    """TESTS statistics. [ACTION]
+    """PERFORMS rigorous hypothesis testing to provide mathematical proof for business claims. [ACTION]
     
     [RAG Context]
-    Run statistical tests on data (ttest, anova, chi2).
-    Returns test results.
+    The definitive "Decision Validation Super Tool" for technical auditing. It moves past simple intuition to provide "Statistical Proof" for observations (e.g., "Is the 5% higher conversion in Region A actually significant, or just a random fluke?"). It supports multiple test types including T-Tests for group comparison, ANOVA for multi-group benchmarking, and Chi-Square for categorical independence. It is the mandatory tool for "Validation Scrutiny," ensuring that every corporate decision is backed by a verifiable P-value.
+    
+    How to Use:
+    - 'test_type': Choose 'ttest', 'anova', or 'chi2'.
+    - 'column1', 'column2': The variables you wish to compare.
+    - Result includes the test statistic and the P-value; a P-value < 0.05 is the standard threshold for "Statistically Significant" proof.
+    
+    Keywords: statistical testing, hypothesis validation, ttest, anova, chi2, decision proof, p-value audit.
     """
     return await run_op(stats.statistical_test, data_url=data_url, test_type=test_type, column1=column1, column2=column2, group_column=group_column)
 

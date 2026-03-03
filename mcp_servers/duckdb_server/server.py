@@ -59,11 +59,16 @@ def connect_db(path: str = "project_data.duckdb") -> str:
 
 @mcp.tool()
 def get_version() -> str: 
-    """FETCHES version. [ACTION]
+    """FETCHES the precise version of the underlying DuckDB engine. [ACTION]
     
     [RAG Context]
-    Get DuckDB version.
-    Returns version string.
+    A critical "Infrastructure Audit Tool" for ensuring compatibility and feature availability. DuckDB has been evolving rapidly, and some advanced SQL features—like specific window functions, nested types, or optimized parquet readers—are only available in newer versions. By checking the version, the Kea kernel can determine if the current environment supports the complex analytical queries it needs to run, or if it needs to fall back to a more conservative SQL dialect. It is a mandatory first step for any automated system that manages persistent data across different deployments.
+    
+    How to Use:
+    - Simply call to get the version string (e.g., '1.1.0').
+    - Essential for logging environment state during a "System Health Check" or before performing a database migration.
+    
+    Keywords: duckdb version, engine info, system compatibility, software audit, database versioning.
     """
     return core_ops.get_version()
 
@@ -79,11 +84,17 @@ def list_extensions() -> str:
 
 @mcp.tool()
 def install_extension(name: str) -> str: 
-    """INSTALLS extension. [ACTION]
+    """INSTALLS a specialized DuckDB extension to enable new SQL capabilities. [ACTION]
     
     [RAG Context]
-    Install a DuckDB extension.
-    Returns status string.
+    A vital "Feature Expansion Super Tool" for extending the database beyond standard SQL. DuckDB uses a modular architecture where massive libraries—like 'httpfs' (for reading data directly from URLs and S3), 'spatial' (for geographic GIS analysis), and 'icu' (for complex international timezones)—are downloaded only when needed. This keeps the core engine lean and fast. This tool allows the system to dynamically "Upgrade" its intelligence by pulling in the specific tools required for a task (e.g., install 'json' before parsing web logs).
+    
+    How to Use:
+    - 'name': The name of the extension (e.g., 'httpfs', 'spatial', 'sqlite_scanner').
+    - MUST be followed by 'load_extension' before the new SQL functions become active in the current session.
+    - Essential for "Just-In-Time" infrastructure preparation.
+    
+    Keywords: install extension, plugin downloader, spatial toolkit, s3 support, database upgrade, dynamic feature loading.
     """
     return core_ops.install_extension(name)
 
@@ -119,11 +130,17 @@ def close_connection() -> str:
 
 @mcp.tool()
 def set_config(key: str, value: str) -> str: 
-    """SETS config. [ACTION]
+    """SETS low-level configuration options to optimize database performance. [ACTION]
     
     [RAG Context]
-    Set DuckDB configuration option.
-    Returns status string.
+    An elite "Performance Tuning Super Tool" for controlling the database engine's resources. Analysing massive datasets (Terabyte-scale) requires precise control over how the CPU and RAM are used. This tool allows the system to set limits on 'memory_limit' (to prevent crashing the host), 'threads' (to maximize multi-core parallel processing), and 'temp_directory' (for spill-to-disk analysis when RAM is full). It is a mandatory requirement for scaling the Kea system from a small laptop to a massive cloud-compute cluster without changing the underlying SQL logic.
+    
+    How to Use:
+    - 'key': The name of the setting (e.g., 'memory_limit', 'access_mode', 'default_order').
+    - 'value': The target setting value (e.g., '4GB', '8', 'READ_ONLY').
+    - Critical for building "Safe" data pipelines that respect system hardware constraints.
+    
+    Keywords: database config, performance tuning, resource limit, thread count, memory management, low-level optimization.
     """
     return core_ops.set_config(key, value)
 
@@ -163,11 +180,17 @@ def fetch_all(query: str) -> List[Dict[str, Any]]:
 
 @mcp.tool()
 def fetch_one(query: str) -> Dict[str, Any]: 
-    """FETCHES one row. [ACTION]
+    """EXECUTES SQL and retrieves exactly one row as a structured dictionary. [ACTION]
     
     [RAG Context]
-    Execute SQL and return first row.
-    Returns JSON dict.
+    A specialized "Lookup Super Tool" for point queries and aggregate status checks. While 'fetch_all' is for datasets, 'fetch_one' is the preferred way to retrieve single configuration records, current system status, or the result of a summary calculation (like `SELECT count(*) FROM table`). It is faster and more memory-efficient when the user only needs a single answer, as it informs the engine to stop processing as soon as the first matching record is found. Essential for state-checks and individual record inspection in automated workflows.
+    
+    How to Use:
+    - Pass any valid SELECT query.
+    - If the query returns multiple rows, only the first one is returned as a JSON-like dictionary.
+    - Perfect for "Existence Checks" and finding the "latest" record in a sorted time-series.
+    
+    Keywords: single row fetch, point lookup, status check, quick query, record retrieval, aggregate result.
     """
     return query_ops.fetch_one(query)
 
@@ -183,11 +206,16 @@ def explain_query(query: str) -> str:
 
 @mcp.tool()
 def count_rows(table_name: str) -> int: 
-    """COUNTS rows. [ACTION]
+    """QUICKLY retrieves the total number of records in a specific table. [ACTION]
     
     [RAG Context]
-    Count rows in a table.
-    Returns int.
+    A fundamental "Data Velocity Super Tool" for auditing and telemetry. Before starting a long-running analysis, the system needs to know if it's dealing with 10 rows or 10 billion rows. This tool provides an instant "Pulse Check" on the size of the dataset. In the Kea corporate kernel, this count is used to dynamically scale hardware resources—if the count is high, the system will automatically allocate more threads and increase memory limits via 'set_config' before proceeding with complex joins or ML model training.
+    
+    How to Use:
+    - 'table_name': The name of any existing table or view.
+    - An essential step for "Data Quality Monitoring"—unexpected drops in row counts can trigger automated alerts about data ingestion failures.
+    
+    Keywords: row count, table size, record auditing, data volume, heartbeat check, table statistics.
     """
     return query_ops.count_rows(table_name)
 
@@ -203,11 +231,16 @@ def get_table_schema(table_name: str) -> List[Dict[str, str]]:
 
 @mcp.tool()
 def list_tables() -> List[str]: 
-    """LISTS tables. [ACTION]
+    """RETRIEVES a complete inventory of all permanent tables in the current database. [ACTION]
     
     [RAG Context]
-    Get list of tables in database.
-    Returns list of strings.
+    A vital "Knowledge Discovery Tool" for exploring the database structure. In a RAG-enabled environment, the system often needs to know which "Data Silos" (Tables) are available before it can answer a user's question. This tool allows the reasoning kernel to map out the available entities, helping it decide whether it needs to query 'EmployeeRecords', 'FinancialData', or 'SensorLogs'. It provides the high-level "Table of Contents" for the analytical workspace, ensuring the AI never tries to query a table that doesn't exist.
+    
+    How to Use:
+    - Simply call to get a list of all table names.
+    - Often used in conjunction with 'get_table_schema' to understand the internal structure of a newly discovered data source.
+    
+    Keywords: list tables, database inventory, data discovery, schema exploration, table registry.
     """
     return query_ops.list_tables()
 
@@ -233,11 +266,17 @@ def check_table_exists(table_name: str) -> bool:
 
 @mcp.tool()
 def preview_table(table_name: str, limit: int = 100000) -> List[Dict[str, Any]]: 
-    """PREVIEWS table data. [ACTION]
+    """RETRIEVES a sample of data from a table to inspect its content and format. [ACTION]
     
     [RAG Context]
-    Get first N rows of table.
-    Returns list of dicts.
+    An essential "Data Inspection Super Tool" for validating data quality and understanding data distributions. Before performing heavy-duty machine learning or complex joins, the kernel needs to "See" the data to ensure the formatting (dates, currency, categories) matches its expectations. This tool provides a non-destructive way to peek into massive datasets without loading millions of rows into memory, allowing for rapid hypothesis testing and debugging of data ingestion pipelines.
+    
+    How to Use:
+    - 'table_name': The target table to inspect.
+    - 'limit': The maximum number of rows to return (default 100,000). Useful for getting enough data for a "Mini-Analysis" while keeping latency low.
+    - Returns a list of dictionaries, perfect for immediate processing or human-readable reporting.
+    
+    Keywords: data preview, table inspection, row sampling, content audit, data sanity check.
     """
     return query_ops.preview_table(table_name, limit)
 
@@ -249,11 +288,16 @@ def preview_table(table_name: str, limit: int = 100000) -> List[Dict[str, Any]]:
 # ==========================================
 @mcp.tool()
 def create_table(table_name: str, columns: Dict[str, str]) -> str: 
-    """CREATES table. [ACTION]
+    """ESTABLISHES a new permanent storage table with a specific columnar schema. [ACTION]
     
     [RAG Context]
-    Create a new table with specified columns.
-    Returns status string.
+    A foundational "Data Definition Super Tool" for building the vault's structure. DuckDB is a strongly-typed database, meaning you must define whether a column is an INTEGER, VARCHAR, or TIMESTAMP before you can save data into it. This tool allows the system to build "Custom Silos" for new datasets it discovers—for example, creating a 'SocialMediaSentiment' table after a web scraping task. It ensures that data is stored in a structured, queryable, and high-performance format that survives beyond the current reasoning cycle.
+    
+    How to Use:
+    - 'columns': A dictionary where keys are column names (e.g., 'user_id') and values are SQL types (e.g., 'BIGINT', 'DOUBLE', 'DATE').
+    - Essential for organizing long-term corporate knowledge and ensuring data integrity across different agent tasks.
+    
+    Keywords: create table, database schema design, data definition, structured storage, table provisioning.
     """
     return schema_ops.create_table(table_name, columns)
 
@@ -309,11 +353,17 @@ def drop_index(index_name: str) -> str:
 
 @mcp.tool()
 def create_view(view_name: str, query: str) -> str: 
-    """CREATES view. [ACTION]
+    """CREATES a Virtual Table (View) based on a saved SQL query. [ACTION]
     
     [RAG Context]
-    Create a view from a SQL query.
-    Returns status string.
+    An elite "Semantic Mapping Super Tool" for simplifying complex data relationships. A View doesn't store data itself; it stores a "Rule" for looking at data. This allows the system to create a "Clean Version" of a messy database—for example, creating a view called 'SuccessfulSales' that only shows records where `status = 'COMPLETED'`. Views are essential for providing the LLM and subsequent agents with a simplified, "Pre-Processed" lens on the raw data, making reasoning faster and reducing the complexity of future SQL queries.
+    
+    How to Use:
+    - 'query': A standard SELECT statement that defines the view.
+    - Use views to build "Data Dashboards" that hide the complexity of complex joins from the end user or decision-making kernel.
+    - Views auto-update: if the underlying table data changes, the view always shows the latest state.
+    
+    Keywords: sql view, virtual table, query abstraction, data cleaning, semantic layer, saved query.
     """
     return schema_ops.create_view(view_name, query)
 
@@ -342,26 +392,32 @@ def truncate_table(table_name: str) -> str:
 # ==========================================
 @mcp.tool()
 def import_csv(file_path: str, table_name: str, auto_detect: bool = True) -> str: 
-    """IMPORTS CSV. [ACTION]
+    """RAPIDLY ingests data from a CSV file into a high-performance database table. [ACTION]
     
     [RAG Context]
-    Fast, efficient data ingestion engine for CSV files. Directly loads data into DuckDB's native format.
+    The primary "Gateway Super Tool" for bringing external flat-file data into the analytical environment. CSV is the universal language of business data, but it is slow and hard to query. By importing it into DuckDB, the system "Upgrades" the file into a high-speed columnar database format. This tool is capable of reading millions of rows per second, with automatic schema detection that identifies dates, numbers, and categories without human intervention. It is the mandatory first step for processing spreadsheets, logs, and legacy exports within the Kea system.
     
     How to Use:
-    - 'auto_detect': Automatically discovers column names, types, and delimiters.
-    - DuckDB's CSV reader is highly optimized and can handle millions of rows in seconds.
+    - 'file_path': The location of the CSV file.
+    - 'auto_detect': When true (default), the system "guesses" the structure perfectly.
+    - 'table_name': The name of the target table (will be created if it doesn't exist).
     
-    Keywords: csv loader, data ingest, import rows, text file database.
+    Keywords: csv import, bulk data load, flat file ingest, delimited data, spreadsheet migration, high-speed ingestion.
     """
     return io_ops.import_csv(file_path, table_name, auto_detect)
 
 @mcp.tool()
 def import_parquet(file_path: str, table_name: str) -> str: 
-    """IMPORTS Parquet. [ACTION]
+    """DIRECTLY loads or links a Parquet file into the database with zero-copy efficiency. [ACTION]
     
     [RAG Context]
-    Load Parquet file into a table.
-    Returns status string.
+    An elite "Modern Data Super Tool" for interacting with Big Data and Cloud storage. Parquet is the industry standard for "Columnar Storage," used by Data Lake systems like Spark and Snowflake. Unlike CSV, Parquet already knows its schema and is heavily compressed. This tool allows DuckDB to read these professional-grade files instantly—often faster than reading from local memory. It is the primary method for the Kea system to interact with "External Intelligence" and "Deep History" stored in corporate data lakes or S3 buckets.
+    
+    How to Use:
+    - 'file_path': Can be a local path or a remote URL (if the 'httpfs' extension is loaded).
+    - Perfect for "Zero-ETL" workflows where the system needs to analyze massive logs without a slow import process.
+    
+    Keywords: parquet import, columnar data, big data link, data lake ingest, apache arrow, compressed storage.
     """
     return io_ops.import_parquet(file_path, table_name)
 
@@ -377,11 +433,17 @@ def import_json(file_path: str, table_name: str, format: str = "auto") -> str:
 
 @mcp.tool()
 def export_csv(table_or_query: str, file_path: str) -> str: 
-    """EXPORTS to CSV. [ACTION]
+    """SAVES the results of a table or complex query into a universal CSV file. [ACTION]
     
     [RAG Context]
-    Save table or query result to CSV.
-    Returns status string.
+    A vital "Data Delivery Super Tool" for communicating findings with external systems or human operators. While the database is great for processing, CSV is what people expect in an email or a report. This tool allows the AI to "Package" its analytical results—like a list of 'Anomalous Transactions' or a 'Monthly Sales Summary'—into a file that can be opened in Excel or uploaded to another platform. It is the primary tool for "Closing the Loop" on a data analysis task by producing a tangible, portable artifact.
+    
+    How to Use:
+    - 'table_or_query': Can be a simple table name or a full SELECT statement (e.g., `SELECT * FROM sales WHERE total > 1000`).
+    - 'file_path': The destination on the filesystem.
+    - Essential for generating downloadable datasets and report enclosures.
+    
+    Keywords: csv export, data packaging, report generation, artifact output, file export, spreadsheet share.
     """
     return io_ops.export_csv(table_or_query, file_path)
 
@@ -503,16 +565,16 @@ def detect_outliers_zscore(table_name: str, column_name: str, threshold: float =
 
 @mcp.tool()
 def summarize_table(table_name: str) -> str: 
-    """SUMMARIZES table. [ACTION]
+    """GENERATES a comprehensive statistical profile of an entire database table. [ACTION]
     
     [RAG Context]
-    A deep-analysis "Super Tool" for exploring a table's structure and contents.
+    The absolute "Exploratory Data Analysis (EDA) Super Tool" for the Kea analytical stack. Before any reasoning can begin, the AI must understand the "Shape" of the data it is working with. This tool automatically calculates the count of records, average values (mean), spread (standard deviation), range (min/max), and the number of unique entries for every column in the table. It allows the system to instantly detect if a column is mostly empty, contains outliers, or holds categorical data that needs encoding. It is a mandatory first step for any automated data-science or financial-auditing task.
     
     How to Use:
-    - Automatically calculates count, mean, std, min, max, and distinct counts for every column.
-    - Crucial for initial EDA (Exploratory Data Analysis).
+    - 'table_name': The target table or view to analyze.
+    - Yields a structured report that informs the kernel whether it should proceed with heavy modeling or if the data needs "Healing" (Imputation/Cleaning) first.
     
-    Keywords: data profiling, eda, table summary, statistics overview.
+    Keywords: table summary, data profiling, automated eda, statistics overview, data quality audit, columnar analysis.
     """
     return analysis_ops.summarize_table(table_name)
 
@@ -534,17 +596,17 @@ def pivot_table(table_name: str, index_col: str, pivot_col: str, value_col: str,
 # ==========================================
 @mcp.tool()
 def etl_pipeline_csv(input_csv: str, output_parquet: str, filter_sql: str = "1=1") -> str: 
-    """RUNS ETL pipeline. [ACTION]
+    """EXECUTES a high-speed Extract-Transform-Load (ETL) operation from CSV to Parquet. [ACTION]
     
     [RAG Context]
-    A multi-stage "Super Tool" that performs Extract, Transform, and Load operations in one pass.
+    A heavy-duty "Data Engineering Super Tool" designed for industrial-scale data preparation. Most real-world data starts as messy CSV files, which are inefficient for high-speed analysis. This tool automates the three core stages of data engineering: (1) Extracting raw text data from the source, (2) Transforming it using the provided SQL filter (e.g., removing negative prices or old records), and (3) Loading it into the professional-grade Parquet format. This results in a 10x to 100x speed increase for all subsequent queries. It is the primary engine for "Data Lake Modernization" within the corporate kernel.
     
     How to Use:
-    - 1. Extract: Reads from 'input_csv'.
-    - 2. Transform: Applies 'filter_sql'.
-    - 3. Load: Saves directly to the highly-optimized 'output_parquet' format.
+    - 'input_csv': The source file path.
+    - 'output_parquet': The destination path for the optimized file.
+    - 'filter_sql': A SQL WHERE clause (e.g., `revenue > 0`) to prune data during transfer.
     
-    Keywords: etl job, data conversion, csv to parquet, batch processing.
+    Keywords: etl pipeline, data transformation, csv conversion, parquet encoding, batch processing, data engineering.
     """
     return super_ops.etl_pipeline_csv(input_csv, output_parquet, filter_sql)
 
@@ -631,21 +693,33 @@ def full_text_search(table_name: str, column_name: str, keyword: str) -> str:
 # ==========================================
 @mcp.tool()
 def st_point(lat: float, lon: float) -> str: 
-    """CREATES point. [ACTION]
+    """CREATES a standardized GIS geometry point from latitude and longitude coordinates. [ACTION]
     
     [RAG Context]
-    Create a spatial point from lat/lon.
-    Returns WKT string.
+    The foundational "Spatial Mapping Super Tool" for location-based analysis. In a corporate environment, this is used to convert raw address coordinates into "Geospatial Objects" that can be mathematically compared. Unlike simple strings, these points allow the system to calculate physical distances, check if a delivery is within a specific "Geofence," or identify the nearest retail branch to a customer. This tool bridges the gap between raw numerical data and physical geographical reality, enabling the AI to reason about the "Where" of its operations.
+    
+    How to Use:
+    - 'lat' & 'lon': Standard GPS decimal coordinates.
+    - Resulting WKT (Well-Known Text) string can be saved into a 'GEOMETRY' column for high-speed spatial indexing and distance calculations.
+    - Essential for logistics optimization, real-estate analysis, and supply-chain mapping.
+    
+    Keywords: spatial point, coordinate conversion, gis geometry, wkt creation, latitude longitude, geo-mapping.
     """
     return spatial_ops.st_point(lat, lon)
 
 @mcp.tool()
 def st_distance(wkt_a: str, wkt_b: str) -> float: 
-    """CALCULATES spatial dist. [ACTION]
+    """CALCULATES the precise geographical distance between two spatial objects. [ACTION]
     
     [RAG Context]
-    Compute distance between two geometries.
-    Returns float.
+    A critical "Logistics & Proximity Super Tool." This tool goes beyond simple math by calculating the distance between complex shapes or points on the Earth's surface. It allows the system to answer questions like: "How far is this warehouse from the shipping port?" or "Which branch is closest to the identified anomaly?" In the Kea corporate system, this is the primary engine for shipping-cost optimization and territorial assignments, ensuring that resources are always allocated to the most geographically efficient location.
+    
+    How to Use:
+    - 'wkt_a' & 'wkt_b': Standard spatial strings (Points, Polygons, etc.).
+    - Returns a numerical value (usually in meters or degrees depending on the coordinate system).
+    - Can be used in SQL WHERE clauses to find items "within X distance" of a target coordinate.
+    
+    Keywords: spatial distance, proximity analysis, geo-distance, gis calculation, logistics math, location audit.
     """
     return spatial_ops.st_distance(wkt_a, wkt_b)
 
@@ -701,11 +775,17 @@ def st_centroid(wkt_geom: str) -> str:
 
 @mcp.tool()
 def st_read(file_path: str, table_name: str) -> str: 
-    """READS spatial file. [ACTION]
+    """INGESTS complex geospatial files (Shapefiles, GeoJSON) into the database. [ACTION]
     
     [RAG Context]
-    Load Shapefile, GeoJSON, etc into table.
-    Returns status string.
+    A professional-grade "GIS Ingestion Super Tool." While CSVs are row-based, GIS files (like ESRI Shapefiles or KML) contain complex multi-dimensional data like city boundaries, power grids, or property lines. This tool allows the Kea system to "Digest" official geographical records from government or industry sources and merge them with internal corporate data. It enables the system to perform high-stakes analysis, such as: "Is our proposed site located within a high-risk flood zone or protected forest area?"
+    
+    How to Use:
+    - 'file_path': The path to a .shp, .json, or .kml file.
+    - Requires the 'spatial' extension to be installed and loaded.
+    - Translates specialized geographical formats into standard, queryable database tables with geometry support.
+    
+    Keywords: gis import, shapefile loader, geojson ingest, spatial data lake, cartographic analysis, map data load.
     """
     return spatial_ops.st_read(file_path, table_name)
 
@@ -747,11 +827,18 @@ def fts_create_index(table_name: str, id_col: str, text_cols: List[str]) -> str:
 
 @mcp.tool()
 def fts_search(table_name: str, keyword: str, limit: int = 100000) -> List[Dict[str, Any]]: 
-    """SEARCHES FTS. [ACTION]
+    """PERFORMS specialized Full-Text Search (FTS) to find keywords within large text datasets. [ACTION]
     
     [RAG Context]
-    Search using existing FTS index.
-    Returns list of matches.
+    A powerful "Semantic Retrieval Super Tool" that enables the system to "Read" through millions of documents or log entries in milliseconds. While standard SQL uses 'LIKE' (which is slow), FTS uses a pre-built "Inverted Index" specifically optimized for natural language. It allows the system to find specific terms, phrases, or concepts across multiple columns simultaneously. This is the primary engine for "Regulatory Auditing" (searching for specific clauses in legal documents) and "Customer Support Mining" (finding all tickets related to a specific product bug).
+    
+    How to Use:
+    - 'table_name': The table containing the text index.
+    - 'keyword': The term or phrase you are looking for.
+    - 'limit': Controls how many matches to return.
+    - REQUIRES a prior call to 'fts_create_index' on the target columns.
+    
+    Keywords: full text search, keyword retrieval, semantic search, document mining, indexed search, text analytics.
     """
     return text_ops.fts_search(table_name, keyword, limit)
 
@@ -813,11 +900,17 @@ def read_json_objects(file_path: str) -> List[Dict[str, Any]]:
 # ==========================================
 @mcp.tool()
 def time_bucket(table_name: str, time_col: str, interval: str, agg_col: str = "count(*)") -> List[Dict[str, Any]]: 
-    """BUCKETS time. [ACTION]
+    """AGGREGATES time-series data into standardized "Buckets" (e.g., hourly, daily). [ACTION]
     
     [RAG Context]
-    Group data by time interval (e.g., '1 day').
-    Returns list of dicts.
+    An elite "Time-Series Intelligence Super Tool" for analyzing trends over time. High-frequency data (like stock prices or sensor readings) is often too noisy to understand in its raw form. Time Bucketing allows the system to "Zoom Out" and see the daily average or hourly count of events. It is a mandatory requirement for "Trend Analysis" and "Financial Forecasting," allowing the AI to transform a chaotic stream of individual timestamps into a structured report that shows growth, seasonal patterns, and cycles.
+    
+    How to Use:
+    - 'time_col': The column containing timestamps or dates.
+    - 'interval': The size of the bucket (e.g., '1 hour', '1 day', '7 days').
+    - 'agg_col': The math to perform inside the bucket (e.g., `avg(price)`, `sum(volume)`, `count(*)`).
+    
+    Keywords: time bucket, temporal aggregation, trend analysis, time-series grouping, historical rollup, period analytics.
     """
     return time_ops.time_bucket(table_name, time_col, interval, agg_col)
 
@@ -833,11 +926,17 @@ def gap_fill(table_name: str, time_col: str, interval: str, value_col: str) -> s
 
 @mcp.tool()
 def asof_join(table_a: str, table_b: str, time_col: str, join_col: str) -> str: 
-    """JOINS as-of. [ACTION]
+    """PERFORMS a sophisticated "ASOF Join" to align datasets with different timestamps. [ACTION]
     
     [RAG Context]
-    Join on nearest time key (ASOF join).
-    Returns status string.
+    A specialized "Temporal Alignment Super Tool" essential for finance and IoT analysis. In many cases, you have two data streams (e.g., 'Target Stock Price' and 'Macro-Economic Indicator') that don't share the exact same second-by-second timestamps. A standard join would fail. An ASOF join finds the record in Table B that was the "Most Recent" at the time of the record in Table A. It allows the system to answer: "What was the interest rate at the exact moment this specific trade was executed?" Mandatory for high-precision backtesting and causal analysis.
+    
+    How to Use:
+    - 'table_a' & 'table_b': The two datasets to merge.
+    - 'time_col': The timestamp column used for the temporal matching.
+    - 'join_col': The attribute column (e.g., 'ticker_symbol') to ensure you are matching the right entities.
+    
+    Keywords: asof join, temporal alignment, time-series merge, financial data join, proximity join, nearest-neighbor time.
     """
     return time_ops.asof_join(table_a, table_b, time_col, join_col)
 
