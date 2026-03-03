@@ -21,30 +21,30 @@ from structlog import DropEvent
 from pydantic import BaseModel, Field
 
 # ============================================================================
-# ── UNIVERSAL LOGGING STABILIZATION ──
+# ── UNIVERSAL TELEMETRY FACTORY ──
 # ============================================================================
-# We apply a recursive monkeypatch to ALL structlog BoundLogger variants.
-# This ensures that even dynamically generated filtering proxies receive our
-# extended log levels (notice, success, alert, emergency).
+# Standardized bridge for extended RFC 5424 severity levels.
+def _get_telemetry_method(name: str):
+    """Creates a standardized logging proxy for success, notice, alert, emergency."""
+    level_map = {"success": "info", "notice": "info", "alert": "error", "emergency": "critical"}
+    def _method(self, event: str, **kw: Any) -> Any:
+        # 1. Try proxy-to-logger (Standard for stdlib filtered loggers)
+        proxy = getattr(self, "_proxy_to_logger", None)
+        if proxy:
+            return proxy(level_map[name], event, **{**kw, "level": name})
+        # 2. Try direct call on the underlying standard method
+        target = getattr(self, level_map[name], getattr(self, "info", None))
+        if target:
+            return target(event, **{**kw, "level": name})
+        return None
+    return _method
+
 def _apply_universal_telemetry_patch():
+    """Recursively patches all structlog logger variants with unified levels."""
     try:
         import structlog.stdlib
         
-        def _make_method(name):
-            level_map = {"success": "info", "notice": "info", "alert": "error", "emergency": "critical"}
-            def _method(self, event: str, **kw: Any) -> Any:
-                # 1. Try proxy-to-logger (standard for stdlib loggers)
-                proxy = getattr(self, "_proxy_to_logger", None)
-                if proxy:
-                    return proxy(level_map[name], event, **{**kw, "level": name})
-                # 2. Try direct call on the underlying standard method
-                target = getattr(self, level_map[name], getattr(self, "info", None))
-                if target:
-                    return target(event, **{**kw, "level": name})
-                return None
-            return _method
-
-        # 1. Base Targets
+        # 1. Base Targets for recursive discovery
         bases = [structlog.BoundLogger, structlog.PrintLogger]
         if hasattr(structlog, "stdlib"):
             bases.append(structlog.stdlib.BoundLogger)
@@ -54,10 +54,10 @@ def _apply_universal_telemetry_patch():
             for m in ["success", "notice", "alert", "emergency"]:
                 if not hasattr(cls, m):
                     try:
-                        setattr(cls, m, _make_method(m))
+                        setattr(cls, m, _get_telemetry_method(m))
                     except Exception: pass
             
-            # Recurse into subclasses (this finds BoundLoggerFilteringAtNotset, etc.)
+            # Recurse into subclasses (finds BoundLoggerFilteringAtNotset, etc.)
             try:
                 for sub in cls.__subclasses__():
                     _patch_recursive(sub)
@@ -73,13 +73,13 @@ def _apply_universal_telemetry_patch():
                 cls = orig_factory(*args, **kwargs)
                 for m in ["success", "notice", "alert", "emergency"]:
                     if not hasattr(cls, m):
-                        setattr(cls, m, _make_method(m))
+                        setattr(cls, m, _get_telemetry_method(m))
                 return cls
             structlog.stdlib.make_filtering_bound_logger = patched_factory
-            
     except Exception:
         pass
 
+# Immediate application for top-level loggers
 _apply_universal_telemetry_patch()
 
 class LogLevel(str, Enum):
@@ -559,13 +559,11 @@ def bind_contextvars(**kwargs): structlog.contextvars.bind_contextvars(**kwargs)
 def clear_contextvars(): structlog.contextvars.clear_contextvars()
 
 def get_logger(name: str) -> structlog.stdlib.BoundLogger: 
-    """Get a standardized logger with unified metadata."""
-    # Note: We avoid importing from shared.config at module level to prevent circular deps
-    # We only sync flags if they are still unknown, using a safe lazy import
+    """Get a standardized logger with unified metadata and safety hooks."""
+    # Lazy environment sync
     if DEFAULT_FLAGS["env"] == "unknown":
         try:
             import sys
-            # Check if shared.config is already loaded to avoid triggering a new load during bootstrap
             if "shared.config" in sys.modules:
                 from shared.config import get_settings
                 settings = get_settings()
@@ -574,7 +572,19 @@ def get_logger(name: str) -> structlog.stdlib.BoundLogger:
         except Exception:
             pass
             
-    return structlog.get_logger(name).bind(**DEFAULT_FLAGS)
+    logger = structlog.get_logger(name)
+    
+    # --- LAZY ON-THE-FLY PATCHING ---
+    # Final safety layer: If structlog generated a class we missed during startup scan
+    # (common in dynamic test environments), we patch it immediately upon first use.
+    cls = logger.__class__
+    for m in ["success", "notice", "alert", "emergency"]:
+        if not hasattr(cls, m):
+             try:
+                 setattr(cls, m, _get_telemetry_method(m))
+             except Exception: pass
+
+    return logger.bind(**DEFAULT_FLAGS)
 
 def log_input(source: str, data: Any, **kw):
     env = IOEnvelope(type=IOType.INPUT, source=source, data=data, **kw)
