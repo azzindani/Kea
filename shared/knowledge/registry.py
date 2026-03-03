@@ -198,14 +198,17 @@ class PostgresKnowledgeRegistry:
 
         logger.info(f"Knowledge Registry: Embedding {len(updates_needed)} new/modified items in batches...")
 
-        # Senior Architect Fix: Chunked Batching to prevent OOM/Timeout on large libraries
+        # Senior Architect Fix: Dynamic Chunked Batching to prevent OOM
         batch_size = 20
-        logger.info(f"Registry: Syncing {len(updates_needed)} items to table '{self.table_name}' in batches of {batch_size}...")
+        logger.info(f"Registry: Syncing {len(updates_needed)} items to table '{self.table_name}'...")
         total_updated = 0
         
-        for i in range(0, len(updates_needed), batch_size):
-            batch = updates_needed[i : i + batch_size]
-            logger.debug(f"Registry: Processing batch {i//batch_size + 1}", offset=i, batch_count=len(batch))
+        i = 0
+        while i < len(updates_needed):
+            actual_batch_size = min(batch_size, len(updates_needed) - i)
+            batch = updates_needed[i : i + actual_batch_size]
+            
+            logger.debug(f"Registry: Processing batch at offset {i}", offset=i, batch_count=len(batch))
             batch_texts = []
             for item, _ in batch:
                 embed_text = (
@@ -269,18 +272,34 @@ class PostgresKnowledgeRegistry:
                                 )
                     
                     total_updated += len(batch)
-                    logger.info(f"Knowledge Registry: Committed batch {i//batch_size + 1} ({len(batch)} items)")
+                    logger.info(f"Knowledge Registry: Committed {len(batch)} items")
+                    i += actual_batch_size  # Move forward ONLY on success
                     batch_success = True
-                    # Small delay between batches to let memory stabilize
-                    await asyncio.sleep(0.5)
                     break
 
                 except Exception as e:
-                    if attempt < max_retries - 1:
+                    # Dynamically catch the HTTP connection errors thrown when the ml_inference server OOMs
+                    error_str = str(e).lower()
+                    if "500" in error_str or "timeout" in error_str or "disconnected" in error_str:
+                        import math
+                        if batch_size > 1:
+                            logger.warning(f"Batch sync OOM/Timeout (attempt {attempt+1}/{max_retries}). Halving sync batch size from {batch_size} to {math.ceil(batch_size/2)}.")
+                            batch_size = math.ceil(batch_size / 2)
+                            await asyncio.sleep(retry_delay)
+                            continue # Try same batch again with smaller size
+                        else:
+                            logger.error(f"Batch sync permanently failed. Document too large for embedding model.", error=str(e))
+                            # Skip this item so the entire bootup sequence doesn't fail
+                            i += 1 
+                            break
+                    elif attempt < max_retries - 1:
                         logger.warning(f"Batch sync failed (attempt {attempt+1}/{max_retries}): {e}. Retrying...")
                         await asyncio.sleep(retry_delay)
                     else:
                         logger.error(f"Batch sync permanently failed at offset {i}", error=str(e))
+                        # Skip this single item and move on
+                        i += actual_batch_size
+                        break
 
         return total_updated
 
