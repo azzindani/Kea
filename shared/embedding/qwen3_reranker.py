@@ -15,6 +15,9 @@ from shared.logging.main import get_logger
 
 
 logger = get_logger(__name__)
+ 
+import threading
+_MODULE_LOCK = threading.Lock()
 
 
 @dataclass
@@ -93,9 +96,19 @@ class LocalReranker(RerankerProvider):
             loop = asyncio.get_running_loop()
             await loop.run_in_executor(None, self._load_model)
 
+    def _get_locks(self):
+        """Thread-safe acquisition of class-level locks."""
+        if LocalReranker._shared_lock is None or LocalReranker._shared_inference_lock is None:
+            with _MODULE_LOCK:
+                if LocalReranker._shared_lock is None:
+                    LocalReranker._shared_lock = threading.Lock()
+                if LocalReranker._shared_inference_lock is None:
+                    LocalReranker._shared_inference_lock = threading.Lock()
+        
+        return LocalReranker._shared_lock, LocalReranker._shared_inference_lock
+
     def _load_model(self):
         """Lazy load model and tokenizer with thread safety (class-level singleton)."""
-        import threading
         import torch
         from transformers import AutoTokenizer, AutoModelForCausalLM
         
@@ -103,13 +116,9 @@ class LocalReranker(RerankerProvider):
         if LocalReranker._shared_model is not None:
             return LocalReranker._shared_model, LocalReranker._shared_tokenizer
         
-        if LocalReranker._shared_inference_lock is None:
-            LocalReranker._shared_inference_lock = threading.Lock()
-            
-        if LocalReranker._shared_lock is None:
-            LocalReranker._shared_lock = threading.Lock()
+        load_lock, _ = self._get_locks()
         
-        with LocalReranker._shared_lock:
+        with load_lock:
             if LocalReranker._shared_model is not None:
                 return LocalReranker._shared_model, LocalReranker._shared_tokenizer
             
@@ -120,15 +129,18 @@ class LocalReranker(RerankerProvider):
             )
             
             # Load model
+            torch_dtype = torch.float16 if "cuda" in self.device else torch.float32
+            
             if self.use_flash_attention:
                 LocalReranker._shared_model = AutoModelForCausalLM.from_pretrained(
                     self.model_name,
-                    torch_dtype=torch.float16,
+                    torch_dtype=torch_dtype,
                     attn_implementation="flash_attention_2",
                 ).to(self.device).eval()
             else:
                 LocalReranker._shared_model = AutoModelForCausalLM.from_pretrained(
-                    self.model_name
+                    self.model_name,
+                    torch_dtype=torch_dtype
                 ).to(self.device).eval()
             
             # Setup token IDs
@@ -238,7 +250,8 @@ class LocalReranker(RerankerProvider):
                     if not batch_pairs: return []
                     inputs = self._process_inputs(batch_pairs)
                     # Thread-safe model call
-                    with LocalReranker._shared_inference_lock:
+                    _, inference_lock = self._get_locks()
+                    with inference_lock:
                         with torch.no_grad():
                             batch_logits = model(**inputs).logits[:, -1, :]
                             true_vector = batch_logits[:, LocalReranker._shared_token_true_id]
@@ -268,9 +281,6 @@ class LocalReranker(RerankerProvider):
                             else:
                                 raise
                         raise
-                        
-                    if torch.cuda.is_available() and len(documents) > 100 and (i % (BATCH_SIZE * 4) == 0):
-                        torch.cuda.empty_cache()
                 return out_scores
                 
             all_scores = await loop.run_in_executor(None, compute_all_scores)
