@@ -476,6 +476,8 @@ async def sync_knowledge(background: bool = True):
 
 async def _sync_knowledge_job(domain: str | None = None, category: str | None = None):
     """Background job to sync knowledge files from the library directory."""
+    from shared.embedding.client import await_ml_inference_ready
+    await await_ml_inference_ready()
     async with _sync_lock:
         logger.info("🚀 Starting Knowledge Library Sync...")
         try:
