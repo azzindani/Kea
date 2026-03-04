@@ -350,21 +350,25 @@ import time
 # Service Lifecycle Management
 # =============================================================================
 
-async def wait_for_service(url: str, name: str, timeout: int = 30) -> bool:
-    """Wait for a service to become healthy."""
+async def wait_for_service(url: str, name: str, timeout: int = 60) -> bool:
+    """Wait for a service to become healthy ('ok' status)."""
     start_time = time.time()
     while time.time() - start_time < timeout:
         try:
-            async with httpx.AsyncClient(timeout=1.0) as client:
+            async with httpx.AsyncClient(timeout=2.0) as client:
                 resp = await client.get(f"{url}/health")
                 if resp.status_code == 200:
-                    logging.info(f"✅ {name} is READY at {url}")
-                    return True
+                    data = resp.json()
+                    if data.get("status") == "ok":
+                        logging.info(f"✅ {name} is READY and HEALTHY at {url}")
+                        return True
+                    else:
+                        logging.debug(f"⏳ {name} is UP but {data.get('status')}...")
         except Exception:
             pass
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(1.0)
 
-    logging.error(f"❌ {name} failed to start at {url} within {timeout}s")
+    logging.error(f"❌ {name} failed to reach 'ok' status at {url} within {timeout}s")
     return False
 
 @pytest.fixture(scope="session", autouse=True)
@@ -373,15 +377,19 @@ async def bootstrap_services():
     Ensure all microservices are running. 
     Auto-starts them as subprocesses if not detected.
     """
+    from shared.service_registry import ServiceName, ServiceRegistry
+    
+    # Resolve correct URLs from registry
+    api_url = ServiceRegistry.get_url(ServiceName.GATEWAY)
+    orch_url = ServiceRegistry.get_url(ServiceName.ORCHESTRATOR)
+    rag_url = ServiceRegistry.get_url(ServiceName.RAG_SERVICE)
+    ml_inf_url = ServiceRegistry.get_url(ServiceName.ML_INFERENCE)
+
     # 1. Check if already running (e.g. Docker or manual)
-    api_ok = await wait_for_service(API_GATEWAY_URL, "API Gateway", timeout=1)
-    orch_ok = await wait_for_service(ORCHESTRATOR_URL, "Orchestrator", timeout=1)
-    # RAG service URL assumption (usually 8003 based on plan)
-    RAG_URL = "http://localhost:8003"
-    rag_ok = await wait_for_service(RAG_URL, "RAG Service", timeout=1)
-    # ML Inference URL assumption
-    ML_INFERENCE_URL = "http://localhost:8007"
-    ml_inf_ok = await wait_for_service(ML_INFERENCE_URL, "ML Inference", timeout=1)
+    api_ok = await wait_for_service(api_url, "API Gateway", timeout=1)
+    orch_ok = await wait_for_service(orch_url, "Orchestrator", timeout=1)
+    rag_ok = await wait_for_service(rag_url, "RAG Service", timeout=1)
+    ml_inf_ok = await wait_for_service(ml_inf_url, "ML Inference", timeout=1)
 
     procs = []
 
@@ -397,9 +405,9 @@ async def bootstrap_services():
         # Paths are relative to project root (cwd)
         # We assume pytest is run from project root
 
-        # Start RAG Service (Port 8001)
+        # Start RAG Service
         if not rag_ok:
-            logging.info("   Starting RAG Service...")
+            logging.info(f"   Starting RAG Service on {rag_url}...")
             p_rag = subprocess.Popen(
                 [sys.executable, "-m", "services.rag_service.main"],
                 env=env,
@@ -407,16 +415,9 @@ async def bootstrap_services():
             )
             procs.append(p_rag)
 
-        # Start Orchestrator (Port 8002 / 8000?)
-        # Note: conftest says 8000, plan says 8002. Let's trust env or standard.
-        # Docker compose says 8002 internal, mapped to 8002.
-        # conftest defaults to 8000. Let's assume 8000 is strictly for orchestrator
-        # BUT wait, the code says ORCHESTRATOR_URL defaults to http://localhost:8000
-        # docker-compose maps 8002:8002.
-        # Let's try to stick to what the code expects (8000) or update expectation.
-        # Orchestrator main.py usually uses port defined in args or env.
+        # Start Orchestrator
         if not orch_ok:
-            logging.info("   Starting Orchestrator...")
+            logging.info(f"   Starting Orchestrator on {orch_url}...")
             p_orch = subprocess.Popen(
                 [sys.executable, "-m", "services.orchestrator.main"],
                 env=env,
@@ -424,9 +425,9 @@ async def bootstrap_services():
             )
             procs.append(p_orch)
 
-        # Start API Gateway (Port 8080)
+        # Start API Gateway
         if not api_ok:
-            logging.info("   Starting API Gateway...")
+            logging.info(f"   Starting API Gateway on {api_url}...")
             p_api = subprocess.Popen(
                 [sys.executable, "-m", "services.api_gateway.main"],
                 env=env,
@@ -436,7 +437,7 @@ async def bootstrap_services():
 
         # Start ML Inference
         if not ml_inf_ok:
-            logging.info("   Starting ML Inference...")
+            logging.info(f"   Starting ML Inference on {ml_inf_url}...")
             p_ml = subprocess.Popen(
                 [sys.executable, "-m", "services.ml_inference.main"],
                 env=env,
@@ -445,15 +446,15 @@ async def bootstrap_services():
             procs.append(p_ml)
 
         # 3. Wait for startup
-        logging.info("⏳ Waiting for services to come online...")
+        logging.info("⏳ Waiting for services to reach 'ok' status...")
         # Give them a moment to crash or bind
         await asyncio.sleep(5)
 
         ready = await asyncio.gather(
-            wait_for_service(ML_INFERENCE_URL, "ML Inference"),
-            wait_for_service(RAG_URL, "RAG Service"),
-            wait_for_service(ORCHESTRATOR_URL, "Orchestrator"),
-            wait_for_service(API_GATEWAY_URL, "API Gateway")
+            wait_for_service(ml_inf_url, "ML Inference"),
+            wait_for_service(rag_url, "RAG Service"),
+            wait_for_service(orch_url, "Orchestrator"),
+            wait_for_service(api_url, "API Gateway")
         )
 
         if not all(ready):

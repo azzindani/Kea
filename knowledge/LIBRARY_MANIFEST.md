@@ -34,6 +34,10 @@ This document is an automatically generated index of all available 'Pure Context
 - [Trades (4)](#trades)
 - [Web_Research (13)](#web_research)
 - [Kea (1)](#kea)
+- [Heuristics (1)](#heuristics)
+- [Mental Models (1)](#models)
+- [Cultural Values (1)](#values)
+- [Interaction Protocols (1)](#protocols)
 - [Silicon Corporate Infrastructure](#infrastructure)
 
 ---
@@ -371,6 +375,30 @@ This document is an automatically generated index of all available 'Pure Context
 | Skill Name | Description | Tags |
 |---|---|---|
 | **[Kea Cognitive Architecture](skills/kea/cognitive_architecture.md)** | Core architectural principles of the Kea Kernel, including the Tiered Hierarchy, Conscious Observer (Tier 7), and the Cognitive Cycle (OODA). | `kea, architecture, ooda, tier-7` |
+
+---
+## Heuristics <a name='heuristics'></a>
+| Heuristic Name | Description | Tags |
+|---|---|---|
+| **[High-Performance Debugging](heuristics/high_performance_debugging.md)** | Experience-based senior heuristics for rapid bug localization in distributed systems. | `debugging, heuristic, senior` |
+
+---
+## Mental Models <a name='models'></a>
+| Model Name | Description | Tags |
+|---|---|---|
+| **[First Principles Thinking](models/first_principles_thinking.md)** | Universal framework for solving complex problems by deconstructing them to their fundamental truths. | `framework, logic, innovation` |
+
+---
+## Cultural Values <a name='values'></a>
+| Value Name | Description | Tags |
+|---|---|---|
+| **[Kea Engineering Values](values/kea_engineering_values.md)** | The core ethical and priority framework for Kea development and operational decisions. | `ethics, priority, engineering` |
+
+---
+## Interaction Protocols <a name='protocols'></a>
+| Protocol Name | Description | Tags |
+|---|---|---|
+| **[Executive Interaction Protocol](protocols/executive_interaction.md)** | Standards for reporting, alerting, and interacting with high-level human stakeholders. | `communication, governance, protocol` |
 
 ---
 ## Silicon Corporate Infrastructure <a name='infrastructure'></a>

@@ -8,6 +8,7 @@ if "PYTORCH_CUDA_ALLOC_CONF" not in os.environ:
     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 import json
+import sys
 from contextlib import asynccontextmanager
 from datetime import datetime, UTC
 from typing import List, Dict, Any, Optional
@@ -512,6 +513,16 @@ async def _sync_knowledge_job(domain: str | None = None, category: str | None = 
             logger.error(f"❌ Knowledge sync failed: {e}", exc_info=True)
 
 
+@app.get("/health")
+@app.get("/health/check")
+async def health_check():
+    """Service health status."""
+    return {
+        "status": "ok" if knowledge_store and knowledge_store.is_ready else "initializing",
+        "service": "rag_service",
+        "version": get_settings().app.version,
+    }
+
 @app.get("/knowledge/stats/summary")
 async def knowledge_stats():
     """Get knowledge registry statistics."""
@@ -523,7 +534,7 @@ async def knowledge_stats():
 
     count = await knowledge_store.count()
     return {
-        "status": "online",
+        "status": "ok",
         "total_items": count,
         "syncing": _sync_lock.locked()
     }
@@ -532,6 +543,10 @@ async def knowledge_stats():
 # ============================================================================
 # Main
 # ============================================================================
+
+# Force Proactor loop for Windows subprocess support
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 
 def main():

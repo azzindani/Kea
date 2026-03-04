@@ -190,7 +190,7 @@ class EmbeddingSettings(BaseModel):
     model_name: str = "Qwen/Qwen3-Embedding-0.6B"
     api_model: str = "qwen/qwen3-embedding-8b"
     dimension: int = 1024
-    batch_size: int = 32
+    batch_size: int = 16
     max_length: int = 32768
     instruction: str = "Given a web search query, retrieve relevant passages that answer the query"
     api_url: str = "https://openrouter.ai/api/v1/embeddings"
@@ -261,7 +261,7 @@ class TimeoutSettings(BaseModel):
     audit_log: float = 2.0
     llm_completion: float = 60.0
     llm_streaming: float = 120.0
-    embedding_api: float = 60.0
+    embedding_api: float = 120.0
     tool_execution: float = 300.0
     auth_token: float = 5.0
     short: float = 5.0
@@ -487,7 +487,7 @@ class RAGSettings(BaseModel):
     default_limit: int = 20
     max_limit: int = 100
     ingest_max_rows: int = 1000
-    batch_size: int = 50
+    batch_size: int = 20
     knowledge_limit: int = 5
     knowledge_candidate_multiplier: int = 5
     artifact_path: str = "./artifacts"
