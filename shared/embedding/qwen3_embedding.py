@@ -34,7 +34,8 @@ import threading
 _MODULE_LOCK = threading.Lock()
 
 
-logger = get_logger(__name__)
+from shared.logging.main import get_logger
+from shared.hardware.gpu_lock import get_gpu_inference_lock
 
 
 class EmbeddingProvider(ABC):
@@ -198,14 +199,13 @@ class LocalEmbedding(EmbeddingProvider):
     
     def _get_locks(self):
         """Thread-safe acquisition of class-level locks."""
-        if LocalEmbedding._shared_lock is None or LocalEmbedding._shared_inference_lock is None:
+        if LocalEmbedding._shared_lock is None:
             with _MODULE_LOCK:
                 if LocalEmbedding._shared_lock is None:
                     LocalEmbedding._shared_lock = threading.Lock()
-                if LocalEmbedding._shared_inference_lock is None:
-                    LocalEmbedding._shared_inference_lock = threading.Lock()
         
-        return LocalEmbedding._shared_lock, LocalEmbedding._shared_inference_lock
+        # We now use the global GPU lock for inference and local lock for loading
+        return LocalEmbedding._shared_lock, get_gpu_inference_lock()
 
 
     def _load_model(self):
@@ -339,9 +339,9 @@ class LocalEmbedding(EmbeddingProvider):
                 )
                 batch_dict = {k: v.to(model.device) for k, v in batch_dict.items()}
                 
-                # Thread-safe model call
-                _, inference_lock = self._get_locks()
-                with inference_lock:
+                # Multi-Model Safety: Use the shared global GPU lock
+                _, gpu_lock = self._get_locks()
+                with gpu_lock:
                     with torch.no_grad():
                         outputs = model(**batch_dict)
                         embeddings = self._last_token_pool(
@@ -350,8 +350,12 @@ class LocalEmbedding(EmbeddingProvider):
                         )
                         # Normalize embeddings
                         embeddings = F.normalize(embeddings, p=2, dim=1)
-                        # Move to CPU while under lock to ensure consistency
-                        return embeddings.cpu().tolist()
+                        # Move to CPU immediately while still under lock
+                        result = embeddings.cpu().tolist()
+                        
+                        # Cleanup specific to this batch to prevent leakage
+                        del outputs, embeddings
+                        return result
             
             def process_all():
                 """Process all texts in batches."""

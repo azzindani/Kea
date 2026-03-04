@@ -13,6 +13,11 @@ Routes are conditionally mounted based on the configured role:
 
 from __future__ import annotations
 
+import os
+# Optimize PyTorch memory allocation before other imports
+if "PYTORCH_CUDA_ALLOC_CONF" not in os.environ:
+    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
 import asyncio
 import sys
 from contextlib import asynccontextmanager

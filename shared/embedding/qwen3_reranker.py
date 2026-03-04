@@ -14,7 +14,8 @@ from dataclasses import dataclass
 from shared.logging.main import get_logger
 
 
-logger = get_logger(__name__)
+from shared.logging.main import get_logger
+from shared.hardware.gpu_lock import get_gpu_inference_lock
  
 import threading
 _MODULE_LOCK = threading.Lock()
@@ -98,14 +99,13 @@ class LocalReranker(RerankerProvider):
 
     def _get_locks(self):
         """Thread-safe acquisition of class-level locks."""
-        if LocalReranker._shared_lock is None or LocalReranker._shared_inference_lock is None:
+        if LocalReranker._shared_lock is None:
             with _MODULE_LOCK:
                 if LocalReranker._shared_lock is None:
                     LocalReranker._shared_lock = threading.Lock()
-                if LocalReranker._shared_inference_lock is None:
-                    LocalReranker._shared_inference_lock = threading.Lock()
         
-        return LocalReranker._shared_lock, LocalReranker._shared_inference_lock
+        # Share the global GPU lock across models
+        return LocalReranker._shared_lock, get_gpu_inference_lock()
 
     def _load_model(self):
         """Lazy load model and tokenizer with thread safety (class-level singleton)."""
@@ -270,15 +270,26 @@ class LocalReranker(RerankerProvider):
                     if not batch_pairs: return []
                     inputs = self._process_inputs(batch_pairs)
                     # Thread-safe model call
-                    _, inference_lock = self._get_locks()
-                    with inference_lock:
+                    # Use Global GPU Lock to prevent conflicts with other models (e.g. embedder)
+                    _, gpu_lock = self._get_locks()
+                    with gpu_lock:
                         with torch.no_grad():
-                            batch_logits = model(**inputs).logits[:, -1, :]
+                            outputs = model(**inputs)
+                            batch_logits = outputs.logits[:, -1, :]
+                            
+                            # Score calculation
                             true_vector = batch_logits[:, LocalReranker._shared_token_true_id]
                             false_vector = batch_logits[:, LocalReranker._shared_token_false_id]
-                            stacked_scores = torch.stack([false_vector, true_vector], dim=1)
-                            log_probs = torch.nn.functional.log_softmax(stacked_scores, dim=1)
-                            return log_probs[:, 1].exp().tolist()
+                            
+                            # Logits to probabilities (softmax on yes/no)
+                            # Using cat + softmax to get normalized score
+                            pair_logits = torch.stack([false_vector, true_vector], dim=1)
+                            probs = torch.softmax(pair_logits, dim=1)
+                            scores = probs[:, 1].cpu().tolist()
+                            
+                            # Cleanup to prevent OOM
+                            del outputs, batch_logits, true_vector, false_vector, pair_logits, probs
+                            return scores
                 
                 i = 0
                 while i < len(documents):
