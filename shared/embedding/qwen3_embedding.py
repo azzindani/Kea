@@ -207,55 +207,59 @@ class LocalEmbedding(EmbeddingProvider):
         
         return LocalEmbedding._shared_lock, LocalEmbedding._shared_inference_lock
 
+
     def _load_model(self):
         """Lazy load model and tokenizer with thread safety (class-level singleton)."""
         import torch
+        from transformers import AutoTokenizer, AutoModel
         
-        # Fast path: model already loaded
+        # Fast path (outside lock)
         if LocalEmbedding._shared_model is not None:
             return LocalEmbedding._shared_model, LocalEmbedding._shared_tokenizer
-        
-        if not _TRANSFORMERS_AVAILABLE:
-            raise ImportError("transformers library is required for local embedding")
-        
+            
         load_lock, _ = self._get_locks()
         
         with load_lock:
-            # Double-check pattern
+            # Re-check inside lock
             if LocalEmbedding._shared_model is not None:
                 return LocalEmbedding._shared_model, LocalEmbedding._shared_tokenizer
             
             device = self.device
+            logger.info(f"Loading {self.model_name} on {device} (Thread: {threading.get_ident()})")
             
-            # Load tokenizer (matches working test code)
-            LocalEmbedding._shared_tokenizer = AutoTokenizer.from_pretrained(
-                self.model_name,
-                padding_side='left',  # Required for Qwen3 embedding
-            )
+            # Explicit cache clear before loading large model
+            if "cuda" in device:
+                torch.cuda.empty_cache()
             
-            # Load model
-            torch_dtype = torch.float16 if "cuda" in device else torch.float32
+            # Load tokenizer
+            LocalEmbedding._shared_tokenizer = AutoTokenizer.from_pretrained(self.model_name)
             
+            # Conservative load strategy: Load in default dtype (usually FP32 or as stored)
+            # then convert to half only on GPU if needed.
             if self.use_flash_attention:
                 LocalEmbedding._shared_model = AutoModel.from_pretrained(
                     self.model_name,
                     attn_implementation="flash_attention_2",
-                    torch_dtype=torch_dtype,
+                    torch_dtype=torch.float16,
                 ).to(device)
             else:
                 # Simple load
-                LocalEmbedding._shared_model = AutoModel.from_pretrained(
-                    self.model_name,
-                    torch_dtype=torch_dtype
-                )
+                LocalEmbedding._shared_model = AutoModel.from_pretrained(self.model_name)
                 
-                # Move to GPU if requested
+                # Move to GPU and convert ONLY if requested
                 if device.startswith("cuda"):
                     LocalEmbedding._shared_model = LocalEmbedding._shared_model.to(device)
+                    # Use float16 on GPU to save memory and match typical hardware support
+                    LocalEmbedding._shared_model = LocalEmbedding._shared_model.half()
             
-            LocalEmbedding._shared_model.eval()  # Set to eval mode
+            LocalEmbedding._shared_model.eval()
             LocalEmbedding._shared_device = device
-            logger.info(f"Loaded {self.model_name} on {LocalEmbedding._shared_model.device}")
+            
+            # Explicit cache clear after loading
+            if "cuda" in device:
+                torch.cuda.empty_cache()
+                
+            logger.info(f"Loaded {self.model_name} successfully on {LocalEmbedding._shared_model.device}")
         
         return LocalEmbedding._shared_model, LocalEmbedding._shared_tokenizer
     
@@ -296,8 +300,13 @@ class LocalEmbedding(EmbeddingProvider):
             self._exec_lock = asyncio.Lock()
             
         async with self._exec_lock:
-            model, tokenizer = self._load_model()
-            loop = asyncio.get_event_loop()
+            # Always check/load model via executor to avoid blocking event loop
+            if LocalEmbedding._shared_model is None:
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(None, self._load_model)
+            
+            model, tokenizer = LocalEmbedding._shared_model, LocalEmbedding._shared_tokenizer
+            loop = asyncio.get_running_loop()
             
             from shared.config import get_settings
             settings = get_settings()

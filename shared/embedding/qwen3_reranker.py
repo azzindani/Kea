@@ -122,6 +122,13 @@ class LocalReranker(RerankerProvider):
             if LocalReranker._shared_model is not None:
                 return LocalReranker._shared_model, LocalReranker._shared_tokenizer
             
+            device = self.device
+            logger.info(f"Loading {self.model_name} on {device} (Thread: {threading.get_ident()})")
+            
+            # Explicit cache clear before loading
+            if "cuda" in device:
+                torch.cuda.empty_cache()
+            
             # Load tokenizer
             LocalReranker._shared_tokenizer = AutoTokenizer.from_pretrained(
                 self.model_name,
@@ -129,19 +136,23 @@ class LocalReranker(RerankerProvider):
             )
             
             # Load model
-            torch_dtype = torch.float16 if "cuda" in self.device else torch.float32
+            torch_dtype = torch.float16 if "cuda" in device else torch.float32
             
             if self.use_flash_attention:
                 LocalReranker._shared_model = AutoModelForCausalLM.from_pretrained(
                     self.model_name,
                     torch_dtype=torch_dtype,
                     attn_implementation="flash_attention_2",
-                ).to(self.device).eval()
+                ).to(device)
             else:
                 LocalReranker._shared_model = AutoModelForCausalLM.from_pretrained(
                     self.model_name,
-                    torch_dtype=torch_dtype
-                ).to(self.device).eval()
+                )
+                if device.startswith("cuda"):
+                    LocalReranker._shared_model = LocalReranker._shared_model.to(device)
+                    LocalReranker._shared_model = LocalReranker._shared_model.half()
+            
+            LocalReranker._shared_model.eval()
             
             # Setup token IDs
             LocalReranker._shared_token_false_id = LocalReranker._shared_tokenizer.convert_tokens_to_ids("no")
@@ -154,7 +165,11 @@ class LocalReranker(RerankerProvider):
             LocalReranker._shared_prefix_tokens = LocalReranker._shared_tokenizer.encode(prefix, add_special_tokens=False)
             LocalReranker._shared_suffix_tokens = LocalReranker._shared_tokenizer.encode(suffix, add_special_tokens=False)
             
-            logger.info(f"Loaded {self.model_name} on {LocalReranker._shared_model.device}")
+            # Final cache clear
+            if "cuda" in device:
+                torch.cuda.empty_cache()
+                
+            logger.info(f"Loaded {self.model_name} successfully on {LocalReranker._shared_model.device}")
         
         return LocalReranker._shared_model, LocalReranker._shared_tokenizer
     
@@ -231,7 +246,12 @@ class LocalReranker(RerankerProvider):
             self._exec_lock = asyncio.Lock()
             
         async with self._exec_lock:
-            model, _ = self._load_model()
+            # Always ensure model is loaded via executor
+            if LocalReranker._shared_model is None:
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(None, self._load_model)
+                
+            model, _ = LocalReranker._shared_model, LocalReranker._shared_tokenizer
             
             from shared.config import get_settings
             settings = get_settings()
