@@ -233,7 +233,10 @@ class LocalEmbedding(EmbeddingProvider):
                 torch.cuda.empty_cache()
             
             # Load tokenizer
-            LocalEmbedding._shared_tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+            LocalEmbedding._shared_tokenizer = AutoTokenizer.from_pretrained(
+                self.model_name,
+                padding_side='left'
+            )
             
             # Conservative load strategy: Load in default dtype (usually FP32 or as stored)
             # then convert to half only on GPU if needed.

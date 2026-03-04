@@ -201,33 +201,23 @@ class LocalReranker(RerankerProvider):
         import torch
         
         model, tokenizer = self._load_model()
-        
-        # Build complete prompts with prefix and suffix
-        full_texts = []
-        prefix = "<|im_start|>system\nJudge whether the Document meets the requirements based on the Query and the Instruct provided. Note that the answer can only be \"yes\" or \"no\".<|im_end|>\n<|im_start|>user\n"
-        suffix = "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
-        
-        for pair in pairs:
-            # Truncate pair content if needed
-            max_pair_len = self.max_length - len(LocalReranker._shared_prefix_tokens) - len(LocalReranker._shared_suffix_tokens)
-            pair_tokens = tokenizer.encode(pair, add_special_tokens=False)
-            if len(pair_tokens) > max_pair_len:
-                pair_tokens = pair_tokens[:max_pair_len]
-                pair = tokenizer.decode(pair_tokens)
-            
-            full_texts.append(prefix + pair + suffix)
+        prefix_tokens = LocalReranker._shared_prefix_tokens
+        suffix_tokens = LocalReranker._shared_suffix_tokens
+        max_length = self.max_length
         
         inputs = tokenizer(
-            full_texts,
-            padding=True,
-            truncation=True,
-            max_length=self.max_length,
-            return_tensors="pt",
+            pairs, padding=False, truncation='longest_first',
+            return_attention_mask=False, max_length=max_length - len(prefix_tokens) - len(suffix_tokens)
         )
+        
+        for i, ele in enumerate(inputs['input_ids']):
+            inputs['input_ids'][i] = prefix_tokens + ele + suffix_tokens
+            
+        inputs = tokenizer.pad(inputs, padding=True, return_tensors="pt", max_length=max_length)
         
         for key in inputs:
             inputs[key] = inputs[key].to(model.device)
-        
+            
         return inputs
     
     async def rerank(
@@ -277,20 +267,19 @@ class LocalReranker(RerankerProvider):
                     with gpu_lock:
                         with torch.no_grad():
                             outputs = model(**inputs)
-                            batch_logits = outputs.logits[:, -1, :]
+                            batch_scores = outputs.logits[:, -1, :]
                             
                             # Score calculation
-                            true_vector = batch_logits[:, LocalReranker._shared_token_true_id]
-                            false_vector = batch_logits[:, LocalReranker._shared_token_false_id]
+                            true_vector = batch_scores[:, LocalReranker._shared_token_true_id]
+                            false_vector = batch_scores[:, LocalReranker._shared_token_false_id]
                             
-                            # Logits to probabilities (softmax on yes/no)
-                            # Using cat + softmax to get normalized score
-                            pair_logits = torch.stack([false_vector, true_vector], dim=1)
-                            probs = torch.softmax(pair_logits, dim=1)
-                            scores = probs[:, 1].cpu().tolist()
+                            # Logits to probabilities (log_softmax + exp)
+                            batch_scores = torch.stack([false_vector, true_vector], dim=1)
+                            batch_scores = torch.nn.functional.log_softmax(batch_scores, dim=1)
+                            scores = batch_scores[:, 1].exp().tolist()
                             
                             # Cleanup to prevent OOM
-                            del outputs, batch_logits, true_vector, false_vector, pair_logits, probs
+                            del outputs, batch_scores, true_vector, false_vector
                             return scores
                 
                 i = 0
