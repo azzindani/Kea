@@ -310,45 +310,17 @@ def _try_http_embedding_provider() -> object | None:
     """
     Attempt to create an HTTP-based embedding provider.
     
-    Returns the client ONLY if the ML Inference service is configured and
-    responds to a health check. This prevents 404/Connection errors from
-    hijacking the provider chain when the service is down or misconfigured.
+    In a strict microservices architecture, we unconditionally return the API client
+    so we don't accidentally load multiple copies of CUDA models into memory 
+    across different service processes simply because the inference service is slow to boot.
     """
     try:
         from shared.embedding.client import EmbeddingServiceClient
         from shared.service_registry import ServiceRegistry, ServiceName
-        import httpx
         
         url = ServiceRegistry.get_url(ServiceName.ML_INFERENCE)
-        
-        # Quick reachability check — short probe to avoid blocking the event
-        # loop for long durations.  When the ML Inference service is not
-        # running we fall back to Local/API within ~1.5 s instead of 30 s.
-        from shared.config import get_settings
-        _probe_cfg = get_settings().ml_inference
-        max_attempts = _probe_cfg.probe_max_attempts
-        attempt_timeout = _probe_cfg.probe_timeout
-        probe_sleep = _probe_cfg.probe_sleep
-        
-        logger.debug(f"Model Manager: Checking ML Inference health at {url}...")
-        
-        for attempt in range(max_attempts):
-            try:
-                with httpx.Client(timeout=attempt_timeout) as client:
-                    resp = client.get(f"{url}/health")
-                    if resp.status_code == 200:
-                        provider = EmbeddingServiceClient()
-                        logger.info(f"Model Manager: Connected to ML Inference HTTP Service ({url})")
-                        return provider
-            except httpx.RequestError:
-                pass
-            
-            if attempt < max_attempts - 1:
-                import time
-                time.sleep(probe_sleep)
-            
-        logger.warning(f"Model Manager: ML Inference at {url} not ready. Falling back to Local/API.")
-        return None
+        logger.info(f"Model Manager: Configured to use ML Inference HTTP Service ({url})")
+        return EmbeddingServiceClient()
         
     except Exception as e:
         logger.debug(f"Model Manager: HTTP embedding client initialization failed: {e}")
@@ -358,36 +330,16 @@ def _try_http_embedding_provider() -> object | None:
 def _try_http_reranker_provider() -> object | None:
     """
     Attempt to create an HTTP-based reranker provider.
+    
+    In a strict microservices architecture, we unconditionally return the API client.
     """
     try:
         from shared.embedding.client import RerankerServiceClient
         from shared.service_registry import ServiceRegistry, ServiceName
-        import httpx
         
         url = ServiceRegistry.get_url(ServiceName.ML_INFERENCE)
-        
-        # Quick reachability check — mirror embedding probe settings
-        from shared.config import get_settings
-        _probe_cfg = get_settings().ml_inference
-        max_attempts = _probe_cfg.probe_max_attempts
-        attempt_timeout = _probe_cfg.probe_timeout
-        probe_sleep = _probe_cfg.probe_sleep
-        
-        for attempt in range(max_attempts):
-            try:
-                with httpx.Client(timeout=attempt_timeout) as client:
-                    resp = client.get(f"{url}/health")
-                    if resp.status_code == 200:
-                        provider = RerankerServiceClient()
-                        logger.info(f"Model Manager: Connected to Reranker HTTP Service ({url})")
-                        return provider
-            except httpx.RequestError:
-                pass
-            
-            if attempt < max_attempts - 1:
-                import time
-                time.sleep(probe_sleep)
-        return None
+        logger.info(f"Model Manager: Configured to use ML Inference HTTP Service ({url})")
+        return RerankerServiceClient()
         
     except Exception as e:
         logger.debug(f"Model Manager: HTTP reranker client initialization failed: {e}")
