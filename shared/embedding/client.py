@@ -57,9 +57,20 @@ class EmbeddingServiceClient:
     so it can be used as a drop-in replacement.
 
     Features:
-    - Connection pooling via httpx.AsyncClient
+    - Per-event-loop connection pooling (thread-safe singleton sharing)
     - Configurable timeouts from shared.config
     - Automatic retry on transient failures
+
+    Thread-safety note
+    ------------------
+    This instance is typically shared as a process-level singleton via
+    model_manager.get_embedding_provider(). Multiple services (RAG, MCP Host,
+    Vault) run in separate OS threads, each with their own asyncio event loop.
+    The original single self._client approach caused a race condition: thread B
+    closing and replacing the client while thread A was mid-request → ReadError.
+
+    Fix: _clients is a dict keyed by event-loop id. Each thread/loop gets its
+    own httpx.AsyncClient and never touches another thread's connection pool.
     """
 
     def __init__(self, base_url: str | None = None) -> None:
@@ -71,34 +82,39 @@ class EmbeddingServiceClient:
         )
         self._max_retries = settings.circuit_breaker.failure_threshold
         self._retry_delay: float = 1.0
-        self._client: httpx.AsyncClient | None = None
-        self._loop: asyncio.AbstractEventLoop | None = None
+        # Per-event-loop clients: id(loop) → httpx.AsyncClient
+        self._clients: dict[int, httpx.AsyncClient] = {}
+
+    def _make_client(self) -> httpx.AsyncClient:
+        settings = get_settings()
+        return httpx.AsyncClient(
+            base_url=self._base_url,
+            timeout=self._timeout,
+            limits=httpx.Limits(
+                max_connections=settings.api.max_connections,
+                max_keepalive_connections=settings.api.max_connections // 2,
+            ),
+        )
 
     async def _get_client(self) -> httpx.AsyncClient:
-        """Get or create the persistent HTTP client, ensuring it matches the current loop."""
-        current_loop = asyncio.get_running_loop()
-        
-        if self._client is None or self._client.is_closed or self._loop != current_loop:
-            if self._client and not self._client.is_closed:
-                await self._client.aclose()
-            
-            settings = get_settings()
-            self._client = httpx.AsyncClient(
-                base_url=self._base_url,
-                timeout=self._timeout,
-                limits=httpx.Limits(
-                    max_connections=settings.api.max_connections,
-                    max_keepalive_connections=settings.api.max_connections // 2,
-                ),
-            )
-            self._loop = current_loop
-        return self._client
+        """Get or create the HTTP client for the current event loop.
+
+        Each asyncio event loop (i.e. each service thread) owns its own
+        httpx.AsyncClient so that concurrent threads never close each other's
+        connections.
+        """
+        loop_id = id(asyncio.get_running_loop())
+        client = self._clients.get(loop_id)
+        if client is None or client.is_closed:
+            self._clients[loop_id] = self._make_client()
+        return self._clients[loop_id]
 
     async def close(self) -> None:
-        """Close the HTTP client and release connections."""
-        if self._client and not self._client.is_closed:
-            await self._client.aclose()
-            self._client = None
+        """Close all per-loop HTTP clients and release connections."""
+        for client in list(self._clients.values()):
+            if not client.is_closed:
+                await client.aclose()
+        self._clients.clear()
 
     async def _request_with_retry(
         self,
@@ -226,6 +242,9 @@ class RerankerServiceClient:
 
     Implements the same interface as RerankerProvider (rerank)
     so it can be used as a drop-in replacement.
+
+    Uses the same per-event-loop client dict pattern as EmbeddingServiceClient
+    to prevent cross-thread ReadErrors when the singleton is shared.
     """
 
     def __init__(self, base_url: str | None = None) -> None:
@@ -237,34 +256,34 @@ class RerankerServiceClient:
         )
         self._max_retries = settings.circuit_breaker.failure_threshold
         self._retry_delay: float = 1.0
-        self._client: httpx.AsyncClient | None = None
-        self._loop: asyncio.AbstractEventLoop | None = None
+        # Per-event-loop clients: id(loop) → httpx.AsyncClient
+        self._clients: dict[int, httpx.AsyncClient] = {}
+
+    def _make_client(self) -> httpx.AsyncClient:
+        settings = get_settings()
+        return httpx.AsyncClient(
+            base_url=self._base_url,
+            timeout=self._timeout,
+            limits=httpx.Limits(
+                max_connections=settings.api.max_connections,
+                max_keepalive_connections=settings.api.max_connections // 2,
+            ),
+        )
 
     async def _get_client(self) -> httpx.AsyncClient:
-        """Get or create the persistent HTTP client, ensuring it matches the current loop."""
-        current_loop = asyncio.get_running_loop()
-        
-        if self._client is None or self._client.is_closed or self._loop != current_loop:
-            if self._client and not self._client.is_closed:
-                await self._client.aclose()
-                
-            settings = get_settings()
-            self._client = httpx.AsyncClient(
-                base_url=self._base_url,
-                timeout=self._timeout,
-                limits=httpx.Limits(
-                    max_connections=settings.api.max_connections,
-                    max_keepalive_connections=settings.api.max_connections // 2,
-                ),
-            )
-            self._loop = current_loop
-        return self._client
+        """Get or create the HTTP client for the current event loop."""
+        loop_id = id(asyncio.get_running_loop())
+        client = self._clients.get(loop_id)
+        if client is None or client.is_closed:
+            self._clients[loop_id] = self._make_client()
+        return self._clients[loop_id]
 
     async def close(self) -> None:
-        """Close the HTTP client and release connections."""
-        if self._client and not self._client.is_closed:
-            await self._client.aclose()
-            self._client = None
+        """Close all per-loop HTTP clients and release connections."""
+        for client in list(self._clients.values()):
+            if not client.is_closed:
+                await client.aclose()
+        self._clients.clear()
 
     async def _request_with_retry(
         self,
