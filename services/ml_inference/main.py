@@ -59,6 +59,34 @@ logger = get_logger(__name__)
 
 
 # ---------------------------------------------------------------------------
+# Server-side GPU concurrency guard
+# ---------------------------------------------------------------------------
+# The embedding and reranker models run sequentially on the GPU.  When
+# multiple Kea services (e.g. RAG + MCP Host) fire embed requests at the
+# same moment, their concurrent HTTP connections can cause TCP ReadErrors
+# because the single-process uvicorn loop is blocked in run_in_executor.
+#
+# This semaphore serializes all inference requests at the server level so
+# that every caller's connection stays alive while it waits for its turn,
+# eliminating ReadErrors without needing cross-process coordination.
+#
+# The limit is driven by settings.ml_inference.max_concurrent_requests
+# (default 1) so it can be tuned via environment variable without a code
+# change.
+_inference_semaphore: asyncio.Semaphore | None = None
+
+
+def _get_inference_semaphore() -> asyncio.Semaphore:
+    """Get or create the GPU inference semaphore for the running event loop."""
+    global _inference_semaphore
+    if _inference_semaphore is None:
+        _inference_semaphore = asyncio.Semaphore(
+            settings.ml_inference.max_concurrent_requests
+        )
+    return _inference_semaphore
+
+
+# ---------------------------------------------------------------------------
 # Lifespan
 # ---------------------------------------------------------------------------
 
@@ -242,7 +270,8 @@ async def embed_texts(request: EmbedRequest):
 
     try:
         provider = pool.get_embedding_provider()
-        embeddings = await provider.embed(request.texts)
+        async with _get_inference_semaphore():
+            embeddings = await provider.embed(request.texts)
 
         return EmbedResponse(
             embeddings=[list(e) for e in embeddings],
@@ -275,7 +304,8 @@ async def embed_query(request: EmbedQueryRequest):
 
     try:
         provider = pool.get_embedding_provider()
-        embedding = await provider.embed_query(request.text)
+        async with _get_inference_semaphore():
+            embedding = await provider.embed_query(request.text)
 
         return EmbedQueryResponse(
             embedding=list(embedding),
@@ -314,12 +344,13 @@ async def rerank_documents(request: RerankRequest):
     try:
         provider = pool.get_reranker_provider()
 
-        # Use the reranker's rerank method
-        scored_results = await provider.rerank(
-            query=request.query,
-            documents=request.documents,
-            top_k=request.top_k,
-        )
+        async with _get_inference_semaphore():
+            # Use the reranker's rerank method
+            scored_results = await provider.rerank(
+                query=request.query,
+                documents=request.documents,
+                top_k=request.top_k,
+            )
 
         # Build response — scored_results should be list of (index, score) or similar
         results = []
