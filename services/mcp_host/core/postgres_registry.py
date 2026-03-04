@@ -182,11 +182,15 @@ class PostgresToolRegistry:
                         break 
                     except Exception as e:
                         # Senior Architect Fix: Explicitly check for timeout and connection errors
-                        # Note: str(e) is often empty for TimeoutError on Windows, so we check types.
-                        is_timeout = isinstance(e, (asyncio.TimeoutError, httpx.TimeoutException))
+                        # Note: str(e) is often empty for TimeoutError/ReadError on Windows, so we check types.
+                        is_transient = isinstance(e, (
+                            asyncio.TimeoutError,
+                            httpx.TimeoutException,
+                            httpx.ReadError,
+                        ))
                         error_str = str(e).lower()
                         
-                        if is_timeout or "500" in error_str or "timeout" in error_str or "disconnected" in error_str:
+                        if is_transient or "500" in error_str or "timeout" in error_str or "disconnected" in error_str:
                             import math
                             if batch_size > 1:
                                 logger.warning(

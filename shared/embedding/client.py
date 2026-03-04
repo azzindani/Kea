@@ -23,6 +23,26 @@ from shared.service_registry import ServiceName, ServiceRegistry
 
 logger = get_logger(__name__)
 
+# ---------------------------------------------------------------------------
+# Concurrency Guard
+# ---------------------------------------------------------------------------
+# The ML Inference service processes GPU requests sequentially.  When
+# multiple callers (tool-registry + knowledge-registry) fire concurrent
+# embedding requests, the single-threaded GPU handler causes TCP-level
+# connection resets (httpx.ReadError).  A module-level semaphore limits
+# in-flight embedding requests so they are serialized cleanly.
+# ---------------------------------------------------------------------------
+_EMBED_MAX_CONCURRENT: int = 1
+_embed_semaphore: asyncio.Semaphore | None = None
+
+
+def _get_embed_semaphore() -> asyncio.Semaphore:
+    """Lazy-init a per-loop semaphore to serialize GPU embedding calls."""
+    global _embed_semaphore
+    if _embed_semaphore is None:
+        _embed_semaphore = asyncio.Semaphore(_EMBED_MAX_CONCURRENT)
+    return _embed_semaphore
+
 
 class EmbeddingServiceClient:
     """
@@ -57,9 +77,14 @@ class EmbeddingServiceClient:
             if self._client and not self._client.is_closed:
                 await self._client.aclose()
             
+            settings = get_settings()
             self._client = httpx.AsyncClient(
                 base_url=self._base_url,
                 timeout=self._timeout,
+                limits=httpx.Limits(
+                    max_connections=settings.api.max_connections,
+                    max_keepalive_connections=settings.api.max_connections // 2,
+                ),
             )
             self._loop = current_loop
         return self._client
@@ -93,13 +118,18 @@ class EmbeddingServiceClient:
 
                 return response
 
-            except (httpx.TimeoutException, httpx.ConnectError, httpx.HTTPStatusError) as e:
+            except (
+                httpx.TimeoutException,
+                httpx.ConnectError,
+                httpx.HTTPStatusError,
+                httpx.ReadError,
+            ) as e:
                 last_error = e
                 if attempt < self._max_retries:
                     delay = self._retry_delay * (2 ** attempt)
                     logger.warning(
                         f"ML Inference request failed (attempt {attempt + 1}) "
-                        f"at {self._base_url}{path}: {e}. "
+                        f"at {self._base_url}{path}: {type(e).__name__}: {e}. "
                         f"Retrying in {delay:.1f}s..."
                     )
                     await asyncio.sleep(delay)
@@ -110,17 +140,21 @@ class EmbeddingServiceClient:
         """
         Embed a batch of texts via the ML Inference service.
 
+        Serialized via a module-level semaphore to prevent concurrent
+        GPU requests from causing TCP connection resets (ReadError).
+
         Args:
             texts: List of texts to embed.
 
         Returns:
             List of embedding vectors (list of floats).
         """
-        response = await self._request_with_retry(
-            "POST",
-            "/v1/embed",
-            json={"texts": texts},
-        )
+        async with _get_embed_semaphore():
+            response = await self._request_with_retry(
+                "POST",
+                "/v1/embed",
+                json={"texts": texts},
+            )
         if response.status_code != 200:
             error_msg = f"ML Inference Service Error ({response.status_code}) at {self._base_url}/v1/embed"
             try:
@@ -139,17 +173,21 @@ class EmbeddingServiceClient:
         """
         Embed a single query text via the ML Inference service.
 
+        Serialized via the same semaphore as embed() to prevent
+        contention on the single GPU inference pipeline.
+
         Args:
             query: Query text to embed.
 
         Returns:
             Embedding vector (list of floats).
         """
-        response = await self._request_with_retry(
-            "POST",
-            "/v1/embed/query",
-            json={"text": query},
-        )
+        async with _get_embed_semaphore():
+            response = await self._request_with_retry(
+                "POST",
+                "/v1/embed/query",
+                json={"text": query},
+            )
         if response.status_code != 200:
             error_msg = f"ML Inference Service Error ({response.status_code}) at {self._base_url}/v1/embed/query"
             try:
@@ -205,9 +243,14 @@ class RerankerServiceClient:
             if self._client and not self._client.is_closed:
                 await self._client.aclose()
                 
+            settings = get_settings()
             self._client = httpx.AsyncClient(
                 base_url=self._base_url,
                 timeout=self._timeout,
+                limits=httpx.Limits(
+                    max_connections=settings.api.max_connections,
+                    max_keepalive_connections=settings.api.max_connections // 2,
+                ),
             )
             self._loop = current_loop
         return self._client
@@ -241,13 +284,18 @@ class RerankerServiceClient:
 
                 return response
 
-            except (httpx.TimeoutException, httpx.ConnectError, httpx.HTTPStatusError) as e:
+            except (
+                httpx.TimeoutException,
+                httpx.ConnectError,
+                httpx.HTTPStatusError,
+                httpx.ReadError,
+            ) as e:
                 last_error = e
                 if attempt < self._max_retries:
                     delay = self._retry_delay * (2 ** attempt)
                     logger.warning(
                         f"ML Reranker request failed (attempt {attempt + 1}) "
-                        f"at {self._base_url}{path}: {e}. "
+                        f"at {self._base_url}{path}: {type(e).__name__}: {e}. "
                         f"Retrying in {delay:.1f}s..."
                     )
                     await asyncio.sleep(delay)
