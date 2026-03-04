@@ -28,20 +28,25 @@ logger = get_logger(__name__)
 # ---------------------------------------------------------------------------
 # The ML Inference service processes GPU requests sequentially.  When
 # multiple callers (tool-registry + knowledge-registry) fire concurrent
-# embedding requests, the single-threaded GPU handler causes TCP-level
-# connection resets (httpx.ReadError).  A module-level semaphore limits
-# in-flight embedding requests so they are serialized cleanly.
+# embedding requests, the single-threaded GPU handler can cause TCP-level
+# connection resets (httpx.ReadError).
+#
+# Each Kea service runs in its own thread with its own asyncio event loop,
+# so we use a per-loop semaphore dictionary.  This serializes requests
+# within each service while cross-service contention is handled by the
+# httpx.ReadError retry logic in _request_with_retry().
 # ---------------------------------------------------------------------------
 _EMBED_MAX_CONCURRENT: int = 1
-_embed_semaphore: asyncio.Semaphore | None = None
+_embed_semaphores: dict[int, asyncio.Semaphore] = {}
 
 
 def _get_embed_semaphore() -> asyncio.Semaphore:
-    """Lazy-init a per-loop semaphore to serialize GPU embedding calls."""
-    global _embed_semaphore
-    if _embed_semaphore is None:
-        _embed_semaphore = asyncio.Semaphore(_EMBED_MAX_CONCURRENT)
-    return _embed_semaphore
+    """Get or create a per-event-loop semaphore to serialize GPU embedding calls."""
+    loop = asyncio.get_running_loop()
+    loop_id = id(loop)
+    if loop_id not in _embed_semaphores:
+        _embed_semaphores[loop_id] = asyncio.Semaphore(_EMBED_MAX_CONCURRENT)
+    return _embed_semaphores[loop_id]
 
 
 class EmbeddingServiceClient:
