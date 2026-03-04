@@ -120,13 +120,14 @@ class PostgresToolRegistry:
             logger.info(f"Registry: Embedding {len(updates_needed)} new/modified tools in batches...")
             
             # Senior Architect Fix: Dynamic Batch processing for large toolsets
-            batch_size = settings.embedding.batch_size
-            total_updated = 0
-            
             from shared.config import get_settings
             settings = get_settings()
             
+            batch_size = settings.embedding.batch_size
+            total_updated = 0
+            
             i = 0
+
             while i < len(updates_needed):
                 actual_batch_size = min(batch_size, len(updates_needed) - i)
                 batch = updates_needed[i : i + actual_batch_size]

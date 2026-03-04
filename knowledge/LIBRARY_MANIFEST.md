@@ -34,6 +34,8 @@ This document is an automatically generated index of all available 'Pure Context
 - [Trades (4)](#trades)
 - [Web_Research (13)](#web_research)
 - [Kea (1)](#kea)
+- [Strategy (1)](#strategy)
+- [Compliance (1)](#compliance)
 - [Heuristics (1)](#heuristics)
 - [Mental Models (1)](#models)
 - [Cultural Values (1)](#values)
@@ -369,6 +371,18 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Social Media Strategist](skills/web_research/social_media_manager.md)** | Expertise in viral loops, community management, and brand voice. | `social, marketing, community, viral` |
 | **[Technical Product Manager](skills/web_research/product_manager.md)** | Expertise in user stories, prioritization frameworks, and stakeholder management. | `product, management, agile, strategy` |
 | **[UX Researcher](skills/web_research/ux_researcher.md)** | Expertise in user interviews, usability testing, and persona creation. | `ux, user-research, design, testing` |
+
+---
+## Strategy <a name='strategy'></a>
+| Strategy Name | Description | Tags |
+|---|---|---|
+| **[Frictionless Scalability](strategy/frictionless_scalability.md)** | Long-term strategy for removing operational drag and ensuring linear enterprise growth. | `strategy, scalability, ops` |
+
+---
+## Compliance <a name='compliance'></a>
+| Policy Name | Description | Tags |
+|---|---|---|
+| **[Institutional Accountability](compliance/institutional_accountability.md)** | Governance rules for long-term ownership and the 'Disagree and Commit' protocol. | `governance, accountability, ethics` |
 
 ---
 ## Kea <a name='kea'></a>
