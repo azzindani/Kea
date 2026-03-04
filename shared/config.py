@@ -254,6 +254,11 @@ class MLInferenceSettings(BaseModel):
     probe_timeout: float = 0.5   # per-attempt HTTP timeout (seconds)
     probe_sleep: float = 0.5     # sleep between failed attempts
 
+    # Startup readiness gate — used by launcher.py to block dependent
+    # services until ML Inference reports healthy models.
+    startup_poll_interval: float = 3.0   # seconds between /health polls
+    startup_health_timeout: float = 300.0  # max seconds to wait (≤ model_load_timeout)
+
 
 class TimeoutSettings(BaseModel):
     """Standardized timeouts."""
