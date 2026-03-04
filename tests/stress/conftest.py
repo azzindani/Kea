@@ -379,11 +379,14 @@ async def bootstrap_services():
     # RAG service URL assumption (usually 8003 based on plan)
     RAG_URL = "http://localhost:8003"
     rag_ok = await wait_for_service(RAG_URL, "RAG Service", timeout=1)
+    # ML Inference URL assumption
+    ML_INFERENCE_URL = "http://localhost:8007"
+    ml_inf_ok = await wait_for_service(ML_INFERENCE_URL, "ML Inference", timeout=1)
 
     procs = []
 
     # 2. Start missing services
-    if not (api_ok and orch_ok and rag_ok):
+    if not (api_ok and orch_ok and rag_ok and ml_inf_ok):
         logging.info("🚀 Bootstrapping Microservices (Subprocesses)...")
         env = os.environ.copy()
 
@@ -431,12 +434,23 @@ async def bootstrap_services():
             )
             procs.append(p_api)
 
+        # Start ML Inference
+        if not ml_inf_ok:
+            logging.info("   Starting ML Inference...")
+            p_ml = subprocess.Popen(
+                [sys.executable, "-m", "services.ml_inference.main"],
+                env=env,
+                cwd=os.getcwd()
+            )
+            procs.append(p_ml)
+
         # 3. Wait for startup
         logging.info("⏳ Waiting for services to come online...")
         # Give them a moment to crash or bind
         await asyncio.sleep(5)
 
         ready = await asyncio.gather(
+            wait_for_service(ML_INFERENCE_URL, "ML Inference"),
             wait_for_service(RAG_URL, "RAG Service"),
             wait_for_service(ORCHESTRATOR_URL, "Orchestrator"),
             wait_for_service(API_GATEWAY_URL, "API Gateway")

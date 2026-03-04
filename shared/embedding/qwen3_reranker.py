@@ -251,7 +251,7 @@ class LocalReranker(RerankerProvider):
             # Batching configuration
             BATCH_SIZE = settings.reranker.batch_size or 8
             
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             
             def compute_all_scores():
                 nonlocal BATCH_SIZE
