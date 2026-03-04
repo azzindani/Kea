@@ -254,6 +254,12 @@ class MLInferenceSettings(BaseModel):
     probe_timeout: float = 0.5   # per-attempt HTTP timeout (seconds)
     probe_sleep: float = 0.5     # sleep between failed attempts
 
+    # Server-side GPU concurrency guard.
+    # The GPU inference pipeline is sequential; allowing more than one
+    # concurrent request causes TCP ReadErrors under cross-service load.
+    # Set > 1 only if the underlying model supports true parallel batching.
+    max_concurrent_requests: int = 1
+
     # Startup readiness gate — used by launcher.py to block dependent
     # services until ML Inference reports healthy models.
     startup_poll_interval: float = 3.0   # seconds between /health polls

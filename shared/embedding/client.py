@@ -385,3 +385,60 @@ def get_reranker_client() -> RerankerServiceClient:
     if _reranker_client is None:
         _reranker_client = RerankerServiceClient()
     return _reranker_client
+
+
+# ---------------------------------------------------------------------------
+# ML Inference Readiness Gate
+# ---------------------------------------------------------------------------
+
+
+async def await_ml_inference_ready() -> None:
+    """
+    Block until the ML Inference service is healthy (all models loaded).
+
+    Intended for use at the top of background sync jobs in services that
+    embed content on startup (RAG knowledge sync, MCP Host tool sync).
+    Calling this as the first line of those tasks means the jobs wait
+    silently instead of hammering the server with ConnectError retries
+    while models are still downloading.
+
+    Config-driven: uses settings.ml_inference.startup_poll_interval and
+    settings.ml_inference.startup_health_timeout — no hardcoded values.
+    """
+    settings = get_settings()
+    poll_interval = settings.ml_inference.startup_poll_interval
+    timeout = settings.ml_inference.startup_health_timeout
+    health_url = f"{ServiceRegistry.get_url(ServiceName.ML_INFERENCE)}/health"
+
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    attempt = 0
+
+    while loop.time() < deadline:
+        attempt += 1
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as client:
+                resp = await client.get(health_url)
+                if resp.status_code == 200 and resp.json().get("status") == "ok":
+                    logger.info(
+                        f"ML Inference ready after {attempt} poll(s) — proceeding with sync."
+                    )
+                    return
+                logger.info(
+                    f"ML Inference initializing (attempt {attempt}, "
+                    f"status={resp.json().get('status', '?')}, "
+                    f"models={resp.json().get('models_loaded', 0)}) — "
+                    f"retrying in {poll_interval}s..."
+                )
+        except Exception:
+            logger.info(
+                f"ML Inference not yet reachable (attempt {attempt}) — "
+                f"retrying in {poll_interval}s..."
+            )
+
+        await asyncio.sleep(poll_interval)
+
+    logger.warning(
+        f"ML Inference did not become ready within {timeout}s. "
+        "Proceeding anyway — embedding retries will self-heal."
+    )
