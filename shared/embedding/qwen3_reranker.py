@@ -16,7 +16,9 @@ from shared.logging.main import get_logger
 
 from shared.logging.main import get_logger
 from shared.hardware.gpu_lock import get_gpu_inference_lock
- 
+
+logger = get_logger(__name__)
+
 import threading
 _MODULE_LOCK = threading.Lock()
 
