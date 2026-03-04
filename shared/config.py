@@ -247,6 +247,13 @@ class MLInferenceSettings(BaseModel):
     device: str = "auto"  # auto | cuda | cuda:0 | cuda:1 | cpu
     use_flash_attention: bool = False
 
+    # Service discovery probe — how long to wait for the ML Inference
+    # HTTP server before falling back to local/API providers.  Keep
+    # short to avoid blocking the caller's event loop.
+    probe_max_attempts: int = 3
+    probe_timeout: float = 0.5   # per-attempt HTTP timeout (seconds)
+    probe_sleep: float = 0.5     # sleep between failed attempts
+
 
 class TimeoutSettings(BaseModel):
     """Standardized timeouts."""

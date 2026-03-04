@@ -321,12 +321,14 @@ def _try_http_embedding_provider() -> object | None:
         
         url = ServiceRegistry.get_url(ServiceName.ML_INFERENCE)
         
-        # 0.4.0: Rigorous reachability check with boot-up patience
-        # We use a sync client with retries to wait for the service to finish loading models.
-        # This prevents the "Cold Start Fallback Collision" where other services boot Local Torch
-        # while the ML service is still initializing its own Local Torch.
-        max_attempts = 30
-        attempt_timeout = 1.0
+        # Quick reachability check — short probe to avoid blocking the event
+        # loop for long durations.  When the ML Inference service is not
+        # running we fall back to Local/API within ~1.5 s instead of 30 s.
+        from shared.config import get_settings
+        _probe_cfg = get_settings().ml_inference
+        max_attempts = _probe_cfg.probe_max_attempts
+        attempt_timeout = _probe_cfg.probe_timeout
+        probe_sleep = _probe_cfg.probe_sleep
         
         logger.debug(f"Model Manager: Checking ML Inference health at {url}...")
         
@@ -343,7 +345,7 @@ def _try_http_embedding_provider() -> object | None:
             
             if attempt < max_attempts - 1:
                 import time
-                time.sleep(1.0)
+                time.sleep(probe_sleep)
             
         logger.warning(f"Model Manager: ML Inference at {url} not ready. Falling back to Local/API.")
         return None
@@ -364,11 +366,16 @@ def _try_http_reranker_provider() -> object | None:
         
         url = ServiceRegistry.get_url(ServiceName.ML_INFERENCE)
         
-        # Reuse logic for reranker
-        max_attempts = 30
-        for _ in range(max_attempts):
+        # Quick reachability check — mirror embedding probe settings
+        from shared.config import get_settings
+        _probe_cfg = get_settings().ml_inference
+        max_attempts = _probe_cfg.probe_max_attempts
+        attempt_timeout = _probe_cfg.probe_timeout
+        probe_sleep = _probe_cfg.probe_sleep
+        
+        for attempt in range(max_attempts):
             try:
-                with httpx.Client(timeout=1.0) as client:
+                with httpx.Client(timeout=attempt_timeout) as client:
                     resp = client.get(f"{url}/health")
                     if resp.status_code == 200:
                         provider = RerankerServiceClient()
@@ -377,8 +384,9 @@ def _try_http_reranker_provider() -> object | None:
             except httpx.RequestError:
                 pass
             
-            import time
-            time.sleep(1.0)
+            if attempt < max_attempts - 1:
+                import time
+                time.sleep(probe_sleep)
         return None
         
     except Exception as e:
