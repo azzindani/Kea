@@ -12,6 +12,7 @@ import os
 import asyncio
 from typing import Any, List, Dict, Optional
 import numpy as np
+import httpx
 
 import asyncpg
 from pgvector.asyncpg import register_vector

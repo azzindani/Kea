@@ -14,6 +14,7 @@ import json
 from typing import Any
 
 import asyncpg
+import httpx
 from pgvector.asyncpg import register_vector
 
 from shared.database.connection import get_database_pool
