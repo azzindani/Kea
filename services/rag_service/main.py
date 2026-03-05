@@ -491,7 +491,10 @@ async def _sync_knowledge_job(domain: str | None = None, category: str | None = 
                 logger.error(f"Knowledge directory does not exist: {knowledge_dir}")
                 return
 
-            items = scan_knowledge_files(knowledge_dir, domain_filter=domain, category_filter=category)
+            items = await asyncio.to_thread(
+                scan_knowledge_files, knowledge_dir,
+                domain_filter=domain, category_filter=category,
+            )
             
             logger.info(f"Sync: Found {len(items)} items to process in library.")
 
