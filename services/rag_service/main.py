@@ -515,7 +515,7 @@ async def _sync_knowledge_job(domain: str | None = None, category: str | None = 
 async def health_check():
     """Service health status."""
     return {
-        "status": "ok" if knowledge_store and knowledge_store.is_ready else "initializing",
+        "status": "ok" if knowledge_store is not None else "initializing",
         "service": "rag_service",
         "version": get_settings().app.version,
     }
