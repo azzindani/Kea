@@ -518,7 +518,12 @@ async def _sync_knowledge_job(domain: str | None = None, category: str | None = 
 async def health_check():
     """Service health status."""
     return {
-        "status": "ok" if knowledge_store is not None else "initializing",
+        # "ok" means the service is alive and accepting requests.
+        # Callers that need the knowledge store should check
+        # `knowledge_store_ready` — retrieval endpoints already
+        # return 503 gracefully when the store is unavailable.
+        "status": "ok",
+        "knowledge_store_ready": knowledge_store is not None,
         "service": "rag_service",
         "version": get_settings().app.version,
     }

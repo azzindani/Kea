@@ -174,7 +174,10 @@ async def health():
     """Health check with model and device status."""
     pool = get_model_pool()
 
-    status = "ok" if pool.is_loaded and pool.loaded_model_count > 0 else "degraded"
+    # "ok" means the service is alive and accepting requests.
+    # Callers that need models to be loaded should inspect `models_loaded > 0`
+    # (or use shared.embedding.client.await_ml_inference_ready() which does so).
+    status = "ok"
 
     return HealthResponse(
         status=status,

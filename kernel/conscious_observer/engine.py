@@ -514,6 +514,19 @@ class ConsciousObserver:
         bound_log.info("ConsciousObserver.process started")
 
         try:
+            # Wait for the ML Inference service to have models loaded before
+            # starting any phase that may trigger embedding calls (Gate-In
+            # calls the RAG bridge which embeds the query via ML Inference).
+            # This avoids flooding the service with 503-retry loops during the
+            # GPU model warm-up window, which can exhaust the retry budget.
+            # await_ml_inference_ready() is config-driven (startup_health_timeout=300s)
+            # and returns immediately if ML Inference is already loaded or unreachable.
+            try:
+                from shared.embedding.client import await_ml_inference_ready
+                await await_ml_inference_ready()
+            except Exception:
+                pass  # Non-fatal: embedding retries will self-heal if needed
+
             # If evidence is provided but no context, bridge them so the agent
             # can actually see the data it needs to ground against later.
             if evidence and not rag_context:
