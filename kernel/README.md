@@ -3,7 +3,7 @@ Show less
 I've completed a thorough exploration of the `/home/user/Kea/kernel/` directory. Here's what I found:
 ---
 ## 1. DIRECTORY STRUCTURE
-The kernel contains **79 Python files** organized into **25 specialized modules**, each implementing a specific cognitive function. The directory structure follows the **Layered Pyramid Architecture** with 7 tiers:
+The kernel contains **79+ Python files** organized into **25+ specialized modules**, each implementing a specific cognitive function. The directory structure follows the **Layered Pyramid Architecture** with 9 tiers:
 ```
 /home/user/Kea/kernel/
 ├── __init__.py (comprehensive exports)
@@ -32,7 +32,12 @@ The kernel contains **79 Python files** organized into **25 specialized modules*
 ├── short_term_memory/      (Tier 4)
 ├── task_decomposition/     (Tier 2)
 ├── validation/             (Tier 1)
-└── what_if_scenario/       (Tier 2)
+├── what_if_scenario/       (Tier 2)
+├── conscious_observer/      (Tier 7 - Human Kernel)
+├── workforce_manager/       (Tier 8 - Corporation Kernel)
+├── team_orchestrator/       (Tier 8 - Corporation Kernel)
+├── quality_resolver/        (Tier 8 - Corporation Kernel)
+└── corporate_gateway/       (Tier 9 - Corporate Gateway)
 ```
 ---
 ## 2. TIER BREAKDOWN
@@ -104,6 +109,29 @@ The kernel contains **79 Python files** organized into **25 specialized modules*
 | **noise_gate** | Final quality checkpoint before output leaves kernel | `filter_output()`, `apply_quality_threshold()`, `annotate_output()`, `generate_rejection_feedback()`, `check_retry_budget()`, `clear_retry_budget()` - multi-dimensional quality check |
 **Pattern**: Tier 6 is **metacognitive oversight**. It watches the OODA Loop, detects anomalies, and adjusts pipeline routing dynamically.
 ---
+### **TIER 7: Human Kernel (The Single Agent)**
+| Module | Purpose | Key Functions |
+|--------|---------|----------------|
+| **conscious_observer** | Top-level orchestrator of Tiers 1-6 for a single agent | `run_conscious_observer()` |
+
+**Pattern**: Tier 7 combines all Subconscious primitives into a cohesive, single simulated employee. Modality-agnostic, single persona.
+---
+### **TIER 8: Corporation Kernel (Middle Management)**
+| Module | Purpose | Key Functions |
+|--------|---------|----------------|
+| **workforce_manager** | Profile matching and team assembly | `hire_team()`, `match_profiles()` |
+| **team_orchestrator** | Multi-agent DAG execution and sprint coordination | `run_sprint()`, `coordinate_agents()` |
+| **quality_resolver** | Cross-agent conflict resolution | `audit_artifacts()`, `resolve_conflicts()` |
+
+**Pattern**: Tier 8 doesn't do the work itself; it manages Tier 7 workers. Scales infrastructure up via Swarm Manager if needed.
+---
+### **TIER 9: Corporate Gateway (The CEO)**
+| Module | Purpose | Key Functions |
+|--------|---------|----------------|
+| **corporate_gateway** | Apex entry point, strategic scaling, and final synthesis | `classify_intent()`, `assess_strategy()`, `synthesize_response()`, `handle_interrupt_logic()` |
+
+**Pattern**: The only tier that interfaces with human clients. Decides if a goal is SOLO, TEAM, or SWARM, and synthesizes the outputs.
+---
 ## 3. KEY CLASSES & DATA STRUCTURES
 ### Core Data Flow Objects
 **Standard I/O Pattern** (Tier 0):
@@ -159,25 +187,43 @@ Methods:
 - `CognitiveLoad` (compute_load, time_load, breadth_load, total)
 - `GroundingReport` (claims[], grounding_score, verdict)
 - `CalibratedConfidence` (stated, calibrated, grounding_score)
+### Tier 7 Output Types (Human Kernel)
+- `ObserverExecutionResult` (loop_result, raw_output, total_tokens_consumed)
+- `ConsciousObserverResult` (mode, phase_completed, final_verdict)
+### Tier 8 Output Types (Corp Ops)
+- `MissionChunk` (chunk_id, description, requires_team)
+- `TeamSprintResult` (sprint_id, consolidated_artifacts[], team_cohesion_score)
+- `QualityAudit` (contradictions_found, resolution_strategy)
+### Tier 9 Output Types (Corp Gateway)
+- `CorporateGateInResult` (client_intent, assigned_strategy, workflow_dag)
+- `CorporateProcessResponse` (synthetic_summary, execution_metrics)
 ---
 ## 4. EXISTING ORCHESTRATION & COORDINATION PATTERNS
 ### **Inter-Tier Communication**
 **Strict Dependency Flow** (Lower → Upper only):
 ```
-Tier 0 ← Tier 1 ← Tier 2 ← Tier 3 ← Tier 4 ← Tier 5 ← Tier 6
+Tier 0 ← Tier 1 ← ... ← Tier 6 ← Tier 7 ← Tier 8 ← Tier 9
 ```
 **Never Reverse**: Tier N modules NEVER import from Tier N+1.
 ### **Main Orchestration Entry Points**
-**The OODA Loop (Tier 4)** is the primary orchestrator:
+
+**The Corporate Gateway (Tier 9)** is the Apex entry point for external users:
+```python
+async def corporate_process(
+    request: CorporateProcessRequest,
+) -> CorporateProcessResponse
+```
+
+**The OODA Loop (Tier 4)** is the primary sub-orchestrator for a single agent (used by Tier 7):
 ```python
 async def run_ooda_loop(
     initial_state: AgentState,
     stm: ShortTermMemory | None = None,
     active_dag: ExecutableDAG | None = None,
     kit: InferenceKit | None = None,
-) → Result
+) -> Result
 ```
-**Loop Flow**:
+**Tier 4 Loop Flow**:
 1. For each cycle (up to `config.ooda_max_cycles`):
    - `observe()` → collect events into STM
    - `orient()` → contextualize with RAG + STM
@@ -191,21 +237,22 @@ async def run_ooda_loop(
 3. **Tier 3**: `plan_advanced(SubTaskItem[], constraints)` → TrackedPlan
 4. **Tier 4**: `run_ooda_cycle(state, stm, active_dag)` → CycleResult
 5. If `Decision.action == REPLAN`: feedback to Tier 3 for replanning
-### **Signal Processing Pipeline** (Tier 1 → Tier 6)
-Typical signal flow:
+### **Signal Processing Pipeline** (Tier 1 → Tier 9)
+Typical multi-agent signal flow:
 ```
-RawInput
-  ↓ [Modality]
-  ↓ [Classification] → ClassificationResult
-  ↓ [Intent/Sentiment/Urgency] → CognitiveLabels
-  ↓ [Entity Recognition] → ValidatedEntity[]
-  ↓ [Activation Router (T6)] → ActivationMap (select pipeline)
-  ↓ [Task Decomposition (T2)] → SubTaskItem[]
-  ↓ [Graph Synthesizer (T3)] → ExecutableDAG
-  ↓ [OODA Loop (T4)] → CycleResult/LoopResult
-  ↓ [Self Model + Hallucination Monitor (T6)] → GroundingReport
-  ↓ [Confidence Calibrator (T6)] → CalibratedConfidence
-  ↓ [Noise Gate (T6)] → FilteredOutput or RejectedOutput
+RawInput (Client Request)
+  ↓ [Corporate Gateway (T9)] → Gate-In (Intent & Strategy)
+  ↓ [Corporate Ops (T8)] → Construct Mission DAG & Spawns Team
+   ├── [Human Kernel A (T7)] → Initiates OODA via T4
+   │    ↓ [Classification (T1)]
+   │    ↓ [Activation Router (T6)]
+   │    ↓ [OODA Loop (T4)] → Runs MCP Tools
+   │    └─ [Noise Gate (T6)] → FilteredOutput A
+   └── [Human Kernel B (T7)]
+        └─ [OODA Loop (T4)] → FliteredOutput B
+  ↓ [Corporate Ops (T8)] → QualityResolver (Checks A vs B)
+  ↓ [Corporate Gateway (T9)] → Gate-Out (Exec Synthesis)
+  ↓ Return Response to Client
 ```
 ### **Async/Blocking Guarantees**
 **CRITICAL RULE**: Tier 4 OODA Loop must NEVER block synchronously on slow calls:
@@ -354,6 +401,9 @@ The Kea **Human Kernel** is a sophisticated, **fractal cognitive architecture** 
 4. **Tier 4** is the **beating heart** — the **OODA Loop** that iterates rapidly, non-blocking
 5. **Tier 5** manages **agent lifecycle and resources**
 6. **Tier 6** provides **metacognitive oversight** (load monitoring, hallucination detection, confidence calibration)
+7. **Tier 7** represents a complete **Single Simulated Employee** (The Conscious Observer)
+8. **Tier 8** provides **Middle Management** (Workforce allocation, Sprint Planning)
+9. **Tier 9** acts as the **CEO / Gateway** (Client Intent, Macro Strategy, and Final Synthesis)
 The **OODA Loop** (Tier 4) with **Short-Term Memory** is the central coordination hub. It calls down into Tier 3 for replanning, reads working state from STM, and receives macro-directives from Tier 5.
 All **inter-module communication** uses Pydantic models and `Result` envelopes. **All configuration** is centralized in `shared/config.py`. **All logging** is structured and context-aware.
 There is **no monolithic KernelCell** — instead, the kernel is a **modular, composable toolkit** where each tier's output is the next tier's input, forming a unified cognitive processing pipeline.

@@ -23,7 +23,7 @@ from shared.environment import get_environment_config
 
 from services.api_gateway.routes import (
     jobs, memory, mcp, system, artifacts, interventions, llm,
-    auth, users, conversations,
+    auth, users, conversations, corporate,
 )
 from services.api_gateway.middleware.auth import create_auth_middleware
 from services.api_gateway.middleware.rate_limit import RateLimitMiddleware
@@ -201,6 +201,9 @@ app.include_router(system.router, prefix="/api/v1/system", tags=["System"])
 app.include_router(artifacts.router, prefix="/api/v1/artifacts", tags=["Artifacts"])
 app.include_router(interventions.router, prefix="/api/v1/interventions", tags=["HITL"])
 app.include_router(llm.router, prefix="/api/v1/llm", tags=["LLM"])
+
+# Corporate (Tier 9 — proxy to Corporate Gateway Service)
+app.include_router(corporate.router, prefix="/api/v1", tags=["Corporate"])
 
 
 # ============================================================================

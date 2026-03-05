@@ -47,6 +47,8 @@ class ServiceSettings(BaseModel):
     chronos: str = "http://localhost:8006"
     ml_inference: str = "http://localhost:8007"
     ml_reranker: str = "http://localhost:8007"  # Same as ml_inference in single-instance; separate in multi-GPU
+    corporate_gateway: str = "http://localhost:8010"
+    corporate_ops: str = "http://localhost:8011"
 
 
 class LLMModelInfo(BaseModel):
@@ -893,6 +895,75 @@ class KernelSettings(BaseModel):
     rag_tool_max_retries_per_tool: int = 2
 
 
+class CorporateSettings(BaseModel):
+    """Tier 8-9 Corporation Kernel settings."""
+
+    # --- Workforce Manager ---
+    max_concurrent_agents: int = 100
+    agent_spawn_timeout_ms: float = 5000.0
+    agent_idle_timeout_ms: float = 30000.0
+    agent_fire_quality_threshold: float = 0.3
+    spawn_batch_size: int = 10
+
+    # --- Team Orchestrator ---
+    sprint_max_parallel_tasks: int = 10
+    sprint_review_enabled: bool = True
+    corporate_ooda_poll_interval_ms: float = 1000.0
+    handoff_timeout_ms: float = 60000.0
+    max_sprints_per_mission: int = 20
+    checkpoint_interval_sprints: int = 1
+
+    # --- Shared Ledger ---
+    artifact_max_size_bytes: int = 10_485_760
+    artifact_ttl_seconds: int = 86400
+    checkpoint_ttl_seconds: int = 604800       # 7 days
+    session_ttl_seconds: int = 86400           # 24 hours
+
+    # --- Quality Resolver ---
+    conflict_similarity_threshold: float = 0.7
+    consensus_quorum_pct: float = 0.5
+    arbitration_timeout_ms: float = 30000.0
+    quality_gate_threshold: float = 0.6
+
+    # --- Hardware-Aware Scaling ---
+    high_pressure_threshold: float = 0.8
+    swarm_min_agents: int = 10
+    swarm_max_agents_per_core: int = 2
+
+    # --- Corporate Gateway ---
+    gateway_max_concurrent_missions: int = 10
+    gateway_session_timeout_ms: float = 3_600_000.0   # 1 hour
+    gateway_interrupt_poll_ms: float = 2000.0
+    gateway_status_keywords: list[str] = [
+        "progress", "status", "how far", "update",
+        "how's it going", "eta", "remaining", "how long",
+    ]
+    gateway_abort_keywords: list[str] = [
+        "stop", "cancel", "abort", "kill", "terminate", "halt",
+    ]
+
+    # --- Strategic Assessment (Gate-In) ---
+    solo_max_domains: int = 1
+    team_max_agents: int = 10
+    timeline_buffer_pct: float = 1.2                  # 20% buffer
+
+    # --- Synthesis (Gate-Out) ---
+    synthesis_max_tokens: int = 8192
+    partial_result_threshold: float = 0.5              # Accept if >= 50% complete
+    quality_gate_min_score: float = 0.6
+
+    # --- HTTP Client Settings ---
+    orchestrator_timeout_ms: float = 120000.0          # 2 min per agent process call
+    corporate_ops_timeout_ms: float = 300000.0         # 5 min (missions can be long)
+    vault_timeout_ms: float = 10000.0
+    rag_timeout_ms: float = 10000.0
+    swarm_timeout_ms: float = 10000.0
+    http_max_retries: int = 3
+    http_retry_base_delay: float = 2.0
+    mission_poll_interval_ms: float = 5000.0           # Poll Corporate Ops every 5s
+
+
+
 class HttpStatusSettings(BaseModel):
     """Standardized HTTP Status Codes."""
     ok: int = 200
@@ -962,6 +1033,7 @@ class Settings(BaseSettings):
     normalization: NormalizationSettings = NormalizationSettings()
     kernel: KernelSettings = KernelSettings()
     ml_inference: MLInferenceSettings = MLInferenceSettings()
+    corporate: CorporateSettings = CorporateSettings()
 
     model_config = SettingsConfigDict(
         env_file=".env",

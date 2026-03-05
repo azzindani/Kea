@@ -1,0 +1,1 @@
+"""Corporate Gateway Service package."""

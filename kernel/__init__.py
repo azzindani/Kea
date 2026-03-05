@@ -60,6 +60,16 @@ Tier 7 — Human Kernel Apex:
                                 three phases (Gate-In, Execute, Gate-Out), with CLM intercept
                                 after every OODA cycle. Mimics end-to-end human cognition.
 
+Tier 8 — Corporation Kernel:
+    workforce_manager/          Specialist matching, performance evaluation, scaling decisions
+    team_orchestrator/          Sprint planning (topological grouping), DAG building, sprint review
+    quality_resolver/           Multi-agent conflict detection, resolution cascade, sprint auditing
+
+Tier 9 — Corporate Gateway (Corporation Kernel Apex):
+    corporate_gateway/          Intent classification, strategic assessment, response synthesis,
+                                interrupt handling. Pure logic — the service layer is in
+                                services/corporate_gateway/.
+
 Integration Protocol:
     - All functions accept Signal(s) and return Result
     - All errors are KernelError (first-class data, not exceptions)
@@ -330,6 +340,66 @@ from kernel.conscious_observer import (
     ProcessingMode,
     run_conscious_observer,
 )
+
+# ============================================================================
+# Tier 8: Corporation Kernel
+# ============================================================================
+from kernel.workforce_manager import (
+    AgentHandle,
+    AgentStatus as CorporateAgentStatus,
+    MissionChunk,
+    PerformanceSnapshot,
+    ProfileMatch,
+    ScaleAction,
+    ScaleDecision,
+    TerminationReason,
+    WorkforcePool,
+    compute_scale_decisions,
+    evaluate_performance,
+    match_specialist,
+)
+from kernel.team_orchestrator import (
+    CorporateOODAResult,
+    MissionResult,
+    Sprint,
+    SprintResult,
+    SprintReview,
+    build_sprint_dag,
+    plan_sprints,
+    review_sprint,
+)
+from kernel.quality_resolver import (
+    Conflict,
+    FinalQualityReport,
+    QualityAudit,
+    Resolution,
+    detect_conflicts,
+    resolve_conflict,
+    score_sprint_quality,
+)
+
+# ============================================================================
+# Tier 9: Corporate Gateway (Corporation Kernel Apex)
+# ============================================================================
+from kernel.corporate_gateway import (
+    ClientIntent,
+    CorporateExecuteResult,
+    CorporateGateInResult,
+    CorporateQuality,
+    InterruptClassification,
+    InterruptResponse as CorporateInterruptResponse,
+    MissionSummary,
+    ResponseSection,
+    ScalingMode,
+    SessionState,
+    StrategyAssessment,
+    SynthesizedResponse,
+    assess_strategy,
+    classify_intent,
+    handle_interrupt_logic,
+    synthesize_response,
+)
+
 
 # ============================================================================
 # Tier 6: Conscious Observer (Metacognitive Oversight)
@@ -641,4 +711,55 @@ __all__ = [
     "ObserverExecuteResult",
     "ObserverPhase",
     "ProcessingMode",
+    # --- Tier 8: Corporation Kernel ---
+    # Workforce Manager
+    "match_specialist",
+    "evaluate_performance",
+    "compute_scale_decisions",
+    "MissionChunk",
+    "AgentHandle",
+    "CorporateAgentStatus",
+    "WorkforcePool",
+    "TerminationReason",
+    "ScaleDecision",
+    "ScaleAction",
+    "ProfileMatch",
+    "PerformanceSnapshot",
+    # Team Orchestrator
+    "plan_sprints",
+    "build_sprint_dag",
+    "review_sprint",
+    "Sprint",
+    "SprintResult",
+    "SprintReview",
+    "MissionResult",
+    "CorporateOODAResult",
+    # Quality Resolver
+    "detect_conflicts",
+    "resolve_conflict",
+    "score_sprint_quality",
+    "Conflict",
+    "Resolution",
+    "QualityAudit",
+    "FinalQualityReport",
+    # --- Tier 9: Corporate Gateway ---
+    # Engine
+    "classify_intent",
+    "assess_strategy",
+    "synthesize_response",
+    "handle_interrupt_logic",
+    # Types
+    "ClientIntent",
+    "ScalingMode",
+    "StrategyAssessment",
+    "CorporateGateInResult",
+    "CorporateExecuteResult",
+    "SynthesizedResponse",
+    "ResponseSection",
+    "CorporateQuality",
+    "MissionSummary",
+    "CorporateInterruptResponse",
+    "InterruptClassification",
+    "SessionState",
 ]
+

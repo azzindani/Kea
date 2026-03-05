@@ -77,6 +77,27 @@ EXPOSE 8006
 CMD ["python", "-m", "services.chronos.main"]
 
 # ============================================================================
+# ML Inference
+# ============================================================================
+FROM base as ml-inference
+EXPOSE 8007
+CMD ["python", "-m", "services.ml_inference.main"]
+
+# ============================================================================
+# Corporate Gateway (Tier 9)
+# ============================================================================
+FROM base as corporate-gateway
+EXPOSE 8010
+CMD ["python", "-m", "services.corporate_gateway.main"]
+
+# ============================================================================
+# Corporate Ops (Tier 8)
+# ============================================================================
+FROM base as corporate-ops
+EXPOSE 8011
+CMD ["python", "-m", "services.corporate_ops.main"]
+
+# ============================================================================
 # Development (all-in-one with hot reload)
 # ============================================================================
 FROM base as development

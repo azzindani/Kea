@@ -16,6 +16,8 @@ class ServiceName(str, Enum):
     CHRONOS = "chronos"
     ML_INFERENCE = "ml_inference"
     ML_RERANKER = "ml_reranker"
+    CORPORATE_GATEWAY = "corporate_gateway"
+    CORPORATE_OPS = "corporate_ops"
 
 class ServiceRegistry:
     """

@@ -185,6 +185,9 @@ async def stream_execution(
         },
     )
 
+from services.orchestrator.routers import corporate_agents
+app.include_router(corporate_agents.router)
+
 
 # ============================================================================
 # Main
