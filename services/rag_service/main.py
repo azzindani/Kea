@@ -74,8 +74,8 @@ async def lifespan(_app: FastAPI):
             if knowledge_store is not None:
                 await knowledge_store._registry._get_pool()
                 logger.info("Knowledge store initialized and table verified")
-            asyncio.create_task(_sync_knowledge_job())
-            logger.info("Knowledge auto-sync scheduled (background)")
+                asyncio.create_task(_sync_knowledge_job())
+                logger.info("Knowledge auto-sync scheduled (background)")
         except Exception as e:
             logger.error(f"Knowledge store failed to initialize: {e}", exc_info=True)
             knowledge_store = None
