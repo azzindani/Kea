@@ -571,7 +571,12 @@ def main():
         "services.rag_service.main:app",
         host=settings.api.host,
         port=ServiceRegistry.get_port(ServiceName.RAG_SERVICE),
-        reload=settings.is_development,
+        # reload=True spawns a watcher + worker subprocess pair. When the
+        # conftest terminates only the watcher, the worker becomes an orphan
+        # that holds the port across test runs, preventing new instances from
+        # binding and causing 100% bootstrap failure.  Always run as a single
+        # process (matching ML Inference & Orchestrator).
+        reload=False,
     )
 
 
