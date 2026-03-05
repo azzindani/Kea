@@ -314,23 +314,12 @@ class LocalEmbedding(EmbeddingProvider):
             
             from shared.config import get_settings
             settings = get_settings()
-            
-            # Check VRAM pressure and adjust batch size
-            batch_size = settings.embedding.batch_size  # Default batch size
-            try:
-                from shared.hardware.detector import detect_hardware
-                hw = detect_hardware()
-                if hw.cuda_available:
-                    hw.refresh_vram()
-                    pressure = hw.vram_pressure()
-                    if pressure > settings.hardware.critical_pressure_threshold:
-                        batch_size = settings.embedding.high_pressure_batch_size
-                        logger.warning(f"VRAM pressure high ({pressure*100:.1f}%), reducing batch to {batch_size}")
-                    elif pressure > settings.hardware.high_pressure_threshold:
-                        batch_size = settings.embedding.med_pressure_batch_size
-            except Exception:
-                pass
-            
+
+            # Default batch size — refined inside process_all() after VRAM sync
+            # (refresh_vram calls torch.cuda.synchronize which must run in the
+            # executor thread, not here in the async event loop).
+            batch_size = settings.embedding.batch_size
+
             def encode_batch(batch_texts: list[str]) -> list[list[float]]:
                 """Encode a batch of texts using official pattern."""
                 # Tokenize with __call__ method (fast path)
@@ -364,11 +353,32 @@ class LocalEmbedding(EmbeddingProvider):
             def process_all():
                 """Process all texts in batches."""
                 all_embeddings = []
-                import sys
                 import math
-                
+
                 nonlocal batch_size
-                
+
+                # VRAM pressure check runs here — safe because process_all() executes
+                # in a thread-pool thread via run_in_executor(), NOT in the asyncio
+                # event loop.  refresh_vram() calls torch.cuda.synchronize(), which
+                # would block uvicorn's event loop (killing health-check responsiveness)
+                # if called from the async body above.
+                try:
+                    from shared.hardware.detector import detect_hardware
+                    hw = detect_hardware()
+                    if hw.cuda_available:
+                        hw.refresh_vram()
+                        pressure = hw.vram_pressure()
+                        if pressure > settings.hardware.critical_pressure_threshold:
+                            batch_size = settings.embedding.high_pressure_batch_size
+                            logger.warning(
+                                f"VRAM pressure high ({pressure*100:.1f}%), "
+                                f"reducing batch to {batch_size}"
+                            )
+                        elif pressure > settings.hardware.high_pressure_threshold:
+                            batch_size = settings.embedding.med_pressure_batch_size
+                except Exception:
+                    pass
+
                 # CPU heuristics to prevent thrashing
                 if model.device.type == "cpu":
                     batch_size = min(batch_size, 4)
