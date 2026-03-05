@@ -1,5 +1,4 @@
-# 📚 Project 'Liquid Intelligence' Library Manifest
-> **Total Intelligence Modules Available**: 215
+> **Total Intelligence Modules Available**: 390
 
 This document is an automatically generated index of all available 'Pure Context' skills.
 
@@ -34,12 +33,15 @@ This document is an automatically generated index of all available 'Pure Context
 - [Trades (4)](#trades)
 - [Web_Research (13)](#web_research)
 - [Kea (1)](#kea)
-- [Strategy (1)](#strategy)
-- [Compliance (1)](#compliance)
-- [Heuristics (1)](#heuristics)
-- [Mental Models (1)](#models)
-- [Cultural Values (1)](#values)
-- [Interaction Protocols (1)](#protocols)
+- [Strategy (3)](#strategy)
+- [Compliance (3)](#compliance)
+- [Heuristics (6)](#heuristics)
+- [Mental Models (6)](#models)
+- [Cultural Values (2)](#values)
+- [Interaction Protocols (5)](#protocols)
+- [Technical References (5)](#references)
+- [Design (1)](#design)
+- [History (1)](#history_knowledge)
 - [Silicon Corporate Infrastructure](#infrastructure)
 
 ---
@@ -72,6 +74,8 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Elite Professional Poker Strategist (GTO Specialist)](skills/business/poker_pro.md)** | Expert in Game Theory Optimal play, risk-adjusted bankroll management, and range analysis. | `poker, game-theory, risk, psychology` |
 | **[Senior Enterprise Sales Engineer (MEDDPICC Master)](skills/business/sales_engineer.md)** | Expert in complex B2B technical sales, MEDDPICC framework, and POC architecture. | `sales, presales, tech, business` |
 | **[Senior Strategic Procurement Architect (MCIPS)](skills/business/supply_procurement.md)** | Expert in global supply chain optimization, Kraljic Matrix, and Total Cost of Ownership (TCO). | `procurement, supply-chain, business, negotiation` |
+| **[Professional Line Stander](skills/business/line_stander.md)** | Specialist in traffic arbitrage and pre-emptive resource-slot occupancy. | `business, ops, arbitrage` |
+| **[High-Stakes Auctioneer](skills/business/high_stakes_auctioneer.md)** | Specialist in real-time resource-allocation and priority-bid scaling. | `business, tech, arbitrage` |
 
 ## Cloud <a name='cloud'></a>
 | Skill Name | Description | Tags |
@@ -125,6 +129,14 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Principal Music Producer](skills/creative/music_producer.md)** | Specializing in spatial audio (Atmos), signal flow, and streaming-standard mastering. | `music-production, audio-engineering, mixing, mastering` |
 | **[Professional Screenwriter (WGA)](skills/creative/screenwriter.md)** | Specializing in 3-Act structure, 'Save the Cat' beats, and subtextual dialogue. | `screenwriting, storytelling, script, film` |
 | **[Principal Visual Brand Architect](skills/creative/graphic_designer.md)** | Specializing in semiotics, modular design systems, and multi-channel visual governance. | `branding, typography, visual-identity, design-systems` |
+| **[Master Perfume Nose](skills/creative/perfume_nose.md)** | Specialist in olfactory composition and neurological sensory anchoring. | `creative, sensory, chemistry` |
+| **[Foley Artist](skills/creative/foley_artist.md)** | Specialist in crafting artificial realism through analogous auditory manipulation. | `creative, audio, perception` |
+| **[High-Stakes Art Restorer](skills/creative/art_restorer.md)** | Specialist in irreversible data/truth recovery without fabrication. | `creative, science, recovery` |
+| **[Master Campanologist](skills/creative/campanologist.md)** | Specialist in mathematical sequence logic and high-precision synchronization. | `creative, math, synchronization` |
+| **[Master Silhouettist](skills/creative/master_silhouettist.md)** | Specialist in high-contrast semantic compression and identity abstraction. | `creative, data, reductionism` |
+| **[Master Fletcher](skills/creative/master_fletcher.md)** | Specialist in aerodynamic logic-craft and high-precision prompt design. | `creative, tech, logic` |
+| **[Master Luthier](skills/creative/master_luthier.md)** | Specialist in harmonic resonance and tonal alignment of system-outputs. | `creative, tech, resonance` |
+| **[Master Bowyer](skills/creative/master_bowyer.md)** | Specialist in elastic state-machines and potential-energy storage. | `creative, tech, performance` |
 
 ## Data <a name='data'></a>
 | Skill Name | Description | Tags |
@@ -170,6 +182,11 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Observability Engineer](skills/devops/prometheus_monitor.md)** | Senior Infrastructure Engineer specializing in Prometheus, PromQL, Alertmanager, and OpenTelemetry. | `monitoring, prometheus, grafana, observability, otel` |
 | **[Site Reliability Engineer (SRE)](skills/devops/sre_engineer.md)** | Principal Reliability Engineer specializing in SLIs, SLOs, Error Budgets, and toil reduction. | `sre, devops, reliability, google, slo` |
 | **[Terraform IaC Expert](skills/devops/terraform_expert.md)** | Principal Infrastructure Engineer specializing in HCL, provider engineering, and state management. | `terraform, iac, hcl, terragrunt, infrastructure` |
+| **[Human Echolocator](skills/ops/human_echolocator.md)** | Specialist in passive-sensing and spatial mapping through signal reflection. | `ops, sensing, mapping` |
+| **[Forward Artillery Spotter](skills/ops/artillery_spotter.md)** | Specialist in remote target-designation and indirect firing-solutions. | `ops, strat, targeting` |
+| **[Knocker-Upper](skills/ops/knocker_upper.md)** | Specialist in predictive JIT awakening and cold-start mitigation. | `ops, timing, scheduling` |
+| **[Lighthouse Keeper](skills/ops/lighthouse_keeper.md)** | Specialist in static-signal reliability and global beacon durability. | `ops, security, reliability` |
+| **[Signal-Lamp Operator](skills/ops/signal_lamp_operator.md)** | Specialist in low-bandwidth pulse-code and emergency communication. | `ops, strat, signal` |
 
 ## Education <a name='education'></a>
 | Skill Name | Description | Tags |
@@ -186,6 +203,7 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Principal Manufacturing Engineer](skills/engineering/manufacturing_process_eng.md)** | Industry 4.0 Architect specializing in LSS 4.0, Cognitive AI, and self-optimizing assembly. | `manufacturing, lean-six-sigma, industry4.0, robotics, automation` |
 | **[Senior Mechanical Systems Designer](skills/engineering/mechanical_engineer.md)** | Senior Mechanical Engineer specializing in Generative Design, FEA/CFD simulation, and smart materials. | `mechanical, cad, simulation, fea, material-science` |
 | **[Principal Supply Chain Architect](skills/engineering/supply_chain_manager.md)** | Senior Logistics Economist specializing in Cost-to-Serve, JIT 2.0, and risk-mitigated global sourcing. | `supply-chain, logistics, procurement, economics, inventory` |
+| **[Master Saturation Diver](skills/engineering/saturation_diver.md)** | Specialist in hyper-pressurized operations and meticulous decompression. | `engineering, ops, pressure` |
 
 ## Finance <a name='finance'></a>
 | Skill Name | Description | Tags |
@@ -212,6 +230,8 @@ This document is an automatically generated index of all available 'Pure Context
 |---|---|---|
 | **[Senior Foreign Service Officer (Diplomat)](skills/gov/diplomat.md)** | Senior Diplomat specializing in digital diplomacy, multi-lateral negotiation (BATNA), and national interest advocacy. | `diplomacy, negotiation, foreign-policy, digital-advocacy, protocol` |
 | **[Senior Urban City Planner (AICP)](skills/gov/city_planner.md)** | Senior Planning Lead specializing in smart city integration, TOD, form-based codes, and resilience modeling. | `urban-planning, smart-cities, zoning, resilience, aicp` |
+| **[Lead Proximity-Intelligence Agent](skills/gov/proximity_intel.md)** | Specialist in kernel-level un-sanitized truth and proximity-steering. | `gov, security, intelligence` |
+| **[Micro-Manorial Governor](skills/gov/micro_manorial_governor.md)** | Specialist in granular local resource governance and soil-level ops. | `gov, ops, management` |
 
 ## Health <a name='health'></a>
 | Skill Name | Description | Tags |
@@ -239,6 +259,13 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Senior Cultural Anthropologist](skills/humanities/anthropologist.md)** | Senior Consultant specializing in digital ethnography, AI-ethics (Cultural Co-Genesis), and CQ intelligence. | `anthropology, culture, digital-ethnography, ai-ethics, intelligence` |
 | **[Professional Historian](skills/humanities/historian.md)** | Senior Historical Researcher specializing in Digital Humanities, Archival Science 2.0, and evidence synthesis. | `history, digital-humanities, archives, research, context` |
 | **[Socratic Philosopher](skills/humanities/socratic_philosopher.md)** | Senior Philosophical Architect specializing in dialectical inquiry, critical thinking frameworks, and AI-Socratic integration. | `philosophy, logic, critical-thinking, dialogue, ethics` |
+| **[Forensic Linguist](skills/humanities/forensic_linguist.md)** | Specialist in stylometric identity fingerprinting and voice forensics. | `humanities, forensics, linguistics` |
+| **[Master of the Art of Memory](skills/humanities/memory_master.md)** | Specialist in spatial context-architecting and artificial memory palaces. | `humanities, psych, memory` |
+| **[Vexillologist](skills/humanities/vexillologist.md)** | Specialist in symbolic identity logic and semiotic systemic grammar. | `humanities, design, semiotics` |
+| **[Master Moirologist](skills/humanities/master_moirologist.md)** | Specialist in public state-signaling and reputation-health orchestration. | `humanities, strat, signaling` |
+| **[Professional Sin Eater](skills/humanities/sin_eater.md)** | Specialist in fault-absorption and systemic-absolution of failed nodes. | `humanities, ops, cleanup` |
+| **[Professional Apology Writer](skills/humanities/apology_writer.md)** | Specialist in semantic recovery and diplomatic reputation-salvage. | `humanities, strat, communication` |
+| **[Professional Scryer](skills/humanities/professional_scryer.md)** | Specialist in stochastic pattern-inference and latent-signal sensing. | `humanities, tech, perception` |
 
 ## Leadership <a name='leadership'></a>
 | Skill Name | Description | Tags |
@@ -263,6 +290,13 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Senior Maritime Logistics Manager](skills/logistics/maritime_logistics_manager.md)** | Senior Ocean Freight Strategist specializing in digital twins, autonomous vessels, and resilience-first network design. | `maritime, logistics, supply-chain, shipping, digital-twin` |
 | **[Senior Rail Freight Scheduler](skills/logistics/rail_scheduler.md)** | Senior Rail Operations Strategist specializing in manifest optimization, PTC, and predictive scheduling. | `rail, freight, logistics, scheduling, intermodal` |
 | **[Senior Trucking Fleet Dispatcher](skills/logistics/trucking_dispatcher.md)** | Senior Fleet Operations Strategist specializing in ELD/HOS compliance and dynamic load matching. | `trucking, fleet, logistics, dispatch, eld` |
+| **[Celestial Navigator](skills/logistics/celestial_navigator.md)** | Specialist in zero-trust positioning using universal physics constants. | `logistics, math, navigation` |
+| **[Harbor Pilot](skills/logistics/harbor_pilot.md)** | Specialist in high-inertia maneuvering and precision channel strategy. | `logistics, strategy, navigation` |
+| **[Ancient Wayfinder](skills/logistics/ancient_wayfinder.md)** | Specialist in ripple-effect navigation and non-instrumental sign reading. | `logistics, ops, navigation` |
+| **[Scarcity-Environment Logistician](skills/logistics/hostile_logistician.md)** | Specialist in survival-resource management in hostile high-latency zones. | `logistics, ops, edge` |
+| **[Iceberg Mover](skills/logistics/iceberg_mover.md)** | Specialist in high-inertia redirection and legacy-object management. | `logistics, data, strategy` |
+| **[Ice-Well Digger](skills/logistics/ice_well_digger.md)** | Specialist in cryo-data archiving and glacial-tier longevity. | `logistics, data, archiving` |
+| **[Lead Stevedore](skills/logistics/lead_stevedore.md)** | Specialist in interface-throughput and context-payload loading. | `logistics, tech, throughput` |
 
 ## Media <a name='media'></a>
 | Skill Name | Description | Tags |
@@ -295,6 +329,17 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Senior Sustainable Agronomist](skills/science/agronomist.md)** | Senior Agricultural Strategist in regenerative agriculture, AI-driven rotation, and soil carbon farming. | `agronomy, sustainable-agriculture, regenerative-farming, carbon-farming, soil-health` |
 | **[Senior Theoretical Physicist](skills/science/theoretical_physicist.md)** | Senior Research Scientist specializing in quantum gravity, formal verification, and AI-assisted theoretical discovery. | `theoretical_physicist, quantum-gravity, string-theory, formal-verification, ai-physics` |
 | **[Senior Zoologist](skills/science/zoologist.md)** | Senior Animal Scientist specializing in AI-driven ethology, drone-monitoring, and conservation genomics. | `zoology, ethology, wildlife-monitoring, genomics, conservation-tech` |
+| **[Forensic Botanist](skills/science/forensic_botanist.md)** | Specialist in biological trace-tracking and environmental origin forensics. | `science, forensics, botany` |
+| **[Snake Milker](skills/science/snake_milker.md)** | Specialist in risk-antidote extraction and vulnerability-harvesting logic. | `science, risk, security` |
+| **[Space Archaeologist](skills/science/space_archaeologist.md)** | Specialist in macro-scale pattern recognition and invisible structure detection. | `science, data, pattern-recognition` |
+| **[Forensic Entomologist](skills/science/forensic_entomologist.md)** | Specialist in chronological decay auditing and post-mortem timing. | `science, forensics, entomology` |
+| **[Hyper-Spectral Tetrachromat](skills/science/tetrachromat.md)** | Specialist in high-dimensional perception and hidden entropy-color detection. | `science, data, perception` |
+| **[Semantic Odor Judge](skills/science/odor_judge.md)** | Specialist in sub-threshold data-smell detection and log-aroma audit. | `science, data, perception` |
+| **[High-Risk Data Taster](skills/science/cup_bearer.md)** | Specialist in lethal-payload canary testing and ingestion-risk management. | `science, security, risk` |
+| **[Master Falconer](skills/science/master_falconer.md)** | Specialist in autonomous-interceptor training and predator-agent logic. | `science, security, hunting` |
+| **[Professional Sleeper](skills/science/professional_sleeper.md)** | Specialist in low-power state auditing and subconscious system-monitoring. | `science, data, observation` |
+| **[Truffle Hunter](skills/science/truffle_hunter.md)** | Specialist in latent-context discovery and hidden-signal extraction. | `science, data, extraction` |
+| **[Cartographer of the Interior](skills/science/interior_cartographer.md)** | Specialist in latent-space manifold mapping and conceptual navigation. | `science, creative, mapping` |
 
 ## Security <a name='security'></a>
 | Skill Name | Description | Tags |
@@ -336,6 +381,9 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Senior Release Manager](skills/tech/release_manager.md)** | Senior Software Delivery Architect in progressive delivery, feature flags, and platform engineering. | `devops, release-management, feature-flags, platform` |
 | **[Senior Small Business SysAdmin](skills/tech/sysadmin_generalist.md)** | Senior IT Generalist in MSP-style hybrid cloud, Microsoft 365 security, and Zero Trust for SMBs. | `sysadmin, small-business, m365, zero-trust` |
 | **[Senior Technical Writer](skills/tech/technical_writer.md)** | Senior Knowledge Architect in Documentation-as-Code (DaC), AI-augmented authoring, and multimodal systems. | `writing, documentation, dac, knowledge-management` |
+| **[Master Clockmaker](skills/tech/master_clockmaker.md)** | Specialist in fractal synchronization and universal reference-pulse design. | `tech, synchronization, timing` |
+| **[Master Chimney Sweep](skills/tech/chimney_sweep.md)** | Specialist in narrow-channel pipe-purge and metadata-soot removal. | `tech, ops, cleaning` |
+| **[Rat-Catcher](skills/tech/rat_catcher.md)** | Specialist in low-level resource-leak hunting and OS-vermin isolation. | `tech, security, cleanup` |
 
 ## Trades <a name='trades'></a>
 | Skill Name | Description | Tags |
@@ -344,6 +392,10 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Senior Plumber & Smart Water Architect](skills/trades/plumber.md)** | Senior Infrastructure Engineer in AI-augmented water management, micro-leak detection, and greywater systems. | `plumbing, smart-water, leak-detection, sustainability` |
 | **[Senior Solar & Renewable Energy Technician](skills/trades/solar_energy_tech.md)** | Senior Renewable Systems Lead in perovskite-silicon tandem cells, microgrid controllers, and V2G. | `solar, renewables, microgrid, storage, v2g` |
 | **[Senior Welding & Advanced Robotics Engineer](skills/trades/welder.md)** | Senior Fabrication Specialist in vision-guided robotic welding, laser welding, and exotic superalloys. | `welding, robotics, fabrication, metals, ndt` |
+| **[Master Dry Stone Waller](skills/trades/dry_stone_waller.md)** | Specialist in mortar-less structural equilibrium and mechanical interlock. | `trades, physics, structural` |
+| **[Master Cooper](skills/trades/master_cooper.md)** | Specialist in self-sealing architecture through natural tension and expansion. | `trades, physics, structural` |
+| **[Master Blacksmith](skills/trades/master_blacksmith.md)** | Specialist in elemental logic-hammering and raw material refinement. | `trades, tech, forge` |
+| **[Master Rope-Maker](skills/trades/rope_maker.md)** | Specialist in long-chain connectivity and robust logic-braiding. | `trades, ops, resilience` |
 
 ## Web_Research <a name='web_research'></a>
 | Skill Name | Description | Tags |
@@ -371,12 +423,29 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Social Media Strategist](skills/web_research/social_media_manager.md)** | Expertise in viral loops, community management, and brand voice. | `social, marketing, community, viral` |
 | **[Technical Product Manager](skills/web_research/product_manager.md)** | Expertise in user stories, prioritization frameworks, and stakeholder management. | `product, management, agile, strategy` |
 | **[UX Researcher](skills/web_research/ux_researcher.md)** | Expertise in user interviews, usability testing, and persona creation. | `ux, user-research, design, testing` |
+| **[Tin-Miner](skills/web_research/tin_miner.md)** | Specialist in sub-bit context-extraction and low-concentration fact-mining. | `web_research, science, extraction` |
 
 ---
 ## Strategy <a name='strategy'></a>
 | Strategy Name | Description | Tags |
 |---|---|---|
 | **[Frictionless Scalability](strategy/frictionless_scalability.md)** | Long-term strategy for removing operational drag and ensuring linear enterprise growth. | `strategy, scalability, ops` |
+| **[Porter's Five Forces](strategy/porters_five_forces.md)** | Framework for analyzing industry structural forces and competitive positioning. | `strategy, competition, business` |
+| **[Blue Ocean Strategy](strategy/blue_ocean_strategy.md)** | Framework for creating uncontested market space and making competition irrelevant. | `strategy, innovation, differentiation` |
+| **[SWOT Analysis](strategy/swot_analysis.md)** | Strategic planning technique for identifying internal factors and external forces. | `strategy, planning, business` |
+| **[Machiavellian Realism](strategy/machiavellian_realism.md)** | Strategic framework for power dynamics and maintaining systemic order. | `strategy, politics, realism` |
+| **[The Art of War](strategy/sun_tzu_art_of_war.md)** | Strategic reference for conflict management and psychological positioning. | `strategy, military, efficiency` |
+| **[On War (Clausewitz)](strategy/von_clausewitz_on_war.md)** | Strategic reference for the fog of war, friction, and the center of gravity. | `strategy, military, statecraft` |
+| **[PESTEL Analysis](strategy/pestel_analysis.md)** | Strategic framework for monitoring macro-environmental external factors. | `strategy, planning, macro` |
+| **[Balanced Scorecard](strategy/balanced_scorecard.md)** | Performance management framework for balanced financial/non-financial health. | `strategy, performance, management` |
+| **[McKinsey 7S Framework](strategy/mckinsey_7s_framework.md)** | Organizational model for aligning hard and soft internal elements. | `strategy, organization, management` |
+| **[The Ansoff Matrix](strategy/ansoff_matrix.md)** | Strategic growth framework: Penetrate, Develop, or Diversify. | `strategy, growth, business` |
+| **[The Learning Organization (Senge)](strategy/learning_organization.md)** | Organizational framework for systems thinking and continuous adaptation. | `strategy, organization, management` |
+| **[The Cynefin Framework](strategy/cynefin_framework.md)** | Decision-making framework for Clear, Complicated, Complex, and Chaotic domains. | `strategy, complexity, decision-making` |
+| **[Wardley Mapping](strategy/wardley_mapping.md)** | Strategic framework for visual mapping of value chains and component evolution. | `strategy, mapping, value-chain` |
+| **[PMESII-PT Analysis](strategy/pmesii_pt_analysis.md)** | Comprehensive intelligence framework for eightway environmental analysis. | `strategy, intelligence, environment` |
+| **[Fabian Strategy](strategy/fabian_strategy.md)** | Strategic model for defeating superior opponents through attrition and avoidance. | `strategy, military, attrition` |
+| **[Deep Battle (Ops)](strategy/deep_battle_ops.md)** | Operational model for achieving systemic collapse via simultaneous depth penetration. | `strategy, military, depth` |
 
 ---
 ## Compliance <a name='compliance'></a>
@@ -384,6 +453,10 @@ This document is an automatically generated index of all available 'Pure Context
 |---|---|---|
 | **[Institutional Accountability](compliance/institutional_accountability.md)** | Governance rules for long-term ownership and the 'Disagree and Commit' protocol. | `governance, accountability, ethics` |
 | **[Financial Governance (GAAP/SOX)](rules/corporate/financial_governance.md)** | Standards for transparent financial reporting and executive accountability. | `compliance, finance, gaap, sox` |
+| **[AML & KYC Compliance](rules/corporate/aml_kyc_compliance.md)** | Anti-Money Laundering and Identity verification standards for financial integrity. | `compliance, finance, legal, integrity` |
+| **[Basel III Accords](rules/corporate/basel_iii_compliance.md)** | Global banking standards for capital adequacy and liquidity risk management. | `compliance, finance, risk` |
+| **[The Nuremberg Code](rules/corporate/nuremberg_code.md)** | Ethical standards for human research and informed consent protocols. | `compliance, ethics, medicine` |
+| **[FCPA Anti-Corruption](rules/corporate/fcpa_compliance.md)** | Standards for preventing bribery and unethical lobbying in global business. | `compliance, legal, ethics` |
 
 ---
 ## Kea <a name='kea'></a>
@@ -399,6 +472,27 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Software Design Quality](heuristics/software_design_quality.md)** | Senior rules of thumb for KISS, YAGNI, and Encapsulation. | `engineering, design, architecture` |
 | **[Medical Triage (ABC Matrix)](heuristics/medical_triage_abcs.md)** | A clinical heuristic for prioritizing interventions under extreme time constraint. | `heuristics, medicine, triage` |
 | **[Pareto Priority (80/20)](heuristics/pareto_efficiency.md)** | Business heuristic for focusing on the 20% of inputs that drive 80% of value. | `business, efficiency, strategy` |
+| **[The Lindy Effect](heuristics/lindy_effect.md)** | Heuristic for predicting the longevity of ideas and technologies based on age. | `heuristics, probability, prediction` |
+| **[Chesterton's Fence](heuristics/chestertons_fence.md)** | Heuristic for understanding the reasoning of existing systems before reform. | `heuristics, logic, systems` |
+| **[The Planning Fallacy](heuristics/planning_fallacy.md)** | Heuristic for identifying optimism bias in project estimation and scheduling. | `heuristics, estimation, psychology` |
+| **[The Peter Principle](heuristics/peter_principle.md)** | Heuristic observing that employees rise to their level of incompetence. | `heuristics, management, sociology` |
+| **[Availability Heuristic](heuristics/availability_heuristic.md)** | Psychological bias relying on vivid/recent examples instead of statistical truth. | `heuristics, psychology, bias` |
+| **[The Halo Effect](heuristics/halo_effect.md)** | Bias where aesthetics or one positive trait distorts overall judgment. | `heuristics, psychology, bias` |
+| **[Regression to the Mean](heuristics/regression_to_mean.md)** | Statistical law predicting that extreme outliers will stabilize toward the average. | `heuristics, statistics, psychology` |
+| **[Nudge Theory](heuristics/nudge_theory.md)** | Behavioral science framework for influencing choice without restriction. | `heuristics, psychology, influence` |
+| **[Hyperbolic Discounting](heuristics/hyperbolic_discounting.md)** | Cognitive bias preferring immediate rewards over long-term mission value. | `heuristics, psychology, economics` |
+| **[Goodhart's Law & Cobra Effect](heuristics/goodharts_law_cobra_effect.md)** | Compound heuristic for detecting perverse metrics and incentive structures. | `heuristics, economics, incentives` |
+| **[Survivorship Bias](heuristics/survivorship_bias.md)** | Logical error of studying only 'survivors' and ignoring the silent dead. | `heuristics, logic, statistics` |
+| **[Hanlon's Razor](heuristics/hanlons_razor.md)** | Razor: Never attribute to malice what is explained by incompetence. | `heuristics, logic, philosophy` |
+| **[Simpson's Paradox](heuristics/simpsons_paradox.md)** | Statistical paradox where grouped trends reverse when data is combined. | `heuristics, statistics, logic` |
+| **[The Streisand Effect](heuristics/streisand_effect.md)** | Social phenomenon where censorship amplifies the censored information. | `heuristics, sociology, communication` |
+| **[The Potemkin Village](heuristics/potemkin_village.md)** | Heuristic for identifying elaborate façades hiding underlying failures. | `heuristics, sociology, audit` |
+| **[The Lindy Effect](heuristics/lindy_effect.md)** | Survival heuristic where non-perishable objects' future lifespan is proportional to their current age. | `heuristics, statistics, time` |
+| **[Chesterton's Fence](heuristics/chestertons_fence.md)** | Systems heuristic: do not destroy a rule until you understand why it was built. | `heuristics, systems, maintenance` |
+| **[Baader-Meinhof Phenomenon](heuristics/baader_meinhof_phenomenon.md)** | Cognitive bias where newly learned information seems to suddenly appear everywhere. | `heuristics, psychology, bias` |
+| **[Brandolini's Law](heuristics/brandolinis_law.md)** | Information heuristic regarding the asymmetric energy cost of refuting bullshit. | `heuristics, information, logic` |
+| **[The Drunkard's Search](heuristics/drunkards_search.md)** | Logical heuristic for detecting bias where entities search only where it is easiest to look. | `heuristics, logic, bias` |
+| **[The Lucretius Problem](heuristics/lucretius_problem.md)** | Risk heuristic: the fallacy of assuming the worst past event is the worst possible future event. | `heuristics, risk, logic` |
 
 ---
 ## Mental Models <a name='models'></a>
@@ -408,12 +502,59 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Occam's Razor](models/occams_razor.md)** | Problem-solving principle prioritizing the simplest explanation or design choice. | `logic, simplicity, debugging` |
 | **[Nash Equilibrium](models/nash_equilibrium.md)** | Game theory mental model optimizing for non-cooperative games and conflict resolution. | `mental-model, game-theory, economics` |
 | **[Hanlon's Razor](models/hanlons_razor.md)** | Psychological model assuming neglect over malice in social/system failures. | `psychology, social, debugging` |
+| **[Inversion Model](models/inversion.md)** | Logic framework focused on avoiding failure paths to ensure system stability. | `logic, problem-solving, munger` |
+| **[Second-Order Thinking](models/second_order_thinking.md)** | Logic model focusing on downstream consequences beyond immediate effects. | `logic, planning, strategy` |
+| **[Circle of Competence](models/circle_of_competence.md)** | Logic framework for identifying boundaries of knowledge to avoid hallucinations. | `logic, integrity, risk` |
+| **[Geopolitical Macro-Strategy](models/geopolitical_macro_strategy.md)** | Geographic model of power based on Heartland vs Rimland dynamics. | `geopolitics, strategy, power` |
+| **[General Systems Theory](models/general_systems_theory.md)** | Transdisciplinary model for understanding feedback loops and emergence. | `logic, systems, holism` |
+| **[Compounding Growth](models/compounding_exponential_growth.md)** | Mathematical model for exponential growth and the impact of technical debt. | `math, growth, strategy` |
+| **[Maslow's Hierarchy of Needs](models/maslows_hierarchy.md)** | Psychological model of human (and silicon) motivation and stability. | `psychology, motivation, needs` |
+| **[Prospect Theory](models/prospect_theory.md)** | Behavioral finance model for loss aversion and asymmetric risk-evaluation. | `behavioral-finance, risk, economics` |
+| **[The Rimland Theory](models/rimland_theory.md)** | Geopolitical model emphasizing coastal control for Eurasian containment. | `geopolitics, strategy, power` |
+| **[The Prisoner's Dilemma](models/prisoners_dilemma.md)** | Game theory model illustrating the conflict between individual and mutual rationalities. | `game-theory, logic, cooperation` |
+| **[Cognitive Dissonance](models/cognitive_dissonance.md)** | Psychological model of the conflict between contradictory beliefs and data. | `model, psychology, logic` |
+| **[The Minsky Moment](models/minsky_moment_risk.md)** | Economic model of systemic collapse following long periods of stability. | `model, economics, risk` |
+| **[Institutional Isomorphism](models/institutional_isomorphism.md)** | Sociological model of organizational mimicry and industry standardization. | `model, sociology, organization` |
+| **[Reflexivity Theory](models/reflexivity_theory.md)** | Finance model of the feedback loop between perception and reality. | `model, finance, feedback` |
+| **[Antifragility (Taleb)](models/antifragility_taleb.md)** | Framework for systems that grow stronger from volatility and disorder. | `model, risk, philosophy` |
+| **[The Overton Window](models/overton_window.md)** | Political science model of the range of acceptable discourse. | `model, politics, discourse` |
+| **[Dunbar's Number](models/dunbars_number.md)** | Anthropological model of cognitive limits on stable social relationships. | `model, anthropology, scaling` |
+| **[Tragedy of the Commons](models/tragedy_of_the_commons.md)** | Economic model of shared resource depletion by rational individual actors. | `model, economics, ecology` |
+| **[Ergodicity Economics](models/ergodicity_economics.md)** | Mathematical model distinguishing ensemble vs. time averages for survival. | `model, economics, mathematics` |
+| **[Principal-Agent Problem](models/principal_agent_problem.md)** | Agency theory model of misaligned incentives under information asymmetry. | `model, economics, organization` |
+| **[Schelling Focal Point](models/schelling_focal_point.md)** | Game theory model of implicit coordination via culturally prominent defaults. | `model, game-theory, sociology` |
+| **[Swiss Cheese Model](models/swiss_cheese_model.md)** | Safety engineering model of layered defenses and catastrophic hole-alignment. | `model, safety, engineering` |
+| **[Red Queen Hypothesis](models/red_queen_hypothesis.md)** | Evolutionary model of continuous adaptation against co-evolving threats. | `model, biology, strategy` |
+| **[The Johari Window](models/johari_window.md)** | Psychological model for mapping self-awareness and blind spots. | `model, psychology, communication` |
+| **[The Panopticon (Foucault)](models/panopticon_foucault.md)** | Philosophy model of internalized discipline through structural surveillance. | `model, philosophy, power` |
+| **[Veblen Goods](models/veblen_goods.md)** | Economic model where demand increases with price due to status signaling. | `model, economics, psychology` |
+| **[The Thucydides Trap](models/thucydides_trap.md)** | Geopolitical model of inevitable conflict during hegemon displacement. | `model, geopolitics, strategy` |
+| **[Dunning-Kruger Effect](models/dunning_kruger_effect.md)** | Psychological bias of competence miscalibration across the skill spectrum. | `model, psychology, logic` |
+| **[Learned Helplessness](models/learned_helplessness.md)** | Psychological state of passivity induced by repeated uncontrollable failure. | `model, psychology, motivation` |
+| **[The Jevons Paradox](models/jevons_paradox.md)** | Economic model where efficiency gains ironically increase total resource consumption. | `model, economics, systems` |
+| **[Tragedy of the Anticommons](models/tragedy_of_the_anticommons.md)** | Economic model of resource underutilization due to excessive veto rights. | `model, economics, law` |
+| **[The Shirky Principle](models/shirky_principle.md)** | Sociological model where institutions unconsciously preserve the problem they solve. | `model, sociology, organization` |
+| **[Conway's Law](models/conways_law.md)** | Systems theory stating that architecture inevitably mirrors organizational communication structures. | `model, systems, architecture` |
+| **[Braess's Paradox](models/braess_paradox.md)** | Network model where adding capacity paradoxically slows down total traffic via selfish routing. | `model, network, game-theory` |
+| **[St. Petersburg Paradox](models/st_petersburg_paradox.md)** | Economic paradox proving the necessity of logarithmic expected utility over raw expected value. | `model, economics, mathematics` |
+| **[O-Ring Theory](models/o_ring_theory.md)** | Economic model where sequential multiplicative failure necessitates strict high-skill assortative matching. | `model, economics, systems` |
+| **[Baumol's Cost Disease](models/baumols_cost_disease.md)** | Economic model explaining why labor-intensive service costs rise despite 0% productivity growth. | `model, economics, ops` |
+| **[Buridan's Ass](models/buridans_ass.md)** | Logical model of decision paralysis caused by equally attractive options. | `model, logic, decision-making` |
+| **[Yerkes-Dodson Law](models/yerkes_dodson_law.md)** | Psychological model of the inverted U-curve between stress and performance. | `model, psychology, optimization` |
+| **[The Paretian Worldview](models/paretian_worldview.md)** | Statistical model of 'Extremistan' where single outliers dominate the system average. | `model, statistics, strategy` |
+| **[Ergodicity Breakdown](models/ergodicity_breakdown.md)** | Math model distinguishing between group-average success and individual-time-average survival. | `model, math, risk` |
+| **[Iatrogenics](models/iatrogenics.md)** | Systems model for harm caused by the intervention/cure itself. | `model, systems, intervention` |
+| **[Tainter's Complexity Collapse](models/tainter_complexity_collapse.md)** | Systems model of diminishing returns on complexity leading to involuntary simplification. | `model, systems, collapse` |
+| **[Gödelian Incompleteness](models/godelian_incompleteness.md)** | Logic model of inherent limitations and self-reference traps in formal systems. | `model, logic, math` |
 
 ---
 ## Cultural Values <a name='values'></a>
 | Value Name | Description | Tags |
 |---|---|---|
 | **[Kea Engineering Values](values/kea_engineering_values.md)** | The core ethical and priority framework for Kea development and operational decisions. | `ethics, priority, engineering` |
+| **[Kaizen Philosophy](values/kaizen_philosophy.md)** | The value of continuous 1% incremental improvements in every operational cycle. | `values, excellence, kaizen` |
+| **[Radical Candor](values/radical_candor.md)** | The value of direct feedback and caring personally to drive excellence. | `values, feedback, integrity` |
+| **[The Stoic Ethos](values/stoic_ethos.md)** | The value of internal reason and resilience in the face of external chaos. | `values, philosophy, resilience` |
 
 ---
 ## Interaction Protocols <a name='protocols'></a>
@@ -423,6 +564,23 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Civility & De-escalation](protocols/civility_and_deescalation.md)** | Standards for managing conflict and high-tension human exchanges. | `communication, ethics, mediation` |
 | **[The Minto Pyramid](protocols/minto_pyramid_protocol.md)** | High-density communication protocol for top-down delivery of complex ideas. | `communication, consulting, logic` |
 | **[Behavioral Change Stairway](protocols/behavioral_change_stairway.md)** | Crisis negotiation protocol for de-escalating volatile situations. | `psychology, negotiation, crisis` |
+| **[Non-Violent Communication](protocols/non_violent_communication.md)** | Protocol for resolving conflict through observation, needs, and requests. | `communication, empathy, nvc` |
+| **[Evidence-Based Medicine](protocols/evidence_based_medicine.md)** | Clinical decision-making protocol based on the hierarchy of statistical evidence. | `protocol, medicine, research` |
+| **[Socratic Method](protocols/socratic_method.md)** | Protocol for critical inquiry and drawing out latent ideas through questioning. | `logic, inquiry, methodology` |
+| **[Double-Entry Bookkeeping](protocols/double_entry_bookkeeping.md)** | Fundamental accounting protocol for financial integrity and auditability. | `finance, accounting, protocol` |
+| **[Toyota Production System](protocols/toyota_production_system.md)** | Integrated socio-technical system for waste elimination and efficiency. | `protocol, ops, lean` |
+| **[Six Sigma (DMAIC)](protocols/six_sigma_dmaic.md)** | Statistical quality control protocol for reducing process variation. | `protocol, quality, statistics` |
+| **[The Delphi Method](protocols/delphi_method_consensus.md)** | Structured protocol for expert consensus and unbiased forecasting. | `protocol, forecasting, consensus` |
+| **[Incident Command System](protocols/incident_command_system.md)** | Protocol for the centralized management of enterprise-scale crises. | `protocol, crisis, management` |
+| **[The RACI Matrix](protocols/raci_matrix.md)** | Operational protocol for assigning responsibility, accountability, and roles. | `protocol, management, accountability` |
+| **[The OODA Loop](protocols/ooda_loop.md)** | Strategic decision-making protocol: Observe, Orient, Decide, Act. | `protocol, strategy, decision-making` |
+| **[Analysis of Competing Hypotheses (ACH)](protocols/ach_intelligence_analysis.md)** | Intelligence protocol for unbiased evaluation of multiple data explanations. | `protocol, intelligence, logic` |
+| **[Theory of Constraints (TOC)](protocols/theory_of_constraints.md)** | Operational protocol for identifying and elevating system bottlenecks. | `protocol, ops, efficiency` |
+| **[Boyd's Destruction & Creation](protocols/boyds_destruction_creation.md)** | Epistemological protocol for destroying and reconstructing mental models. | `protocol, strategy, epistemology` |
+| **[Bayesian Reasoning](protocols/bayesian_reasoning.md)** | Probabilistic protocol for updating beliefs as new evidence arrives. | `protocol, logic, statistics` |
+| **[Monte Carlo Thinking](protocols/monte_carlo_thinking.md)** | Simulation protocol for exploring full distributions of possible outcomes. | `protocol, statistics, risk` |
+| **[Dialectical Thinking](protocols/dialectical_thinking.md)** | Philosophical protocol for resolving contradictions via Thesis-Antithesis-Synthesis. | `protocol, philosophy, logic` |
+| **[The Veil of Ignorance (Rawls)](protocols/veil_of_ignorance_rawls.md)** | Justice protocol for designing unbiased rules by temporarily erasing personal identity. | `protocol, philosophy, ethics` |
 
 ---
 ## Technical References <a name='references'></a>
@@ -431,6 +589,34 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Clean Architecture Standard](reference/clean_architecture_standard.md)** | Blueprint for separating business logic from frameworks and databases. | `architecture, standards, engineering` |
 | **[McKinsey Problem Solving](reference/mckinsey_problem_solving.md)** | Inductive logic framework for deconstructing and solving business challenges. | `business, logic, strategy` |
 | **[Robert's Rules of Order](reference/roberts_rules_of_order.md)** | Standardized reference manual for parliamentary procedure and orderly group meetings. | `governance, meetings, parliamentary` |
+| **[Common Law Fundamentals](reference/common_law_fundamentals.md)** | Legal reference for the doctrine of Precedent and Ratio Decidendi. | `legal, history, precedent` |
+| **[The Geneva Conventions](reference/geneva_conventions.md)** | International humanitarian standards for ethical conduct in conflict. | `ethics, law, conflict` |
+| **[The Magna Carta](reference/magna_carta.md)** | Historical foundation for the Rule of Law and procedural due process. | `history, law, governance` |
+| **[48 Laws of Power (Greene)](reference/48_laws_of_power.md)** | Pragmatic reference for influence dynamics and strategic positioning. | `sociology, influence, strategy` |
+| **[Five Dysfunctions of a Team](reference/five_dysfunctions_team.md)** | Organizational reference for identifying and fixing team failure points. | `management, psychology, leadership` |
+| **[Design of Everyday Things](reference/design_everyday_things.md)** | Psychological reference for usability, feedback, and conceptual models. | `design, psychology, ux` |
+| **[Incoterms (Logistics)](reference/incoterms_logistics.md)** | International reference for logistics responsibility and risk transfer. | `logistics, law, trade` |
+| **[Thinking, Fast and Slow (Kahneman)](reference/kahneman_thinking_fast_slow.md)** | Psychological reference for System 1/System 2 logic and cognitive biases. | `psychology, logic, economics` |
+| **[The Law of Agency](reference/law_of_agency.md)** | Legal reference for Principal-Agent relationships and fiduciary duties. | `legal, reference, agency` |
+| **[Management by Objectives (MBO)](reference/management_by_objectives.md)** | Historical management reference for Drucker's theory of goal-alignment. | `management, reference, goals` |
+
+---
+## Design <a name='design'></a>
+| Design Philosophy | Description | Tags |
+|---|---|---|
+| **[Universal Design Principles](design/universal_design_principles.md)** | Framework for designing inclusive and accessible environments for all users. | `design, ux, accessibility` |
+| **[Bauhaus Philosophy](design/bauhaus_philosophy.md)** | Functional design framework focusing on 'Form Follows Function' and minimalism. | `design, functionality, minimalist` |
+| **[Cradle to Cradle](design/cradle_to_cradle.md)** | Regenerative design framework for waste-free circular lifecycles. | `design, sustainability, ecology` |
+
+---
+## History <a name='history_knowledge'></a>
+| History Brick | Description | Tags |
+|---|---|---|
+| **[Industrial Standardization](history/industrial_standardization.md)** | Historical model of mass production and interchangeable parts for scalability. | `history, ops, efficiency` |
+| **[Renaissance & Humanism](history/renaissance_humanism.md)** | Historical model for polymathic learning and individual scientific agency. | `history, humanities, science` |
+| **[Meiji Restoration](history/meiji_restoration.md)** | Historical model of rapid organizational transformation and modernization. | `history, strategy, change` |
+| **[The Enlightenment](history/enlightenment_scientific_method.md)** | Historical foundation for the Scientific Method and Empirical Reasoning. | `history, science, logic` |
+| **[The Great Depression](history/great_depression_macroeconomics.md)** | Historical model of systemic economic collapse and intervention logic. | `history, economics, macro` |
 
 ---
 ## Silicon Corporate Infrastructure <a name='infrastructure'></a>
@@ -470,6 +656,7 @@ This document is an automatically generated index of all available 'Pure Context
 | Procedure Name | Description | Tags |
 |---|---|---|
 | **[Critical Incident Response](procedures/general/critical_incident_response.md)** | SOP for handling high-severity technical outages or breaches. | `sop, incident, recovery` |
+| **[Crisis PR Management](procedures/general/crisis_pr_management.md)** | SOP for managing stakeholder trust and corporate narrative during crises. | `pr, reputation, communications` |
 | **[Strategic Resource Allocation](procedures/general/resource_allocation.md)** | SOP for managing tier-sensitive compute and agentic resources. | `operations, efficiency, planning` |
 | **[Supply Chain Vendor Audit](procedures/general/supply_chain_audit.md)** | SOP for evaluating suppliers on ESG standards and operational resilience. | `logistics, supply-chain, audit` |
 | **[Strategic Planning](procedures/general/strategic_planning.md)** | Framework for translating objectives into executable DAGs. | `strategy, planning, dag` |

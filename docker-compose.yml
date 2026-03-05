@@ -137,6 +137,52 @@ services:
               capabilities: [gpu]
 
   # =========================================================================
+  # Corporate Operations (Tier 8-9)
+  # =========================================================================
+
+  corporate-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: corporate-gateway
+    ports:
+      - "8010:8010"
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - DATABASE_URL=postgresql://user:password@postgres:5432/system_db
+      - SERVICE_URL_CORPORATE_OPS=http://corporate-ops:8011
+      - SERVICE_URL_VAULT=http://vault:8004
+      - SERVICE_URL_RAG_SERVICE=http://rag-service:8003
+    depends_on:
+      - postgres
+      - corporate-ops
+      - vault
+      - rag-service
+
+  corporate-ops:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: corporate-ops
+    ports:
+      - "8011:8011"
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - DATABASE_URL=postgresql://user:password@postgres:5432/system_db
+      - SERVICE_URL_ORCHESTRATOR=http://orchestrator:8001
+      - SERVICE_URL_VAULT=http://vault:8004
+      - SERVICE_URL_RAG_SERVICE=http://rag-service:8003
+      - SERVICE_URL_SWARM_MANAGER=http://swarm-manager:8005
+    depends_on:
+      - postgres
+      - orchestrator
+      - vault
+      - rag-service
+      - swarm-manager
+
+  # =========================================================================
   # Background Workers
   # =========================================================================
 

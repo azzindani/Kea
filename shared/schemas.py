@@ -420,3 +420,147 @@ class ToolResponse(BaseModel):
             output=tool_output,
             is_error=result.isError
         )
+
+
+# ============================================================================
+# Corporate Agent API (Tier 8 ↔ Orchestrator)
+# ============================================================================
+
+
+class CorporateAgentSpawnRequest(BaseModel):
+    """Request to spawn a Human Kernel specialist via Orchestrator."""
+
+    mission_id: str = Field(..., description="Parent mission identifier")
+    chunk_id: str = Field(..., description="MissionChunk this agent handles")
+    profile_id: str = Field(..., description="CognitiveProfile to load")
+    sub_objective: str = Field(..., description="What this specialist should accomplish")
+    required_tools: list[str] = Field(default_factory=list, description="MCP tool categories")
+    token_budget: int = Field(default=0, ge=0)
+    cost_budget: float = Field(default=0.0, ge=0.0)
+    time_budget_ms: float = Field(default=0.0, ge=0.0)
+    predecessor_artifact_ids: list[str] = Field(
+        default_factory=list,
+        description="Vault artifact IDs from prior sprints",
+    )
+    trace_id: str = Field(default="", description="Distributed tracing ID")
+
+
+class CorporateAgentSpawnResponse(BaseModel):
+    """Response after spawning a Human Kernel specialist."""
+
+    agent_id: str = Field(..., description="Unique agent identifier")
+    status: str = Field(default="initializing", description="initializing | active")
+    profile_id: str = Field(default="", description="Profile used")
+    spawned_utc: str = Field(default="", description="ISO 8601 timestamp")
+
+
+class CorporateAgentProcessRequest(BaseModel):
+    """Request to execute ConsciousObserver.process() on a spawned agent."""
+
+    raw_input: str = Field(..., description="The task input for the agent")
+    attachments: list[dict[str, Any]] | None = Field(
+        default=None, description="Optional file/data attachments"
+    )
+    trace_id: str = Field(default="", description="Distributed tracing ID")
+
+
+class CorporateAgentProcessResponse(BaseModel):
+    """Response from executing a corporate agent."""
+
+    agent_id: str = Field(..., description="Agent that processed the request")
+    status: str = Field(default="completed", description="completed | failed")
+    result: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Serialized ConsciousObserverResult",
+    )
+    quality_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    grounding_rate: float = Field(default=0.0, ge=0.0, le=1.0)
+    duration_ms: float = Field(default=0.0, ge=0.0)
+    cost: float = Field(default=0.0, ge=0.0)
+
+
+class CorporateAgentStatusResponse(BaseModel):
+    """Heartbeat/status response for a corporate agent."""
+
+    agent_id: str = Field(..., description="Agent identifier")
+    status: str = Field(
+        default="active",
+        description="initializing | active | completed | failed",
+    )
+    progress_pct: float = Field(default=0.0, ge=0.0, le=1.0)
+    elapsed_ms: float = Field(default=0.0, ge=0.0)
+    cost_so_far: float = Field(default=0.0, ge=0.0)
+
+
+# ============================================================================
+# Corporate Gateway API (Tier 9 — THE Entry Point)
+# ============================================================================
+
+
+class Attachment(BaseModel):
+    """File or data attachment on a corporate request."""
+
+    filename: str = Field(default="", description="Original filename")
+    content_type: str = Field(default="text/plain", description="MIME type")
+    content: str = Field(default="", description="Base64 or text content")
+    size_bytes: int = Field(default=0, ge=0)
+
+
+class CorporateProcessRequest(BaseModel):
+    """THE entry point request for the Corporation Kernel.
+
+    Every client interaction flows through this single schema.
+    """
+
+    request_id: str = Field(default="", description="Idempotency key")
+    client_id: str = Field(default="", description="Client identifier")
+    session_id: str | None = Field(
+        default=None, description="None = new session"
+    )
+    content: str = Field(..., min_length=1, description="Natural language request")
+    attachments: list[Attachment] | None = Field(default=None)
+    constraints: list[str] | None = Field(default=None)
+    deadline_utc: str | None = Field(default=None)
+    budget_limit: float | None = Field(default=None, ge=0.0)
+    trace_id: str = Field(default="", description="Distributed tracing ID")
+
+
+class CorporateProcessResponse(BaseModel):
+    """THE entry point response — final output of the Corporation Kernel."""
+
+    result_id: str = Field(default="")
+    trace_id: str = Field(default="")
+    request_id: str = Field(default="")
+    session_id: str = Field(default="")
+    intent: str = Field(default="", description="ClientIntent value")
+    response_title: str = Field(default="")
+    response_summary: str = Field(default="")
+    response_content: str = Field(default="")
+    quality_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    grounding_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    completeness_pct: float = Field(default=0.0, ge=0.0, le=1.0)
+    is_partial: bool = Field(default=False)
+    total_agents_hired: int = Field(default=0, ge=0)
+    total_agents_fired: int = Field(default=0, ge=0)
+    total_cost: float = Field(default=0.0, ge=0.0)
+    total_duration_ms: float = Field(default=0.0, ge=0.0)
+    gate_in_ms: float = Field(default=0.0, ge=0.0)
+    execute_ms: float = Field(default=0.0, ge=0.0)
+    gate_out_ms: float = Field(default=0.0, ge=0.0)
+
+
+class MissionStatusResponse(BaseModel):
+    """Response to a mission status query."""
+
+    mission_id: str = Field(default="")
+    status: str = Field(default="running")
+    completion_pct: float = Field(default=0.0, ge=0.0, le=1.0)
+    current_sprint: int = Field(default=0, ge=0)
+    total_sprints: int = Field(default=0, ge=0)
+    active_agents: int = Field(default=0, ge=0)
+    elapsed_ms: float = Field(default=0.0, ge=0.0)
+    estimated_remaining_ms: float = Field(default=0.0, ge=0.0)
+
+

@@ -60,20 +60,27 @@ async def lifespan(_app: FastAPI):
     dataset_loader = DatasetLoader()
     artifact_store = create_artifact_store()
 
-    # Initialize knowledge store (graceful fallback if DATABASE_URL not set)
+    # Initialize knowledge store in the background so uvicorn can start
+    # serving health-check requests immediately (same pattern as ML Inference).
     try:
         knowledge_store = create_knowledge_store()
-        # Explicitly trigger initialization (table creation) on startup
-        await knowledge_store._registry._get_pool()
-        logger.info("Knowledge store initialized and table verified")
-
-        # Auto-sync knowledge files from the knowledge/ library on startup.
-        import asyncio
-        asyncio.create_task(_sync_knowledge_job())
-        logger.info("Knowledge auto-sync scheduled (background)")
     except Exception as e:
-        logger.error(f"Knowledge store failed to start: {e}", exc_info=True)
+        logger.error(f"Knowledge store creation failed: {e}", exc_info=True)
         knowledge_store = None
+
+    async def _init_knowledge_store_bg() -> None:
+        global knowledge_store
+        try:
+            if knowledge_store is not None:
+                await knowledge_store._registry._get_pool()
+                logger.info("Knowledge store initialized and table verified")
+                asyncio.create_task(_sync_knowledge_job())
+                logger.info("Knowledge auto-sync scheduled (background)")
+        except Exception as e:
+            logger.error(f"Knowledge store failed to initialize: {e}", exc_info=True)
+            knowledge_store = None
+
+    asyncio.create_task(_init_knowledge_store_bg())
 
     logger.info("RAG Service initialized")
 
@@ -491,7 +498,10 @@ async def _sync_knowledge_job(domain: str | None = None, category: str | None = 
                 logger.error(f"Knowledge directory does not exist: {knowledge_dir}")
                 return
 
-            items = scan_knowledge_files(knowledge_dir, domain_filter=domain, category_filter=category)
+            items = await asyncio.to_thread(
+                scan_knowledge_files, knowledge_dir,
+                domain_filter=domain, category_filter=category,
+            )
             
             logger.info(f"Sync: Found {len(items)} items to process in library.")
 
@@ -515,7 +525,12 @@ async def _sync_knowledge_job(domain: str | None = None, category: str | None = 
 async def health_check():
     """Service health status."""
     return {
-        "status": "ok" if knowledge_store is not None else "initializing",
+        # "ok" means the service is alive and accepting requests.
+        # Callers that need the knowledge store should check
+        # `knowledge_store_ready` — retrieval endpoints already
+        # return 503 gracefully when the store is unavailable.
+        "status": "ok",
+        "knowledge_store_ready": knowledge_store is not None,
         "service": "rag_service",
         "version": get_settings().app.version,
     }
@@ -556,7 +571,12 @@ def main():
         "services.rag_service.main:app",
         host=settings.api.host,
         port=ServiceRegistry.get_port(ServiceName.RAG_SERVICE),
-        reload=settings.is_development,
+        # reload=True spawns a watcher + worker subprocess pair. When the
+        # conftest terminates only the watcher, the worker becomes an orphan
+        # that holds the port across test runs, preventing new instances from
+        # binding and causing 100% bootstrap failure.  Always run as a single
+        # process (matching ML Inference & Orchestrator).
+        reload=False,
     )
 
 
