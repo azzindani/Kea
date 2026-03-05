@@ -438,7 +438,7 @@ async def await_ml_inference_ready() -> None:
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as client:
                 resp = await client.get(health_url)
-                if resp.status_code == 200 and resp.json().get("status") == "ok":
+                if resp.status_code == 200 and resp.json().get("models_loaded", 0) > 0:
                     logger.info(
                         f"ML Inference ready after {attempt} poll(s) — proceeding with sync."
                     )
