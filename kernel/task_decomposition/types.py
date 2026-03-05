@@ -141,6 +141,10 @@ class SubTaskItem(BaseModel):
     )
     inputs: list[str] = Field(default_factory=list)
     outputs: list[str] = Field(default_factory=list)
+    action_type: str = Field(
+        default="general",
+        description="The specific type of action (e.g. tool_call, llm_inference, data_transform, general)",
+    )
     parallelizable: bool = Field(
         default=False,
         description="Whether this can run in parallel with other tasks",

@@ -33,8 +33,20 @@ async def web_search(query: str, max_results: int = 10, search_depth: str = "bas
     """SEARCHES web (general). [ACTION]
     
     [RAG Context]
-    Robust general purpose search using Tavily/Brave.
-    Returns search results.
+    Performs a high-fidelity web search using advanced aggregators like Tavily or Brave. This is the primary entry point for gathering external real-time information, facts, and website references.
+    
+    How to Use:
+    - Provide a natural language query (e.g., "latest advancements in solid-state batteries 2024").
+    - Use 'basic' depth for fast, broad results.
+    - Use 'advanced' or 'comprehensive' depth (if supported) for more detailed extraction.
+    - Returns a list of snippets, titles, and source URLs.
+    
+    Arguments:
+    - query (str): The search terms.
+    - max_results (int): Number of sources to return (default 10).
+    - search_depth (str): Quality level of the search.
+    
+    Keywords: internet search, engine, information retrieval, live facts, website finder.
     """
     try:
         return await web_search.web_search_tool(query, max_results, search_depth)
@@ -46,8 +58,18 @@ async def news_search(query: str, days: int = 7, max_results: int = 10) -> str:
     """SEARCHES news. [ACTION]
     
     [RAG Context]
-    Search news articles with date filtering (lookback window).
-    Returns news results.
+    Specialized search for recent news articles, press releases, and media reports. Includes a lookback window to filter for the most current events.
+    
+    How to Use:
+    - Best for tracking current events, corporate announcements, or trending topics.
+    - Set 'days' to define the freshness of the articles (e.g., 1 for today, 7 for the last week).
+    
+    Arguments:
+    - query (str): The news topic.
+    - days (int): How many days back to look for articles.
+    - max_results (int): Max articles to return.
+    
+    Keywords: current events, breaking news, press releases, media monitoring, recent articles.
     """
     try:
         return await news_search.news_search_tool(query, days, max_results)

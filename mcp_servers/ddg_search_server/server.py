@@ -28,6 +28,7 @@ logger = structlog.get_logger()
 
 # Create the FastMCP server
 from shared.logging.main import setup_logging
+from shared.logging.decorators import trace_io
 setup_logging(force_stderr=True)
 
 mcp = FastMCP("ddg_search_server", dependencies=["duckduckgo_search"])
@@ -39,12 +40,19 @@ mcp = FastMCP("ddg_search_server", dependencies=["duckduckgo_search"])
 # 1. Text Search
 # ==========================================
 @mcp.tool()
+@trace_io()
 async def search_text(query: str, region: str = "wt-wt", safe_search: str = "moderate", time: Optional[str] = None, max_results: int = 100000) -> List[Any]: 
     """SEARCHES text. [ACTION]
     
     [RAG Context]
-    General DuckDuckGo text search.
-    Returns list of results.
+    The primary "Super Tool" for live web intelligence via DuckDuckGo. It performs broad-spectrum keyword searches across the public internet, returning snippets, titles, and URLs for real-time fact-checking and discovery.
+    
+    How to Use:
+    - 'query': Be specific (e.g., "latest quarterly earnings for NVIDIA 2024").
+    - 'time': Use 'd' (day), 'w' (week), 'm' (month), or 'y' (year) to filter for recent data.
+    - Essential for bypassing static knowledge cutoffs and fetching up-to-the-minute information.
+    
+    Keywords: web search, live intelligence, fact checking, internet browser, ddg lookup.
     """
     return await text_ops.search_text(query, region, safe_search, time, max_results)
 
@@ -152,6 +160,7 @@ async def search_stackoverflow(query: str, max_results: int = 100000) -> List[An
 # 2. Image Search
 # ==========================================
 @mcp.tool()
+@trace_io()
 async def search_images(query: str, size: Optional[str] = None, type_image: Optional[str] = None, layout: Optional[str] = None, license_image: Optional[str] = None, max_results: int = 100000) -> List[Any]: 
     """SEARCHES images. [ACTION]
     
@@ -258,6 +267,7 @@ async def find_blue_images(query: str, max_results: int = 100000) -> List[Any]:
 # 3. Video Search
 # ==========================================
 @mcp.tool()
+@trace_io()
 async def search_videos(query: str, resolution: Optional[str] = None, duration: Optional[str] = None, max_results: int = 100000) -> List[Any]: 
     """SEARCHES videos. [ACTION]
     
@@ -311,6 +321,7 @@ async def find_cc_videos(query: str, max_results: int = 100000) -> List[Any]:
 # 4. News
 # ==========================================
 @mcp.tool()
+@trace_io()
 async def search_news(query: str, region: str = "wt-wt", max_results: int = 100000) -> List[Any]: 
     """SEARCHES news. [ACTION]
     

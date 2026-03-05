@@ -221,7 +221,7 @@ Every new MCP server **MUST** include a dedicated test file to simulate real-wor
     - **Summary Line**: Must start with a capitalized verb (FETCHES, CALCULATES, RUNS, ANALYZES) and end with `[ACTION]`.
     - **Context Block**: `[RAG Context]` is MANDATORY.
   - **Content Rules**: 
-    - **Length**: ~200 characters max.
+    - **Length**: ~200 words max.
     - **Keywords**: Include synonyms (e.g. "stock" for "ticker", "profit" for "income").
     - **No Empty Blocks**: Unlike some legacy servers, new servers MUST populate this block.
 - **Auto-Detection**:

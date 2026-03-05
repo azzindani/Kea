@@ -22,6 +22,7 @@ from shared.inference_kit import InferenceKit
 from shared.knowledge import load_system_knowledge
 from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -146,6 +147,7 @@ def _build_pipeline_templates() -> dict[ComplexityLevel, PipelineConfig]:
 _ROUTER_ANCHOR_CACHE: dict[str, list[float]] = {}
 
 
+@trace_io()
 async def classify_signal_complexity(
     signal_tags: SignalTags,
     text: str | None = None,
@@ -207,7 +209,7 @@ async def classify_signal_complexity(
                     embedding_bonus = (weight - 0.3) * sim 
             
             if embedding_match:
-                log.info("Complexity determined via embedding anchor", complexity=embedding_match.value, confidence=round(best_sim, 3))
+                log.debug("Complexity determined via embedding anchor", complexity=embedding_match.value, confidence=round(best_sim, 3))
                 return embedding_match
                 
         except Exception as e:
@@ -252,6 +254,7 @@ async def classify_signal_complexity(
 # ============================================================================
 
 
+@trace_io()
 def select_pipeline(
     complexity: ComplexityLevel,
     pressure: float,
@@ -293,7 +296,7 @@ def select_pipeline(
     pipeline = templates[selected_complexity]
 
     if downgrade > 0:
-        log.info(
+        log.notice(
             "Pipeline downgraded due to pressure",
             original=complexity.value,
             selected=selected_complexity.value,
@@ -345,6 +348,7 @@ def cache_decision(
 # ============================================================================
 
 
+@trace_io()
 async def compute_activation_map(
     signal_tags: SignalTags,
     capability: CapabilityAssessment,
@@ -425,7 +429,7 @@ async def compute_activation_map(
             },
         )
 
-        log.info(
+        log.notice(
             "Activation map computed",
             pipeline=pipeline.pipeline_name,
             complexity=complexity.value,

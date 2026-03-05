@@ -18,6 +18,7 @@ from shared.config import get_settings
 from shared.inference_kit import InferenceKit
 from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -53,6 +54,7 @@ def _ref(fn: str) -> ModuleRef:
 # ============================================================================
 
 
+@trace_io()
 async def filter_attention(task_state: TaskState) -> FilteredState:
     """Mask irrelevant noise from incoming task context.
 
@@ -88,7 +90,7 @@ async def filter_attention(task_state: TaskState) -> FilteredState:
     # Sort by relevance (highest first)
     critical.sort(key=lambda e: e.relevance, reverse=True)
 
-    log.info(
+    log.debug(
         "Attention filter complete",
         total=len(task_state.context_elements),
         kept=len(critical),
@@ -118,6 +120,7 @@ _CONTRADICTION_PATTERNS: list[tuple[str, str]] = [
 ]
 
 
+@trace_io()
 async def check_plausibility(
     filtered_state: FilteredState,
     kit: InferenceKit | None = None,
@@ -212,6 +215,7 @@ async def check_plausibility(
 # ============================================================================
 
 
+@trace_io()
 async def run_cognitive_filters(
     task_state: TaskState,
     kit: InferenceKit | None = None,
@@ -248,7 +252,7 @@ async def run_cognitive_filters(
                 tags={"verdict": "pass", "confidence": f"{plausibility.confidence:.2f}"},
             )
 
-            log.info(
+            log.notice(
                 "Cognitive filters passed",
                 confidence=round(plausibility.confidence, 3),
                 context_kept=len(filtered.critical_elements),

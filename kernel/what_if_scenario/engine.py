@@ -19,6 +19,7 @@ from shared.id_and_hash import generate_id
 from shared.inference_kit import InferenceKit
 from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.normalization import min_max_scale
 from shared.standard_io import (
     Metrics,
@@ -118,6 +119,7 @@ def generate_outcome_branches(
 # ============================================================================
 
 
+@trace_io()
 async def predict_consequences(
     branches: list[OutcomeBranch],
     kit: InferenceKit | None = None,
@@ -190,6 +192,7 @@ async def predict_consequences(
 # ============================================================================
 
 
+@trace_io()
 def calculate_risk_reward(
     predictions: list[ConsequencePrediction],
 ) -> SimulationVerdict:
@@ -271,6 +274,7 @@ def calculate_risk_reward(
 # ============================================================================
 
 
+@trace_io()
 async def simulate_outcomes(
     proposed_action: CompiledDAG,
     knowledge: WorldState,
@@ -308,7 +312,7 @@ async def simulate_outcomes(
             },
         )
 
-        log.info(
+        log.notice(
             "Simulation complete",
             decision=verdict.decision.value,
             risk=round(verdict.risk_score, 3),

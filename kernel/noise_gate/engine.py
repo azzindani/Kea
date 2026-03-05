@@ -19,6 +19,7 @@ from kernel.hallucination_monitor.types import (
 )
 from shared.config import get_settings
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -61,6 +62,7 @@ _retry_counts: dict[str, int] = {}
 # ============================================================================
 
 
+@trace_io()
 def apply_quality_threshold(
     grounding_score: float,
     confidence: float,
@@ -95,6 +97,7 @@ def apply_quality_threshold(
 # ============================================================================
 
 
+@trace_io()
 def annotate_output(
     output: ToolOutput,
     grounding: GroundingReport,
@@ -138,6 +141,7 @@ def annotate_output(
 # ============================================================================
 
 
+@trace_io()
 def generate_rejection_feedback(
     output: ToolOutput,
     grounding: GroundingReport,
@@ -223,6 +227,7 @@ def generate_rejection_feedback(
 # ============================================================================
 
 
+@trace_io()
 def check_retry_budget(output_id: str) -> RetryBudgetStatus:
     """Check how many retry attempts have been made for this output.
 
@@ -256,6 +261,7 @@ def clear_retry_budget(output_id: str) -> None:
 # ============================================================================
 
 
+@trace_io()
 async def filter_output(
     output: ToolOutput,
     grounding: GroundingReport,
@@ -288,7 +294,7 @@ async def filter_output(
             # Clear retry budget on success
             clear_retry_budget(output.output_id)
 
-            log.info(
+            log.notice(
                 "Output passed noise gate",
                 output_id=output.output_id,
                 grounding_score=round(grounding.grounding_score, 3),

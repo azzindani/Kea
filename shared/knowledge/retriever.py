@@ -172,7 +172,11 @@ class KnowledgeRetriever:
         settings = get_settings()
         limit = limit or settings.knowledge.raw_search_limit
 
-        payload: dict[str, Any] = {"query": query, "limit": limit}
+        payload: dict[str, Any] = {
+            "query": query,
+            "limit": limit,
+            "enable_reranking": False,  # Raw search is for name extraction only
+        }
         if domain:
             payload["domain"] = domain
         if category:

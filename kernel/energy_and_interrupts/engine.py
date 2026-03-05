@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 from kernel.lifecycle_controller.types import LifecyclePhase
 from shared.config import get_settings
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -59,6 +60,7 @@ def _now_utc() -> str:
 # ============================================================================
 
 
+@trace_io()
 def track_budget(
     cost_event: CostEvent,
     budget_state: BudgetState,
@@ -122,6 +124,7 @@ def check_budget_warning(budget_state: BudgetState) -> bool:
 # ============================================================================
 
 
+@trace_io()
 async def handle_interrupt(
     interrupt_signal: InterruptSignal,
 ) -> InterruptAction:
@@ -139,7 +142,7 @@ async def handle_interrupt(
 
     action = action_map.get(interrupt_signal.interrupt_type, InterruptAction.IGNORE)
 
-    log.info(
+    log.notice(
         "Interrupt handled",
         interrupt_type=interrupt_signal.interrupt_type.value,
         action=action.value,
@@ -154,6 +157,7 @@ async def handle_interrupt(
 # ============================================================================
 
 
+@trace_io()
 async def manage_lifecycle_state(
     trigger: ControlTrigger,
     current_phase: LifecyclePhase,
@@ -187,7 +191,7 @@ async def manage_lifecycle_state(
         agent_id=agent_id,
     )
 
-    log.info(
+    log.notice(
         "Lifecycle state transition",
         from_phase=current_phase.value,
         to_phase=new_phase.value,
@@ -202,6 +206,7 @@ async def manage_lifecycle_state(
 # ============================================================================
 
 
+@trace_io()
 async def enforce_energy_authority(
     cost_events: list[CostEvent],
     interrupt_signals: list[InterruptSignal],
@@ -300,7 +305,7 @@ async def enforce_energy_authority(
             },
         )
 
-        log.info(
+        log.notice(
             "Energy authority decision",
             action=action.value,
             utilization=round(budget_state.utilization, 3),

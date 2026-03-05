@@ -43,6 +43,14 @@ def parse_xml_string(xml_input: str) -> Dict[str, Any]:
     """PARSES XML string. [ACTION]
     
     [RAG Context]
+    A core "Super Tool" that transforms raw XML text into a native Python dictionary following the 'xmltodict' convention. It treats XML elements as dictionary keys and attributes as nested '@' keys.
+    
+    How to Use:
+    - Input a string containing valid XML data.
+    - Returns a structured dictionary, making it easy to access values using dot or bracket notation.
+    - Ideal for processing quick-burn XML snippets from web responses or logs.
+    
+    Keywords: xml to dict, xml parser, structured data, soap response reader.
     """
     return parse_ops.parse_xml_string(xml_input)
 
@@ -126,6 +134,13 @@ def unparse_dict_string(data: Dict[str, Any]) -> str:
     """CONVERTS dict to XML. [ACTION]
     
     [RAG Context]
+    The inverse "Super Tool" of the parser. It takes a Python dictionary and generates a corresponding XML string. It correctly handles nested structures and attributes prefixed with '@'.
+    
+    How to Use:
+    - Pass a dictionary that follows the xmltodict schema.
+    - Returns a minified XML string ready for transmission or storage.
+    
+    Keywords: dict to xml, xml generator, serialization, web service request.
     """
     return unparse_ops.unparse_dict_string(data)
 
@@ -379,6 +394,13 @@ def xml_to_json_file(xml_file: str, json_file: str) -> str:
     """CONVERTS XML file to JSON. [ACTION]
     
     [RAG Context]
+    A high-level "Super Tool" for data migration. it reads a large XML file from disk, parses it, and writes the resulting structure to a JSON file.
+    
+    How to Use:
+    - Provide the paths to the source .xml and destination .json files.
+    - Perfect for modernizing legacy datasets or preparing data for NoSQL databases like MongoDB.
+    
+    Keywords: format converter, xml migration, dataset modernization, batch conversion.
     """
     return super_ops.xml_to_json_file(xml_file, json_file)
 

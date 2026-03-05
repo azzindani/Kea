@@ -20,13 +20,21 @@ from shared.logging.main import get_logger
 # Pre-import transformers to avoid threading issues in Colab/Kaggle
 # These imports happen at module load time, before any threads spawn
 try:
+    os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+    os.environ["USE_TF"] = "0"
+    os.environ["USE_JAX"] = "0"
     from transformers import AutoTokenizer, AutoModel
     _TRANSFORMERS_AVAILABLE = True
 except ImportError:
     _TRANSFORMERS_AVAILABLE = False
     AutoTokenizer = None
     AutoModel = None
+ 
+import threading
+_MODULE_LOCK = threading.Lock()
 
+
+from shared.hardware.gpu_lock import get_gpu_inference_lock
 
 logger = get_logger(__name__)
 
@@ -42,6 +50,10 @@ class EmbeddingProvider(ABC):
     @abstractmethod
     async def embed_query(self, query: str) -> list[float]:
         """Generate embedding for a query (with query prompt)."""
+        pass
+    
+    async def load(self) -> None:
+        """Explicitly load the model into memory/GPU (optional)."""
         pass
     
     @property
@@ -68,6 +80,7 @@ class OpenRouterEmbedding(EmbeddingProvider):
         self,
         api_key: str | None = None,
         dimension: int | None = None,
+        **kwargs: Any,
     ) -> None:
         settings = get_settings()
         self.api_key = api_key or settings.llm.openrouter_api_key
@@ -111,6 +124,10 @@ class OpenRouterEmbedding(EmbeddingProvider):
         
         return embeddings
     
+    async def load(self) -> None:
+        """OpenRouter is an API, no local loading needed."""
+        pass
+    
     async def embed_query(self, query: str) -> list[float]:
         """Generate embedding for query with instruction."""
         # Qwen3 embedding uses instruction prefix for queries
@@ -142,7 +159,7 @@ class LocalEmbedding(EmbeddingProvider):
     _shared_model = None
     _shared_tokenizer = None
     _shared_lock = None  # Threading lock for model loading
-    _shared_execution_lock = None # Asyncio lock for inference
+    _shared_inference_lock = None # Threading lock for multi-service cross-thread inference
     _shared_device = None
     
     def __init__(
@@ -152,6 +169,7 @@ class LocalEmbedding(EmbeddingProvider):
         device: str | None = None,
         use_flash_attention: bool = False,
         max_length: int | None = None,
+        **kwargs: Any,
     ) -> None:
         from shared.config import get_settings
         settings = get_settings()
@@ -161,9 +179,17 @@ class LocalEmbedding(EmbeddingProvider):
         self.use_flash_attention = use_flash_attention
         self.max_length = max_length or settings.embedding.max_length
         
-        if LocalEmbedding._shared_execution_lock is None:
-            import asyncio
-            LocalEmbedding._shared_execution_lock = asyncio.Lock()
+        self._exec_lock = None
+            
+    async def load(self) -> None:
+        """Force the model to load into memory/GPU now."""
+        import asyncio
+        if self._exec_lock is None:
+            self._exec_lock = asyncio.Lock()
+            
+        async with self._exec_lock:
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, self._load_model)
     
     def _has_cuda(self) -> bool:
         try:
@@ -172,57 +198,72 @@ class LocalEmbedding(EmbeddingProvider):
         except ImportError:
             return False
     
+    def _get_locks(self):
+        """Thread-safe acquisition of class-level locks."""
+        if LocalEmbedding._shared_lock is None:
+            with _MODULE_LOCK:
+                if LocalEmbedding._shared_lock is None:
+                    LocalEmbedding._shared_lock = threading.Lock()
+        
+        # We now use the global GPU lock for inference and local lock for loading
+        return LocalEmbedding._shared_lock, get_gpu_inference_lock()
+
+
     def _load_model(self):
         """Lazy load model and tokenizer with thread safety (class-level singleton)."""
-        import threading
         import torch
+        from transformers import AutoTokenizer, AutoModel
         
-        # Fast path: model already loaded
+        # Fast path (outside lock)
         if LocalEmbedding._shared_model is not None:
             return LocalEmbedding._shared_model, LocalEmbedding._shared_tokenizer
+            
+        load_lock, _ = self._get_locks()
         
-        if not _TRANSFORMERS_AVAILABLE:
-            raise ImportError("transformers library is required for local embedding")
-        
-        # Create class-level lock if not exists
-        if LocalEmbedding._shared_lock is None:
-            LocalEmbedding._shared_lock = threading.Lock()
-        
-        with LocalEmbedding._shared_lock:
-            # Double-check pattern
+        with load_lock:
+            # Re-check inside lock
             if LocalEmbedding._shared_model is not None:
                 return LocalEmbedding._shared_model, LocalEmbedding._shared_tokenizer
             
-            # Pin to specific device
             device = self.device
-            if device == "cuda":
-                device = "cuda:0"
+            logger.info(f"Loading {self.model_name} on {device} (Thread: {threading.get_ident()})")
             
-            # Load tokenizer (matches working test code)
+            # Explicit cache clear before loading large model
+            if "cuda" in device:
+                torch.cuda.empty_cache()
+            
+            # Load tokenizer
             LocalEmbedding._shared_tokenizer = AutoTokenizer.from_pretrained(
                 self.model_name,
-                padding_side='left',  # Required for Qwen3 embedding
+                padding_side='left'
             )
             
-            # Load model - keep it SIMPLE like the user's working test code
-            # Don't add extra parameters that cause meta tensor issues
+            # Conservative load strategy: Load in default dtype (usually FP32 or as stored)
+            # then convert to half only on GPU if needed.
             if self.use_flash_attention:
                 LocalEmbedding._shared_model = AutoModel.from_pretrained(
                     self.model_name,
                     attn_implementation="flash_attention_2",
                     torch_dtype=torch.float16,
-                ).cuda()
+                ).to(device)
             else:
-                # Simple load - exactly like user's working code
+                # Simple load
                 LocalEmbedding._shared_model = AutoModel.from_pretrained(self.model_name)
                 
-                # Move to GPU if requested
+                # Move to GPU and convert ONLY if requested
                 if device.startswith("cuda"):
                     LocalEmbedding._shared_model = LocalEmbedding._shared_model.to(device)
+                    # Use float16 on GPU to save memory and match typical hardware support
+                    LocalEmbedding._shared_model = LocalEmbedding._shared_model.half()
             
-            LocalEmbedding._shared_model.eval()  # Set to eval mode
+            LocalEmbedding._shared_model.eval()
             LocalEmbedding._shared_device = device
-            logger.info(f"Loaded {self.model_name} on {LocalEmbedding._shared_model.device}")
+            
+            # Explicit cache clear after loading
+            if "cuda" in device:
+                torch.cuda.empty_cache()
+                
+            logger.info(f"Loaded {self.model_name} successfully on {LocalEmbedding._shared_model.device}")
         
         return LocalEmbedding._shared_model, LocalEmbedding._shared_tokenizer
     
@@ -259,89 +300,124 @@ class LocalEmbedding(EmbeddingProvider):
         import torch
         import torch.nn.functional as F
         
-        async with LocalEmbedding._shared_execution_lock:
-            model, tokenizer = self._load_model()
-            loop = asyncio.get_event_loop()
-        
-        from shared.config import get_settings
-        settings = get_settings()
-        
-        # Check VRAM pressure and adjust batch size
-        batch_size = settings.embedding.batch_size  # Default batch size
-        try:
-            from shared.hardware.detector import detect_hardware
-            hw = detect_hardware()
-            if hw.cuda_available:
-                hw.refresh_vram()
-                pressure = hw.vram_pressure()
-                if pressure > settings.hardware.critical_pressure_threshold:
-                    batch_size = settings.embedding.high_pressure_batch_size
-                    logger.warning(f"VRAM pressure high ({pressure*100:.1f}%), reducing batch to {batch_size}")
-                elif pressure > settings.hardware.high_pressure_threshold:
-                    batch_size = settings.embedding.med_pressure_batch_size
-        except Exception:
-            pass
-        
-        def encode_batch(batch_texts: list[str]) -> list[list[float]]:
-            """Encode a batch of texts using official pattern."""
-            # Tokenize with __call__ method (fast path)
-            batch_dict = tokenizer(
-                batch_texts,
-                padding=True,
-                truncation=True,
-                max_length=self.max_length,
-                return_tensors="pt",
-            )
-            batch_dict = {k: v.to(model.device) for k, v in batch_dict.items()}
+        if self._exec_lock is None:
+            self._exec_lock = asyncio.Lock()
             
-            with torch.no_grad():
-                outputs = model(**batch_dict)
-                embeddings = self._last_token_pool(
-                    outputs.last_hidden_state,
-                    batch_dict['attention_mask']
-                )
-                # Normalize embeddings
-                embeddings = F.normalize(embeddings, p=2, dim=1)
+        async with self._exec_lock:
+            # Always check/load model via executor to avoid blocking event loop
+            if LocalEmbedding._shared_model is None:
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(None, self._load_model)
             
-            return embeddings.cpu().tolist()
-        
-        def process_all():
-            """Process all texts in batches."""
-            all_embeddings = []
-            import sys
+            model, tokenizer = LocalEmbedding._shared_model, LocalEmbedding._shared_tokenizer
+            loop = asyncio.get_running_loop()
             
-            # CPU heuristics to prevent thrashing
-            actual_batch_size = batch_size
-            if model.device.type == "cpu":
-                actual_batch_size = min(batch_size, 4)
-            
-            for i in range(0, len(texts), actual_batch_size):
-                batch = texts[i:i + actual_batch_size]
-                try:
-                    embs = encode_batch(batch)
-                    all_embeddings.extend(embs)
-                    logger.debug(
-                        f"Embedder progress",
-                        processed=i + len(batch),
-                        total=len(texts),
-                        device=model.device.type
-                    )
-                except Exception as e:
-                    logger.error(f"Embedder error at offset {i}", error=str(e))
-                    raise
-                # Clear cache after each batch
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-            return all_embeddings
-        
-        embeddings = await loop.run_in_executor(None, process_all)
-        return embeddings
-    
-    async def embed_query(self, query: str, task: str | None = None) -> list[float]:
-        """Generate embedding for query with instruction (official Qwen3 pattern)."""
-        if task is None:
             from shared.config import get_settings
-            task = get_settings().embedding.instruction
+            settings = get_settings()
+            
+            # Check VRAM pressure and adjust batch size
+            batch_size = settings.embedding.batch_size  # Default batch size
+            try:
+                from shared.hardware.detector import detect_hardware
+                hw = detect_hardware()
+                if hw.cuda_available:
+                    hw.refresh_vram()
+                    pressure = hw.vram_pressure()
+                    if pressure > settings.hardware.critical_pressure_threshold:
+                        batch_size = settings.embedding.high_pressure_batch_size
+                        logger.warning(f"VRAM pressure high ({pressure*100:.1f}%), reducing batch to {batch_size}")
+                    elif pressure > settings.hardware.high_pressure_threshold:
+                        batch_size = settings.embedding.med_pressure_batch_size
+            except Exception:
+                pass
+            
+            def encode_batch(batch_texts: list[str]) -> list[list[float]]:
+                """Encode a batch of texts using official pattern."""
+                # Tokenize with __call__ method (fast path)
+                batch_dict = tokenizer(
+                    batch_texts,
+                    padding=True,
+                    truncation=True,
+                    max_length=self.max_length,
+                    return_tensors="pt",
+                )
+                batch_dict = {k: v.to(model.device) for k, v in batch_dict.items()}
+                
+                # Multi-Model Safety: Use the shared global GPU lock
+                _, gpu_lock = self._get_locks()
+                with gpu_lock:
+                    with torch.no_grad():
+                        outputs = model(**batch_dict)
+                        embeddings = self._last_token_pool(
+                            outputs.last_hidden_state,
+                            batch_dict['attention_mask']
+                        )
+                        # Normalize embeddings
+                        embeddings = F.normalize(embeddings, p=2, dim=1)
+                        # Move to CPU immediately while still under lock
+                        result = embeddings.cpu().tolist()
+                        
+                        # Cleanup specific to this batch to prevent leakage
+                        del outputs, embeddings
+                        return result
+            
+            def process_all():
+                """Process all texts in batches."""
+                all_embeddings = []
+                import sys
+                import math
+                
+                nonlocal batch_size
+                
+                # CPU heuristics to prevent thrashing
+                if model.device.type == "cpu":
+                    batch_size = min(batch_size, 4)
+                
+                i = 0
+                while i < len(texts):
+                    actual_batch_size = min(batch_size, len(texts) - i)
+                    batch = texts[i:i + actual_batch_size]
+                    try:
+                        embs = encode_batch(batch)
+                        all_embeddings.extend(embs)
+                        logger.debug(
+                            f"Embedder progress: {i + len(batch)}/{len(texts)}",
+                            processed=i + len(batch),
+                            total=len(texts),
+                            device=model.device.type
+                        )
+                        i += actual_batch_size
+                    except torch.cuda.OutOfMemoryError:
+                        logger.warning(f"OOM error processing batch of size {actual_batch_size}. Halving batch size.")
+                        # Emergency clear only on OOM
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
+                        if batch_size > 1:
+                            batch_size = math.ceil(batch_size / 2)
+                        else:
+                            raise
+                    except Exception as e:
+                        # Some versions of PyTorch throw RuntimeError for CUDA OOM
+                        if "OutOfMemory" in str(type(e).__name__) or "CUDA out of memory" in str(e):
+                            logger.warning(f"OOM error processing batch of size {actual_batch_size}. Halving batch size.")
+                            if torch.cuda.is_available():
+                                torch.cuda.empty_cache()
+                            if batch_size > 1:
+                                batch_size = math.ceil(batch_size / 2)
+                                continue
+                            else:
+                                raise
+                        logger.error(f"Embedder error at offset {i}", error=str(e))
+                        raise
+                return all_embeddings
+            
+            embeddings = await loop.run_in_executor(None, process_all)
+            return embeddings
+    
+    async def embed_query(self, query: str) -> list[float]:
+        """Generate embedding for query with instruction (official Qwen3 pattern)."""
+        from shared.config import get_settings
+        task = get_settings().embedding.instruction
         
         # Format query with instruction
         formatted_query = self._get_detailed_instruct(task, query)

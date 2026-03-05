@@ -14,6 +14,8 @@ class ServiceName(str, Enum):
     VAULT = "vault"
     SWARM_MANAGER = "swarm_manager"
     CHRONOS = "chronos"
+    ML_INFERENCE = "ml_inference"
+    ML_RERANKER = "ml_reranker"
 
 class ServiceRegistry:
     """
@@ -32,6 +34,8 @@ class ServiceRegistry:
         url = getattr(settings.services, attr_name, None)
         
         if url:
+            from shared.logging.main import get_logger
+            get_logger("registry").debug(f"ServiceRegistry: Resolved '{service.value}' -> {url}")
             return url
             
         # Fallback to env var override: e.g. SERVICE_URL_VAULT
@@ -40,6 +44,9 @@ class ServiceRegistry:
         
         if not url:
             raise ValueError(f"Service location for '{service.value}' is not configured in environment variables or shared.config defaults.")
+            
+        from shared.logging.main import get_logger
+        get_logger("registry").debug(f"ServiceRegistry: Resolved '{service.value}' (via ENV) -> {url}")
         return url
 
     @classmethod

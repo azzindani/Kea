@@ -141,13 +141,12 @@ def _scan_markdown_files(
 
         meta, body = _parse_frontmatter(text)
 
-        # Diagnostic: Skip files without a name or if they look like internal docs
+        # Diagnostic: Handle files without a 'name'
         if not meta.get("name"):
             if md_file.name.startswith("_") or "internal" in str(md_file).lower():
                 continue
-            # logger is not available globally here unless we import it, use stderr for raw debug
-            print(f"DEBUG: Skipping {md_file.name} - No 'name' field in frontmatter", file=sys.stderr)
-            continue
+            # Instead of skipping, we just warn and let the fallback logic below handle it
+            print(f"DEBUG: Auto-generating 'name' for {md_file.name} (missing in frontmatter)", file=sys.stderr)
 
         name: str = meta.get("name", md_file.stem.replace("_", " ").title())
         description: str = meta.get("description", name)

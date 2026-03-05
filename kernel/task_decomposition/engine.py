@@ -21,6 +21,7 @@ from shared.id_and_hash import generate_id
 from shared.inference_kit import InferenceKit
 from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -56,6 +57,7 @@ def _ref(fn: str) -> ModuleRef:
 # ============================================================================
 
 
+@trace_io()
 async def analyze_goal_complexity(
     context: WorldState,
     intent: IntentLabel,
@@ -110,6 +112,7 @@ async def analyze_goal_complexity(
 # ============================================================================
 
 
+@trace_io()
 def split_into_sub_goals(assessment: ComplexityAssessment) -> list[SubGoal]:
     """Decompose the assessed goal into logical sub-goals.
 
@@ -164,6 +167,7 @@ def split_into_sub_goals(assessment: ComplexityAssessment) -> list[SubGoal]:
 # ============================================================================
 
 
+@trace_io()
 def build_dependency_array(sub_goals: list[SubGoal]) -> DependencyGraph:
     """Analyze input/output relationships for execution ordering.
 
@@ -260,6 +264,7 @@ def _find_parallel_groups(
 # ============================================================================
 
 
+@trace_io()
 def map_required_skills(
     sub_goals: list[SubGoal],
     dependency_graph: DependencyGraph,
@@ -336,6 +341,7 @@ def _infer_tools(sub_goal: SubGoal) -> list[str]:
 # ============================================================================
 
 
+@trace_io(logger_name="kernel.task_decomposition.decompose_goal")
 async def decompose_goal(context: WorldState, kit: InferenceKit | None = None) -> Result:
     """Top-level goal decomposition orchestrator.
 
@@ -385,7 +391,7 @@ async def decompose_goal(context: WorldState, kit: InferenceKit | None = None) -
                         "Decompose the task into sub-tasks. "
                         "Respond EXACTLY in JSON: [{\"id\": \"...\", \"description\": \"...\", \"domain\": \"...\", "
                         "\"required_skills\": [\"...\"], \"required_tools\": [\"...\"], \"depends_on\": [\"id_...\"], "
-                        "\"inputs\": [\"...\"], \"outputs\": [\"...\"], \"parallelizable\": true/false}]"
+                        "\"inputs\": [\"...\"], \"outputs\": [\"...\"], \"action_type\": \"...\" (must be one of: tool_call, llm_inference, data_transform, general), \"parallelizable\": true/false}]"
                     )
                 )
                 user_msg = LLMMessage(role="user", content=f"Goal: {context.goal}\nContext: {json.dumps(context.context)}")
@@ -410,6 +416,7 @@ async def decompose_goal(context: WorldState, kit: InferenceKit | None = None) -
                             depends_on=t.get("depends_on", []),
                             inputs=t.get("inputs", []),
                             outputs=t.get("outputs", []),
+                            action_type=t.get("action_type", "general"),
                             parallelizable=t.get("parallelizable", False)
                         ))
                     tasks = llm_tasks
@@ -431,7 +438,7 @@ async def decompose_goal(context: WorldState, kit: InferenceKit | None = None) -
             },
         )
 
-        log.info(
+        log.notice(
             "Goal decomposition complete",
             complexity=assessment.level.value,
             task_count=len(tasks),

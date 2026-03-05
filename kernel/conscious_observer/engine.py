@@ -82,7 +82,8 @@ from kernel.what_if_scenario.engine import simulate_outcomes
 from shared.config import get_settings
 from shared.id_and_hash import generate_id
 from shared.inference_kit import InferenceKit
-from shared.logging.main import get_logger
+from shared.logging.main import get_logger, log_final_result
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -478,6 +479,7 @@ class ConsciousObserver:
     # Public Entry Point
     # ------------------------------------------------------------------
 
+    @trace_io()
     async def process(
         self,
         raw_input: RawInput,
@@ -531,7 +533,7 @@ class ConsciousObserver:
                 trace_id=trace_id
             )
 
-            bound_log.info(
+            bound_log.notice(
                 "Gate-In complete",
                 mode=gate_in.mode.value,
                 capable=gate_in.capability.can_handle,
@@ -579,7 +581,7 @@ class ConsciousObserver:
             )
             execute_ms = (time.perf_counter() - execute_start) * 1000
 
-            bound_log.info(
+            bound_log.notice(
                 "Execute complete",
                 cycles=exec_res.total_cycles,
                 simplified=exec_res.was_simplified,
@@ -601,7 +603,7 @@ class ConsciousObserver:
             )
             gate_out_ms = (time.perf_counter() - gate_out_start) * 1000
 
-            bound_log.info(
+            bound_log.notice(
                 "Gate-Out complete",
                 phase=observer_result.final_phase.value,
                 gate_out_ms=round(gate_out_ms, 2),
@@ -624,6 +626,15 @@ class ConsciousObserver:
                     "simplified": str(observer_result.was_simplified),
                     "escalated": str(observer_result.was_escalated),
                 },
+            )
+
+            # Premium Final Result Logging
+            log_final_result(
+                logger=log,
+                objective=spawn_request.objective,
+                content=observer_result.partial_output or "No output produced.",
+                artifacts_count=0,
+                trace_id=trace_id
             )
 
             return ok(signals=[signal], metrics=metrics)
@@ -651,6 +662,7 @@ class ConsciousObserver:
     # Phase 1: Gate-In
     # ------------------------------------------------------------------
 
+    @trace_io()
     async def _phase_gate_in(
         self,
         raw_input: RawInput,
@@ -788,6 +800,7 @@ class ConsciousObserver:
     # Phase 2: Execute (pipeline dispatcher)
     # ------------------------------------------------------------------
 
+    @trace_io()
     async def _phase_plan(
         self,
         gate: GateInResult,
@@ -815,6 +828,7 @@ class ConsciousObserver:
             origin=_ref("_phase_plan")
         )])
 
+    @trace_io()
     async def _phase_execute(
         self,
         gate: GateInResult,
@@ -849,7 +863,7 @@ class ConsciousObserver:
                 retrieval_ms=tool_result.retrieval_ms,
             )
             gate.rag_enrichment.tools_available = bool(tool_names)
-            log.info(
+            log.debug(
                 "Dynamic Tool Retrieval complete",
                 count=len(tool_names),
                 tools=tool_names,
@@ -865,7 +879,7 @@ class ConsciousObserver:
             if gate.rag_enrichment.tools_available:
                 rag_context["available_tools"] = gate.rag_enrichment.tools.tool_names
             
-            log.info(
+            log.debug(
                 "RAG context injected into OODA Orient",
                 knowledge_available=gate.rag_enrichment.knowledge_available,
                 tools_available=gate.rag_enrichment.tools_available,
@@ -932,16 +946,30 @@ class ConsciousObserver:
         spawn_request: SpawnRequest,
         rag_context: dict[str, Any] | None,
     ) -> ObserverExecuteResult:
-        """STANDARD: T2 decompose → T4. For MODERATE signals."""
+        """STANDARD: T2 decompose → T3 Synthesize → T4. For MODERATE signals."""
         start = time.perf_counter()
 
         world_state = _build_world_state(spawn_request, gate.identity_context, rag_context, gate.rag_enrichment)
         subtasks_result = await decompose_goal(world_state, self._kit)
-        # subtasks intentionally ignored for standard path as we don't synthesize a DAG here (standard mapping)
-        _ = _extract_subtasks(subtasks_result)
+        subtasks = _extract_subtasks(subtasks_result)
+
+        active_dag: ExecutableDAG | None = None
+        if subtasks:
+            plan_res = await synthesize_plan(
+                objective=spawn_request.objective,
+                context=world_state,
+                kit=self._kit,
+                subtasks=subtasks,
+            )
+            active_dag = _extract_dag(plan_res)
 
         agent_state = _build_agent_state(gate.identity_context, spawn_request)
+        if active_dag:
+            agent_state.active_dag_id = active_dag.dag_id
+
         stm = ShortTermMemory()
+        if active_dag:
+            stm.register_dag(active_dag.dag_id, [n.node_id for n in active_dag.nodes])
 
         loop_result, decisions, outputs, simplified, escalated, aborted = (
             await self._run_ooda_with_clm(
@@ -949,7 +977,7 @@ class ConsciousObserver:
                 spawn_request=spawn_request,
                 agent_state=agent_state,
                 stm=stm,
-                active_dag=None,
+                active_dag=active_dag,
                 objective=spawn_request.objective,
                 activation_map=gate.activation_map,
                 rag_context=rag_context,
@@ -1003,7 +1031,7 @@ class ConsciousObserver:
             )
             active_dag = _extract_dag(plan_result)
             if active_dag:
-                log.info(
+                log.debug(
                     "DAG Synthesized",
                     dag_id=active_dag.dag_id,
                     nodes=[{
@@ -1031,8 +1059,8 @@ class ConsciousObserver:
 
         # T3: Pre-execution conscience gate
         if active_dag:
-            log.info("📊 Final DAG Structure", dag_id=active_dag.dag_id, node_count=len(active_dag.nodes))
-            log.info("🛡️ Pre-execution check: validating DAG nodes and schemas", dag_id=active_dag.dag_id)
+            log.debug("📊 Final DAG Structure", dag_id=active_dag.dag_id, node_count=len(active_dag.nodes))
+            log.debug("🛡️ Pre-execution check: validating DAG nodes and schemas", dag_id=active_dag.dag_id)
             pre_exec_result = await run_pre_execution_check(active_dag, self._kit)
             if not pre_exec_result.error and pre_exec_result.signals:
                 approval = pre_exec_result.signals[0].body["data"]
@@ -1065,7 +1093,7 @@ class ConsciousObserver:
                     )
 
                 else:
-                    log.info("✅ Pre-execution check: DAG approved for execution", dag_id=active_dag.dag_id)
+                    log.debug("✅ Pre-execution check: DAG approved for execution", dag_id=active_dag.dag_id)
         
         # T4: OODA loop with CLM monitoring
         agent_state = _build_agent_state(gate.identity_context, spawn_request)
@@ -1073,6 +1101,8 @@ class ConsciousObserver:
             agent_state.active_dag_id = active_dag.dag_id
 
         stm = ShortTermMemory()
+        if active_dag:
+            stm.register_dag(active_dag.dag_id, [n.node_id for n in active_dag.nodes])
 
         loop_result, decisions, outputs, simplified, escalated, aborted = (
             await self._run_ooda_with_clm(
@@ -1205,7 +1235,7 @@ class ConsciousObserver:
             memory_summary = tool_memory.get_memory_summary()
             if memory_summary:
                 rag_context = rag_context or {}
-                log.info("🧠 STM: Pulled tool execution memory (Layer 3 Artifact retrieval)", records_count=len(tool_memory.succeeded) + len(tool_memory.failed))
+                log.debug("🧠 STM: Pulled tool execution memory (Layer 3 Artifact retrieval)", records_count=len(tool_memory.succeeded) + len(tool_memory.failed))
                 rag_context["tool_execution_memory"] = memory_summary
 
             # Run one OODA cycle
@@ -1234,7 +1264,7 @@ class ConsciousObserver:
                         cycle_number=cycle_num + 1,
                         duration_ms=ar.duration_ms,
                     )
-                    log.info(
+                    log.debug(
                         "OODA Act: Task executed",
                         node_id=ar.node_id,
                         type=ar.action_type,
@@ -1285,7 +1315,7 @@ class ConsciousObserver:
                 if tool_memory.failed:
                     replan_reason = f"Failure detected in previous tools: {list(tool_memory.failed.keys())}"
                 
-                log.info(
+                log.notice(
                     "🔄 OODA Replan triggered", 
                     reason=replan_reason,
                     trace_id=trace_id,
@@ -1305,7 +1335,7 @@ class ConsciousObserver:
                     if refreshed.tool_names:
                         rag_context = rag_context or {}
                         rag_context["available_tools"] = refreshed.tool_names
-                        log.info(
+                        log.debug(
                             "JIT tool refresh: replaced blacklisted tools",
                             blacklisted=list(tool_memory.blacklisted),
                             replacements=refreshed.tool_names[:5],
@@ -1316,7 +1346,7 @@ class ConsciousObserver:
                     plan_res = await self._phase_plan(gate, spawn_request, rag_context)
                     if not plan_res.error and plan_res.signals:
                         active_dag = _extract_dag(plan_res)
-                        log.info(f"OODA Replan successful: injected new DAG {active_dag.dag_id}", trace_id=trace_id)
+                        log.debug(f"OODA Replan successful: injected new DAG {active_dag.dag_id}", trace_id=trace_id)
                     else:
                         log.warning("OODA Replan failed: Plan phase returned error/no signals.", trace_id=trace_id)
                 else:
@@ -1441,7 +1471,7 @@ class ConsciousObserver:
             action_outputs=recent_outputs,
         )
 
-        log.info(
+        log.notice(
             "OODA+CLM loop complete",
             agent_id=state.agent_id,
             cycles=state.cycle_count,
@@ -1465,6 +1495,7 @@ class ConsciousObserver:
     # Phase 3: Gate-Out
     # ------------------------------------------------------------------
 
+    @trace_io()
     async def _phase_gate_out(
         self,
         gate: GateInResult,
@@ -1515,7 +1546,7 @@ class ConsciousObserver:
         # T6: Hallucination Monitor
         grounding: GroundingReport | None = None
         if evidence:
-            log.info("Grounding Verification started", evidence_count=len(evidence), output_id=tool_output.output_id)
+            log.debug("Grounding Verification started", evidence_count=len(evidence), output_id=tool_output.output_id)
             grounding_result = await verify_grounding(tool_output, evidence, self._kit)
             if not grounding_result.error and grounding_result.signals:
                 grounding = _extract_grounding_report(grounding_result)
@@ -1549,7 +1580,7 @@ class ConsciousObserver:
         if isinstance(verdict, FilteredOutput):
             # PASS — clean up retry counter and return success
             clear_retry_budget(tool_output.output_id)
-            log.info(
+            log.notice(
                 "Gate-Out complete: PASS",
                 output_id=tool_output.output_id,
                 confidence=calibrated_confidence.calibrated_confidence if calibrated_confidence else 0.0,
@@ -1558,16 +1589,12 @@ class ConsciousObserver:
             )
             # Log the FINAL result that will be returned to Tier 8 / User
             # This ensures the 'real output' is visible in logs as requested.
-            log.info(
-                f"\n{'='*60}\n"
-                f"FINAL MISSION OUTPUT [GATE-OUT]\n"
-                f"Objective: {exec_res.objective or 'unknown'}\n"
-                f"Trace ID: {trace_id}\n"
-                f"{'='*60}\n"
-                f"{verdict.content}\n"
-                f"{'='*60}",
-                output_id=tool_output.output_id,
-                objective=exec_res.objective or "unknown"
+            log_final_result(
+                logger=log,
+                objective=exec_res.objective or "unknown",
+                content=verdict.content,
+                artifacts_count=len(exec_res.loop_result.artifacts_produced),
+                trace_id=trace_id
             )
             return ConsciousObserverResult(
                 trace_id=trace_id,
@@ -1598,7 +1625,7 @@ class ConsciousObserver:
         )
 
         if not guidance.should_escalate:
-            log.info(
+            log.notice(
                 "Noise gate rejected — retry budget available",
                 output_id=tool_output.output_id,
                 retries_used=guidance.retry_count,
@@ -1663,6 +1690,7 @@ def _default_confidence() -> CalibratedConfidence:
 # ============================================================================
 
 
+@trace_io()
 async def run_conscious_observer(
     raw_input: RawInput,
     spawn_request: SpawnRequest,

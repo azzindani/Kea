@@ -63,9 +63,13 @@ async def get_block(block_id: str = "latest", full_transactions: bool = False, r
     """RETRIEVES block details. [ACTION]
     
     [RAG Context]
-    Returns block details including timestamp, miner, and transaction count.
-    Args:
-        block_id: "latest", "earliest", "pending", or block number/hash.
+    Queries the blockchain for information about a specific block. Blocks are the fundamental units of the chain, containing groups of transactions.
+    
+    How to Use:
+    - 'block_id': Can be a number (hex or int), a hash (0x...), or tags like 'latest', 'earliest', 'pending'.
+    - Use 'full_transactions=True' to get the details of every transaction inside the block (Heavy).
+    
+    Keywords: block header, miner info, timestamp, block explorer.
     """
     return await run_op(rpc.get_block, block_id=block_id, full_transactions=full_transactions, rpc_url=rpc_url)
 
@@ -85,9 +89,13 @@ async def get_balance(address: str, block_id: str = "latest", rpc_url: str = Non
     """FETCHES ETH balance. [ACTION]
     
     [RAG Context]
-    Returns balance in Wei (use from_wei to convert to ETH).
-    Args:
-        address: 0x... wallet or contract address.
+    Retrieves the native Ether (ETH) balance of any Ethereum address.
+    
+    How to Use:
+    - Returns the balance in 'Wei' (the smallest unit of ETH). 1 ETH = 10^18 Wei.
+    - Use the 'from_wei' tool to convert this into a human-readable Ether value.
+    
+    Keywords: wallet funds, eth balance, native currency, account wealth.
     """
     return await run_op(rpc.get_balance, address=address, block_id=block_id, rpc_url=rpc_url)
 
@@ -96,8 +104,13 @@ async def get_gas_price(rpc_url: str = None) -> str:
     """FETCHES gas prices. [ACTION]
     
     [RAG Context]
-    Essential for estimating transaction costs.
-    Returns values in Wei.
+    Retrieves the current network fee required to process a transaction. Gas prices fluctuate based on network congestion.
+    
+    How to Use:
+    - Crucial for estimating if a transaction will be accepted by miners/validators.
+    - High gas price means high demand; you may want to wait for lower fees before sending large trades.
+    
+    Keywords: transaction fees, network cost, gwei, priority fee.
     """
     return await run_op(rpc.get_gas_price, rpc_url=rpc_url)
 
@@ -106,7 +119,13 @@ async def get_block_number(rpc_url: str = None) -> str:
     """FETCHES current block number. [ACTION]
     
     [RAG Context]
-    Returns the number of the most recent block.
+    Retrieves the index of the most recent block successfully added to the blockchain. This serves as the system's "heartbeat" and is used to measure the passage of time or the confirmation depth of recent transactions.
+    
+    How to Use:
+    - Useful for determining if the network is stalled or if your local RPC node is synchronized.
+    - Used as a reference point for 'from_block' and 'to_block' in event indexing.
+    
+    Keywords: block height, current block, chain status, network sync.
     """
     return await run_op(rpc.get_block_number, rpc_url=rpc_url)
 
@@ -115,7 +134,13 @@ async def get_transaction_count(address: str, rpc_url: str = None) -> str:
     """FETCHES transaction count (Nonce). [ACTION]
     
     [RAG Context]
-    Required for constructing new transactions (to determine nonce).
+    Retrieves the 'nonce' of an Ethereum address, which represents the number of transactions sent from that account. Every transaction sent MUST have a nonce exactly one higher than the previous one.
+    
+    How to Use:
+    - Critical for transaction construction; if you use the wrong nonce, the transaction will be rejected by the network.
+    - Also used to identify if an account has any outgoing history.
+    
+    Keywords: account nonce, tx sequence, transaction indexing, sender statistics.
     """
     return await run_op(rpc.get_transaction_count, address=address, rpc_url=rpc_url)
 
@@ -124,7 +149,16 @@ async def get_chain_id(rpc_url: str = None) -> str:
     """FETCHES Chain ID. [ACTION]
     
     [RAG Context]
-    E.g., 1 (Mainnet), 137 (Polygon), 42161 (Arbitrum).
+    Identifies the specific blockchain network being queried. This is a security feature that prevents a transaction from being "replayed" on another chain (e.g., a transaction meant for a testnet being valid on Mainnet).
+    
+    How to Use:
+    - 1: Ethereum Mainnet
+    - 137: Polygon
+    - 42161: Arbitrum
+    - 10: Optimism
+    - 8453: Base
+    
+    Keywords: network id, chain identifier, eip-155, replay protection.
     """
     return await run_op(rpc.get_chain_id, rpc_url=rpc_url)
 
@@ -143,10 +177,13 @@ async def switch_chain(chain: str) -> str:
     """SWITCHES default network. [ACTION]
     
     [RAG Context]
-    Args:
-        chain: "ethereum", "arbitrum", "optimism", "polygon", "bsc", "base".
+    Changes the active network context for all subsequent Web3 calls.
     
-    CRITICAL: Call this BEFORE any other tool if target is not Ethereum Mainnet.
+    How to Use:
+    - Supported: 'ethereum' (Mainnet), 'arbitrum', 'optimism', 'polygon', 'bsc', 'base'.
+    - CRITICAL: You MUST call this first if you intend to interact with Layer 2s or sidechains.
+    
+    Keywords: change network, l2 switch, polygon rpc, arbitrum rpc, base chain.
     """
     return await run_op(network.switch_chain, chain=chain)
 
@@ -156,9 +193,12 @@ async def get_token_balance(token_address: str, wallet_address: str, rpc_url: st
     """FETCHES ERC20 token balance. [ACTION]
     
     [RAG Context]
-    Args:
-        token_address: Contract address of the token (e.g. USDT)
-        wallet_address: User's address
+    Queries an ERC20 smart contract (like USDT, USDC, LINK) to find how much of that specific token is held by a wallet address.
+    
+    How to Use:
+    - Input the token contract address and the user's wallet address.
+    
+    Keywords: erc20 balance, asset holdings, digital assets, token tracker.
     """
     return await run_op(erc20.get_token_balance, token_address=token_address, wallet_address=wallet_address, rpc_url=rpc_url)
 
@@ -262,8 +302,13 @@ async def get_uniswap_price(token_in: str, token_out: str, amount_in: float, fee
     """FETCHES Uniswap V3 price quote. [ACTION]
     
     [RAG Context]
-    Args:
-        fee: Pool fee tier (500, 3000, 10000)
+    Queries the Uniswap V3 Quoter contract to find the expected output for a swap between two tokens. This is the on-chain "Market Price".
+    
+    How to Use:
+    - 'fee': Common V3 fee tiers are 500 (0.05%), 3000 (0.3%), or 10000 (1%). 
+    - Essential for calculating swap efficiency and potential slippage.
+    
+    Keywords: coin price, swap quote, uniswap trade, on-chain market.
     """
     return await run_op(defi.get_uniswap_price, token_in=token_in, token_out=token_out, amount_in=amount_in, fee=fee, rpc_url=rpc_url)
 
@@ -281,7 +326,14 @@ async def send_eth(to_address: str, amount: float, private_key: str, rpc_url: st
     """SENDS native ETH. [ACTION]
     
     [RAG Context]
-    Requires Private Key.
+    Constructs, signs, and broadcasts a Transfer transaction for native Ether (ETH).
+    
+    CAUTION: 
+    - This is a non-reversible execution. 
+    - Requires the 'private_key' of the sender. 
+    - Ensure 'amount' is in ETH (not Wei).
+    
+    Keywords: transfer funds, send crypto, eth payment, blockchain tx.
     """
     return await run_op(action.send_eth, to_address=to_address, amount=amount, private_key=private_key, rpc_url=rpc_url)
 
@@ -319,7 +371,13 @@ async def get_aave_reserve_data(asset: str, rpc_url: str = None) -> str:
     """FETCHES Aave V3 reserve data. [ACTION]
     
     [RAG Context]
-    Returns Supply APY, Borrow APY, Total Liquidity.
+    Queries the Aave lending protocol for liquidity and yield data on a specific asset.
+    
+    How to Use:
+    - Returns 'Supply APY' (what you earn for lending) and 'Borrow APY' (what you pay to borrow).
+    - Checks for protocol liquidity to ensure you can withdraw assets.
+    
+    Keywords: lending rates, yield farming, aave yield, borrow apy.
     """
     return await run_op(lending.get_aave_reserve_data, asset=asset, rpc_url=rpc_url)
 
@@ -347,9 +405,14 @@ async def read_contract(address: str, function_signature: str, args: list, arg_t
     """CALLS contract function (Read). [ACTION]
     
     [RAG Context]
-    Universal tool for interacting with arbitrary contracts.
-    Args:
-        function_signature: e.g. "balanceOf(address)"
+    A powerful, low-level tool that allows reading data from ANY smart contract on the blockchain without needing the full ABI.
+    
+    How to Use:
+    - Provide the 'function_signature' (e.g., "balanceOf(address)").
+    - Map 'args' to 'arg_types' (e.g., ["0x..."], ["address"]).
+    - Identify 'return_types' (e.g., ["uint256"]).
+    
+    Keywords: generic contract, low-level call, state query, smart contract data.
     """
     return await run_op(contract_interaction.read_contract, address=address, function_signature=function_signature, args=args, arg_types=arg_types, return_types=return_types, rpc_url=rpc_url)
 
@@ -412,7 +475,12 @@ async def simulate_transaction(to_address: str, value: float, data: str, from_ad
     """SIMULATES transaction. [ACTION]
     
     [RAG Context]
-    Dry-run execution.
+    Executes a transaction in a local, virtualized state to determine its outcome without actually broadcasting it to the blockchain (Dry Run).
+    
+    How to Use:
+    - CRITICAL for security. Use this to check for potential errors, reverted transactions, or malicious contract outcomes before risking real funds.
+    
+    Keywords: dry run, trace transaction, security audit, gas check outcome.
     """
     return await run_op(security.simulate_transaction, to_address=to_address, value=value, data=data, from_address=from_address, rpc_url=rpc_url)
 
@@ -437,17 +505,45 @@ tokens = {
 # Chainlink Shortcuts
 @mcp.tool()
 async def get_chainlink_eth_usd() -> str:
-    """FETCHES ETH/USD price. [ACTION]"""
+    """FETCHES ETH/USD price. [ACTION]
+    
+    [RAG Context]
+    A high-precision "Super Tool" for fetching the definitive ETH/USD exchange rate. It queries the Chainlink decentralized oracle network, which aggregates prices from dozens of high-volume exchanges.
+    
+    How to Use:
+    - Returns the current price of Ethereum in US Dollars. 
+    - Essential for calculating the fiat value of gas fees, portfolio holdings, or DeFi liquidation thresholds.
+    
+    Keywords: eth price, ethereum value, chainlink oracle, market rate.
+    """
     return await run_op(oracle.get_chainlink_price, feed_address="0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419")
 
 @mcp.tool()
 async def get_chainlink_btc_usd() -> str:
-    """FETCHES BTC/USD price. [ACTION]"""
+    """FETCHES BTC/USD price. [ACTION]
+    
+    [RAG Context]
+    A critical "Super Tool" for Bitcoin pricing on-chain. It utilizes the Chainlink network to provide the highly accurate BTC/USD benchmark price used by major DeFi platforms for collateral valuation.
+    
+    How to Use:
+    - Useful for cross-asset analysis or when calculating the BTC-equivalent value of an Ethereum-based portfolio.
+    
+    Keywords: bitcoin price, btc value, crypto oracle, btc market.
+    """
     return await run_op(oracle.get_chainlink_price, feed_address="0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c")
 
 @mcp.tool()
 async def get_chainlink_usdc_usd() -> str:
-    """FETCHES USDC/USD price. [ACTION]"""
+    """FETCHES USDC/USD price. [ACTION]
+    
+    [RAG Context]
+    A stability-monitoring "Super Tool". While USDC is a stablecoin pegged to 1 USD, its on-chain price can fluctuate slightly during market stress. This oracle provides the real-time market value.
+    
+    How to Use:
+    - Essential for verifying that a stablecoin has not "depegged" before using it as collateral in a loan.
+    
+    Keywords: usdc peg, stablecoin price, dollar parity, liquidity check.
+    """
     return await run_op(oracle.get_chainlink_price, feed_address="0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6")
 
 # Register dynamic shortcuts

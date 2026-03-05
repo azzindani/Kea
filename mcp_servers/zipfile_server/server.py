@@ -97,6 +97,13 @@ def list_files(path: str) -> List[str]:
     """LISTS files in zip archive. [DATA]
     
     [RAG Context]
+    A discovery "Super Tool" for inspecting the contents of a compressed .zip archive without extracting it. It provides a flat list of all file and directory members.
+    
+    How to Use:
+    - Pass the absolute path to the zip file.
+    - Ideal for verifying if a specific file exists inside a package before attempting to read it.
+    
+    Keywords: zip inventory, archive explorer, member list, file inspection.
     """
     return read_ops.list_files(path)
 
@@ -186,6 +193,14 @@ def extract_all(path: str, extract_path: str = "", pwd: Optional[str] = None) ->
     """EXTRACTS all files from zip. [ACTION]
     
     [RAG Context]
+    A bulk "Super Tool" for inflating a zip archive. It decompresses every file and recreates the internal directory structure at the target destination.
+    
+    How to Use:
+    - 'path': The zip file to extract.
+    - 'extract_path': The destination directory where files will be placed.
+    - 'pwd': Optional password for encrypted archives.
+    
+    Keywords: unzip all, archive inflation, decompress bulk, bulk file recovery.
     """
     if not extract_path:
         return "Error: No extraction path provided (extract_path)."
@@ -285,6 +300,14 @@ def add_directory_recursive(path: str, dir_path: str) -> str:
     """ADDS directory recursively. [ACTION]
     
     [RAG Context]
+    A powerful "Super Tool" for creating archive backups. It traverses an entire directory tree on disk and adds every file and subdirectory found into the specified zip file.
+    
+    How to Use:
+    - 'path': Target zip file (created if it doesn't exist).
+    - 'dir_path': Source directory to archive.
+    - Maintains the relative path structure within the zip file.
+    
+    Keywords: recursive archiving, directory backup, bulk compression, tree zipping.
     """
     return write_ops.add_directory_recursive(path, dir_path)
 
@@ -424,7 +447,13 @@ def backup_and_zip(dir_path: str) -> str:
     """BACKUPS directory to zip. [ACTION]
     
     [RAG Context]
-    Timestamped.
+    A specialized "Super Tool" for system maintenance. it creates a timestamped zip archive of a specific directory, serving as a point-in-time snapshot.
+    
+    How to Use:
+    - Pass the directory path you wish to backup.
+    - The tool automatically generates a filename like 'backup_YYYYMMDD_HHMMSS.zip'.
+    
+    Keywords: snapshot tool, point in time backup, automated archiving, recovery point.
     """
     return super_ops.backup_and_zip(dir_path)
 

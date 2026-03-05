@@ -21,6 +21,7 @@ from kernel.short_term_memory.types import NodeExecutionStatus
 from shared.config import get_settings
 from shared.id_and_hash import generate_id
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -57,6 +58,7 @@ def _ref(fn: str) -> ModuleRef:
 # ============================================================================
 
 
+@trace_io()
 def check_async_requirement(node_result: ActionResult) -> bool:
     """Inspect the action result to determine if async waiting is needed.
 
@@ -77,6 +79,7 @@ def check_async_requirement(node_result: ActionResult) -> bool:
 # ============================================================================
 
 
+@trace_io()
 async def park_dag_state(
     dag: ExecutableDAG,
     stm: ShortTermMemory,
@@ -109,7 +112,7 @@ async def park_dag_state(
         parked_utc=datetime.now(UTC).isoformat(),
     )
 
-    log.info(
+    log.notice(
         "DAG parked",
         dag_id=dag.dag_id,
         ticket_id=ticket.ticket_id,
@@ -125,6 +128,7 @@ async def park_dag_state(
 # ============================================================================
 
 
+@trace_io()
 async def register_wait_listener(
     parking_ticket: ParkingTicket,
     node_result: ActionResult,
@@ -155,7 +159,7 @@ async def register_wait_listener(
         registered_utc=datetime.now(UTC).isoformat(),
     )
 
-    log.info(
+    log.debug(
         "Wait listener registered",
         handle_id=handle.handle_id,
         ticket_id=parking_ticket.ticket_id,
@@ -170,6 +174,7 @@ async def register_wait_listener(
 # ============================================================================
 
 
+@trace_io()
 async def switch_context(dag_queue: DAGQueue) -> str | None:
     """Load the next highest-priority DAG from the queue.
 
@@ -183,14 +188,14 @@ async def switch_context(dag_queue: DAGQueue) -> str | None:
     ]
 
     if not active_entries:
-        log.info("No actionable DAGs in queue, signaling for sleep")
+        log.debug("No actionable DAGs in queue, signaling for sleep")
         return None
 
     # Sort by priority (lower = higher priority)
     active_entries.sort(key=lambda e: e.priority)
     selected = active_entries[0]
 
-    log.info(
+    log.notice(
         "Context switch",
         target_dag=selected.dag_id,
         priority=selected.priority,
@@ -205,6 +210,7 @@ async def switch_context(dag_queue: DAGQueue) -> str | None:
 # ============================================================================
 
 
+@trace_io()
 async def request_deep_sleep(
     parked_tickets: list[ParkingTicket],
 ) -> SleepToken:
@@ -224,7 +230,7 @@ async def request_deep_sleep(
         entered_sleep_utc=datetime.now(UTC).isoformat(),
     )
 
-    log.info(
+    log.notice(
         "Deep sleep requested",
         token_id=token.token_id,
         parked_dags=len(parked_tickets),
@@ -239,6 +245,7 @@ async def request_deep_sleep(
 # ============================================================================
 
 
+@trace_io()
 async def manage_async_tasks(
     node_result: ActionResult,
     dag: ExecutableDAG,
@@ -323,7 +330,7 @@ async def manage_async_tasks(
             },
         )
 
-        log.info(
+        log.notice(
             "Async task management complete",
             action=next_action.kind.value,
             async_required=needs_async,

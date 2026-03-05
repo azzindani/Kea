@@ -34,6 +34,12 @@ This document is an automatically generated index of all available 'Pure Context
 - [Trades (4)](#trades)
 - [Web_Research (13)](#web_research)
 - [Kea (1)](#kea)
+- [Strategy (1)](#strategy)
+- [Compliance (1)](#compliance)
+- [Heuristics (1)](#heuristics)
+- [Mental Models (1)](#models)
+- [Cultural Values (1)](#values)
+- [Interaction Protocols (1)](#protocols)
 - [Silicon Corporate Infrastructure](#infrastructure)
 
 ---
@@ -367,10 +373,64 @@ This document is an automatically generated index of all available 'Pure Context
 | **[UX Researcher](skills/web_research/ux_researcher.md)** | Expertise in user interviews, usability testing, and persona creation. | `ux, user-research, design, testing` |
 
 ---
+## Strategy <a name='strategy'></a>
+| Strategy Name | Description | Tags |
+|---|---|---|
+| **[Frictionless Scalability](strategy/frictionless_scalability.md)** | Long-term strategy for removing operational drag and ensuring linear enterprise growth. | `strategy, scalability, ops` |
+
+---
+## Compliance <a name='compliance'></a>
+| Policy Name | Description | Tags |
+|---|---|---|
+| **[Institutional Accountability](compliance/institutional_accountability.md)** | Governance rules for long-term ownership and the 'Disagree and Commit' protocol. | `governance, accountability, ethics` |
+| **[Financial Governance (GAAP/SOX)](rules/corporate/financial_governance.md)** | Standards for transparent financial reporting and executive accountability. | `compliance, finance, gaap, sox` |
+
+---
 ## Kea <a name='kea'></a>
 | Skill Name | Description | Tags |
 |---|---|---|
 | **[Kea Cognitive Architecture](skills/kea/cognitive_architecture.md)** | Core architectural principles of the Kea Kernel, including the Tiered Hierarchy, Conscious Observer (Tier 7), and the Cognitive Cycle (OODA). | `kea, architecture, ooda, tier-7` |
+
+---
+## Heuristics <a name='heuristics'></a>
+| Heuristic Name | Description | Tags |
+|---|---|---|
+| **[High-Performance Debugging](heuristics/high_performance_debugging.md)** | Experience-based senior heuristics for rapid bug localization in distributed systems. | `debugging, heuristic, senior` |
+| **[Software Design Quality](heuristics/software_design_quality.md)** | Senior rules of thumb for KISS, YAGNI, and Encapsulation. | `engineering, design, architecture` |
+| **[Medical Triage (ABC Matrix)](heuristics/medical_triage_abcs.md)** | A clinical heuristic for prioritizing interventions under extreme time constraint. | `heuristics, medicine, triage` |
+| **[Pareto Priority (80/20)](heuristics/pareto_efficiency.md)** | Business heuristic for focusing on the 20% of inputs that drive 80% of value. | `business, efficiency, strategy` |
+
+---
+## Mental Models <a name='models'></a>
+| Model Name | Description | Tags |
+|---|---|---|
+| **[First Principles Thinking](models/first_principles_thinking.md)** | Universal framework for solving complex problems by deconstructing them to their fundamental truths. | `framework, logic, innovation` |
+| **[Occam's Razor](models/occams_razor.md)** | Problem-solving principle prioritizing the simplest explanation or design choice. | `logic, simplicity, debugging` |
+| **[Nash Equilibrium](models/nash_equilibrium.md)** | Game theory mental model optimizing for non-cooperative games and conflict resolution. | `mental-model, game-theory, economics` |
+| **[Hanlon's Razor](models/hanlons_razor.md)** | Psychological model assuming neglect over malice in social/system failures. | `psychology, social, debugging` |
+
+---
+## Cultural Values <a name='values'></a>
+| Value Name | Description | Tags |
+|---|---|---|
+| **[Kea Engineering Values](values/kea_engineering_values.md)** | The core ethical and priority framework for Kea development and operational decisions. | `ethics, priority, engineering` |
+
+---
+## Interaction Protocols <a name='protocols'></a>
+| Protocol Name | Description | Tags |
+|---|---|---|
+| **[Executive Interaction Protocol](protocols/executive_interaction.md)** | Standards for reporting, alerting, and interacting with high-level human stakeholders. | `communication, governance, protocol` |
+| **[Civility & De-escalation](protocols/civility_and_deescalation.md)** | Standards for managing conflict and high-tension human exchanges. | `communication, ethics, mediation` |
+| **[The Minto Pyramid](protocols/minto_pyramid_protocol.md)** | High-density communication protocol for top-down delivery of complex ideas. | `communication, consulting, logic` |
+| **[Behavioral Change Stairway](protocols/behavioral_change_stairway.md)** | Crisis negotiation protocol for de-escalating volatile situations. | `psychology, negotiation, crisis` |
+
+---
+## Technical References <a name='references'></a>
+| Reference Name | Description | Tags |
+|---|---|---|
+| **[Clean Architecture Standard](reference/clean_architecture_standard.md)** | Blueprint for separating business logic from frameworks and databases. | `architecture, standards, engineering` |
+| **[McKinsey Problem Solving](reference/mckinsey_problem_solving.md)** | Inductive logic framework for deconstructing and solving business challenges. | `business, logic, strategy` |
+| **[Robert's Rules of Order](reference/roberts_rules_of_order.md)** | Standardized reference manual for parliamentary procedure and orderly group meetings. | `governance, meetings, parliamentary` |
 
 ---
 ## Silicon Corporate Infrastructure <a name='infrastructure'></a>
@@ -379,6 +439,7 @@ This document is an automatically generated index of all available 'Pure Context
 | Persona Name | Description | Tags |
 |---|---|---|
 | **[CEO](personas/hierarchy/ceo.md)** | Ultimate visionary and goal-setter. Focused on mission alignment and value creation. | `hierarchy, executive, ceo` |
+| **[The Pragmatic CEO](personas/hierarchy/pragmatic_ceo.md)** | Decisive strategic leader focused on economic efficiency and scalability. | `hierarchy, leadership, strategy` |
 | **[Principal Solutions Architect](personas/hierarchy/principal.md)** | System designer focused on multi-step orchestration and DAG integrity. | `hierarchy, architecture, principal` |
 | **[Senior Research Analyst](personas/hierarchy/senior.md)** | Independent optimizer focused on pattern recognition and triangulation. | `hierarchy, optimization, senior` |
 | **[Junior Research Associate](personas/hierarchy/intern.md)** | High-execution persona focused on reliable data collection and primary research. | `hierarchy, execution, intern` |
@@ -391,11 +452,16 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Compliance & Governance Officer](personas/functional/compliance_officer.md)** | Enforcer of ethical boundaries and Swarm Governance Policy. | `compliance, legal, ethics` |
 | **[Product & Mission Manager](personas/functional/product_manager.md)** | Advocate for the human user and actionable strategic output. | `product, alignment, user` |
 | **[Chief Intelligence Officer (CIO)](personas/functional/cio.md)** | Librarian of the swarm; optimizes RAG and knowledge flow. | `knowledge, rag, cio` |
+| **[Adversarial Red-Teamer](personas/functional/red_teamer.md)** | Skeptical auditor focused on finding vulnerabilities and flaws. | `security, audit, adversarial` |
+| **[Chief Legal Officer (CLO)](personas/functional/chief_legal_officer.md)** | Enterprise risk mitigation, contract enforcement, and strict regulatory adherence. | `legal, compliance, law` |
 
 ### ⚖️ Governance Rules
 | Rule Name | Description | Tags |
 |---|---|---|
 | **[Corporate Mission](rules/corporate/mission_statement.md)** | The philosophical anchor and core values of the Silicon Swarm. | `mission, vision, values` |
+| **[Financial Governance](rules/corporate/financial_governance.md)** | Hard rules for GAAP/SOX compliance and fiscal transparency. | `finance, compliance, rules` |
+| **[HIPAA Privacy & Security Rule](rules/corporate/hipaa_privacy_rule.md)** | Governance standards for the protection of sensitive patient health information (PHI). | `compliance, medical, hipaa` |
+| **[NIST AI Risk Framework](rules/corporate/nist_ai_risk_framework.md)** | Governance rails for identifying and managing AI-specific risks. | `nist, compliant, ai-safety` |
 | **[Swarm Governance Policy](rules/corporate/governance_policy.md)** | Hard boundaries for evidence-based reasoning and tool safety. | `compliance, governance, swarm` |
 | **[Enterprise Risk Management](rules/corporate/risk_management.md)** | Framework for handling operational and reputational risks. | `risk, mitigation, safety` |
 | **[Ethics & Safety Guidelines](rules/general/ethics_and_safety.md)** | Global constraints on privacy, bias, and harm prevention. | `ethics, safety, privacy` |
@@ -403,6 +469,9 @@ This document is an automatically generated index of all available 'Pure Context
 ### 📋 Operating Procedures (SOPs)
 | Procedure Name | Description | Tags |
 |---|---|---|
+| **[Critical Incident Response](procedures/general/critical_incident_response.md)** | SOP for handling high-severity technical outages or breaches. | `sop, incident, recovery` |
+| **[Strategic Resource Allocation](procedures/general/resource_allocation.md)** | SOP for managing tier-sensitive compute and agentic resources. | `operations, efficiency, planning` |
+| **[Supply Chain Vendor Audit](procedures/general/supply_chain_audit.md)** | SOP for evaluating suppliers on ESG standards and operational resilience. | `logistics, supply-chain, audit` |
 | **[Strategic Planning](procedures/general/strategic_planning.md)** | Framework for translating objectives into executable DAGs. | `strategy, planning, dag` |
 | **[Swarm Communication](procedures/general/communication_protocol.md)** | Standards for inter-agent handoffs and status reporting. | `communication, handoff, soap` |
 | **[Agent Onboarding](procedures/general/agent_onboarding.md)** | The initialization sequence for new agent instances. | `onboarding, initialization, boot` |

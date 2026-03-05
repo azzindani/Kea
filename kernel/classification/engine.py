@@ -21,6 +21,7 @@ from shared.config import get_settings
 from shared.inference_kit import InferenceKit
 from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.normalization import min_max_scale, softmax_transform
 from shared.standard_io import (
     Metrics,
@@ -57,6 +58,7 @@ def _ref(fn: str) -> ModuleRef:
 # ============================================================================
 
 
+@trace_io()
 def run_linguistic_analysis(
     text: str,
     profile_rules: ClassProfileRules,
@@ -128,6 +130,7 @@ _IMPERATIVE_VERBS = frozenset({
 _ANCHOR_CACHE: dict[str, list[float]] = {}
 
 
+@trace_io()
 async def run_semantic_proximity(
     text: str,
     profile_rules: ClassProfileRules,
@@ -213,6 +216,7 @@ def _cosine_similarity(vec_a: list[float], vec_b: list[float]) -> float:
 # ============================================================================
 
 
+@trace_io()
 def merge_classification_layers(
     linguistic: LinguisticResult,
     semantic: SemanticResult,
@@ -293,6 +297,7 @@ def merge_classification_layers(
 # ============================================================================
 
 
+@trace_io()
 async def classify(
     text: str,
     profile_rules: ClassProfileRules,
@@ -337,7 +342,7 @@ async def classify(
             tags={"domain": "classification"},
         )
 
-        log.info(
+        log.debug(
             "Classification complete",
             top_label=result.top_label if isinstance(result, ClassificationResult) else "FALLBACK",
             confidence=result.confidence if isinstance(result, ClassificationResult) else 0.0,

@@ -65,8 +65,14 @@ async def screenshot_extract(
     """EXTRACTS screenshot text. [ACTION]
     
     [RAG Context]
-    Extract text, tables, and structured data from a screenshot or image.
-    Returns extracted content ("text"|"table"|"structured"|"all").
+    A multimodal "Super Tool" that uses Vision LLMs to perform Optical Character Recognition (OCR) and document understanding on images. It can transcribe text, rebuild tables, and identify UI elements.
+    
+    How to Use:
+    - Provide 'image_url' (link) or 'image_base64' (raw data).
+    - 'extraction_type': Choose 'text', 'table', 'structured' (for key-value pairs), or 'all'.
+    - Excellent for digitizing receipts, Dashboards, and non-selectable text from Web3 apps.
+    
+    Keywords: visual ocr, image scribe, document digitizer, screenshot reader.
     """
     return await run_op(ocr.screenshot_extract, image_url=image_url, image_base64=image_base64, extraction_type=extraction_type)
 
@@ -79,8 +85,13 @@ async def chart_reader(
     """READS charts. [ACTION]
     
     [RAG Context]
-    Interpret charts and graphs, extract data points and trends.
-    Returns analysis report.
+    A specialized Vision "Super Tool" for data quantification from static images. It interprets Bar charts, Line graphs, Pie charts, and Candlestick plots.
+    
+    How to Use:
+    - Analyzes the image to extract raw data points (x, y coordinates) and identifies the underlying trend.
+    - 'chart_type': Optional hint (e.g., 'scatter', 'candlestick') to improve accuracy.
+    
+    Keywords: chart interpretation, visual data extraction, graph digitizer, trend analysis.
     """
     return await run_op(ocr.chart_reader, image_url=image_url, image_base64=image_base64, chart_type=chart_type)
 

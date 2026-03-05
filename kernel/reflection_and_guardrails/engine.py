@@ -27,6 +27,7 @@ from shared.id_and_hash import generate_id
 from shared.inference_kit import InferenceKit
 from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -65,6 +66,7 @@ def _ref(fn: str) -> ModuleRef:
 # ============================================================================
 
 
+@trace_io()
 async def evaluate_consensus(
     dag_candidates: list[ExecutableDAG],
     kit: InferenceKit | None = None,
@@ -113,7 +115,7 @@ async def evaluate_consensus(
                     best_score = candidate_score
                     best_dag = dag
 
-    log.info(
+    log.notice(
         "Consensus evaluation complete",
         candidates_evaluated=len(candidates),
         selected_dag=best_dag.dag_id,
@@ -128,6 +130,7 @@ async def evaluate_consensus(
 # ============================================================================
 
 
+@trace_io()
 async def check_value_guardrails(dag: ExecutableDAG, kit: InferenceKit | None = None) -> GuardrailResult:
     """The final ethical/security/corporate gate before execution.
 
@@ -199,7 +202,7 @@ async def check_value_guardrails(dag: ExecutableDAG, kit: InferenceKit | None = 
         policies_checked=len(forbidden_actions) * len(dag.nodes),
     )
 
-    log.info(
+    log.notice(
         "Guardrail check complete",
         dag_id=dag.dag_id,
         passed=passed,
@@ -215,6 +218,7 @@ async def check_value_guardrails(dag: ExecutableDAG, kit: InferenceKit | None = 
 # ============================================================================
 
 
+@trace_io()
 async def run_pre_execution_check(dag: ExecutableDAG, kit: InferenceKit | None = None) -> Result:
     """Top-level pre-execution orchestrator (The Conscience).
 
@@ -279,7 +283,7 @@ async def run_pre_execution_check(dag: ExecutableDAG, kit: InferenceKit | None =
             },
         )
 
-        log.info(
+        log.notice(
             "Pre-execution check complete",
             decision=decision.value,
             violations=len(guardrail_result.violations),
@@ -305,6 +309,7 @@ async def run_pre_execution_check(dag: ExecutableDAG, kit: InferenceKit | None =
 # ============================================================================
 
 
+@trace_io()
 def critique_execution(
     result: ExecutionResult,
     expected: list[ExpectedOutcome],
@@ -372,7 +377,7 @@ def critique_execution(
         strengths=strengths,
     )
 
-    log.info(
+    log.notice(
         "Execution critique complete",
         dag_id=result.dag_id,
         success_rate=round(success_rate, 3),
@@ -388,6 +393,7 @@ def critique_execution(
 # ============================================================================
 
 
+@trace_io()
 def optimize_loop(critique: CritiqueReport) -> list[OptimizationSuggestion]:
     """Generate actionable optimization suggestions from critique.
 
@@ -435,7 +441,7 @@ def optimize_loop(critique: CritiqueReport) -> list[OptimizationSuggestion]:
             estimated_improvement=0.3,
         ))
 
-    log.info("Optimization suggestions generated", count=len(suggestions))
+    log.debug("Optimization suggestions generated", count=len(suggestions))
     return suggestions
 
 
@@ -444,6 +450,7 @@ def optimize_loop(critique: CritiqueReport) -> list[OptimizationSuggestion]:
 # ============================================================================
 
 
+@trace_io()
 async def commit_policy_update(
     suggestions: list[OptimizationSuggestion],
     critique: CritiqueReport,
@@ -466,7 +473,7 @@ async def commit_policy_update(
         committed_to_vault=False,  # Vault integration is via service API
     )
 
-    log.info(
+    log.debug(
         "Reflection insight packaged",
         insight_id=insight.insight_id,
         dag_id=critique.dag_id,
@@ -481,6 +488,7 @@ async def commit_policy_update(
 # ============================================================================
 
 
+@trace_io()
 async def run_post_execution_reflection(
     result: ExecutionResult,
     expected: list[ExpectedOutcome],
@@ -519,7 +527,7 @@ async def run_post_execution_reflection(
             },
         )
 
-        log.info(
+        log.notice(
             "Post-execution reflection complete",
             dag_id=result.dag_id,
             success_rate=round(critique.success_rate, 3),

@@ -115,6 +115,27 @@ services:
     depends_on:
       - postgres
 
+  ml-inference:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ml-inference
+    ports:
+      - "8007:8007"
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - ML_INFERENCE__ROLE=both
+      - ML_INFERENCE__DEVICE=auto
+      - ML_INFERENCE__ENABLE_VL_MODELS=false
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
   # =========================================================================
   # Background Workers
   # =========================================================================

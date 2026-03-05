@@ -41,9 +41,13 @@ async def get_fama_french_data(dataset_name: str, start_date: str = None, end_da
     """FETCHES Fama-French data. [ACTION]
     
     [RAG Context]
-    ACADEMIC: Get Fama-French Data by Code.
-    Common Codes: 'F-F_Research_Data_Factors', 'F-F_Momentum_Factor', '5_Industry_Portfolios'.
-    Returns JSON string.
+    A premier "Super Tool" for academic finance research. It provides access to the Fama-French library of asset pricing factors, industry portfolios, and risk premiums.
+    
+    How to Use:
+    - 'dataset_name': Common codes include 'F-F_Research_Data_Factors' (3-factor model), 'F-F_Momentum_Factor', and '10_Industry_Portfolios'.
+    - Essential for calculating Alpha and Beta in modern portfolio theory and risk-adjusted returns analysis.
+    
+    Keywords: asset pricing, risk factors, academic research, fama french library, cost of capital.
     """
     return await famafrench.get_fama_french_data(dataset_name, start_date, end_date)
 
@@ -54,8 +58,13 @@ async def get_stooq_data(symbols: list[str], start_date: str = None) -> str:
     """FETCHES Stooq data. [ACTION]
     
     [RAG Context]
-    MARKET: Stooq Data (Indices, Bonds, Commodities).
-    Returns JSON string.
+    A specialized "Super Tool" for fetching global multi-asset historical data from Stooq. This includes indices, bonds, commodities, and international equities.
+    
+    How to Use:
+    - Symbols: '^SPX' (S&P 500), 'GC.F' (Gold), '^NIK' (Nikkei 225).
+    - Excellent for macroeconomic analysis and cross-market correlation studies.
+    
+    Keywords: global indices, bond yields, commodity prices, international markets, macro data.
     """
     return await market_global.get_stooq_data(symbols, start_date)
 
@@ -128,8 +137,13 @@ async def get_nasdaq_symbol_list(query: str = None) -> str:
     """SEARCHES Nasdaq symbols. [ACTION]
     
     [RAG Context]
-    DISCOVERY: Search Nasdaq/NYSE Symbols.
-    Returns JSON string.
+    A utility "Super Tool" for market discovery. It retrieves a comprehensive list of all securities traded on various US exchanges (Nasdaq, NYSE, AMEX).
+    
+    How to Use:
+    - If 'query' is provided, it filters the large result set for specific ticker patterns or names.
+    - Critical for dynamic tool selection where you know the company name but not the exact ticker.
+    
+    Keywords: ticker lookup, exchange symbols, security discovery, amex nyse nasdaq.
     """
     return await market_symbols.get_nasdaq_symbol_list(query)
 

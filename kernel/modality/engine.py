@@ -15,6 +15,7 @@ import time
 from shared.config import get_settings
 from shared.inference_kit import InferenceKit
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -49,6 +50,7 @@ def _ref(fn: str) -> ModuleRef:
 # ============================================================================
 
 
+@trace_io()
 def detect_modality(input_data: RawInput) -> ModalityType:
     """Identify input type based on MIME type, extension, and content sniffing."""
     settings = get_settings().kernel
@@ -111,6 +113,7 @@ def create_file_handle(file_path: str, modality: ModalityType) -> FileHandle:
 # ============================================================================
 
 
+@trace_io()
 async def decompose_document(doc_path: str) -> DocumentParts:
     """Structural decomposition for complex documents.
 
@@ -149,6 +152,7 @@ async def decompose_document(doc_path: str) -> DocumentParts:
 # ============================================================================
 
 
+@trace_io()
 async def decompose_video(video_path: str) -> VideoParts:
     """Split video into keyframes and audio using FFMPEG.
 
@@ -173,12 +177,13 @@ async def decompose_video(video_path: str) -> VideoParts:
 # ============================================================================
 
 
+@trace_io()
 async def transcribe_audio(audio_path: str) -> str:
     """Speech-to-text translation.
 
     Delegates to configured STT model. Returns raw transcript.
     """
-    log.info("Audio transcription requested", path=audio_path)
+    log.debug("Audio transcription requested", path=audio_path)
     return f"[Audio transcription pending for: {audio_path}]"
 
 
@@ -187,12 +192,13 @@ async def transcribe_audio(audio_path: str) -> str:
 # ============================================================================
 
 
+@trace_io()
 async def parse_vision(image_path: str) -> str:
     """OCR and visual understanding.
 
     Delegates to configured vision model. Returns text representation.
     """
-    log.info("Vision parsing requested", path=image_path)
+    log.debug("Vision parsing requested", path=image_path)
     return f"[Vision parsing pending for: {image_path}]"
 
 
@@ -201,6 +207,7 @@ async def parse_vision(image_path: str) -> str:
 # ============================================================================
 
 
+@trace_io()
 async def embed_text(text: str, kit: InferenceKit | None = None) -> list[float]:
     """Generate dense vector embedding from text.
 
@@ -224,6 +231,7 @@ async def embed_text(text: str, kit: InferenceKit | None = None) -> list[float]:
 # ============================================================================
 
 
+@trace_io()
 async def ingest(input_data: RawInput, kit: InferenceKit | None = None) -> Result:
     """Top-level modality ingestion orchestrator.
 
@@ -291,7 +299,7 @@ async def ingest(input_data: RawInput, kit: InferenceKit | None = None) -> Resul
             tags={"modality": modality.value},
         )
 
-        log.info(
+        log.notice(
             "Modality ingestion complete",
             modality=modality.value,
             has_text=cognitive_context is not None,

@@ -38,8 +38,14 @@ async def pdf_parser(url: str, pages: str = "all", extract_tables: bool = False)
     """EXTRACTS text/tables from PDF. [DATA]
     
     [RAG Context]
-    Args:
-        pages: 'all', '1-5', '1,3,5'
+    A robust "Super Tool" for digitizing Portable Document Format (PDF) files. It handles complex layouts and can optionally reconstruct data tables from PDF grids.
+    
+    How to Use:
+    - 'url': Local file path or a remote URL to the PDF.
+    - 'pages': String defining ranges, e.g., 'all', '1-5', '10,12,15'.
+    - 'extract_tables': If True, it uses specialized logic to preserve table structures in the output.
+    
+    Keywords: pdf to text, document extraction, digital archive, table recovery.
     """
     return await pdf.parse_pdf(url, pages, extract_tables)
 
@@ -48,7 +54,13 @@ async def docx_parser(url: str) -> str:
     """EXTRACTS text from Word docs. [DATA]
     
     [RAG Context]
-    Preserves structure where possible.
+    A specialized "Super Tool" for parsing Microsoft Word (.docx) files. It extracts text while attempting to preserve structural elements like headings and lists.
+    
+    How to Use:
+    - Simply provide the 'url' (local path or remote) to the .docx file.
+    - Ideal for ingesting internal reports, legal documents, or project briefs.
+    
+    Keywords: word doc parser, office document, text extraction, docx reader.
     """
     return await word.parse_docx(url)
 
@@ -57,7 +69,13 @@ async def xlsx_parser(url: str, sheet_name: str = None, preview_rows: int = 10) 
     """EXTRACTS data from Excel sheets. [DATA]
     
     [RAG Context]
-    Returns CSV or JSON representation.
+    A high-performance "Super Tool" for reading Microsoft Excel (.xlsx) workbooks. It converts tabular data into computer-readable formats like CSV or structured JSON.
+    
+    How to Use:
+    - 'sheet_name': Specify the tab name; defaults to the first sheet if None.
+    - 'preview_rows': Limit output to the first N rows for quick inspections.
+    
+    Keywords: excel to csv, workbook parser, spreadsheet data, xlsx extraction.
     """
     return await excel.parse_excel(url, sheet_name, preview_rows)
 
@@ -77,6 +95,13 @@ async def json_parser(url: str, flatten: bool = False, path: str = None) -> str:
     """PARSES and FLATTENS JSON data. [DATA]
     
     [RAG Context]
+    A technical "Super Tool" for decomposing complex hierarchical JSON structures. Essential for processing API responses or config files.
+    
+    How to Use:
+    - 'flatten': If True, nested objects are normalized into a flat dot-notation dictionary.
+    - 'path': Optional JMESPath-style string to extract a specific sub-tree.
+    
+    Keywords: json normalizer, flat schema, data decomposition, api parser.
     """
     return await json_tool.parse_json(url, flatten, path)
 

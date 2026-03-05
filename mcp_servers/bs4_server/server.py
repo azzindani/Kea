@@ -39,7 +39,13 @@ async def parse_html(html: str) -> str:
     """PARSES HTML string. [ACTION]
     
     [RAG Context]
-    Returns soup_id.
+    Initializes a Beautiful Soup object from a raw HTML string. It uses 'lxml' as the default parser for speed and efficiency.
+    
+    How to Use:
+    - Returns a 'soup_id' which is a unique handle used to reference this specific document in subsequent tool calls (Navigation, Search, Extraction).
+    - Session-based: The document stays in memory until 'close_soup' is called.
+    
+    Keywords: parse dom, soup init, html load, memory session.
     """
     return await core_ops.parse_html(html)
 
@@ -128,6 +134,14 @@ async def select_one(selector: str, soup_id: Optional[str] = None) -> str:
     """FINDS first match (CSS). [DATA]
     
     [RAG Context]
+    Uses standard CSS selectors to find the first matching element in the DOM tree. Extremely efficient for pinpointing specific UI components.
+    
+    How to Use:
+    - 'selector': A CSS string like 'div.content p' or '#main-title'.
+    - Returns the raw HTML string of the matched element.
+    - If 'soup_id' is omitted, it uses the last parsed document.
+    
+    Keywords: css selector, find element, dom query, single match.
     """
     return await search_ops.select_one(selector, soup_id)
 
@@ -136,6 +150,14 @@ async def select_all(selector: str, limit: int = 0, soup_id: Optional[str] = Non
     """FINDS all matches (CSS). [DATA]
     
     [RAG Context]
+    Queries the entire document for all elements matching the provided CSS selector. 
+    
+    How to Use:
+    - Returns a list of strings, each being the raw HTML of a match.
+    - 'limit': Optional integer to stop after N matches (useful for large pages).
+    - Perfect for scraping lists of items (e.g., 'li.product-item').
+    
+    Keywords: batch selection, query all, list scraping, repeated elements.
     """
     return await search_ops.select_all(selector, limit, soup_id)
 
@@ -337,6 +359,13 @@ async def bulk_extract(selector_map: Dict[str, str], scope: Optional[str] = None
     """EXTRACTS multiple fields (CSS). [DATA]
     
     [RAG Context]
+    A high-speed "Super Tool" for data mining. It extracts multiple fields simultaneously into a Python dictionary.
+    
+    How to Use:
+    - 'selector_map': Key as the field name, value as the CSS selector (e.g. {'name': 'h1', 'price': '.price-val'}).
+    - 'scope': Optional CSS selector to limit the search area within the page.
+    
+    Keywords: batch scrape, structured mining, fast extraction, multi-selector.
     """
     return await super_ops.bulk_extract_css(selector_map, scope, soup_id)
 
@@ -373,6 +402,13 @@ async def to_markdown(selector: str = "body", soup_id: Optional[str] = None) -> 
     """CONVERTS to Markdown. [DATA]
     
     [RAG Context]
+    Transforms the specified HTML element into clean, readable Markdown format. It preserves headings, lists, bold/italic styles, and links while stripping away unnecessary styling.
+    
+    How to Use:
+    - Excellent for preparing web content for ingestion into LLMs or RAG systems.
+    - 'selector': A CSS selector to specify which part of the document to convert.
+    
+    Keywords: html to markdown, content ingestion, clean text, llm friendly format.
     """
     return await convert_ops.html_to_markdown(selector, soup_id)
 
@@ -469,6 +505,13 @@ async def get_jsonld(soup_id: Optional[str] = None) -> List[Dict[str, Any]]:
     """EXTRACTS structured data (JSON-LD). [DATA]
     
     [RAG Context]
+    An intelligent "Super Tool" that retrieves SEO-friendly 'application/ld+json' metadata embedded in the page.
+    
+    How to Use:
+    - Automatically parses and returns Schema.org entities (Product, Review, Organization).
+    - Best for clean data extraction from modern websites with low scraping effort.
+    
+    Keywords: schema.org, structured data, ld+json, richer snippets.
     """
     return await semantic_ops.extract_jsonld(soup_id)
 
@@ -559,6 +602,13 @@ async def table_to_csv(selector: str = "table", soup_id: Optional[str] = None) -
     """CONVERTS table to CSV. [DATA]
     
     [RAG Context]
+    A data-extraction "Super Tool" that transforms tabular HTML elements into raw CSV data. It correctly handles nested tags, rowspans, and colspans, ensuring that the visual structure of the table is preserved in the structured output.
+    
+    How to Use:
+    - 'selector': A CSS selector targeting the desired table (e.g., "table.financial-results").
+    - Ideal for migrating data from legacy websites into Excel or Pandas for further analysis.
+    
+    Keywords: table scraper, html to csv, data migration, structural export.
     """
     return await export_ops.table_to_csv(selector, soup_id)
 
@@ -567,6 +617,12 @@ async def list_to_csv(selector: str = "ul", soup_id: Optional[str] = None) -> st
     """CONVERTS list to CSV. [DATA]
     
     [RAG Context]
+    A utility "Super Tool" for flattening hierarchical lists (UL/OL) into a single-column CSV. It recursively traverses list items to ensure all text content is captured.
+    
+    How to Use:
+    - Use this to extract bullet-point features, product specifications, or directory listings from web pages.
+    
+    Keywords: list extractor, bullet point to csv, flat file generation.
     """
     return await export_ops.list_to_csv(selector, soup_id)
 
@@ -575,6 +631,13 @@ async def to_jsonl(selector: str, mode: str = "text", soup_id: Optional[str] = N
     """CONVERTS content to JSONL. [DATA]
     
     [RAG Context]
+    A dataset-generation "Super Tool" that creates JSON Lines (JSONL) output from multiple HTML elements. This format is the industry standard for training Large Language Models (LLMs) and fine-tuning datasets.
+    
+    How to Use:
+    - 'mode': 'text' (only characters) or 'html' (including tags).
+    - Perfect for batch-processing thousands of web pages into a clean, machine-readable format for RAG ingestion or model training.
+    
+    Keywords: json lines, dataset builder, llm training data, structured scraping.
     """
     return await export_ops.to_jsonl(selector, mode, soup_id)
 

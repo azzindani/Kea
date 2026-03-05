@@ -225,7 +225,7 @@ async def root():
 async def health_check():
     """Basic health check (fast)."""
     return {
-        "status": "healthy",
+        "status": "ok",
         "service": "api_gateway",
     }
 
@@ -244,15 +244,26 @@ async def full_health_check():
     
     status_code = 200 if health.status == "healthy" else 503
     
+    data = health.to_dict()
+    # Unify status field for bootstrap
+    data["status"] = "ok" if health.status == "healthy" else "degraded"
+    
     return JSONResponse(
         status_code=status_code,
-        content=health.to_dict(),
+        content=data,
     )
 
 
 # ============================================================================
 # Main
 # ============================================================================
+
+# Force Proactor loop for Windows subprocess support
+import sys
+import asyncio
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
 
 def main():
     """Run the API gateway."""

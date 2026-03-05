@@ -22,6 +22,7 @@ from kernel.graph_synthesizer.types import ActionInstruction, ExecutableNode, No
 from shared.inference_kit import InferenceKit
 from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger, log_node_assembly
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -53,6 +54,7 @@ def _ref(fn: str) -> ModuleRef:
 # ============================================================================
 
 
+@trace_io()
 def wrap_in_standard_io(action_callable: NodeCallable) -> NodeCallable:
     """Wrap a raw callable in try/except that produces structured errors.
 
@@ -88,6 +90,7 @@ def wrap_in_standard_io(action_callable: NodeCallable) -> NodeCallable:
 # ============================================================================
 
 
+@trace_io()
 def inject_telemetry(
     wrapped_callable: NodeCallable,
     trace_id: str,
@@ -107,14 +110,14 @@ def inject_telemetry(
             dag_id=dag_id,
             node_id=node_id,
         )
-        bound_log.info("Node execution started")
+        bound_log.debug("Node execution started")
         start = time.perf_counter()
 
         result = await wrapped_callable(state)
 
         elapsed_ms = (time.perf_counter() - start) * 1000
         success = result.get("__node_success__", True)
-        bound_log.info(
+        bound_log.debug(
             "Node execution completed",
             duration_ms=round(elapsed_ms, 2),
             success=success,
@@ -132,6 +135,7 @@ def inject_telemetry(
 # ============================================================================
 
 
+@trace_io()
 def hook_input_validation(
     callable_fn: NodeCallable,
     input_schema: type[BaseModel],
@@ -170,6 +174,7 @@ def hook_input_validation(
 # ============================================================================
 
 
+@trace_io()
 def hook_output_validation(
     callable_fn: NodeCallable,
     output_schema: type[BaseModel],
@@ -213,6 +218,7 @@ def hook_output_validation(
 # ============================================================================
 
 
+@trace_io()
 async def assemble_node(
     instruction: ActionInstruction,
     input_schema: type[BaseModel] | None = None,
@@ -331,7 +337,7 @@ async def assemble_node(
             tags={"layers": ",".join(layers_applied)},
         )
 
-        log.info(
+        log.debug(
             "Node assembled",
             node_id=node_id,
             layers=layers_applied,

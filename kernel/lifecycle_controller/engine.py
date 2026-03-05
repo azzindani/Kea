@@ -21,6 +21,7 @@ from kernel.short_term_memory.types import EpochSummary
 from shared.config import get_settings
 from shared.id_and_hash import generate_id
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -64,6 +65,7 @@ def _now_utc() -> str:
 # ============================================================================
 
 
+@trace_io()
 async def initialize_agent(spawn_request: SpawnRequest) -> AgentIdentity:
     """Create a new agent instance.
 
@@ -79,7 +81,7 @@ async def initialize_agent(spawn_request: SpawnRequest) -> AgentIdentity:
         created_utc=_now_utc(),
     )
 
-    log.info(
+    log.notice(
         "Agent initialized",
         agent_id=agent_id,
         role=spawn_request.role,
@@ -94,6 +96,7 @@ async def initialize_agent(spawn_request: SpawnRequest) -> AgentIdentity:
 # ============================================================================
 
 
+@trace_io()
 async def load_cognitive_profile(profile_id: str) -> CognitiveProfile:
     """Retrieve the agent's cognitive profile.
 
@@ -114,7 +117,7 @@ async def load_cognitive_profile(profile_id: str) -> CognitiveProfile:
         quality_bar=settings.noise_gate_grounding_threshold,
     )
 
-    log.info(
+    log.debug(
         "Cognitive profile loaded",
         profile_id=profile.profile_id,
         role=profile.role_name,
@@ -128,6 +131,7 @@ async def load_cognitive_profile(profile_id: str) -> CognitiveProfile:
 # ============================================================================
 
 
+@trace_io()
 def set_identity_constraints(
     agent_id: str,
     profile: CognitiveProfile,
@@ -147,7 +151,7 @@ def set_identity_constraints(
         quality_bar=profile.quality_bar,
     )
 
-    log.info(
+    log.debug(
         "Identity constraints set",
         agent_id=agent_id,
         role=profile.role_name,
@@ -163,6 +167,7 @@ def set_identity_constraints(
 # ============================================================================
 
 
+@trace_io()
 def track_macro_objective(
     objective: MacroObjective,
     stm: ShortTermMemory | None = None,
@@ -255,7 +260,7 @@ async def control_sleep_wake(
         transitioned_utc=_now_utc(),
     )
 
-    log.info(
+    log.notice(
         "Lifecycle transition",
         from_phase=current_phase.value,
         to_phase=new_phase.value,
@@ -271,6 +276,7 @@ async def control_sleep_wake(
 # ============================================================================
 
 
+@trace_io()
 async def commit_epoch_memory(
     stm: ShortTermMemory,
 ) -> EpochSummary:
@@ -281,7 +287,7 @@ async def commit_epoch_memory(
     """
     summary = stm.flush_to_summarizer()
 
-    log.info(
+    log.notice(
         "Epoch memory committed",
         epoch_id=summary.epoch_id,
         dags_processed=len(summary.dag_ids_processed),
@@ -296,6 +302,7 @@ async def commit_epoch_memory(
 # ============================================================================
 
 
+@trace_io()
 async def run_lifecycle(spawn_request: SpawnRequest) -> Result:
     """Top-level lifecycle runner.
 
@@ -355,7 +362,7 @@ async def run_lifecycle(spawn_request: SpawnRequest) -> Result:
             },
         )
 
-        log.info(
+        log.notice(
             "Lifecycle initialized",
             agent_id=identity.agent_id,
             role=identity.role,

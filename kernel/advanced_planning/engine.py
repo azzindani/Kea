@@ -20,6 +20,7 @@ from shared.id_and_hash import generate_id
 from shared.inference_kit import InferenceKit
 from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -57,6 +58,7 @@ def _ref(fn: str) -> ModuleRef:
 # ============================================================================
 
 
+@trace_io()
 async def sequence_and_prioritize(
     subtasks: list[SubTaskItem],
     constraints: PlanningConstraints,
@@ -141,7 +143,7 @@ async def sequence_and_prioritize(
     # Sort by priority rank (lower = higher priority)
     sequenced.sort(key=lambda t: t.priority_rank)
 
-    log.info(
+    log.debug(
         "Tasks sequenced",
         total=len(sequenced),
         mode=constraints.priority_mode.value,
@@ -175,6 +177,7 @@ def _estimate_duration(task: SubTaskItem) -> float:
 # ============================================================================
 
 
+@trace_io()
 async def bind_tools(
     sequenced_tasks: list[SequencedTask],
     mcp_registry: MCPToolRegistry,
@@ -205,7 +208,7 @@ async def bind_tools(
         ))
 
     bound_count = sum(1 for t in bound if t.tool_binding is not None)
-    log.info(
+    log.debug(
         "Tools bound",
         total_tasks=len(bound),
         tasks_with_tools=bound_count,
@@ -256,6 +259,7 @@ def _find_best_tool(
 # ============================================================================
 
 
+@trace_io()
 def generate_hypotheses(bound_tasks: list[BoundTask]) -> list[ExpectedOutcome]:
     """Generate expected output hypotheses for each task.
 
@@ -292,7 +296,7 @@ def generate_hypotheses(bound_tasks: list[BoundTask]) -> list[ExpectedOutcome]:
             confidence=round(confidence, 3),
         ))
 
-    log.info("Hypotheses generated", count=len(hypotheses))
+    log.debug("Hypotheses generated", count=len(hypotheses))
     return hypotheses
 
 
@@ -301,6 +305,7 @@ def generate_hypotheses(bound_tasks: list[BoundTask]) -> list[ExpectedOutcome]:
 # ============================================================================
 
 
+@trace_io()
 def inject_progress_tracker(
     tasks: list[BoundTask],
     hypotheses: list[ExpectedOutcome],
@@ -327,7 +332,7 @@ def inject_progress_tracker(
         constraints=constraints,
     )
 
-    log.info(
+    log.debug(
         "Progress tracker injected",
         plan_id=plan.plan_id,
         total_tasks=len(tasks),
@@ -342,6 +347,7 @@ def inject_progress_tracker(
 # ============================================================================
 
 
+@trace_io()
 async def plan_advanced(
     subtasks: list[SubTaskItem],
     constraints: PlanningConstraints | None = None,
@@ -390,7 +396,7 @@ async def plan_advanced(
             },
         )
 
-        log.info(
+        log.notice(
             "Advanced planning complete",
             plan_id=plan.plan_id,
             tasks=len(plan.tasks),

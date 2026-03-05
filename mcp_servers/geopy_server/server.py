@@ -97,8 +97,13 @@ def geocode_address(query: str) -> Dict[str, Any]:
     """GEOCODES address. [ACTION]
     
     [RAG Context]
-    Convert address to coordinates.
-    Returns JSON dict.
+    A powerful "Super Tool" for converting human-readable location descriptions (street addresses, landmarks, city names) into precise geographic coordinates (Latitude and Longitude).
+    
+    How to Use:
+    - Input a string 'query' such as "1600 Pennsylvania Ave NW, Washington, DC" or "Empire State Building".
+    - Returns a dictionary containing 'latitude', 'longitude', and the 'address' as recognized by the geocoding service.
+    
+    Keywords: address to lat lon, geocoder, location lookup, coordinate discovery.
     """
     return geocode_ops.geocode_address(query)
 
@@ -210,8 +215,14 @@ def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
     """CALCULATES distance. [ACTION]
     
     [RAG Context]
-    Calculate great-circle distance (km).
-    Returns float km.
+    A critical "Super Tool" for spatial analysis. It calculates the Great-Circle distance (as the crow flies) between two points on the Earth's surface using the Haversine formula.
+    
+    How to Use:
+    - Provide the Latitude and Longitude for two distinct locations.
+    - Returns the distance in kilometers by default.
+    - Ideal for logistics, travel planning, and proximity checks.
+    
+    Keywords: great circle distance, haversine, proximity calculator, spatial gap.
     """
     return distance_ops.calculate_distance(lat1, lon1, lat2, lon2)
 
@@ -359,8 +370,13 @@ def solve_tsp(locations: List[Tuple[float, float]]) -> Dict[str, Any]:
     """SOLVES TSP. [ACTION]
     
     [RAG Context]
-    Solve Traveling Salesperson Problem (nearest neighbor).
-    Returns dict with route and distance.
+    A specialized "Super Tool" for routing optimization. It addresses the Traveling Salesperson Problem by finding the most efficient sequence to visit a list of coordinates, minimizing the total travel distance.
+    
+    How to Use:
+    - Input a list of (lat, lon) tuples.
+    - Uses a nearest-neighbor heuristic to provide a fast and effective route for delivery or site-visit scenarios.
+    
+    Keywords: route optimization, traveling salesman, multi-stop planning, logistics optimizer.
     """
     return super_ops.solve_tsp(locations)
 
@@ -429,8 +445,14 @@ def geocode_dataframe_csv(input_csv: str, address_col: str, output_csv: str) -> 
     """GEOCODES CSV. [ACTION]
     
     [RAG Context]
-    Geocode address column in CSV file.
-    Returns output path.
+    A high-level "Super Tool" for bulk data enrichment. It reads a CSV file, identifies a column containing addresses, and appends the corresponding geographic coordinates to a new output file.
+    
+    How to Use:
+    - 'input_csv': Path to your source data.
+    - 'address_col': The name of the column where addresses are stored.
+    - 'output_csv': Path where the enriched dataset will be saved.
+    
+    Keywords: batch geocoding, csv enrichment, spatial data prep, bulk location processing.
     """
     return super_ops.geocode_dataframe_csv(input_csv, address_col, output_csv)
 

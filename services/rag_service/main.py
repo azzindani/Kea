@@ -8,6 +8,7 @@ if "PYTORCH_CUDA_ALLOC_CONF" not in os.environ:
     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 import json
+import sys
 from contextlib import asynccontextmanager
 from datetime import datetime, UTC
 from typing import List, Dict, Any, Optional
@@ -154,11 +155,6 @@ class InsightResponse(BaseModel):
 # Routes
 # ============================================================================
 
-
-@app.get("/health")
-async def health_check():
-    from datetime import datetime
-    return {"status": "healthy", "service": "rag_service", "timestamp": datetime.utcnow().isoformat()}
 
 
 @app.post("/insights", response_model=dict)
@@ -475,6 +471,8 @@ async def sync_knowledge(background: bool = True):
 
 async def _sync_knowledge_job(domain: str | None = None, category: str | None = None):
     """Background job to sync knowledge files from the library directory."""
+    from shared.embedding.client import await_ml_inference_ready
+    await await_ml_inference_ready()
     async with _sync_lock:
         logger.info("🚀 Starting Knowledge Library Sync...")
         try:
@@ -512,6 +510,16 @@ async def _sync_knowledge_job(domain: str | None = None, category: str | None = 
             logger.error(f"❌ Knowledge sync failed: {e}", exc_info=True)
 
 
+@app.get("/health")
+@app.get("/health/check")
+async def health_check():
+    """Service health status."""
+    return {
+        "status": "ok" if knowledge_store is not None else "initializing",
+        "service": "rag_service",
+        "version": get_settings().app.version,
+    }
+
 @app.get("/knowledge/stats/summary")
 async def knowledge_stats():
     """Get knowledge registry statistics."""
@@ -523,7 +531,7 @@ async def knowledge_stats():
 
     count = await knowledge_store.count()
     return {
-        "status": "online",
+        "status": "ok",
         "total_items": count,
         "syncing": _sync_lock.locked()
     }
@@ -532,6 +540,10 @@ async def knowledge_stats():
 # ============================================================================
 # Main
 # ============================================================================
+
+# Force Proactor loop for Windows subprocess support
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 
 def main():

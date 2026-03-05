@@ -20,6 +20,7 @@ from shared.inference_kit import InferenceKit
 from shared.knowledge import load_system_knowledge
 from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -91,6 +92,7 @@ _ABSOLUTE_DATE_PATTERN = re.compile(
 )
 
 
+@trace_io()
 def extract_temporal_signals(
     text: str,
     system_time: datetime,
@@ -131,6 +133,7 @@ _SPATIAL_HINT_PATTERNS = re.compile(
 )
 
 
+@trace_io()
 def extract_spatial_signals(
     text: str,
     geo_anchor: GeoAnchor | None,
@@ -181,6 +184,7 @@ def extract_spatial_signals(
 # ============================================================================
 
 
+@trace_io()
 def resolve_temporal_hierarchy(
     signals: list[TemporalSignal],
     system_time: datetime,
@@ -351,6 +355,7 @@ def _resolve_single_temporal(
 # ============================================================================
 
 
+@trace_io()
 async def resolve_spatial_hierarchy(
     signals: list[SpatialSignal],
     geo_anchor: GeoAnchor | None,
@@ -575,6 +580,7 @@ def fuse_spatiotemporal(
 # ============================================================================
 
 
+@trace_io()
 async def anchor_spatiotemporal(
     text: str,
     system_time: datetime,
@@ -660,7 +666,7 @@ async def anchor_spatiotemporal(
                             spatial.constituent_labels = s["constituents"]
                         spatial.confidence = 0.95
 
-                log.info("Semantic reasoning complete", reasoning=data.get("reasoning"))
+                log.debug("Semantic reasoning complete", reasoning=data.get("reasoning"))
 
             except Exception as e:
                 log.warning("Semantic spatiotemporal reasoning failed", error=str(e))
@@ -684,7 +690,7 @@ async def anchor_spatiotemporal(
             },
         )
 
-        log.info(
+        log.notice(
             "Spatiotemporal anchoring complete",
             temporal_signals=len(temporal_signals),
             spatial_signals=len(spatial_signals),

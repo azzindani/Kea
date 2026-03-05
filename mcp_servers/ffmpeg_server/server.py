@@ -97,8 +97,13 @@ def probe_file(path: str) -> Dict[str, Any]:
     """PROBES file. [ACTION]
     
     [RAG Context]
-    Get detailed media metadata (ffprobe).
-    Returns JSON dict.
+    A diagnostic "Super Tool" for media forensics. It uses 'ffprobe' to extract every available stream attribute (bitrate, sample rate, pixel format, rotation) from a video or audio file without decoding the content.
+    
+    How to Use:
+    - Input the absolute path to a local media file.
+    - Essential for determining if a file requires transcoding or if it meets specific delivery standards (e.g., 4K, H.264).
+    
+    Keywords: ffprobe metadata, media info extractor, stream analyzer, codec detector.
     """
     return info_ops.probe_file(path)
 
@@ -200,8 +205,13 @@ def convert_format(input_path: str, output_path: str) -> str:
     """CONVERTS format. [ACTION]
     
     [RAG Context]
-    Convert media file to different format.
-    Returns report string.
+    The core "Super Tool" for media interoperability. It invokes the FFmpeg engine to transcode files between containers (e.g., MKV to MP4, WAV to MP3), resolving compatibility issues across different devices and platforms.
+    
+    How to Use:
+    - Specify source path and desired output path with extension.
+    - Handles complex multi-stream conversions while maintaining as much quality as the target codec allows.
+    
+    Keywords: format transcoder, video converter, audio encoder, container swap.
     """
     return convert_ops.convert_format(input_path, output_path)
 
@@ -452,8 +462,13 @@ def create_slideshow(image_dir: str, output_path: str, fps: int = 1) -> str:
     """CREATES slideshow. [ACTION]
     
     [RAG Context]
-    Create video from directory of images.
-    Returns output path.
+    A generative "Super Tool" for video creation. It compiles a sequence of static images from a directory into a smooth video file, allowing for rapid visualization of image datasets or time-lapse photography.
+    
+    How to Use:
+    - 'image_dir': Path containing sequential images.
+    - 'fps': Frames per second (controls the speed of the slideshow).
+    
+    Keywords: image to video, timelapse builder, photo slideshow, frame sequencer.
     """
     return super_ops.create_slideshow(image_dir, output_path, fps)
 

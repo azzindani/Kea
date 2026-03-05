@@ -52,8 +52,13 @@ def load_model(model_name: str = "en_core_web_sm") -> str:
     """LOADS spaCy model. [ACTION]
     
     [RAG Context]
-    Load a spaCy model into memory.
-    Returns status string.
+    Initializes a spaCy language model Pipeline. Models include the vocabulary, weights, and configuration needed to process text.
+    
+    How to Use:
+    - Default is 'en_core_web_sm' (small, fast, no word vectors).
+    - Use 'en_core_web_md' or 'en_core_web_lg' for higher accuracy and vector support.
+    
+    Keywords: nlp init, spacy start, language model, pipeline loading.
     """
     from mcp_servers.spacy_server.tools import core_ops
     return core_ops.load_model(model_name)
@@ -118,8 +123,13 @@ def explain_term(term: str) -> str:
     """EXPLAINS spaCy term. [ACTION]
     
     [RAG Context]
-    Get explanation for a spaCy term (e.g., 'ORG', 'dobj').
-    Returns string explanation.
+    A vital utility for understanding the linguistic codes used by spaCy (labels, tags, etc.).
+    
+    How to Use:
+    - Input a tag like 'GPE' -> returns "Countries, cities, states".
+    - Input a POS tag like 'NNP' -> returns "Noun, proper singular".
+    
+    Keywords: tag glossary, label lookup, nlp terminology, dictionary.
     """
     from mcp_servers.spacy_server.tools import core_ops
     return core_ops.explain_term(term)
@@ -306,8 +316,13 @@ def get_entities(text: str, model_name: str = "en_core_web_sm") -> List[Dict[str
     """EXTRACTS entities. [ACTION]
     
     [RAG Context]
-    Get Named Entities (NER) with labels.
-    Returns list of dicts.
+    Uses Named Entity Recognition (NER) to find real-world objects in text (People, Places, Organizations, Dates).
+    
+    How to Use:
+    - Returns a list of entities with their 'text', 'label_', and start/end positions.
+    - Labels like 'ORG' (Companies), 'GPE' (Locations), 'PERSON'.
+    
+    Keywords: ner, entity mining, information extraction, real-world objects.
     """
     from mcp_servers.spacy_server.tools import entity_ops
     return entity_ops.get_entities(text, model_name)
@@ -389,8 +404,13 @@ def get_similarity(text1: str, text2: str, model_name: str = "en_core_web_sm") -
     """CALCULATES similarity. [ACTION]
     
     [RAG Context]
-    Calculate cosine similarity between two texts.
-    Returns float (0.0 to 1.0).
+    Computes a semantic similarity score between two documents or segments of text using cosine similarity of their vectors.
+    
+    How to Use:
+    - Requires a model with vectors ('md' or 'lg').
+    - Returns a float from 0.0 (totally different) to 1.0 (identical/semantically same).
+    
+    Keywords: semantic match, cosine similarity, document distance, meaning check.
     """
     from mcp_servers.spacy_server.tools import vector_ops
     return vector_ops.get_similarity(text1, text2, model_name)
@@ -544,8 +564,13 @@ def analyze_document_full(text: str, model_name: str = "en_core_web_sm") -> Dict
     """ANALYZES document fully. [ACTION]
     
     [RAG Context]
-    Comprehensive analysis (entities, pos, layout).
-    Returns JSON dict.
+    A deep-digging "Super Tool" that performs a complete linguistic autopsy on a piece of text.
+    
+    How to Use:
+    - Runs Tokenization, POS Tagging, NER, and Noun Chunking in a single optimized pass.
+    - Best for complex data mining where multiple features are needed simultaneously.
+    
+    Keywords: full text analysis, linguistic profile, document audit, comprehensive nlp.
     """
     from mcp_servers.spacy_server.tools import super_ops
     return super_ops.analyze_document_full(text, model_name)
@@ -555,11 +580,17 @@ def anonymize_text(text: str, model_name: str = "en_core_web_sm") -> str:
     """ANONYMIZES text. [ACTION]
     
     [RAG Context]
-    Replace named entities with placeholders.
-    Returns anonymized string.
+    A privacy-focused "Super Tool" that sanitizes text by replacing sensitive named entities (Names, Organizations, GPE) with generic placeholders.
+    
+    How to Use:
+    - Replaces "John Doe at Apple" with "[PERSON] at [ORG]".
+    - Critical for pre-processing logs or customer feedback before sending to shared storage.
+    
+    Keywords: pii protection, data masking, de-identification, privacy filter.
     """
     from mcp_servers.spacy_server.tools import super_ops
     return super_ops.anonymize_text(text, model_name)
+    
 
 @mcp.tool()
 def extract_key_information(text: str, model_name: str = "en_core_web_sm") -> Dict[str, Any]: 
@@ -610,8 +641,13 @@ def categorize_text(text: str, model_name: str = "en_core_web_sm") -> Dict[str, 
     """CATEGORIZES text. [ACTION]
     
     [RAG Context]
-    Zero-shot categorization based on keywords/vectors.
-    Returns scores.
+    A semantic "Super Tool" that attempts to assign the document to high-level categories using vector similarity and linguistic keywords.
+    
+    How to Use:
+    - Returns confidence scores for potential topics.
+    - Used for automated document routing or sorting massive text datasets into buckets.
+    
+    Keywords: topic classification, intent matching, automated sorting, text labeling.
     """
     from mcp_servers.spacy_server.tools import super_ops
     return super_ops.categorize_text(text, model_name)

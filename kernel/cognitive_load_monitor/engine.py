@@ -22,6 +22,7 @@ from kernel.ooda_loop.types import Decision
 from shared.config import get_settings
 from shared.inference_kit import InferenceKit
 from shared.logging.main import get_logger
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -63,6 +64,7 @@ def _decision_hash(decision: Decision) -> str:
 # ============================================================================
 
 
+@trace_io()
 def measure_load(
     activation_map: ActivationMap,
     telemetry: CycleTelemetry,
@@ -125,6 +127,7 @@ def measure_load(
 # ============================================================================
 
 
+@trace_io()
 def detect_loop(recent_decisions: list[Decision]) -> LoopDetection:
     """Analyze recent decisions for repetitive patterns.
 
@@ -173,6 +176,7 @@ def detect_loop(recent_decisions: list[Decision]) -> LoopDetection:
 # ============================================================================
 
 
+@trace_io()
 def detect_stall(
     cycle_duration: float,
     expected_duration: float,
@@ -195,6 +199,7 @@ def detect_stall(
 # ============================================================================
 
 
+@trace_io()
 def detect_oscillation(recent_decisions: list[Decision]) -> OscillationDetection:
     """Detect alternating A→B→A→B or A→B→C→A→B→C patterns.
 
@@ -250,6 +255,7 @@ def detect_oscillation(recent_decisions: list[Decision]) -> OscillationDetection
 # ============================================================================
 
 
+@trace_io()
 async def detect_goal_drift(
     recent_outputs: list[str],
     original_objective: str,
@@ -339,6 +345,7 @@ async def detect_goal_drift(
 # ============================================================================
 
 
+@trace_io()
 def recommend_action(
     load: CognitiveLoad,
     loops: LoopDetection,
@@ -441,6 +448,7 @@ def recommend_action(
 # ============================================================================
 
 
+@trace_io()
 async def monitor_cognitive_load(
     activation_map: ActivationMap,
     telemetry: CycleTelemetry,
@@ -496,7 +504,7 @@ async def monitor_cognitive_load(
             },
         )
 
-        log.info(
+        log.notice(
             "Cognitive load monitored",
             action=recommendation.action.value,
             aggregate_load=round(load.aggregate, 3),

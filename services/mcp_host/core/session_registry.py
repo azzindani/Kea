@@ -122,7 +122,7 @@ class SessionRegistry:
             logger.warning(f"MCP Servers directory not found at: {base_path}")
             return
 
-        logger.info(f"🔍 Scanning for MCP servers in: {base_path}")
+        logger.debug(f"Scanning for MCP servers in: {base_path}")
         
         # Strategy 1: Top level .py
         for file_path in base_path.glob("*.py"):
@@ -134,11 +134,14 @@ class SessionRegistry:
         for dir_path in base_path.iterdir():
             if dir_path.is_dir():
                 server_script = dir_path / "server.py"
-                logger.info(f"Checking {dir_path.name} -> {server_script} (Exists: {server_script.exists()})")
                 if server_script.exists():
                     self._register_script(dir_path.name, server_script)
         
-        logger.info(f"✅ Scanning COMPLETE: Found {len(self.server_configs)} servers and {len(self.discovered_tools)} tools.")
+        logger.info(
+            "mcp_discovery_completed", 
+            servers_found=len(self.server_configs), 
+            tools_found=len(self.discovered_tools)
+        )
 
     def _register_script(self, server_name: str, script_path: Path):
         """Register a server script configuration."""
@@ -152,8 +155,7 @@ class SessionRegistry:
             script_path=script_path,
             env=env
         )
-        logger.info(f"✅ Registered JIT Server: {server_name}")
-        # Static Analysis: Discover tools without spawning (logs at DEBUG level)
+        # Static Analysis: Discover tools without spawning
         self._scan_tools_static(server_name, script_path)
 
     def _scan_tools_static(self, server_name: str, script_path: Path):
@@ -179,7 +181,6 @@ class SessionRegistry:
                                 break
                         if tool_name:
                             SessionRegistry._shared_tool_to_server[tool_name] = server_name
-                            logger.debug(f"   🔍 Discovered tool '{tool_name}' in {server_name}")
 
                 # 2. FastMCP: @mcp.tool() decorators on functions (Sync & Async)
                 elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -202,7 +203,6 @@ class SessionRegistry:
                     if is_tool:
                         tool_name = node.name
                         SessionRegistry._shared_tool_to_server[tool_name] = server_name
-                        logger.debug(f"   🔍 Discovered FastMCP tool '{tool_name}' in {server_name}")
                         
                         # Extract Docstring for RAG (use function name as fallback)
                         docstring = ast.get_docstring(node)

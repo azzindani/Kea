@@ -31,8 +31,12 @@ async def screen_signal(signal: str, limit: int = 100000) -> Any:
     """SCREENS stocks by signal. [ACTION]
     
     [RAG Context]
-    Get stocks matching a specific Finviz Signal.
-    signal: 'top_gainers', 'new_highs', 'major_news', etc.
+    A versatile "Super Tool" for technical and fundamental stock screening. It filters the entire US equity market based on specific predefined signals from Finviz.
+    
+    How to Use:
+    - 'signal': Choose from 'top_gainers', 'top_losers', 'new_high', 'new_low', 'most_volatile', 'most_active', 'unusual_volume', 'overbought', 'oversold', 'downgrades', 'upgrades', 'earnings_before', 'earnings_after', 'insider_buying', 'insider_selling'.
+    
+    Keywords: stock screener, technical signal, market filters, equity screening.
     """
     return await screener.get_screener_signal(limit, signal)
 
@@ -44,8 +48,13 @@ async def screen_top_gainers(limit: int = 100000) -> Any:
     """SCREENS Top Gainers. [ACTION]
     
     [RAG Context]
-    Get top gaining stocks.
-    Returns JSON list of stocks.
+    Retrieves a list of stocks with the highest percentage price increase during the current trading session. Essential for momentum trading strategies.
+    
+    How to Use:
+    - Returns a JSON list of stocks including Ticker, Company, Sector, Price, Change, and Volume.
+    - Use this to identify stocks with strong upward momentum and 'hot' market sectors.
+    
+    Keywords: momentum stocks, market leaders, high growth, daily gainers.
     """
     return await screener.get_screener_signal(limit, "top_gainers")
 
@@ -54,8 +63,13 @@ async def screen_top_losers(limit: int = 100000) -> Any:
     """SCREENS Top Losers. [ACTION]
     
     [RAG Context]
-    Get top losing stocks.
-    Returns JSON list of stocks.
+    Retrieves a list of stocks with the sharpest percentage price decrease. Useful for identifying 'oversold' bounce candidates or failing companies.
+    
+    How to Use:
+    - Analyzes intraday sell-offs across NYSE, NASDAQ, and AMEX.
+    - Check 'get_stock_news' for the tickers found to understand the reason for the drop.
+    
+    Keywords: oversold stocks, market laggards, daily losers, short-side candidates.
     """
     return await screener.get_screener_signal(limit, "top_losers")
 
@@ -84,8 +98,13 @@ async def screen_insider_buying(limit: int = 100000) -> Any:
     """SCREENS Insider Buying. [ACTION]
     
     [RAG Context]
-    Get stocks with recent insider buying.
-    Returns JSON list of stocks.
+    A high-conviction "Super Tool" that filters for stocks where company executives (CEOs, CFOs, Directors) are buying their own company's shares in the open market.
+    
+    How to Use:
+    - Often considered a strong bullish indicator as insiders have the most visibility into the company's future value.
+    - Combine with 'get_fundamental_ratios' to verify valuation before investing.
+    
+    Keywords: insider accumulation, conviction buying, executive trades, smart money flow.
     """
     return await screener.get_screener_signal(limit, "insider_buying")
 
@@ -260,9 +279,13 @@ async def screen_strategy(strategy: str, limit: int = 100000) -> str:
     """SCREENS strategy preset. [ACTION]
     
     [RAG Context]
-    Run a preset strategy screen.
-    strategies: 'value_stocks', 'growth_stocks', 'high_yield_dividend', 
-                'oversold_bounce', 'new_highs_volume', 'short_squeeze_candidate'.
+    A powerful "Super Tool" for running advanced, automated trading strategies from the Finviz strategy database.
+    
+    How to Use:
+    - 'strategies': 'value_stocks', 'growth_stocks', 'high_yield_dividend', 'oversold_bounce', 'new_highs_volume', 'short_squeeze_candidate'.
+    - Returns a list of tickers that meet multiple technical and fundamental criteria for each strategy.
+    
+    Keywords: investment strategy, stock picks, value growth, strategy engine.
     """
     return await strategy.get_strategy_screen(limit, strategy)
 
@@ -282,8 +305,14 @@ async def get_finviz_statement(ticker: str, statement: str = "I", timeframe: str
     """FETCHES financials. [ACTION]
     
     [RAG Context]
-    Get Income(I)/Balance(B)/Cash(C) Flow table.
-    Returns JSON string.
+    Retrieves high-level accounting data for a public company.
+    
+    How to Use:
+    - 'statement': 'I' (Income Statement), 'B' (Balance Sheet), 'C' (Cash Flow).
+    - 'timeframe': 'A' (Annual), 'Q' (Quarterly).
+    - Returns columns for Net Income, Total Assets, Revenue, and Operating Cash over time.
+    
+    Keywords: corporate health, accounting data, revenue report, p&l statement.
     """
     return await financials.get_finviz_statement(ticker, statement, timeframe)
 

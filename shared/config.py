@@ -45,6 +45,8 @@ class ServiceSettings(BaseModel):
     vault: str = "http://localhost:8004"
     swarm_manager: str = "http://localhost:8005"
     chronos: str = "http://localhost:8006"
+    ml_inference: str = "http://localhost:8007"
+    ml_reranker: str = "http://localhost:8007"  # Same as ml_inference in single-instance; separate in multi-GPU
 
 
 class LLMModelInfo(BaseModel):
@@ -188,7 +190,7 @@ class EmbeddingSettings(BaseModel):
     model_name: str = "Qwen/Qwen3-Embedding-0.6B"
     api_model: str = "qwen/qwen3-embedding-8b"
     dimension: int = 1024
-    batch_size: int = 32
+    batch_size: int = 16
     max_length: int = 32768
     instruction: str = "Given a web search query, retrieve relevant passages that answer the query"
     api_url: str = "https://openrouter.ai/api/v1/embeddings"
@@ -226,13 +228,51 @@ class VLRerankerSettings(BaseModel):
     instruction: str = "Given a web search query, retrieve relevant passages that answer the query"
 
 
+class MLInferenceSettings(BaseModel):
+    """ML Inference Service settings.
+    
+    Controls the dedicated ML Inference microservice that serves
+    embedding and reranking models behind HTTP APIs.
+    
+    Roles:
+        - 'embedding': Load only embedding model(s)
+        - 'reranker': Load only reranker model(s)
+        - 'both': Load all models (dev/single-instance mode)
+    """
+    role: str = "both"
+    max_batch_size: int = 64
+    request_timeout: float = 60.0
+    model_load_timeout: float = 300.0
+    enable_vl_models: bool = False
+    device: str = "auto"  # auto | cuda | cuda:0 | cuda:1 | cpu
+    use_flash_attention: bool = False
+
+    # Service discovery probe — how long to wait for the ML Inference
+    # HTTP server before falling back to local/API providers.  Keep
+    # short to avoid blocking the caller's event loop.
+    probe_max_attempts: int = 3
+    probe_timeout: float = 0.5   # per-attempt HTTP timeout (seconds)
+    probe_sleep: float = 0.5     # sleep between failed attempts
+
+    # Server-side GPU concurrency guard.
+    # The GPU inference pipeline is sequential; allowing more than one
+    # concurrent request causes TCP ReadErrors under cross-service load.
+    # Set > 1 only if the underlying model supports true parallel batching.
+    max_concurrent_requests: int = 1
+
+    # Startup readiness gate — used by launcher.py to block dependent
+    # services until ML Inference reports healthy models.
+    startup_poll_interval: float = 3.0   # seconds between /health polls
+    startup_health_timeout: float = 300.0  # max seconds to wait (≤ model_load_timeout)
+
+
 class TimeoutSettings(BaseModel):
     """Standardized timeouts."""
     default: float = 30.0
     audit_log: float = 2.0
     llm_completion: float = 60.0
     llm_streaming: float = 120.0
-    embedding_api: float = 60.0
+    embedding_api: float = 120.0
     tool_execution: float = 300.0
     auth_token: float = 5.0
     short: float = 5.0
@@ -332,8 +372,8 @@ class KnowledgeSettings(BaseModel):
     skill_limit: int = 3
     rule_limit: int = 2
     procedure_limit: int = 3
-    timeout_search: float = 30.0
-    timeout_raw: float = 30.0
+    timeout_search: float = 60.0
+    timeout_raw: float = 60.0
     timeout_health: float = 3.0
     
     # Registry & Backend
@@ -458,7 +498,7 @@ class RAGSettings(BaseModel):
     default_limit: int = 20
     max_limit: int = 100
     ingest_max_rows: int = 1000
-    batch_size: int = 50
+    batch_size: int = 20
     knowledge_limit: int = 5
     knowledge_candidate_multiplier: int = 5
     artifact_path: str = "./artifacts"
@@ -921,6 +961,7 @@ class Settings(BaseSettings):
     cache_hierarchy: CacheHierarchySettings = CacheHierarchySettings()
     normalization: NormalizationSettings = NormalizationSettings()
     kernel: KernelSettings = KernelSettings()
+    ml_inference: MLInferenceSettings = MLInferenceSettings()
 
     model_config = SettingsConfigDict(
         env_file=".env",

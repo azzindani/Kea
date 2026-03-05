@@ -34,6 +34,13 @@ def create_document_file(path: str) -> str:
     """CREATES new empty Word doc. [ACTION]
     
     [RAG Context]
+    Initializes a fresh Microsoft Word (.docx) document at the specified path. It uses the standard library template as a base.
+    
+    How to Use:
+    - Provides a 'blank canvas' for subsequent operations like 'add_paragraph' or 'add_table'.
+    - Returns the absolute path of the created file upon success.
+    
+    Keywords: new word doc, docx initialization, blank document, office file creation.
     """
     return core_ops.create_document_file(path)
 
@@ -70,6 +77,13 @@ def add_paragraph(path: str, text: str, style: Optional[str] = None) -> str:
     """ADDS paragraph to doc. [ACTION]
     
     [RAG Context]
+    Appends a new block of text to the end of the specified Word document.
+    
+    How to Use:
+    - 'style': Optional name of a Word style (e.g., 'Normal', 'Heading 1', 'List Bullet').
+    - Returns a confirmation of the addition.
+    
+    Keywords: append text, write paragraph, docx editing, content addition.
     """
     return text_ops.add_paragraph(path, text, style)
 
@@ -334,6 +348,13 @@ def bulk_read_text(path: str) -> str:
     """READS all text (flat). [DATA]
     
     [RAG Context]
+    A high-speed "Super Tool" for content extraction. It iterates through all paragraphs in a document and returns them as a single continuous string.
+    
+    How to Use:
+    - Ideal for feeding document content into an LLM for summarization or analysis.
+    - Stays efficient even for long documents by avoiding complex XML parsing where possible.
+    
+    Keywords: extract all text, whole doc reader, docx ingestion, content audit.
     """
     return bulk_ops.bulk_read_text(path)
 
@@ -408,7 +429,13 @@ def template_fill(template_path: str, output_path: str, replacements: Dict[str, 
     """FILLS jinja-like template. [ACTION]
     
     [RAG Context]
-    Replaces {{key}} placeholders.
+    A powerful "Super Tool" for automated document generation. It scans a template document for placeholders in the format {{key}} and replaces them with corresponding values.
+    
+    How to Use:
+    - Use this for generating contracts, invoices, or personalized letters from a standardized base.
+    - 'replacements': A dictionary mapping placeholder keys to their new values.
+    
+    Keywords: document automation, mail merge, template engine, dynamic doc generation.
     """
     return super_ops.template_fill(template_path, output_path, replacements)
 

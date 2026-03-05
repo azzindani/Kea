@@ -60,9 +60,13 @@ async def price_option_chain(data: list[dict]) -> str:
     """PRICES option chain (Bulk). [ACTION]
     
     [RAG Context]
-    Calculates prices and Greeks for a list of options.
-    Args:
-        data: List of dicts with keys: underlying, strike, interest, days, volatility.
+    A high-performance "Super Tool" for derivatives desk automation. It takes a list of option contracts (calls and puts) and simultaneously calculates their fair market prices, all "Greeks" (Delta, Gamma, Theta, Vega, Rho), and implied volatilities using requested pricing models.
+    
+    How to Use:
+    - 'data': A list of contract dictionaries (underlying, strike, dte, etc.).
+    - Essential for massive risk management audits and portfolio rebalancing simulations.
+    
+    Keywords: bulk option pricing, derivatives risk, greek calculator, portfolio volatility.
     """
     return await bulk.price_option_chain(data)
 

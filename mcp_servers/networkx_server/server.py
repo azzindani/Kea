@@ -277,8 +277,13 @@ async def shortest_path(graph: GraphInput, source: Any, target: Any, weight: Opt
     """CALCULATES shortest path. [ACTION]
     
     [RAG Context]
-    Find shortest path between source and target.
-    Returns list of nodes.
+    A critical "Super Tool" for network optimization. It identifies the most efficient sequence of nodes (the "path") to travel from point A to point B within a graph, either by minimizing the number of hops or by considering edge weights (like distance, cost, or time).
+    
+    How to Use:
+    - Provide the graph data, source node ID, and target node ID.
+    - Used in logistics (routing), social network analysis (six degrees of separation), and IT infrastructure monitoring (trace route).
+    
+    Keywords: dijkstra algorithm, pathfinding, network routing, hop count.
     """
     return await path_ops.shortest_path(graph, source, target, weight)
 

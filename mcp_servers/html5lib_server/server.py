@@ -42,6 +42,14 @@ def parse_string(html_input: str) -> str:
     """PARSES HTML string. [ACTION]
     
     [RAG Context]
+    A robust "Super Tool" for legacy and broken web content. It utilizes the HTML5lib parser to create a complete DOM tree from any input string, automatically handling missing tags and malformed structures exactly like a modern web browser.
+    
+    How to Use:
+    - Input a raw HTML string.
+    - Returns a string representation of the parsed document tree.
+    - Use this when strict standards-compliance is needed for messy input.
+    
+    Keywords: html5 parser, resilient parsing, web browser simulator, dom tree builder.
     """
     return parse_ops.parse_string(html_input)
 
@@ -217,7 +225,13 @@ def sanitize_html(html_input: str) -> str:
     """SANITIZES HTML. [ACTION]
     
     [RAG Context]
-    Removes dangerous tags.
+    A critical "Super Tool" for security and content cleaning. It filters HTML input by removing potentially dangerous tags (like <script>, <object>, <embed>) and attributes (onmouseover, etc.) while preserving safe formatting.
+    
+    How to Use:
+    - Wrap any untrusted user input or external web content with this tool before displaying or further processing.
+    - Ensures the resulting HTML is safe for re-rendering in a secure environment.
+    
+    Keywords: html cleaner, security filter, xss prevention, tag stripping.
     """
     return filter_ops.sanitize_html(html_input)
 
@@ -333,6 +347,13 @@ def repair_html_page(html_input: str) -> str:
     """REPAIRS broken HTML. [ACTION]
     
     [RAG Context]
+    A high-level "Super Tool" for data recovery. It identifies critical structural failures in an HTML document (unclosed body/head tags, overlapping elements) and reconstructs a valid, standards-compliant version.
+    
+    How to Use:
+    - Ideal for cleaning up raw output from scrapers or LLMs that generate partial or broken HTML snippets.
+    - Guarantees the output will be compatible with downstream XML or DOM-based processors.
+    
+    Keywords: html fixer, structure repair, auto close tags, standards converter.
     """
     return super_ops.repair_html_page(html_input)
 

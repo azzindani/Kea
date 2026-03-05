@@ -23,6 +23,7 @@ from shared.id_and_hash import generate_id
 from shared.inference_kit import InferenceKit
 from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger, log_dag_blueprint
+from shared.logging.decorators import trace_io
 from shared.standard_io import (
     Metrics,
     ModuleRef,
@@ -58,6 +59,7 @@ def _ref(fn: str) -> ModuleRef:
 # ============================================================================
 
 
+@trace_io()
 async def map_subtasks_to_nodes(subtasks: list[SubTaskItem], kit: InferenceKit | None = None) -> list[ExecutableNode]:
     """Translate each SubTaskItem into an ExecutableNode.
 
@@ -70,7 +72,7 @@ async def map_subtasks_to_nodes(subtasks: list[SubTaskItem], kit: InferenceKit |
         instruction = ActionInstruction(
             task_id=task.id,
             description=task.description,
-            action_type=_infer_action_type(task),
+            action_type=getattr(task, "action_type", None) or _infer_action_type(task),
             required_skills=task.required_skills,
             required_tools=task.required_tools,
             parameters={
@@ -79,25 +81,6 @@ async def map_subtasks_to_nodes(subtasks: list[SubTaskItem], kit: InferenceKit |
                 "domain": task.domain,
             },
         )
-
-        if kit and kit.has_llm:
-            try:
-                system_msg = LLMMessage(
-                    role="system",
-                    content="Infer the exact action_type for this node (e.g. tool_call, llm_inference, data_transform, general). Respond exactly with JSON: {\"action_type\": \"...\"}"
-                )
-                user_msg = LLMMessage(role="user", content=instruction.description)
-                resp = await kit.llm.complete([system_msg, user_msg], kit.llm_config)
-
-                content = resp.content.strip()
-                if content.startswith("```json"):
-                    content = content[7:-3].strip()
-                elif content.startswith("```"):
-                    content = content[3:-3].strip()
-                data = json.loads(content)
-                instruction.action_type = data.get("action_type", instruction.action_type)
-            except Exception:
-                pass
 
         node = ExecutableNode(
             node_id=generate_id("node"),
@@ -109,7 +92,7 @@ async def map_subtasks_to_nodes(subtasks: list[SubTaskItem], kit: InferenceKit |
         )
         
         # Log the mapping details for JIT transparency
-        log.info(
+        log.debug(
             "📍 JIT Mapping: Task to Node established",
             task_id=task.id,
             node_id=node.node_id,
@@ -123,7 +106,7 @@ async def map_subtasks_to_nodes(subtasks: list[SubTaskItem], kit: InferenceKit |
 
         nodes.append(node)
 
-    log.info("📊 Graph Synthesis: Mapped sub-tasks to nodes", task_count=len(subtasks), node_count=len(nodes))
+    log.debug("📊 Graph Synthesis: Mapped sub-tasks to nodes", task_count=len(subtasks), node_count=len(nodes))
     return nodes
 
 
@@ -144,6 +127,7 @@ def _infer_action_type(task: SubTaskItem) -> str:
 # ============================================================================
 
 
+@trace_io()
 def calculate_dependency_edges(nodes: list[ExecutableNode]) -> list[Edge]:
     """Determine execution ordering from input/output dependencies.
 
@@ -173,7 +157,7 @@ def calculate_dependency_edges(nodes: list[ExecutableNode]) -> list[Edge]:
                     ))
                     node_ids_with_deps.add(node.node_id)
 
-    log.info(
+    log.debug(
         "Dependency edges calculated",
         total_edges=len(edges),
         nodes_with_deps=len(node_ids_with_deps),
@@ -186,6 +170,7 @@ def calculate_dependency_edges(nodes: list[ExecutableNode]) -> list[Edge]:
 # ============================================================================
 
 
+@trace_io()
 def compile_dag(
     nodes: list[ExecutableNode],
     edges: list[Edge],
@@ -257,7 +242,7 @@ def compile_dag(
         has_state_mutations=has_mutations,
     )
 
-    log.info(
+    log.notice(
         "DAG compiled",
         dag_id=dag_id,
         nodes=len(nodes),
@@ -382,6 +367,7 @@ async def review_dag_with_simulation(dag: ExecutableDAG) -> SimulationVerdict:
 # ============================================================================
 
 
+@trace_io()
 async def synthesize_plan(
     objective: str,
     context: WorldState | None = None,
@@ -482,7 +468,7 @@ async def synthesize_plan(
             },
         )
 
-        log.info(
+        log.notice(
             "Plan synthesis complete",
             dag_id=dag.dag_id,
             nodes=len(nodes),

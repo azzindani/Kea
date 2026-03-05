@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import os
+from datetime import datetime
 # Optimize PyTorch memory allocation
 if "PYTORCH_CUDA_ALLOC_CONF" not in os.environ:
     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
@@ -23,16 +24,24 @@ from shared.schemas import (
 logger = get_logger(__name__)
 
 
+async def _register_tools_when_ready(registry) -> None:
+    """Wait for ML Inference to be healthy, then populate the tool RAG registry."""
+    from shared.embedding.client import await_ml_inference_ready
+    await await_ml_inference_ready()
+    await registry.register_discovered_tools()
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     # Startup: Initialize Registry
     from services.mcp_host.core.session_registry import get_session_registry
     registry = get_session_registry()
-    
+
     # Static RAG Population (Background)
-    # Ensure MCP Host also populates the registry for standard API usage
-    asyncio.create_task(registry.register_discovered_tools())
-    
+    # Gate behind ML Inference readiness so tool embedding doesn't fire
+    # ConnectError retries while the embedding model is still loading.
+    asyncio.create_task(_register_tools_when_ready(registry))
+
     yield
     # Shutdown: Stop servers
     await registry.shutdown()
@@ -228,6 +237,12 @@ async def execute_batch(request: BatchToolRequest):
 
     tasks = [_exec_one(t) for t in request.tasks]
     return await asyncio.gather(*tasks)
+
+
+# Force Proactor loop for Windows subprocess support
+import sys
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 
 if __name__ == "__main__":

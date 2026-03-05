@@ -42,6 +42,14 @@ def parse_xml_string(xml_input: str) -> str:
     """PARSES XML string. [ACTION]
     
     [RAG Context]
+    A high-performance "Super Tool" for XML processing. It uses the C-based LibXML2 library for extremely fast parsing, building an efficient in-memory tree for querying and manipulation.
+    
+    How to Use:
+    - Input a raw XML string from a file or API.
+    - Yields a serialized version of the parsed tree structure.
+    - Ideal for processing large datasets where standard Python XML libraries are too slow.
+    
+    Keywords: libxml2, fast xml, high perf parser, xml memory tree.
     """
     return core_ops.parse_xml_string(xml_input)
 
@@ -125,6 +133,13 @@ def xpath_query(xml_input: str, query: str) -> List[str]:
     """EXECUTES XPath query. [DATA]
     
     [RAG Context]
+    A precise "Super Tool" for data extraction. XPath (XML Path Language) allow you to navigate through elements and attributes in an XML document with surgically accurate address logic.
+    
+    How to Use:
+    - 'query': A standard XPath 1.0 expression (e.g., '//item/title/text()' or '/root/@version').
+    - Returns a list of strings representing the matching elements or values.
+    
+    Keywords: xpath selector, xml navigation, pinpoint extraction, tree querying.
     """
     return xpath_ops.xpath_query(xml_input, query)
 
@@ -184,6 +199,13 @@ def xslt_transform(xml_input: str, xslt_input: str) -> str:
     """TRANSFORMS via XSLT. [ACTION]
     
     [RAG Context]
+    A functional "Super Tool" for structural XML conversion. XSLT allows for the definition of rule-based templates to reorganize, filter, or reformat an XML document into HTML, text, or a different XML schema.
+    
+    How to Use:
+    - Provide the XML source and the XSLT stylesheet string.
+    - Standard tool for enterprise reporting and data interchange between legacy systems.
+    
+    Keywords: xml transform, xslt processor, rule based conversion, structure mapping.
     """
     return transform_ops.xslt_transform(xml_input, xslt_input)
 
@@ -425,6 +447,14 @@ def xml_to_dict_lxml(xml_input: str) -> str:
     """CONVERTS XML to dict. [DATA]
     
     [RAG Context]
+    A modern "Super Tool" for Pythonic data access. It simplifies complex nested XML structures into standard Python dictionaries, making data easier to manipulate in standard logic flows.
+    
+    How to Use:
+    - Input the source XML.
+    - Yields a JSON-formatted string of the dictionary representation.
+    - Perfect for bridge operations between XML-based APIs and JSON-based frontends.
+    
+    Keywords: xml converter, dictionary wrapper, json bridge, pythonic xml.
     """
     return super_ops.xml_to_dict_lxml(xml_input)
 

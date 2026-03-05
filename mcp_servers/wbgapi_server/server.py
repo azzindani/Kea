@@ -64,8 +64,14 @@ async def get_indicator_data(indicator_code: str, economies: list[str] = None, m
     """FETCHES indicator data. [ACTION]
     
     [RAG Context]
-    Get data for any World Bank indicator (e.g., 'NY.GDP.MKTP.CD').
-    Returns data table.
+    A premier "Super Tool" for global economic research. It retrieves historical time-series data for any of the 16,000+ indicators in the World Bank Open Data catalog.
+    
+    How to Use:
+    - 'indicator_code': The unique WB ID (e.g., 'NY.GDP.MKTP.CD' for GDP, 'SP.POP.TOTL' for Population).
+    - 'economies': List of ISO3 codes (e.g., ['USA', 'CHN', 'GBR']) or regions.
+    - 'mrv': Most Recent Values. Number of recent periods to fetch.
+    
+    Keywords: world bank data, economic indicator, gdp fetch, macro stats, time series.
     """
     return await run_op(indicators.get_indicator_data, indicator_code=indicator_code, economies=economies, mrv=mrv)
 
@@ -106,8 +112,13 @@ async def search_indicators(query: str) -> str:
     """SEARCHES indicators. [ACTION]
     
     [RAG Context]
-    Find indicators by keyword search.
-    Returns list of matches.
+    A discovery "Super Tool" for navigating the massive World Bank database. It identifies indicator codes based on natural language keywords.
+    
+    How to Use:
+    - Input 'query' such as "renewable energy", "literacy rate", or "inflation".
+    - Returns a list of matching indicator titles and their corresponding codes (IDs) for use in 'get_indicator_data'.
+    
+    Keywords: indicator search, wb catalog, find metrics, research discovery.
     """
     return await run_op(discovery.search_indicators, query=query)
 
@@ -137,8 +148,13 @@ async def get_growth_dashboard(economies: list[str] = None) -> str:
     """GENERATES Growth db. [ACTION]
     
     [RAG Context]
-    Get aggregated Growth indicators.
-    Returns dashboard string.
+    A high-level "Super Tool" for macro-economic profiling. It aggregates a suite of growth-related indicators (GDP growth, GNI per capita, Inflation) into a structured summary report.
+    
+    How to Use:
+    - Provide a list of country codes to compare their recent economic performance.
+    - Essential for rapid country risk assessment and investment research.
+    
+    Keywords: growth report, economic health, gdp summary, country profile.
     """
     return await run_op(dashboards.get_dashboard, diff_args={"dashboard_type": "growth"}, economies=economies)
 
@@ -231,8 +247,13 @@ async def get_sdg_data(goal: int, economies: list[str] = None) -> str:
     """FETCHES SDG data. [ACTION]
     
     [RAG Context]
-    Get data for a specific Sustainable Development Goal.
-    Returns data table.
+    A specialized "Super Tool" for tracking the UN Sustainable Development Goals. It filters the global database for indicators specifically mapped to one of the 17 SDG goals.
+    
+    How to Use:
+    - 'goal': An integer from 1 to 17 (e.g., 1 for No Poverty, 13 for Climate Action).
+    - Perfect for ESG (Environmental, Social, and Governance) analysis and developmental impact studies.
+    
+    Keywords: esg metrics, sustainable development, un goals, impact investing.
     """
     return await run_op(sdg.get_sdg_data, goal=goal, economies=economies)
 

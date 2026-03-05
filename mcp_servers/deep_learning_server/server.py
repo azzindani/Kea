@@ -30,8 +30,14 @@ def build_dense_network(input_dim: int, output_dim: int, hidden_layers: List[int
     """BUILDS dense neural network. [ACTION]
     
     [RAG Context]
-    Creates a standard MLP model (Dense -> BN -> ReLU -> Dropout).
-    Returns model architecture summary.
+    Constructs a Multi-Layer Perceptron (MLP) architecture suitable for tabular data analysis. It automatically adds Batch Normalization and Dropout to each layer for improved stability and regularization.
+    
+    How to Use:
+    - 'input_dim': Number of input features.
+    - 'hidden_layers': List of units per layer (e.g. [64, 32]).
+    - 'task': 'classification' (uses softmax) or 'regression' (uses linear).
+    
+    Keywords: mlp builder, fully connected, neural arch, tabular dl.
     """
     from mcp_servers.deep_learning_server.tools import model_ops
     return model_ops.build_dense_network(input_dim, output_dim, hidden_layers, task)
@@ -52,8 +58,13 @@ def build_residual_network(input_shape: List[int], output_dim: int, blocks: int 
     """BUILDS ResNet architecture. [ACTION]
     
     [RAG Context]
-    Creates a Residual Network for deep learning on tabular/sequence data.
-    Returns model architecture summary.
+    Creates a Deep Residual Network (ResNet). Use this for very deep architectures where vanishing gradients are a concern.
+    
+    How to Use:
+    - 'blocks': Number of residual blocks to stack.
+    - Ideal for complex pattern recognition in sequences or high-dimensional structured data.
+    
+    Keywords: residual learning, skip connections, deep model, resnet builder.
     """
     from mcp_servers.deep_learning_server.tools import model_ops
     return model_ops.build_residual_network(input_shape, output_dim, blocks, task)
@@ -109,7 +120,13 @@ def add_batch_normalization() -> Dict[str, Any]:
     """ADDS BatchNormalization layer config. [DATA]
     
     [RAG Context]
-    Normalizes layer inputs.
+    A critical layer for training deep networks. It normalizes the activations of the previous layer at each batch, reducing internal covariate shift.
+    
+    How to Use:
+    - Insert after a Dense or Conv layer but before the Activation for best results.
+    - Helps models converge faster and act as a light form of regularization.
+    
+    Keywords: normalization, convergence speed, internal shift, deep training.
     """
     from mcp_servers.deep_learning_server.tools import layer_ops
     return layer_ops.add_batch_normalization()
@@ -169,8 +186,14 @@ def train_deep_model(data_url: str, target_column: str, model_config: Dict[str, 
     """TRAINS deep learning model. [ACTION]
     
     [RAG Context]
-    Trains a deep learning model with EarlyStopping and Checkpointing.
-    Returns training history and metrics.
+    The main engine for executing model training. Orchestrates data loading, multi-GPU scaling, and callback management (EarlyStopping, TensorBoard logs).
+    
+    How to Use:
+    - 'epochs': Max training cycles.
+    - 'model_config': A dictionary describing the layers and compilation settings.
+    - Automatically captures metrics per epoch.
+    
+    Keywords: training loop, fit model, deep learning engine, metrics tracking.
     """
     from mcp_servers.deep_learning_server.tools import train_ops
     return train_ops.train_deep_model(data_url, target_column, model_config, epochs, batch_size)
@@ -289,7 +312,13 @@ def app_resnet50(input_shape: List[int] = (224, 224, 3), include_top: bool = Fal
     """CONFIGURES ResNet50 Model. [DATA]
     
     [RAG Context]
-    50-layer Residual Network.
+    Initializes the famous ResNet50 architecture with weights pre-trained on ImageNet.
+    
+    How to Use:
+    - 'include_top': False allows Transfer Learning (remove final classification layers).
+    - Perfect for Computer Vision tasks where specialized data is limited.
+    
+    Keywords: transfer learning, pretrained resnet, computer vision, imagenet weights.
     """
     from mcp_servers.deep_learning_server.tools import application_ops
     return application_ops.app_resnet50(input_shape, include_top)

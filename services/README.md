@@ -1,6 +1,6 @@
 # 🏙️ Fractal Corp Services ("The Architecture")
 
-The `services/` directory is the engine room of the Kea system. It follows a **Fractal Microservices Architecture**, where complex cognition is divided into 7 specialized, independent services. Each service embodies a specific "Corporate Persona" (e.g., The Brain, The Mouth, The Conscience) and communicates via an asynchronous, resilient service mesh.
+The `services/` directory is the engine room of the Kea system. It follows a **Fractal Microservices Architecture**, where complex cognition is divided into 8 specialized, independent services. Each service embodies a specific "Corporate Persona" (e.g., The Brain, The Mouth, The Conscience) and communicates via an asynchronous, resilient service mesh.
 
 ## ✨ Features
 
@@ -11,7 +11,7 @@ The `services/` directory is the engine room of the Kea system. It follows a **F
 
 ---
 
-## 🏗️ The 7-Service "Fractal Corp"
+## 🏗️ The 8-Service "Fractal Corp"
 
 Project cognition is built on a **"Brain vs Body"** topology, where core reasoning is isolated from microservice execution.
 
@@ -31,6 +31,7 @@ graph TD
         Orchestrator -->|Execute| Host[MCP Host]
         Orchestrator -->|Learn| RAG[RAG Service]
         Orchestrator -->|Audit| Vault[Vault]
+        RAG --> ML[ML Inference]
     end
     
     subgraph "The Conscience (Oversight)"
@@ -66,6 +67,7 @@ graph TD
 | **[vault](vault/README.md)** | **The Memory** | Immutable Audit Trail & Persistence | [📖 View Doc](vault/README.md) |
 | **[swarm_manager](swarm_manager/README.md)** | **The Conscience** | Governance, Compliance & HITL Oversight | [📖 View Doc](swarm_manager/README.md) |
 | **[chronos](chronos/README.md)** | **The Clock** | Job Scheduling & Temporal Management | [📖 View Doc](chronos/README.md) |
+| **[ml_inference](ml_inference/README.md)** | **The Cortex** | Dedicated ML model serving (Embeddings/Reranking) | [📖 View Doc](ml_inference/README.md) |
 
 ---
 
@@ -95,6 +97,7 @@ Every service in the "Body" is aware of the substrate it runs on. Through the `s
 | memory | 8004 | `/persistence` | The Memory |
 | manager | 8005 | `/swarm` | The Conscience |
 | clock | 8006 | `/jobs` | The Clock |
+| ml_inference | 8007 | `/v1` | The Cortex |
 
 ---
 *The Kea Services architecture ensures that corporate intelligence is distributed, governed, and resilient.*

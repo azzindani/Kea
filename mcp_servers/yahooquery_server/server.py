@@ -39,9 +39,13 @@ async def search_ticker(query: str, limit: int = 5) -> str:
     """SEARCHES for ticker symbols. [ACTION]
     
     [RAG Context]
-    ALWAYS USE THIS FIRST when you don't know the exact stock ticker symbol.
-    Searches by company name or keywords (e.g., "BCA Bank" -> "BBCA.JK").
-    Returns table of matching symbols.
+    The definitive "Super Tool" for symbol resolution. Because financial tools require exact ticker codes (e.g., 'AAPL' vs 'Apple'), this tool bridges the gap by searching the Yahoo Finance database for names, keywords, or ISINs.
+    
+    How to Use:
+    - ALWAYS USE THIS FIRST when you have a company name but not its ticker.
+    - Supports global markets (e.g., searching "Indonesian Bank" returns 'BBCA.JK').
+    
+    Keywords: symbol lookup, ticker finder, company to ticker, market identifier.
     """
     return await ticker.search_ticker_handler(query, limit)
 
@@ -174,10 +178,13 @@ async def screen_market(preset: str = "day_gainers", count: int = 100000) -> str
     """SCREENS market using preset. [ACTION]
     
     [RAG Context]
-    Get data from predefined screener lists.
-    Presets: day_gainers, day_losers, most_actives, cryptocurrencies,
-    most_shorted_stocks, undervalued_growth_stocks, growth_technology_stocks, etc.
-    Returns JSON string.
+    A scanning "Super Tool" for market opportunity discovery. It provides access to Yahoo Finance pre-computed screener lists, allowing you to identify outliers, momentum plays, or thematic stock groups in real-time.
+    
+    How to Use:
+    - 'preset': Useful values include 'day_gainers', 'most_actives', 'undervalued_growth_stocks', and 'cryptocurrencies'.
+    - Returns a ranked list of tickers meeting the criteria.
+    
+    Keywords: market scanner, stock screener, top gainers, momentum discovery.
     """
     return await screener.get_screen_data(preset, count)
 

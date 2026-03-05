@@ -109,20 +109,40 @@ class FastMCP(LibFastMCP):
     2. Reliable Execution (Retries)
     3. Standardized Output Envelope
     4. Structured Error Handling
+    5. Automatic I/O Tracing (optional)
     """
+    
+    @property
+    def trace(self):
+        """Access the unified trace_io decorator factory."""
+        from shared.logging.decorators import trace_io
+        return trace_io
     
     def __init__(self, name: str, **kwargs):
         super().__init__(name, **kwargs)
         self.server_name = name
 
-    def tool(self, name: Optional[str] = None, description: Optional[str] = None, **kwargs):
+    def tool(self, name: Optional[str] = None, description: Optional[str] = None, tracer: bool = True, **kwargs):
         """
         Decorator to register a tool with standardized execution wrapper.
+        
+        Args:
+            name: Override tool name
+            description: Override tool description
+            tracer: If True, automatically applies @trace_io for input/output logging.
+            **kwargs: Passed to FastMCP registration.
         """
         def decorator(func: Callable):
             # 1. Get the original tool name/desc if not provided
             tool_name = name or func.__name__
             tool_desc = description or func.__doc__
+
+            # 2. Apply tracing if requested
+            if tracer:
+                from shared.logging.decorators import trace_io
+                # Use a specific category for MCP tracing
+                source = f"mcp.{self.server_name}.{tool_name}"
+                func = trace_io(logger_name=source)(func)
 
             # Check if original function is async
             is_async = inspect.iscoroutinefunction(func)
@@ -243,7 +263,7 @@ class FastMCP(LibFastMCP):
             return wrapper
         return decorator
 
-    def add_tool(self, fn: Callable, name: Optional[str] = None, description: Optional[str] = None, **kwargs):
+    def add_tool(self, fn: Callable, name: Optional[str] = None, description: Optional[str] = None, tracer: bool = True, **kwargs):
         """
         Manually register a tool with standardized envelope.
         """
@@ -252,7 +272,7 @@ class FastMCP(LibFastMCP):
             return LibFastMCP.add_tool(self, fn, name=name, description=description, **kwargs)
 
         # Apply our tool decorator logic to get the wrapper
-        decorator = self.tool(name=name, description=description, **kwargs)
+        decorator = self.tool(name=name, description=description, tracer=tracer, **kwargs)
         return decorator(fn)
 
     def run(self, transport: str = "stdio"):

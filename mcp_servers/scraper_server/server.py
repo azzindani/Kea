@@ -25,11 +25,22 @@ mcp = FastMCP("scraper_server")
 
 @mcp.tool()
 async def fetch_url(url: str, timeout: int = 30, headers: Dict[str, str] = {}) -> str:
-    """FETCHES URL. [ACTION]
+    """FETCHES URL content. [ACTION]
     
     [RAG Context]
-    Fetch URL content via HTTP GET request.
-    Returns HTML content.
+    Downloads the raw content of a specific URL using a standard HTTP GET request. This is the fastest way to retrieve static content from blogs, documentation, and news sites that do not require complex JavaScript execution.
+    
+    How to Use:
+    - Provide the full URL including 'http://' or 'https://'.
+    - Use this for simple page extractions where speed is more important than visual fidelity.
+    - If the page is a "Single Page App" (React/Vue), use 'browser_scrape_page' instead.
+    
+    Arguments:
+    - url (str): The target web address.
+    - timeout (int): Seconds to wait before giving up (default 30).
+    - headers (Dict): Custom HTTP headers (e.g., User-Agent).
+    
+    Keywords: download page, http request, curl, static extraction, web getter.
     """
     return await fetch_url_module.fetch_url_tool(url, timeout, headers)
 
@@ -38,8 +49,20 @@ async def browser_scrape_page(url: str, wait_for: Optional[str] = None, extract_
     """SCRAPES page (browser). [ACTION]
     
     [RAG Context]
-    Scrape URL using headless browser with JavaScript execution.
-    Returns extracted content.
+    Uses a headless browser (Playwright) to render a webpage exactly as a human would see it, including executing all JavaScript. This is essential for modern websites (React, Vue, Next.js) and pages that load content dynamically.
+    
+    How to Use:
+    - Use this for "Heavy" sites or sites that have anti-bot protections.
+    - 'wait_for': Pass a CSS selector (e.g., '.inventory-list') if the content takes time to load after the initial page load.
+    - 'extract_tables': Automatically finds and converts HTML tables into clean Markdown format.
+    - 'screenshot': Set to True if you need a visual verification of the page state.
+    
+    Arguments:
+    - url (str): Target web address.
+    - wait_for (str): CSS selector to wait for.
+    - extract_tables (bool): Enable/disable table parsing.
+    
+    Keywords: headless browser, playwright, dynamic content, js rendering, stealth scraping.
     """
     return await browser_scrape_module.browser_scrape_tool(url, wait_for, extract_tables, screenshot)
 
@@ -50,8 +73,17 @@ async def batch_scrape(urls: list[str], max_concurrent: int = 5, timeout: int = 
     """BATCH SCRAPE multiple URLs. [ACTION]
     
     [RAG Context]
-    Scrape multiple URLs in parallel using the fetch_url tool.
-    Returns combined results.
+    A "Super Tool" for parallel web extraction. It fires off multiple 'fetch_url' requests simultaneously, significantly reducing the time needed to gather data from multiple sources (e.g., comparing 10 news articles).
+    
+    How to Use:
+    - Provide a list of URLs.
+    - 'max_concurrent': Controls the "politeness" and resource usage. Higher values are faster but risk being blocked.
+    
+    Arguments:
+    - urls (List[str]): List of target web addresses.
+    - max_concurrent (int): Number of parallel threads (default 5).
+    
+    Keywords: parallel scraping, multi-url, bulk fetch, mass extraction.
     """
     arguments = {
         "urls": urls,
