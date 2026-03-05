@@ -156,11 +156,6 @@ class InsightResponse(BaseModel):
 # ============================================================================
 
 
-@app.get("/health")
-async def health_check():
-    from datetime import datetime
-    return {"status": "healthy", "service": "rag_service", "timestamp": datetime.utcnow().isoformat()}
-
 
 @app.post("/insights", response_model=dict)
 async def add_insight(request: AddInsightRequest):
