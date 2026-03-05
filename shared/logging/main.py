@@ -479,8 +479,19 @@ def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optiona
 
     root_logger = logging.getLogger()
 
-    # ── Purge ALL existing handlers ──
-    root_logger.handlers = []
+    # ── Preserve pytest's log-capture handlers so test output remains visible ──
+    # pytest installs LogCaptureHandler (live-log) and _LiveLoggingStreamHandler
+    # on the root logger before pytest_configure runs.  Purging them blindly
+    # silences all service-check and crash messages from pytest's "LIVE LOG"
+    # sections — making the actual failure location invisible to the user.
+    pytest_handlers = [
+        h for h in root_logger.handlers
+        if getattr(type(h), "__module__", "").startswith("_pytest")
+        or type(h).__name__ in ("LogCaptureHandler", "LiveLoggingStreamHandler")
+    ]
+
+    # ── Purge non-pytest handlers from root and all child loggers ──
+    root_logger.handlers = [h for h in root_logger.handlers if h in pytest_handlers]
     # Use list() to avoid "dictionary changed size during iteration" crash
     for name in list(logging.root.manager.loggerDict.keys()):
         lg = logging.getLogger(name)
