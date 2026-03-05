@@ -60,20 +60,27 @@ async def lifespan(_app: FastAPI):
     dataset_loader = DatasetLoader()
     artifact_store = create_artifact_store()
 
-    # Initialize knowledge store (graceful fallback if DATABASE_URL not set)
+    # Initialize knowledge store in the background so uvicorn can start
+    # serving health-check requests immediately (same pattern as ML Inference).
     try:
         knowledge_store = create_knowledge_store()
-        # Explicitly trigger initialization (table creation) on startup
-        await knowledge_store._registry._get_pool()
-        logger.info("Knowledge store initialized and table verified")
-
-        # Auto-sync knowledge files from the knowledge/ library on startup.
-        import asyncio
-        asyncio.create_task(_sync_knowledge_job())
-        logger.info("Knowledge auto-sync scheduled (background)")
     except Exception as e:
-        logger.error(f"Knowledge store failed to start: {e}", exc_info=True)
+        logger.error(f"Knowledge store creation failed: {e}", exc_info=True)
         knowledge_store = None
+
+    async def _init_knowledge_store_bg() -> None:
+        global knowledge_store
+        try:
+            if knowledge_store is not None:
+                await knowledge_store._registry._get_pool()
+                logger.info("Knowledge store initialized and table verified")
+            asyncio.create_task(_sync_knowledge_job())
+            logger.info("Knowledge auto-sync scheduled (background)")
+        except Exception as e:
+            logger.error(f"Knowledge store failed to initialize: {e}", exc_info=True)
+            knowledge_store = None
+
+    asyncio.create_task(_init_knowledge_store_bg())
 
     logger.info("RAG Service initialized")
 
