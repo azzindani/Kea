@@ -101,15 +101,23 @@ async def lifespan(_app: FastAPI):
         f"device_config={settings.ml_inference.device}"
     )
 
-    try:
-        await pool.load_models()
-        logger.info(
-            f"ML Inference ready: {pool.loaded_model_count} model(s) loaded "
-            f"on {pool.device}"
-        )
-    except Exception as e:
-        logger.error(f"Failed to load models during startup: {e}")
-        # Service starts in degraded mode — /health will report the issue
+    # Start model loading as a background task so uvicorn can serve
+    # health-check requests immediately instead of blocking all connections
+    # for the entire GPU model download / init duration.  The /health endpoint
+    # already returns "degraded" until pool._loaded is True, so callers that
+    # need models (await_ml_inference_ready, wait_for_service) will poll and
+    # wait correctly without hitting ConnectError on a silent socket.
+    async def _load_models_bg() -> None:
+        try:
+            await pool.load_models()
+            logger.info(
+                f"ML Inference ready: {pool.loaded_model_count} model(s) loaded "
+                f"on {pool.device}"
+            )
+        except Exception as e:
+            logger.error(f"Failed to load models during startup: {e}")
+
+    asyncio.create_task(_load_models_bg())
 
     # Log registered routes for debugging (INFO level to ensure visibility)
     for route in _app.routes:
