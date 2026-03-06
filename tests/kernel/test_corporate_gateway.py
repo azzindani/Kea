@@ -7,11 +7,11 @@ from kernel.corporate_gateway.engine import (
 )
 from shared.schemas import (
     CorporateProcessRequest,
+)
+from kernel.corporate_gateway.types import (
     ClientIntent,
     ScalingMode,
-    CorporateProcessResponse,
-    CorporateQuality,
-    MissionSummary
+    StrategyAssessment,
 )
 from kernel.task_decomposition.types import GoalComplexity
 
@@ -29,34 +29,27 @@ async def test_corporate_gateway_comprehensive(query, inference_kit):
     """
     print(f"\n\033[1;36m[GATEWAY SIMULATION] Incoming Signal:\033[0m {query}")
     
-    request = CorporateProcessRequest(message=query)
+    # In realistic setting, the gateway gets string from the request instead of building process request.
+    # However we will test the unit functions which accept strings:
     
     # Tier 9 Entry Point: Intent Classification
-    intent_res = await classify_intent(request, kit=inference_kit)
-    assert intent_res.is_success
-    intent = intent_res.signals[0].body["data"]["intent"]
+    intent = await classify_intent(request_content=query, session=None, kit=inference_kit)
+    assert isinstance(intent, ClientIntent)
     
     print(f"   [BRAIN DECISION]: Classified Intent = {intent.upper()}")
     
     if intent == ClientIntent.STATUS_CHECK:
         print("   [ACTION]: Routing to Status retrieval pipeline.")
     elif intent == ClientIntent.INTERRUPT:
-        interrupt_res = await handle_interrupt_logic(request, active_mission_id="mission_active_01")
-        assert interrupt_res.is_success
-        data = interrupt_res.signals[0].body["data"]
-        print(f"   [ACTION]: Interrupt processed -> {data['action']} over {data['mission_id']}")
+        interrupt_res = handle_interrupt_logic(request_content=query, active_mission_id="mission_active_01")
+        print(f"   [ACTION]: Interrupt processed -> {interrupt_res.interrupt_type} | Confidence: {interrupt_res.confidence}")
     else:
         # Assuming NEW_TASK or CONVERSATION
-        # Mock complexity for demo purposes based on keywords
-        complexity = GoalComplexity.COMPOUND if "platform" in query.lower() else GoalComplexity.SIMPLE
+        strategy = await assess_strategy(request_content=query, session=None, kit=inference_kit)
         
-        strategy_res = await assess_strategy(request, complexity, kit=inference_kit)
-        assert strategy_res.is_success
-        strategy = strategy_res.signals[0].body["data"]
-        
-        print(f"   [STRATEGY]: Complexity Assessment = {complexity.value.upper()}")
-        print(f"   [STRATEGY]: Scaling Mode Selected = {strategy['selected_mode'].upper()}")
-        print(f"   [STRATEGY]: Required Domains = {strategy['required_domains']}")
+        print(f"   [STRATEGY]: Complexity Assessment = {strategy.complexity.upper()}")
+        print(f"   [STRATEGY]: Scaling Mode Selected = {strategy.scaling_mode.value.upper()}")
+        print(f"   [STRATEGY]: Estimated Agents = {strategy.estimated_agents}")
 
     print(" \033[92m[SIMULATION STABLE]\033[0m")
 
@@ -66,39 +59,33 @@ async def test_corporate_gateway_synthesis(inference_kit):
     
     objective = "Analyze market and confirm engineering capabilities."
     artifacts = [
-        "Artifact 1: Market research shows 20% growth.",
-        "Artifact 2: Engineering confirms feasibility."
+        {"content": "Market research shows 20% growth.", "metadata": {"topic": "Market Research", "agent_id": "agent-market"}},
+        {"content": "Engineering confirms feasibility.", "metadata": {"topic": "Engineering Feasibility", "agent_id": "agent-eng"}}
     ]
-    report = CorporateQuality(
-        contradictions_found=False,
-        quality_score=0.92,
-        resolution_notes="All clear."
-    )
-    summary = MissionSummary(
-        total_tasks=2,
-        failed_tasks=0,
-        total_duration_ms=1500.0,
-        total_cost=0.04
+    
+    strategy = StrategyAssessment(
+        complexity="moderate",
+        scaling_mode=ScalingMode.TEAM,
+        estimated_agents=2,
     )
     
-    request = CorporateProcessRequest(
-        message=objective,
-        require_executive_summary=True
-    )
+    quality_report = {"gaps": [], "completion_pct": 1.0}
     
     print(f"\n--- Testing Corporate Gateway Synthesis: Objective='{objective}' ---")
     
-    result = await synthesize_response(request, artifacts, report, summary, kit=inference_kit)
-    assert result.is_success
+    result = await synthesize_response(
+        artifacts=artifacts, 
+        strategy=strategy, 
+        quality_report=quality_report, 
+        kit=inference_kit
+    )
     
-    resp_obj = CorporateProcessResponse(**result.signals[0].body["data"])
+    print(f"   [OUTPUT]: Merged Sections = {len(result.sections)}")
+    print(f"   [OUTPUT]: Is Partial = {result.is_partial}")
+    print(f"\n\033[1;32m[FINAL EXECUTIVE SUMMARY]:\033[0m\n{result.executive_summary}\n")
     
-    print(f"   [OUTPUT]: Merged Artifacts = {len(resp_obj.artifacts)}")
-    print(f"   [OUTPUT]: Quality Score = {resp_obj.quality_metrics.quality_score:.2f}")
-    print(f"\n\033[1;32m[FINAL EXECUTIVE SUMMARY]:\033[0m\n{resp_obj.executive_summary}\n")
-    
-    assert resp_obj.executive_summary is not None
-    assert len(resp_obj.artifacts) == 2
+    assert result.executive_summary != ""
+    assert len(result.sections) == 2
     
     print(" \033[92m[SUCCESS]\033[0m")
 

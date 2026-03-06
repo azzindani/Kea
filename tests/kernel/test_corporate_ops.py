@@ -1,101 +1,57 @@
 import pytest
-from kernel.corporate_ops.engine import (
-    hire_team,
-    match_profiles,
-    run_sprint,
-    audit_artifacts
-)
-from shared.schemas import (
-    MissionChunk,
-    TeamSprintResult,
-    QualityAudit,
-    RoleProfile,
-    MissionStatus
-)
-from kernel.task_decomposition.types import SubTaskItem
+from kernel.workforce_manager.engine import evaluate_performance, match_specialist
+from kernel.team_orchestrator.engine import plan_sprints
+from kernel.quality_resolver.engine import score_sprint_quality
+from kernel.workforce_manager.types import MissionChunk
+from kernel.quality_resolver.types import QualityAudit
 
-@pytest.mark.parametrize("scenario, chunks, required_domains", [
-    (
-        "Simple Feature", 
-        [MissionChunk(chunk_id="c1", description="Write a sorting algorithm.", requires_team=False)], 
-        ["python", "algorithms"]
-    ),
-    (
-        "Full Stack Application", 
-        [
-            MissionChunk(chunk_id="t1", description="Design database schema", requires_team=False), 
-            MissionChunk(chunk_id="t2", description="Build API endpoints", requires_team=False)
-        ], 
-        ["engineering", "database"]
-    ),
-])
 @pytest.mark.asyncio
-async def test_corporate_ops_hiring_simulation(scenario, chunks, required_domains, inference_kit):
+async def test_corporate_ops_comprehensive(inference_kit):
     """
-    MIDDLE MANAGEMENT SIMULATION: Team hiring and profile matching based on mission chunks.
+    APEX SIMULATION: Tier 8 Corporate Operations.
+    This simulates the full Ops pipeline: Planning -> Hiring -> Quality Audit.
     """
-    print(f"\n\033[1;34m[OPS SIMULATION] Scenario:\033[0m {scenario}")
+    print(f"\n\033[1;34m[OPS SIMULATION] Starting Full Corporate Operations Pipeline\033[0m")
     
-    # 1. Profile Match Simulation for single task
-    if len(chunks) == 1:
-        result = await match_profiles(chunks[0], required_skills=required_domains)
-        assert result.is_success
-        role = RoleProfile(**result.signals[0].body["data"])
-        
-        print(f"   [PROFILE MATCH]: Picked Specialist = {role.role_name} (Confidence: {role.confidence:.2f})")
-        assert role.confidence > 0.0
+    # 1. Plan Sprints (Team Orchestrator)
+    print("   [ACTION]: Planning sprints for complex mission...")
+    chunks = [
+        MissionChunk(chunk_id="c1", parent_objective_id="o1", domain="infrastructure", sub_objective="Setup K8s"),
+        MissionChunk(chunk_id="c2", parent_objective_id="o1", domain="database", sub_objective="Configure Postgres", depends_on=["c1"]),
+    ]
     
-    # 2. Complete Team Assembly
-    team_res = await hire_team(mission_chunks=chunks, required_domains=required_domains)
-    assert team_res.is_success
-    team = team_res.signals[0].body["data"]
+    plan_result = await plan_sprints(chunks, mission_id="mission_01", kit=inference_kit)
+    assert plan_result.is_success
+    sprints = plan_result.signals[0].body["data"]["sprints"]
+    print(f"   [ORCHESTRATOR]: Planned {len(sprints)} sprints.")
     
-    print(f"   [TEAM ASSEMBLED]: Total Size = {len(team)}")
-    for i, member in enumerate(team):
-        print(f"     - Agent {i+1}: {member['role_name']}")
+    # 2. Assign Specialists (Workforce Manager)
+    print("   [ACTION]: Hiring specialists for Sprint 1...")
+    available_profiles = [
+        {"profile_id": "prof-devops", "role_name": "DevOps Engineer", "skills": ["aws", "k8s", "docker"]},
+        {"profile_id": "prof-db", "role_name": "Database Admin", "skills": ["sql", "postgres"]}
+    ]
+    
+    match_result = await match_specialist(chunks[0], available_profiles, kit=inference_kit)
+    assert match_result.is_success
+    best_profile = match_result.signals[0].body["data"]["agent_profile_id"]
+    print(f"   [WORKFORCE MANAGER]: Assigned {best_profile} to chunk {chunks[0].chunk_id}")
+    
+    # 3. Quality Audit (Quality Resolver)
+    print("   [ACTION]: Auditing sprint results...")
+    mock_agent_results = [
+        {"agent_id": best_profile, "quality_score": 0.95, "confidence": 0.9, "grounding_rate": 0.99}
+    ]
+    
+    audit_result = await score_sprint_quality(mock_agent_results, sprint_id="sprint_1", kit=inference_kit)
+    assert audit_result.is_success
+    audit = QualityAudit(**audit_result.signals[0].body["data"])
+    
+    print(f"   [QUALITY RESOLVER]: Sprint Audit Verdict = {audit.overall.upper()}")
+    print(f"   [QUALITY RESOLVER]: Average Quality = {audit.avg_quality:.2f}")
 
-    assert len(team) > 0
+    assert audit.overall == "pass"
     print(" \033[92m[SIMULATION STABLE]\033[0m")
-
-@pytest.mark.asyncio
-async def test_corporate_ops_sprint_and_audit(inference_kit):
-    """Verify sprint coordination and the post-sprint quality auditing processes."""
-    
-    sprint_id = "sprint_alpha_01"
-    tasks = [
-        SubTaskItem(task_id="task_1", description="Draft a greeting message.", required_skills=[]),
-        SubTaskItem(task_id="task_2", description="Translate the greeting to Spanish.", required_skills=["translation"])
-    ]
-    
-    print(f"\n--- Testing Ops Sprint Execution: Sprint ID='{sprint_id}' ---")
-    
-    # 1. Sprint Execution
-    sprint_res_pkt = await run_sprint(tasks, sprint_id=sprint_id, kit=inference_kit)
-    assert sprint_res_pkt.is_success
-    sprint_res = TeamSprintResult(**sprint_res_pkt.signals[0].body["data"])
-    
-    print(f"   [SPRINT OUTPUT]: Status = {sprint_res.status.value.upper()}")
-    print(f"   [SPRINT OUTPUT]: Artifacts Generated = {len(sprint_res.consolidated_artifacts)}")
-    print(f"   [SPRINT OUTPUT]: Cohesion Score = {sprint_res.team_cohesion_score:.2f}")
-    
-    assert sprint_res.status == MissionStatus.COMPLETED
-    
-    # 2. Quality Audit on contradictory artifacts
-    artifacts = [
-        {"agent": "Agent A", "content": "The database should use PostgreSQL for production."},
-        {"agent": "Agent B", "content": "We must use MongoDB for this database, discard SQL."}
-    ]
-    
-    audit_res_pkt = await audit_artifacts(artifacts, kit=inference_kit)
-    assert audit_res_pkt.is_success
-    audit = QualityAudit(**audit_res_pkt.signals[0].body["data"])
-    
-    print(f"\n\033[1;31m[RESOLUTION QUALITY AUDIT]:\033[0m")
-    print(f"   -> Contradictions Found: {audit.contradictions_found}")
-    print(f"   -> Mitigation Strategy: {audit.resolution_strategy}\n")
-
-    assert audit.contradictions_found is True
-    print(" \033[92m[SUCCESS]\033[0m")
 
 if __name__ == "__main__":
     import sys
