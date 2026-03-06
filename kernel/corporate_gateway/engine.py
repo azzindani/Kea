@@ -22,7 +22,7 @@ from shared.logging.main import get_logger
 from shared.standard_io import Result, Signal
 
 from ..classification.engine import classify
-from ..classification.types import ClassProfileRules, FallbackTrigger
+from ..classification.types import ClassProfileRules, FallbackTrigger, PatternRule
 
 from .types import (
     ClientIntent,
@@ -96,37 +96,15 @@ async def classify_intent(
     # --- T1 classification for deeper analysis ---
     classify_result = await classify(
         text=request_content,
-        config=ClassProfileRules(
-            profiles={
-                "new_task": {
-                    "keywords": ["build", "create", "design", "implement",
-                                 "develop", "write", "make", "generate",
-                                 "analyze", "research"],
-                    "weight": 1.0,
-                },
-                "follow_up": {
-                    "keywords": ["what was", "recall", "remember", "show me",
-                                 "from before", "earlier", "previous",
-                                 "last time"],
-                    "weight": 1.0,
-                },
-                "status_check": {
-                    "keywords": ["progress", "status", "how far", "update",
-                                 "how's it going", "eta", "remaining"],
-                    "weight": 1.0,
-                },
-                "revision": {
-                    "keywords": ["change", "modify", "update", "fix",
-                                 "revise", "instead", "rather"],
-                    "weight": 1.0,
-                },
-                "conversation": {
-                    "keywords": ["what do you think", "opinion", "explain",
-                                 "tell me about", "discuss", "how does",
-                                 "why is"],
-                    "weight": 1.0,
-                },
-            }
+        profile_rules=ClassProfileRules(
+            labels=["new_task", "follow_up", "status_check", "revision", "conversation"],
+            pattern_rules=[
+                PatternRule(label="new_task", pattern=r"(?i)\b(build|create|design|implement|develop|write|make|generate|analyze|research)\b", weight=1.0),
+                PatternRule(label="follow_up", pattern=r"(?i)\b(what was|recall|remember|show me|from before|earlier|previous|last time)\b", weight=1.0),
+                PatternRule(label="status_check", pattern=r"(?i)\b(progress|status|how far|update|how's it going|eta|remaining)\b", weight=1.0),
+                PatternRule(label="revision", pattern=r"(?i)\b(change|modify|update|fix|revise|instead|rather)\b", weight=1.0),
+                PatternRule(label="conversation", pattern=r"(?i)\b(what do you think|opinion|explain|tell me about|discuss|how does|why is)\b", weight=1.0),
+            ]
         ),
         kit=kit,
     )

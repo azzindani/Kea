@@ -224,9 +224,79 @@ Aggregate the metrics into a `benchmark.json` containing pass rates, timings, an
 
 ---
 
-## 🛠️ Integration Guide
+## �️ Using Scripts in Knowledge Bricks
 
-This library is consumed by the **Orchestrator** (via the `KnowledgeRegistry`). At runtime, the `KnowledgeRetriever` selects the most relevant "Bricks" and rebuilds the LLM's system prompt dynamically.
+Bricks can instruct agents to run shell commands or execute files bundled in their `scripts/` directory. This applies mostly to Skills and Procedures but can be attached to any domain where an agent needs to programmatically execute logic. 
+
+### 1. One-Off Commands vs Bundled Scripts
+When an existing package does exactly what you need, reference it directly in your `SKILL.md` rather than writing a custom script. Since Kea uses `uv`, strongly prefer `uvx` for Python tools.
+- **Example**: `uvx ruff@0.8.0 check .` (Aggressively cached, isolated environments).
+- **Rule**: If a command becomes too complex or needs error handling, move it into a tested file inside `scripts/`.
+
+### 2. Referencing Scripts
+When referencing scripts in your `SKILL.md` (or `REFERENCE.md`), you must use **relative paths from the brick directory root**:
+```markdown
+1. Run the validation script:
+   `bash scripts/validate.sh "$INPUT_FILE"`
+```
+
+### 3. Self-Contained Scripts (PEP 723)
+When you build a reusable script in Python (Kea's primary language), **declare dependencies inline** so the agent can run it without a separate install step. Use the standard PEP 723 format.
+
+```python
+# scripts/extract.py
+# /// script
+# dependencies = [
+#   "beautifulsoup4>=4.12,<5",
+# ]
+# ///
+import sys
+from bs4 import BeautifulSoup
+# ... logic ...
+```
+The agent can then safely run this via: `uv run scripts/extract.py`
+
+### 4. Designing Scripts for Agentic Use
+When building scripts specifically for the Kea orchestrated agents, adhere to these hard interfaces:
+
+- **NO Interactive Prompts**: Agents run in non-interactive shells. Tools that block on `stdin` or `[y/N]` confirmations will hang the orchestration layer. Use strict CLI flags (e.g., `--env staging --force`).
+- **Helpful Errors**: When an agent gets an error, it learns from it. "Error: invalid input" wastes an LLM turn. Write: *"Error: --format must be one of: json, csv. Received: xml"*.
+- **Structured Output**: Prefer JSON or CSV to stdout so the LLM or next pipeline step can reliably parse it. Route diagnostics/warnings to `stderr`.
+- **Expose `--help`**: The agent will often `--help` your script to map its interface. Keep the output concise and include quick examples.
+- **Idempotency**: Agents retry things. "Create if not exists" is vastly superior to "Create and crash if duplicate".
+- **Pagination / Output Limits**: Kea's context window is finite. If a script spits out 500k lines of text, it will destroy the agent's memory. Implement `--limit` and `--offset`, or dump large outputs to an artifact file and print the artifact path.
+
+---
+
+## �🛠️ Integration Guide
+
+This library is consumed by the **Orchestrator** (via the `KnowledgeRegistry`) and fed into the active agent. This section dictates exactly how Kea discovers, parses, and injects Knowledge Bricks into the LLM context.
+
+### 1. Progressive Disclosure Architecture
+Both the AgentSkills specification and Kea depend on a three-tier context loading strategy:
+| Tier | What's Loaded | When | Context Cost |
+| :--- | :--- | :--- | :--- |
+| **1. Catalog** | Name + description | Session start (System Prompt) | ~50-100 tokens per brick |
+| **2. Instructions** | Full `SKILL.md` body | When activated by LLM | <5000 tokens (Standardized) |
+| **3. Resources** | Scripts, references | Dynamically read via tools | Varies |
+
+### 2. Discovery & Parsing (`KnowledgeRegistry`)
+At startup, the `KnowledgeRegistry` discovers bricks to build the Tier 1 Catalog.
+- **Scope Scanning**: Kea recursively scans `knowledge/` categories (Rules, Procedures, etc.). It should also support scanning local repository workspaces via the universal `.agents/skills/` paths for cross-client interoperability.
+- **Precedence & Collisions**: If a Project-level brick and a Universal Kea brick share the same `name`, the **Project-level brick overrides** the Universal brick. 
+- **Lenient Parsing**: The Registry extracts the YAML frontmatter between `---` delimiters. If formatting is imperfect (e.g., string colons breaking standard YAML), the parser will attempt a fallback. If the description is missing entirely, the brick is skipped. Valid metadata is mapped into memory, keyed by `name` alongside the absolute `location` path.
+
+### 3. Disclosure & Activation (`KnowledgeRetriever`)
+- **Disclosure (Tier 1)**: Available bricks are injected into the agent's system prompt (or an activation tool's description) as a lightweight XML catalog: `<available_knowledge><brick><name>...</name><description>...</description></brick>...`.
+- **Activation (Tier 2)**: The agent uses a tool (or file-read capability) to retrieve the required brick.
+- **Structured Wrapping**: When injected into the context, the Orchestrator wraps the body in structured tags (e.g., `<knowledge_brick name="compliance_rule"> ... </knowledge_brick>`). This prevents the LLM from confusing system instructions with user conversation.
+- **Resource Allowlisting**: If Kea restricts file reads via permissions, internal `knowledge/` paths and `.agents/skills/` are strictly **allowlisted**. Agents can read bundled references (`REFERENCE.md`) without asking human permission.
+
+### 4. Context Management & Persistence (The Vault)
+Once instructions are in context, they must remain effective.
+- **Context Compaction Protection**: When Kea's Context Engine (Vault) summarizes or truncates older messages due to token limits, **activated knowledge bricks must be completely exempt from pruning.** Losing constraints or procedures mid-conversation silently degrades enterprise capability.
+- **Deduplication**: The Orchestrator tracks activated bricks. Re-triggering an already loaded rule skips re-injection.
+- **Subagent Spawning (Tier 8+)**: For highly complex bricks, the Corporate Kernel can opt to spawn a dedicated subagent solely loaded with that specific knowledge brick, executing the complex workflow without polluting the primary "Conscious Observer" context.
 
 ---
 
