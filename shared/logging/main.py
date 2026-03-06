@@ -458,23 +458,39 @@ _LOGGING_CONFIGURED = False
 def setup_logging(config: Optional[Union[LogConfig, str]] = None, level: Optional[str] = None, force_stderr: bool = True):
     """Standardized logging setup for all codebases."""
     global _LOGGING_CONFIGURED
-    
+
+    # LOG_LEVEL env-var always wins — read directly to bypass lru_cache on get_settings().
+    # This ensures SILENT_MODE (os.environ["LOG_LEVEL"] = "ERROR") takes effect even when
+    # settings were already cached at a different level, or when logging was already configured.
+    env_override = os.environ.get("LOG_LEVEL", "").strip().upper()
+
     if _LOGGING_CONFIGURED:
+        # Re-entry: just honour any env-var level change on the root logger and return.
+        if env_override:
+            logging.getLogger().setLevel(getattr(logging, env_override, logging.INFO))
         return
 
     with _LOGGING_LOCK:
         if _LOGGING_CONFIGURED:
+            if env_override:
+                logging.getLogger().setLevel(getattr(logging, env_override, logging.INFO))
             return
         _LOGGING_CONFIGURED = True
 
     from shared.config import get_settings
     settings = get_settings()
-    
+
     # Update global flags
     DEFAULT_FLAGS["env"] = settings.app.environment
     DEFAULT_FLAGS["version"] = settings.app.version
-    
-    raw_level = (config.level if isinstance(config, LogConfig) else (config if isinstance(config, str) else settings.logging.level)).lower()
+
+    # Effective level: explicit arg > LOG_LEVEL env-var > settings (cached)
+    _settings_level = settings.logging.level
+    raw_level = (
+        config.level if isinstance(config, LogConfig)
+        else config if isinstance(config, str)
+        else env_override or _settings_level
+    ).lower()
     log_format = settings.logging.format.lower()
 
     root_logger = logging.getLogger()
@@ -562,12 +578,12 @@ try:
             tid = request.headers.get("X-Trace-ID", uuid.uuid4().hex)
             bind_contextvars(request_id=rid, trace_id=tid, method=request.method, path=request.url.path)
             
-            get_logger("http").info(f"▶️  {request.method} {request.url.path}")
+            get_logger("http").debug(f"▶️  {request.method} {request.url.path}")
             start = time.perf_counter()
             try:
                 response = await call_next(request)
                 duration = time.perf_counter() - start
-                get_logger("http").info(f"✅ {response.status_code}", duration_ms=round(duration*1000, 2))
+                get_logger("http").debug(f"✅ {response.status_code}", duration_ms=round(duration*1000, 2))
                 record_api_request(request.method, request.url.path, response.status_code, duration)
                 response.headers["X-Request-ID"] = rid
                 return response
