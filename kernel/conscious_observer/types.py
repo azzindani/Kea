@@ -14,17 +14,17 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from kernel.activation_router.types import ActivationMap
-from kernel.classification.types import ClassificationResult, FallbackTrigger
-from kernel.confidence_calibrator.types import CalibratedConfidence
-from kernel.entity_recognition.types import ValidatedEntity
-from kernel.hallucination_monitor.types import GroundingReport, Origin
-from kernel.intent_sentiment_urgency.types import CognitiveLabels
-from kernel.lifecycle_controller.types import IdentityContext
-from kernel.modality.types import ModalityOutput
-from kernel.noise_gate.types import FilteredOutput, RejectedOutput, RetryGuidance
-from kernel.ooda_loop.types import Decision, LoopResult
-from kernel.self_model.types import CapabilityAssessment, SignalTags
+from ..activation_router.types import ActivationMap
+from ..classification.types import ClassificationResult, FallbackTrigger
+from ..confidence_calibrator.types import CalibratedConfidence
+from ..entity_recognition.types import ValidatedEntity
+from ..hallucination_monitor.types import GroundingReport, Origin
+from ..intent_sentiment_urgency.types import CognitiveLabels
+from ..lifecycle_controller.types import IdentityContext
+from ..modality.types import ModalityOutput
+from ..noise_gate.types import FilteredOutput, RejectedOutput, RetryGuidance
+from ..ooda_loop.types import Decision, LoopResult
+from ..self_model.types import CapabilityAssessment, SignalTags
 
 # Re-export Origin so callers can import it from this module
 __all__ = [

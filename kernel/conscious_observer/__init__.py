@@ -18,11 +18,11 @@ Public API::
 
 from __future__ import annotations
 
-from kernel.conscious_observer.engine import (
+from .engine import (
     ConsciousObserver,
     run_conscious_observer,
 )
-from kernel.conscious_observer.types import (
+from .types import (
     ConsciousObserverResult,
     GateInResult,
     ObserverExecuteResult,

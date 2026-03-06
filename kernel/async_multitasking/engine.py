@@ -14,10 +14,10 @@ from __future__ import annotations
 import time
 from datetime import UTC, datetime
 
-from kernel.graph_synthesizer.types import ExecutableDAG
-from kernel.ooda_loop.types import ActionResult
-from kernel.short_term_memory.engine import ShortTermMemory
-from kernel.short_term_memory.types import NodeExecutionStatus
+from ..graph_synthesizer.types import ExecutableDAG
+from ..ooda_loop.types import ActionResult
+from ..short_term_memory.engine import ShortTermMemory
+from ..short_term_memory.types import NodeExecutionStatus
 from shared.config import get_settings
 from shared.id_and_hash import generate_id
 from shared.logging.main import get_logger

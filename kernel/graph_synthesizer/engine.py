@@ -14,10 +14,10 @@ from __future__ import annotations
 import json
 import time
 
-from kernel.task_decomposition import WorldState, decompose_goal
-from kernel.task_decomposition.types import SubTaskItem
-from kernel.what_if_scenario import simulate_outcomes
-from kernel.what_if_scenario.types import CompiledDAG, SimulationVerdict, VerdictDecision
+from ..task_decomposition import WorldState, decompose_goal
+from ..task_decomposition.types import SubTaskItem
+from ..what_if_scenario import simulate_outcomes
+from ..what_if_scenario.types import CompiledDAG, SimulationVerdict, VerdictDecision
 from shared.config import get_settings
 from shared.id_and_hash import generate_id
 from shared.inference_kit import InferenceKit

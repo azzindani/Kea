@@ -15,7 +15,7 @@ import json
 import time
 from typing import Any
 
-from kernel.lifecycle_controller.types import IdentityContext
+from ..lifecycle_controller.types import IdentityContext
 from shared.config import get_settings
 from shared.inference_kit import InferenceKit
 from shared.llm.provider import LLMMessage

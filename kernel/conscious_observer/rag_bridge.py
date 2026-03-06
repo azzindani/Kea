@@ -29,13 +29,13 @@ from shared.knowledge.retriever import KnowledgeRetriever, get_knowledge_retriev
 from shared.logging.main import get_logger
 from services.mcp_host.core.tool_registry import get_tool_registry
 
-from kernel.conscious_observer.types import (
+from ..conscious_observer.types import (
     RAGEnrichmentResult,
     RAGKnowledgeResult,
     RAGToolResult,
 )
-from kernel.lifecycle_controller.types import CognitiveProfile
-from kernel.self_model.types import SignalTags
+from ..lifecycle_controller.types import CognitiveProfile
+from ..self_model.types import SignalTags
 
 log = get_logger(__name__)
 

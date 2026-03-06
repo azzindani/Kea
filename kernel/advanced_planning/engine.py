@@ -14,7 +14,7 @@ import json
 import time
 from typing import Any
 
-from kernel.task_decomposition.types import SubTaskItem
+from ..task_decomposition.types import SubTaskItem
 from shared.config import get_settings
 from shared.id_and_hash import generate_id
 from shared.inference_kit import InferenceKit

@@ -14,8 +14,8 @@ from __future__ import annotations
 import time
 from datetime import UTC, datetime
 
-from kernel.self_model.engine import update_accuracy_history
-from kernel.self_model.types import (
+from ..self_model.engine import update_accuracy_history
+from ..self_model.types import (
     CalibrationCurve,
     CalibrationHistory,
 )
