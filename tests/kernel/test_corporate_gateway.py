@@ -13,7 +13,6 @@ from kernel.corporate_gateway.types import (
     ScalingMode,
     StrategyAssessment,
 )
-from kernel.task_decomposition.types import GoalComplexity
 
 @pytest.mark.parametrize("query", [
     "Please analyze the competitor data and build a report.",
