@@ -18,77 +18,87 @@ async def test_match_specialist(inference_kit):
     """Test matching a mission chunk to a specialist profile."""
     chunk = MissionChunk(
         chunk_id="chk-123",
-        description="Optimize a distributed SQL database for high read throughput.",
+        parent_objective_id="obj-001",
+        domain="database",
+        sub_objective="Optimize for high read throughput",
         required_skills=["sql", "database_optimization", "distributed_systems"]
     )
     
     available_profiles = [
-        {"role_name": "Frontend Developer", "skills": ["react", "typescript", "css"]},
-        {"role_name": "Database Architect", "skills": ["sql", "postgres", "distributed_systems", "indexing"]},
-        {"role_name": "DevOps Engineer", "skills": ["docker", "kubernetes", "aws"]}
+        {"profile_id": "prof-1", "role_name": "Frontend Developer", "skills": ["react", "typescript", "css"]},
+        {"profile_id": "prof-2", "role_name": "Database Architect", "skills": ["sql", "postgres", "distributed_systems", "indexing"]},
+        {"profile_id": "prof-3", "role_name": "DevOps Engineer", "skills": ["docker", "kubernetes", "aws"]}
     ]
     
     result = await match_specialist(chunk, available_profiles, kit=inference_kit)
     assert result.is_success
     
     match_data = result.signals[0].body["data"]
-    print(f"\n\033[1;36m[WORKFORCE MATCH]\033[0m Chunk: {chunk.description}")
-    print(f"   -> Best Profile: {match_data['role_name']}")
-    print(f"   -> Match Score: {match_data['score']:.2f}")
+    print(f"\n\033[1;36m[WORKFORCE MATCH]\033[0m Chunk: {chunk.sub_objective}")
+    print(f"   -> Best Profile ID: {match_data['agent_profile_id']}")
+    print(f"   -> Match Score: {match_data['composite_score']:.2f}")
     
-    assert match_data['role_name'] == "Database Architect"
-    assert match_data['score'] > 0.5
+    assert match_data['agent_profile_id'] == "prof-2"
+    assert match_data['composite_score'] > 0.5
 
 def test_evaluate_performance():
     """Test extracting performance metrics from a result dict."""
-    handle = AgentHandle(agent_id="agent-007", role="Security Specialist")
+    handle = AgentHandle(
+        agent_id="agent-007", 
+        profile_id="prof-1",
+        chunk_id="chk-123",
+        role_name="Security Specialist"
+    )
     mock_result = {
         "status": "completed",
-        "metrics": {
-            "total_tokens": 1500,
-            "duration_ms": 2500.0,
-            "cost_usd": 0.05
-        },
+        "quality_score": 0.9,
+        "confidence": 0.85,
+        "grounding_rate": 0.95,
+        "duration_ms": 2500.0,
+        "cost": 0.05,
         "success": True
     }
     
     perf = evaluate_performance(handle, mock_result)
     
     print(f"\n\033[1;32m[PERFORMANCE EVALUATION]\033[0m Agent: {handle.agent_id}")
-    print(f"   -> Tokens: {perf.total_tokens} | Duration: {perf.total_duration_ms}ms")
+    print(f"   -> Latency: {perf.latency_ms}ms | Cost: {perf.cost}")
     
     assert perf.agent_id == "agent-007"
-    assert perf.status == AgentStatus.IDLE
-    assert perf.total_tokens == 1500
+    assert perf.quality_score == 0.9
+    assert perf.latency_ms == 2500.0
 
 def test_compute_scale_decisions():
     """Test the pure-logic scaling computation."""
     pool = WorkforcePool(
-        agents=[AgentHandle(agent_id="a1", role="Dev", status=AgentStatus.BUSY)],
-        max_size=5
+        pool_id="pool-1",
+        mission_id="mission-1",
+        agents={
+            "a1": AgentHandle(agent_id="a1", profile_id="prof-1", chunk_id="c0", status=AgentStatus.ACTIVE)
+        },
+        budget_remaining=10.0
     )
     
     pending_chunks = [
-        MissionChunk(chunk_id="c1", description="Task 1"),
-        MissionChunk(chunk_id="c2", description="Task 2"),
-        MissionChunk(chunk_id="c3", description="Task 3")
+        MissionChunk(chunk_id="c1", parent_objective_id="o1", domain="d", sub_objective="s1"),
+        MissionChunk(chunk_id="c2", parent_objective_id="o1", domain="d", sub_objective="s2"),
+        MissionChunk(chunk_id="c3", parent_objective_id="o1", domain="d", sub_objective="s3")
     ]
     
     performance = [
-        PerformanceSnapshot(agent_id="a1", status=AgentStatus.BUSY, total_tokens=100, total_duration_ms=100.0, total_cost=0.01)
+        PerformanceSnapshot(agent_id="a1", quality_score=0.9, cost=0.01)
     ]
     
-    hardware = {"cpu_usage": 0.3, "memory_usage": 0.4}
+    hardware = {"safe_parallel_limit": 5}
     
-    decision_result = compute_scale_decisions(pool, pending_chunks, performance, hardware)
+    decisions = compute_scale_decisions(pool, pending_chunks, performance, hardware)
     
     print(f"\n\033[1;33m[SCALING DECISION]\033[0m Pending: {len(pending_chunks)} | Active: 1")
-    print(f"   -> Action: {decision_result.action}")
-    print(f"   -> Count: {decision_result.count}")
+    for d in decisions:
+        print(f"   -> Action: {d.action} | Target Chunk: {d.target_chunk_id}")
     
-    # With 3 pending tasks and only 1 busy agent, we should probably hire more.
-    assert decision_result.action == ScaleAction.HIRE_MORE
-    assert decision_result.count > 0
+    assert len(decisions) > 0
+    assert any(d.action == ScaleAction.HIRE_MORE for d in decisions)
 
 if __name__ == "__main__":
     import sys

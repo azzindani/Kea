@@ -4,15 +4,15 @@ from kernel.quality_resolver.engine import (
     resolve_conflict,
     score_sprint_quality
 )
-from kernel.quality_resolver.types import Conflict, Resolution
+from kernel.quality_resolver.types import Conflict, Resolution, QualityAudit
 
 @pytest.mark.asyncio
 async def test_detect_conflicts(inference_kit):
     """Test detecting semantic contradictions between agent artifacts."""
     artifacts = [
-        {"agent": "Alice", "content": "The system must use an async Postgres driver."},
-        {"agent": "Bob", "content": "The system should use a synchronous SQLite database for simplicity."},
-        {"agent": "Charlie", "content": "Async Postgres is the best choice for scaling."}
+        {"id": "art-1", "agent": "Alice", "content": "The system must use an async Postgres driver."},
+        {"id": "art-2", "agent": "Bob", "content": "The system should use a synchronous SQLite database for simplicity."},
+        {"id": "art-3", "agent": "Charlie", "content": "Async Postgres is the best choice for scaling."}
     ]
     
     result = await detect_conflicts(artifacts, kit=inference_kit)
@@ -30,25 +30,25 @@ async def test_detect_conflicts(inference_kit):
 async def test_resolve_conflict(inference_kit):
     """Test resolving a detected conflict via weighted consensus."""
     conflict = Conflict(
-        conflict_id="conf-001",
+        artifact_a_id="art-1",
+        artifact_b_id="art-2",
         description="Async Postgres vs Sync SQLite",
-        involved_agents=["Alice", "Bob"],
-        severity=0.8
+        severity="high"
     )
     
-    art_a = {"agent": "Alice", "content": "Async Postgres", "confidence": 0.9}
-    art_b = {"agent": "Bob", "content": "Sync SQLite", "confidence": 0.6}
+    art_a = {"id": "art-1", "agent": "Alice", "content": "Async Postgres", "confidence": 0.9}
+    art_b = {"id": "art-2", "agent": "Bob", "content": "Sync SQLite", "confidence": 0.6}
     
     result = await resolve_conflict(conflict, art_a, art_b, kit=inference_kit)
     assert result.is_success
     
     resolution = result.signals[0].body["data"]
     print(f"\n\033[1;33m[CONFLICT RESOLUTION]\033[0m {conflict.description}")
-    print(f"   -> Winner: {resolution['winning_agent']}")
-    print(f"   -> Strategy: {resolution['strategy']}")
+    print(f"   -> Winner ID: {resolution['winning_artifact_id']}")
+    print(f"   -> Strategy: {resolution.get('strategy_used', 'consensus')}")
     
     # Alice has higher confidence, she should win
-    assert resolution['winning_agent'] == "Alice"
+    assert resolution['winning_artifact_id'] == "art-1"
 
 @pytest.mark.asyncio
 async def test_score_sprint_quality(inference_kit):
@@ -64,11 +64,11 @@ async def test_score_sprint_quality(inference_kit):
     
     audit = result.signals[0].body["data"]
     print(f"\n\033[1;32m[SPRINT QUALITY AUDIT]\033[0m Sprint: {audit['sprint_id']}")
-    print(f"   -> Overall Score: {audit['quality_score']:.2f}")
-    print(f"   -> Verdict: {audit['verdict']}")
+    print(f"   -> Overall Score: {audit['avg_quality']:.2f}")
+    print(f"   -> Verdict: {audit['overall']}")
     
-    assert audit['quality_score'] < 0.8  # Pull down by the third result
-    assert audit['verdict'] in ["pass", "warning", "fail"]
+    assert audit['avg_quality'] < 0.8  # Pull down by the third result
+    assert audit['overall'] in ["pass", "warning", "fail"]
 
 if __name__ == "__main__":
     import sys

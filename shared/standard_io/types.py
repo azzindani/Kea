@@ -73,7 +73,7 @@ class ModuleRef(BaseModel):
     carries a ModuleRef so the full provenance chain is always traceable.
     """
 
-    tier: int = Field(..., ge=0, le=7, description="Tier number (0-7)")
+    tier: int = Field(..., ge=0, le=9, description="Tier number (0-9)")
     module: str = Field(..., min_length=1, description="Module name (e.g., 'classification')")
     function: str = Field(..., min_length=1, description="Function name (e.g., 'classify')")
 
