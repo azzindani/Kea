@@ -578,12 +578,12 @@ try:
             tid = request.headers.get("X-Trace-ID", uuid.uuid4().hex)
             bind_contextvars(request_id=rid, trace_id=tid, method=request.method, path=request.url.path)
             
-            get_logger("http").info(f"▶️  {request.method} {request.url.path}")
+            get_logger("http").debug(f"▶️  {request.method} {request.url.path}")
             start = time.perf_counter()
             try:
                 response = await call_next(request)
                 duration = time.perf_counter() - start
-                get_logger("http").info(f"✅ {response.status_code}", duration_ms=round(duration*1000, 2))
+                get_logger("http").debug(f"✅ {response.status_code}", duration_ms=round(duration*1000, 2))
                 record_api_request(request.method, request.url.path, response.status_code, duration)
                 response.headers["X-Request-ID"] = rid
                 return response
