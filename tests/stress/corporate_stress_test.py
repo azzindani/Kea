@@ -102,21 +102,37 @@ async def test_corporate_kernel_stress(inference_kit, swarm_size):
         logger.info(f"   => Phase Duration: {p1_dur:.3f}s")
     
     # ------------------------------------------------------------------
-    # PHASE 2: TEAM ORCHESTRATOR - MASSIVE DAG (TIER 8)
+    # PHASE 2: TIER 2 TASK DECOMPOSITION -> ORCHESTRATOR
     # ------------------------------------------------------------------
-    logger.info(f"\n[PHASE 2] Ops Orchestrator: Generating {swarm_size} Mission Chunks")
+    logger.info(f"\n[PHASE 2] Ops Orchestrator: Dynamically Decomposing User Request")
     p2_start = time.time()
     
-    # Synthetically generate massive chunk load
+    from kernel.task_decomposition.engine import decompose_goal
+    from kernel.task_decomposition.types import WorldState
+    
+    # Let Tier 2 use the LLM to dynamically figure out how many chunks this takes!
+    ws = WorldState(goal=query)
+    decompose_result = await decompose_goal(context=ws, kit=inference_kit)
+    assert decompose_result.is_success, "Task Decomposition failed!"
+    
+    dynamic_subtasks = decompose_result.signals[0].payload
+    if not isinstance(dynamic_subtasks, list) or len(dynamic_subtasks) == 0:
+        logger.warning("LLM didn't return chunks, creating a fallback single chunk")
+        dynamic_subtasks = [{"id": "fallback_1", "domain": "general", "description": query, "required_skills": ["general"]}]
+    
+    swarm_size = len(dynamic_subtasks)
+    logger.info(f"   => Auto-Scaled Swarm Size: {swarm_size} distinct tasks derived from prompt")
+    
     chunks = []
-    for i in range(swarm_size):
+    for i, st in enumerate(dynamic_subtasks):
         chunks.append(
             MissionChunk(
-                chunk_id=f"chk_{i}", 
+                chunk_id=st.get("id", f"chk_{i}"), 
                 parent_objective_id="msg_stress_test", 
-                domain="engineering" if i % 2 == 0 else "analysis", 
-                sub_objective=f"Develop critical module {i}",
-                depends_on=[f"chk_{i-1}"] if i > 0 and i % 5 != 0 else [] # Occasional parallelism
+                domain=st.get("domain", "general"), 
+                sub_objective=st.get("description", f"Develop module {i}"),
+                depends_on=st.get("depends_on", []),
+                required_skills=st.get("required_skills", ["general"])
             )
         )
         
@@ -132,19 +148,48 @@ async def test_corporate_kernel_stress(inference_kit, swarm_size):
     # ------------------------------------------------------------------
     # PHASE 3: WORKFORCE MANAGER - PARALLEL HIRING (TIER 8)
     # ------------------------------------------------------------------
-    logger.info(f"\n[PHASE 3] Ops Workforce: Parallel Specialist Matching ({swarm_size} agents)")
+    # Load REAL profiles from the Kea Library Manifest
+    manifest_path = PROJECT_ROOT / "knowledge" / "LIBRARY_MANIFEST.md"
+    real_profiles = []
+    
+    import re
+    if manifest_path.exists():
+        content = manifest_path.read_text(encoding="utf-8")
+        # Match markdown table rows: | **[Role Name](link.md)** | Description | `tags, here` |
+        pattern = re.compile(r"\|\s*\*\*\[(.*?)\]\((.*?)\)\*\*\s*\|\s*(.*?)\s*\|\s*`(.*?)`\s*\|")
+        for match in pattern.finditer(content):
+            role_name = match.group(1).strip()
+            link = match.group(2).strip()
+            # Description is group 3
+            tags = [t.strip() for t in match.group(4).split(",")]
+            profile_id = Path(link).stem
+            
+            real_profiles.append({
+                "profile_id": "prof-" + profile_id,
+                "role_name": role_name,
+                "skills": tags
+            })
+            
+    # Fallback if parsing failed or file missing
+    if len(real_profiles) < 10:
+        logger.warning("Could not parse LIBRARY_MANIFEST.md, falling back to dummy profiles")
+        real_profiles = [
+            {"profile_id": "prof-devops", "role_name": "DevOps Engineer", "skills": ["aws", "k8s", "docker", "engineering"]},
+            {"profile_id": "prof-db", "role_name": "Database Admin", "skills": ["sql", "postgres", "engineering"]},
+            {"profile_id": "prof-analyst", "role_name": "Data Analyst", "skills": ["analysis", "finance", "reports"]}
+        ]
+    
+    # Limit to 50 profiles to avoid immediately rate-limiting the LLM API during massive parallel testing
+    # In a real environment, Kea uses cached embeddings, but here we cap to prevent test failure.
+    limited_profiles = real_profiles[:50] 
+
+    logger.info(f"\n[PHASE 3] Ops Workforce: Parallel Specialist Matching ({swarm_size} chunks vs {len(limited_profiles)} REAL profiles)")
     p3_start = time.time()
     
-    available_profiles = [
-        {"profile_id": "prof-devops", "role_name": "DevOps Engineer", "skills": ["aws", "k8s", "docker", "engineering"]},
-        {"profile_id": "prof-db", "role_name": "Database Admin", "skills": ["sql", "postgres", "engineering"]},
-        {"profile_id": "prof-analyst", "role_name": "Data Analyst", "skills": ["analysis", "finance", "reports"]}
-    ]
-    
-    # Run all matching concurrently
+    # Run all matching concurrently - THIS IS THE INTENSIVE LLM/VECTOR LOAD
     match_tasks = []
     for chunk in chunks:
-        match_tasks.append(match_specialist(chunk, available_profiles, kit=inference_kit))
+        match_tasks.append(match_specialist(chunk, limited_profiles, kit=inference_kit))
     
     match_results = await asyncio.gather(*match_tasks)
     
