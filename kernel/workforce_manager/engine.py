@@ -126,7 +126,7 @@ async def match_specialist(
             # Extract score from result signals
             score_value = 0.0
             if score_result.signals:
-                score_data = score_result.signals[0].payload
+                score_data = score_result.signals[0].body.get("data", {})
                 if isinstance(score_data, dict):
                     score_value = score_data.get("score", 0.0)
 

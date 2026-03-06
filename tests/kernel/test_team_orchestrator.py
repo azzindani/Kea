@@ -43,7 +43,7 @@ async def test_build_sprint_dag(inference_kit):
         ]
     )
     
-    result = await build_sprint_dag(sprint, kit=inference_kit)
+    result = build_sprint_dag(sprint, kit=inference_kit)
     assert result.is_success
     
     dag = result.signals[0].body["data"]
@@ -67,6 +67,9 @@ async def test_review_sprint(inference_kit):
         sprint_id="s1",
         completed_chunks=["c1"],
         failed_chunks=[],
+        agent_results={
+            "agent_a": {"quality_score": 0.95}
+        },
         artifacts_produced=["art-1", "art-2"],
         duration_ms=5000.0,
         total_cost=0.04

@@ -111,7 +111,7 @@ async def detect_conflicts(
 
                 similarity = 0.0
                 if score_result.signals:
-                    score_data = score_result.signals[0].payload
+                    score_data = score_result.signals[0].body.get("data", {})
                     if isinstance(score_data, dict):
                         similarity = score_data.get("score", 0.0)
 

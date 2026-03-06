@@ -134,7 +134,7 @@ async def classify_intent(
     # Extract classification result
     top_profile = "new_task"
     if classify_result.signals:
-        payload = classify_result.signals[0].payload
+        payload = classify_result.signals[0].body.get("data", {})
         if isinstance(payload, dict):
             top_profile = payload.get("profile", "new_task")
 
@@ -196,7 +196,7 @@ async def assess_strategy(
 
     complexity = "moderate"
     if complexity_result.signals:
-        payload = complexity_result.signals[0].payload
+        payload = complexity_result.signals[0].body.get("data", {})
         if isinstance(payload, dict):
             complexity = payload.get("level", "moderate")
 
@@ -206,7 +206,7 @@ async def assess_strategy(
         from kernel.self_model.engine import assess_capability
         cap_result = assess_capability(request_content)
         if cap_result.signals:
-            payload = cap_result.signals[0].payload
+            payload = cap_result.signals[0].body.get("data", {})
             if isinstance(payload, dict):
                 capability_gaps = payload.get("gaps", [])
     except Exception as exc:
