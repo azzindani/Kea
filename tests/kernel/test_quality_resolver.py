@@ -36,8 +36,14 @@ async def test_resolve_conflict(inference_kit):
         severity="high"
     )
     
-    art_a = {"id": "art-1", "agent": "Alice", "content": "Async Postgres", "confidence": 0.9}
-    art_b = {"id": "art-2", "agent": "Bob", "content": "Sync SQLite", "confidence": 0.6}
+    art_a = {
+        "artifact_id": "art-1", 
+        "metadata": {"confidence": 0.9, "quality_score": 0.9}
+    }
+    art_b = {
+        "artifact_id": "art-2", 
+        "metadata": {"confidence": 0.6, "quality_score": 0.6}
+    }
     
     result = await resolve_conflict(conflict, art_a, art_b, kit=inference_kit)
     assert result.is_success
