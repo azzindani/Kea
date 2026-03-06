@@ -24,7 +24,7 @@ from shared.standard_io import Result, Signal
 from ..classification.engine import classify
 from ..classification.types import ClassProfileRules, FallbackTrigger
 
-from ..corporate_gateway.types import (
+from .types import (
     ClientIntent,
     CorporateQuality,
     InterruptClassification,

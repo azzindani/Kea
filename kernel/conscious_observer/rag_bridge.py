@@ -29,7 +29,7 @@ from shared.knowledge.retriever import KnowledgeRetriever, get_knowledge_retriev
 from shared.logging.main import get_logger
 from services.mcp_host.core.tool_registry import get_tool_registry
 
-from ..conscious_observer.types import (
+from .types import (
     RAGEnrichmentResult,
     RAGKnowledgeResult,
     RAGToolResult,
