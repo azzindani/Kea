@@ -63,23 +63,12 @@ forecasting models for cloud costs, an intelligent AI load balancer, marketing m
 and a legal compliance framework for GDPR.
 """
 
-def pytest_addoption(parser):
-    """Add custom pytest options for corporate stress tests."""
-    try:
-        parser.addoption(
-            "--swarm-size",
-            action="store",
-            default="100",
-            help="Number of chunks/agents to simulate for the Swarm limit test",
-        )
-    except ValueError:
-        pass
-
+import os
 
 @pytest.fixture
-def swarm_size(request):
-    """Get swarm size from command line."""
-    return int(request.config.getoption("--swarm-size", default="100"))
+def swarm_size():
+    """Get swarm size from environment variable."""
+    return int(os.environ.get("SWARM_SIZE", "100"))
 
 
 @pytest.mark.stress
@@ -234,6 +223,6 @@ if __name__ == "__main__":
     else:
         pytest_args.append("--log-cli-level=INFO")
         
-    pytest_args.extend(["--swarm-size", str(args.swarm_size)])
+    os.environ["SWARM_SIZE"] = str(args.swarm_size)
     
     sys.exit(pytest.main(pytest_args))
