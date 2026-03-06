@@ -24,9 +24,6 @@ from shared.schemas import (
     CorporateAgentStatusResponse,
 )
 
-from kernel.conscious_observer import ConsciousObserver
-from kernel.lifecycle_controller import SpawnRequest, SpawnResponse, spawn_agent
-from shared.inference_kit import InferenceKit
 # The Orchestrator manages an in-memory pool of agents for now
 # In a robust distributed setup, this would be Redis/Db + Kubernetes Pods
 _ACTIVE_AGENTS: dict[str, dict[str, Any]] = {}
@@ -45,7 +42,8 @@ def _get_agent_state(agent_id: str) -> dict[str, Any]:
 @router.post("", response_model=CorporateAgentSpawnResponse)
 async def spawn_corporate_agent(request: CorporateAgentSpawnRequest) -> CorporateAgentSpawnResponse:
     """Spawn a new Human Kernel specialist (Tier 7)."""
-    
+    from kernel.lifecycle_controller import SpawnRequest, spawn_agent
+
     # 1. Use Tier 5 lifecycle_controller to generate identity
     spawn_req = SpawnRequest(
         mission_id=request.mission_id,
@@ -111,6 +109,8 @@ async def spawn_corporate_agents_batch(requests: list[CorporateAgentSpawnRequest
 @router.post("/{agent_id}/process", response_model=CorporateAgentProcessResponse)
 async def process_corporate_agent(agent_id: str, request: CorporateAgentProcessRequest) -> CorporateAgentProcessResponse:
     """Execute ConsciousObserver.process() on a spawned agent."""
+    from kernel.conscious_observer import ConsciousObserver
+    from shared.inference_kit import InferenceKit
     state = _get_agent_state(agent_id)
     
     spawn_req: CorporateAgentSpawnRequest = state["spawn_request"]

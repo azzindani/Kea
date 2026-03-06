@@ -14,11 +14,11 @@ from __future__ import annotations
 import json
 import time
 
-from kernel.advanced_planning.types import ExpectedOutcome
-from kernel.graph_synthesizer.types import ExecutableDAG
-from kernel.task_decomposition.types import WorldState
-from kernel.what_if_scenario import simulate_outcomes
-from kernel.what_if_scenario.types import (
+from ..advanced_planning.types import ExpectedOutcome
+from ..graph_synthesizer.types import ExecutableDAG
+from ..task_decomposition.types import WorldState
+from ..what_if_scenario import simulate_outcomes
+from ..what_if_scenario.types import (
     CompiledDAG,
     SimulationVerdict,
 )

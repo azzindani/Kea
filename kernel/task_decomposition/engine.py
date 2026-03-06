@@ -13,9 +13,9 @@ from __future__ import annotations
 import json
 import time
 
-from kernel.entity_recognition import extract_entities
-from kernel.entity_recognition.types import ValidatedEntity as ValidatedEntityType
-from kernel.intent_sentiment_urgency import IntentLabel, detect_intent, detect_intent_async
+from ..entity_recognition import extract_entities
+from ..entity_recognition.types import ValidatedEntity as ValidatedEntityType
+from ..intent_sentiment_urgency import IntentLabel, detect_intent, detect_intent_async
 from shared.config import get_settings
 from shared.id_and_hash import generate_id
 from shared.inference_kit import InferenceKit

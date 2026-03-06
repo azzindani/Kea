@@ -17,8 +17,8 @@ import time
 
 import numpy as np
 
-from kernel.activation_router.types import ActivationMap
-from kernel.ooda_loop.types import Decision
+from ..activation_router.types import ActivationMap
+from ..ooda_loop.types import Decision
 from shared.config import get_settings
 from shared.inference_kit import InferenceKit
 from shared.logging.main import get_logger

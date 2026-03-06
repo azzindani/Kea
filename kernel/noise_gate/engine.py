@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import time
 
-from kernel.confidence_calibrator.types import CalibratedConfidence
-from kernel.hallucination_monitor.types import (
+from ..confidence_calibrator.types import CalibratedConfidence
+from ..hallucination_monitor.types import (
     ClaimGradeLevel,
     GroundingReport,
 )

@@ -18,7 +18,7 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
-from kernel.graph_synthesizer.types import ActionInstruction, ExecutableNode, NodeStatus
+from ..graph_synthesizer.types import ActionInstruction, ExecutableNode, NodeStatus
 from shared.inference_kit import InferenceKit
 from shared.llm.provider import LLMMessage
 from shared.logging.main import get_logger, log_node_assembly

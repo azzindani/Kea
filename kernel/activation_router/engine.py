@@ -16,7 +16,7 @@ import json
 import time
 
 import numpy as np
-from kernel.self_model.types import CapabilityAssessment, SignalTags
+from ..self_model.types import CapabilityAssessment, SignalTags
 from shared.config import get_settings
 from shared.inference_kit import InferenceKit
 from shared.knowledge import load_system_knowledge

@@ -13,7 +13,7 @@ from __future__ import annotations
 import time
 from datetime import UTC, datetime
 
-from kernel.lifecycle_controller.types import LifecyclePhase
+from ..lifecycle_controller.types import LifecyclePhase
 from shared.config import get_settings
 from shared.logging.main import get_logger
 from shared.logging.decorators import trace_io

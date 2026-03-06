@@ -21,18 +21,6 @@ from shared.schemas import (
     CorporateAgentSpawnRequest,
 )
 
-from kernel.team_orchestrator import (
-    MissionResult,
-    Sprint,
-    SprintResult,
-    SprintReview,
-    CorporateOODAResult,
-    build_sprint_dag,
-    plan_sprints,
-    review_sprint,
-)
-from kernel.workforce_manager import AgentHandle, AgentStatus, MissionChunk, WorkforcePool
-
 from services.corporate_ops.clients.orchestrator_client import (
     get_corporate_orchestrator_client,
 )
@@ -63,7 +51,7 @@ class MissionRequest(BaseModel):
 
     mission_id: str = Field(..., description="Unique mission identifier")
     objective: str = Field(..., description="High-level mission objective")
-    chunks: list[MissionChunk] = Field(..., description="Decomposed mission chunks")
+    chunks: list[Any] = Field(..., description="Decomposed mission chunks (MissionChunk dicts)")
     budget: float = Field(default=0.0, ge=0.0)
     available_profiles: list[dict[str, Any]] = Field(default_factory=list)
 
@@ -91,10 +79,10 @@ class ResumeRequest(BaseModel):
 
 
 async def _execute_sprint(
-    sprint: Sprint,
+    sprint: Any,
     mission_id: str,
     available_profiles: list[dict[str, Any]],
-) -> SprintResult:
+) -> Any:
     """Execute a sprint by hiring agents and dispatching work via HTTP.
 
     1. Build sprint DAG (pure kernel)
@@ -102,6 +90,7 @@ async def _execute_sprint(
     3. For each agent: execute via Orchestrator HTTP
     4. Collect results
     """
+    from kernel.team_orchestrator import SprintResult
     settings = get_settings()
     orch_client = await get_corporate_orchestrator_client()
 
@@ -226,6 +215,9 @@ async def orchestrate_mission(request: MissionRequest) -> dict[str, Any]:
     2. For each sprint: execute_sprint() → review_sprint() → checkpoint
     3. Return aggregated MissionResult
     """
+    from kernel.team_orchestrator import (
+        MissionResult, Sprint, SprintReview, plan_sprints, review_sprint,
+    )
     settings = get_settings()
     mission_id = request.mission_id
     start_time = time.perf_counter()

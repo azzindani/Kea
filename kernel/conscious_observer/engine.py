@@ -22,43 +22,43 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from kernel.activation_router.engine import (
+from ..activation_router.engine import (
     compute_activation_map,
     select_pipeline,
 )
-from kernel.activation_router.types import ActivationMap, ComplexityLevel
-from kernel.advanced_planning.engine import plan_advanced
-from kernel.advanced_planning.types import PlanningConstraints
-from kernel.classification.engine import classify
-from kernel.classification.types import (
+from ..activation_router.types import ActivationMap, ComplexityLevel
+from ..advanced_planning.engine import plan_advanced
+from ..advanced_planning.types import PlanningConstraints
+from ..classification.engine import classify
+from ..classification.types import (
     ClassificationResult,
     ClassProfileRules,
     FallbackTrigger,
 )
-from kernel.cognitive_load_monitor.engine import monitor_cognitive_load
-from kernel.cognitive_load_monitor.types import CycleTelemetry, LoadAction, LoadRecommendation
-from kernel.confidence_calibrator.engine import run_confidence_calibration
-from kernel.confidence_calibrator.types import CalibratedConfidence
-from kernel.entity_recognition.engine import extract_entities
-from kernel.entity_recognition.types import ValidatedEntity
-from kernel.graph_synthesizer.engine import synthesize_plan
-from kernel.graph_synthesizer.types import ActionInstruction, DAGState, ExecutableDAG, ExecutableNode, NodeStatus
-from kernel.hallucination_monitor.engine import verify_grounding
-from kernel.hallucination_monitor.types import GroundingReport, Origin
-from kernel.intent_sentiment_urgency.engine import run_primitive_scorers
-from kernel.intent_sentiment_urgency.types import CognitiveLabels
-from kernel.lifecycle_controller.engine import (
+from ..cognitive_load_monitor.engine import monitor_cognitive_load
+from ..cognitive_load_monitor.types import CycleTelemetry, LoadAction, LoadRecommendation
+from ..confidence_calibrator.engine import run_confidence_calibration
+from ..confidence_calibrator.types import CalibratedConfidence
+from ..entity_recognition.engine import extract_entities
+from ..entity_recognition.types import ValidatedEntity
+from ..graph_synthesizer.engine import synthesize_plan
+from ..graph_synthesizer.types import ActionInstruction, DAGState, ExecutableDAG, ExecutableNode, NodeStatus
+from ..hallucination_monitor.engine import verify_grounding
+from ..hallucination_monitor.types import GroundingReport, Origin
+from ..intent_sentiment_urgency.engine import run_primitive_scorers
+from ..intent_sentiment_urgency.types import CognitiveLabels
+from ..lifecycle_controller.engine import (
     initialize_agent,
     load_cognitive_profile,
     set_identity_constraints,
 )
-from kernel.lifecycle_controller.types import IdentityContext, SpawnRequest
-from kernel.modality.engine import ingest
-from kernel.modality.types import ModalityOutput, RawInput
-from kernel.noise_gate.engine import clear_retry_budget, filter_output
-from kernel.noise_gate.types import FilteredOutput, RejectedOutput, ToolOutput
-from kernel.ooda_loop.engine import run_ooda_cycle
-from kernel.ooda_loop.types import (
+from ..lifecycle_controller.types import IdentityContext, SpawnRequest
+from ..modality.engine import ingest
+from ..modality.types import ModalityOutput, RawInput
+from ..noise_gate.engine import clear_retry_budget, filter_output
+from ..noise_gate.types import FilteredOutput, RejectedOutput, ToolOutput
+from ..ooda_loop.engine import run_ooda_cycle
+from ..ooda_loop.types import (
     AgentState,
     AgentStatus,
     CycleAction,
@@ -68,17 +68,17 @@ from kernel.ooda_loop.types import (
     LoopTerminationReason,
     MacroObjective,
 )
-from kernel.reflection_and_guardrails.engine import run_pre_execution_check
-from kernel.self_model.engine import (
+from ..reflection_and_guardrails.engine import run_pre_execution_check
+from ..self_model.engine import (
     assess_capability,
     get_calibration_history,
     update_cognitive_state,
 )
-from kernel.self_model.types import ProcessingPhase, SignalTags
-from kernel.short_term_memory.engine import ShortTermMemory
-from kernel.task_decomposition.engine import decompose_goal
-from kernel.task_decomposition.types import SubTaskItem, WorldState
-from kernel.what_if_scenario.engine import simulate_outcomes
+from ..self_model.types import ProcessingPhase, SignalTags
+from ..short_term_memory.engine import ShortTermMemory
+from ..task_decomposition.engine import decompose_goal
+from ..task_decomposition.types import SubTaskItem, WorldState
+from ..what_if_scenario.engine import simulate_outcomes
 from shared.config import get_settings
 from shared.id_and_hash import generate_id
 from shared.inference_kit import InferenceKit

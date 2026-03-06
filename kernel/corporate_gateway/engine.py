@@ -19,12 +19,12 @@ from typing import Any
 from shared.config import get_settings
 from shared.inference_kit import InferenceKit
 from shared.logging.main import get_logger
-from shared.standard_io import Result, Signal, make_signal
+from shared.standard_io import Result, Signal
 
-from kernel.classification.engine import classify
-from kernel.classification.types import ClassProfileRules, FallbackTrigger
+from ..classification.engine import classify
+from ..classification.types import ClassProfileRules, FallbackTrigger
 
-from kernel.corporate_gateway.types import (
+from .types import (
     ClientIntent,
     CorporateQuality,
     InterruptClassification,

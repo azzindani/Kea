@@ -23,11 +23,14 @@ Usage (from RAG service):
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Any
-import sys
 
 from shared.config import get_settings
+from shared.logging.main import get_logger
+
+log = get_logger(__name__)
 
 # Optional YAML support for frontmatter
 try:
@@ -124,10 +127,10 @@ def _scan_markdown_files(
 
 
     settings = get_settings().knowledge
-    print(f"DEBUG: Scanning knowledge directory: {knowledge_dir.absolute()}", file=sys.stderr)
+    log.debug("scanning_knowledge_dir", path=str(knowledge_dir.absolute()))
 
     all_md_files = list(knowledge_dir.rglob("*.md"))
-    print(f"DEBUG: Found {len(all_md_files)} total .md files in {knowledge_dir}", file=sys.stderr)
+    log.debug("knowledge_files_found", count=len(all_md_files), path=str(knowledge_dir))
 
     for md_file in all_md_files:
         # Skip README / documentation files
@@ -146,7 +149,7 @@ def _scan_markdown_files(
             if md_file.name.startswith("_") or "internal" in str(md_file).lower():
                 continue
             # Instead of skipping, we just warn and let the fallback logic below handle it
-            print(f"DEBUG: Auto-generating 'name' for {md_file.name} (missing in frontmatter)", file=sys.stderr)
+            log.debug("knowledge_name_auto_generated", file=md_file.name)
 
         name: str = meta.get("name", md_file.stem.replace("_", " ").title())
         description: str = meta.get("description", name)
