@@ -57,13 +57,16 @@ logger = get_logger(__name__)
 
 # Single massive query designed to trigger Swarm mode
 DEFAULT_SWARM_QUERY = """
-Build a comprehensive distributed supercomputer simulator, including frontend, backend, 
-database sharding mechanisms, kubernetes deployment scripts, CI/CD pipelines, financial 
-forecasting models for cloud costs, an intelligent AI load balancer, marketing materials, 
-and a legal compliance framework for GDPR.
+Perform a comprehensive risk analysis and M&A due diligence on a hypothetical merger 
+between a top-tier U.S. commercial bank and a leading decentralized finance (DeFi) protocol. 
+I need a full regulatory compliance audit, a Monte Carlo simulation of combined tier 1 capital, 
+a market microstructure analysis of the DeFi token's liquidity, a post-merger integration plan 
+for legacy COBOL systems with Solidity smart contracts, and a finalized pitch deck for the board of directors.
 """
 
-import os
+def pytest_addoption(parser):
+    pass
+
 
 @pytest.fixture
 def swarm_size():
@@ -79,7 +82,7 @@ async def test_corporate_kernel_stress(inference_kit, swarm_size):
     """
     query = DEFAULT_SWARM_QUERY
     logger.info("="*80)
-    logger.info(f"🚀 INITIALIZING CORPORATE KERNEL STRESS TEST (TARGET SWARM SIZE: {swarm_size})")
+    logger.info(f"🚀 INITIALIZING CORPORATE KERNEL STRESS TEST")
     logger.info("="*80)
     
     total_start_time = time.time()
@@ -115,7 +118,8 @@ async def test_corporate_kernel_stress(inference_kit, swarm_size):
     decompose_result = await decompose_goal(context=ws, kit=inference_kit)
     assert decompose_result.is_success, "Task Decomposition failed!"
     
-    dynamic_subtasks = decompose_result.signals[0].payload
+    # FIX: Signal object uses .body["data"] instead of .payload in the Kea kernel
+    dynamic_subtasks = decompose_result.signals[0].body.get("data", [])
     if not isinstance(dynamic_subtasks, list) or len(dynamic_subtasks) == 0:
         logger.warning("LLM didn't return chunks, creating a fallback single chunk")
         dynamic_subtasks = [{"id": "fallback_1", "domain": "general", "description": query, "required_skills": ["general"]}]
