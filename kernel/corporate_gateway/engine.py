@@ -94,7 +94,7 @@ async def classify_intent(
             return ClientIntent.INTERRUPT
 
     # --- T1 classification for deeper analysis ---
-    classify_result = classify(
+    classify_result = await classify(
         text=request_content,
         config=ClassProfileRules(
             profiles={
