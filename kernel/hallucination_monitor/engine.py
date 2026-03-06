@@ -16,7 +16,7 @@ import re
 import time
 from typing import Any
 
-from kernel.noise_gate.types import ToolOutput
+from ..noise_gate.types import ToolOutput
 from shared.config import get_settings
 from shared.id_and_hash import generate_id
 from shared.inference_kit import InferenceKit

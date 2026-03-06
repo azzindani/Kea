@@ -12,8 +12,8 @@ from __future__ import annotations
 import json
 import time
 
-from kernel.intent_sentiment_urgency import score_urgency
-from kernel.task_decomposition.types import WorldState
+from ..intent_sentiment_urgency import score_urgency
+from ..task_decomposition.types import WorldState
 from shared.config import get_settings
 from shared.id_and_hash import generate_id
 from shared.inference_kit import InferenceKit

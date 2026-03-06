@@ -18,9 +18,9 @@ import json
 import time
 from typing import Any
 
-from kernel.graph_synthesizer.types import ExecutableDAG, NodeStatus
-from kernel.short_term_memory.engine import ShortTermMemory
-from kernel.short_term_memory.types import (
+from ..graph_synthesizer.types import ExecutableDAG, NodeStatus
+from ..short_term_memory.engine import ShortTermMemory
+from ..short_term_memory.types import (
     EventSource,
     NodeExecutionStatus,
     ObservationEvent,

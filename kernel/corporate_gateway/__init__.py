@@ -21,7 +21,7 @@ Composes:
 from __future__ import annotations
 
 # Engine functions
-from kernel.corporate_gateway.engine import (
+from .engine import (
     assess_strategy,
     classify_intent,
     handle_interrupt_logic,
@@ -29,7 +29,7 @@ from kernel.corporate_gateway.engine import (
 )
 
 # Types
-from kernel.corporate_gateway.types import (
+from .types import (
     ClientIntent,
     CorporateExecuteResult,
     CorporateGateInResult,

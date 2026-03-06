@@ -15,9 +15,9 @@ from __future__ import annotations
 import time
 from datetime import UTC, datetime
 
-from kernel.ooda_loop.types import MacroObjective
-from kernel.short_term_memory import ShortTermMemory
-from kernel.short_term_memory.types import EpochSummary
+from ..ooda_loop.types import MacroObjective
+from ..short_term_memory import ShortTermMemory
+from ..short_term_memory.types import EpochSummary
 from shared.config import get_settings
 from shared.id_and_hash import generate_id
 from shared.logging.main import get_logger

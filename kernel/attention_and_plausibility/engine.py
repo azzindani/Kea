@@ -12,8 +12,8 @@ import json
 import re
 import time
 
-from kernel.intent_sentiment_urgency import detect_intent
-from kernel.scoring import compute_semantic_similarity
+from ..intent_sentiment_urgency import detect_intent
+from ..scoring import compute_semantic_similarity
 from shared.config import get_settings
 from shared.inference_kit import InferenceKit
 from shared.llm.provider import LLMMessage

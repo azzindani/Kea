@@ -13,8 +13,8 @@ import json
 import time
 
 # Re-import WorldState from task_decomposition for consistency
-from kernel.task_decomposition.types import WorldState
-from kernel.validation.types import ErrorResponse
+from ..task_decomposition.types import WorldState
+from ..validation.types import ErrorResponse
 from shared.config import get_settings
 from shared.id_and_hash import generate_id
 from shared.inference_kit import InferenceKit
