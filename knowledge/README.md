@@ -48,11 +48,16 @@ Every item added to this library is a permanent asset. When requested to enhance
 When you are asked to generate knowledge, use the following standards:
 
 ### ⚙️ Skills (Capabilities)
-The "How-To" algorithms for the LLM. Every skill must include:
-- **Role**: Define exactly who the agent becomes (e.g., "Principal Architect").
-- **Core Concepts**: 3-5 "First Principles" of the domain.
-- **Reasoning Framework**: A numbered, step-by-step logic chain. **Must be tool-agnostic.**
-- **Output Standards**: Strict formatting, citation, or quality control rules.
+The "How-To" algorithms for the LLM. We integrate the **AgentSkills Specification** for structural consistency and progressive disclosure. Every skill must include:
+- **Directory Structure**: Each skill must reside within its own directory (e.g., `skill-name/`, using lowercase alphanumeric characters and hyphens) and contain a required `SKILL.md` file. Optional directories (`scripts/`, `references/`, `assets/`) can be added for deeper specialized knowledge.
+- **Frontmatter**: The `SKILL.md` must begin with YAML frontmatter specifying at least the `name` (matching the folder) and a clear `description` of what it does and when to use it. Optional fields include `license`, `compatibility`, and `allowed-tools`.
+- **Body Content Requirements**:
+  - **Role**: Define exactly who the agent becomes (e.g., "Principal Architect").
+  - **Core Concepts**: 3-5 "First Principles" of the domain.
+  - **Reasoning Framework**: A numbered, step-by-step logic chain. **Must be tool-agnostic.**
+  - **Examples & Edge Cases**: Include examples of desired inputs/outputs and how to gracefully handle common edge cases.
+  - **Output Standards**: Strict formatting, citation, or quality control rules.
+- **Progressive Disclosure**: Keep the primary `SKILL.md` concise. Offload heavy technical references or templates to the `references/` or `assets/` folders so they are loaded only when necessary.
 
 ### 🛡️ Rules & Compliance
 High-authority constraints. Use **SCREAMING_SNAKE_CASE** for critical identifiers.

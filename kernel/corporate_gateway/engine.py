@@ -94,7 +94,7 @@ async def classify_intent(
             return ClientIntent.INTERRUPT
 
     # --- T1 classification for deeper analysis ---
-    classify_result = await classify(
+    classify_result = classify(
         text=request_content,
         config=ClassProfileRules(
             profiles={
@@ -192,24 +192,23 @@ async def assess_strategy(
 
     # --- 1. Complexity assessment via T6 activation_router ---
     from kernel.activation_router.engine import classify_signal_complexity
-    from kernel.self_model.types import SignalTags
-    
-    tags = SignalTags(intent="new_task", urgency="normal")
-    complexity_level = await classify_signal_complexity(tags, text=request_content, kit=kit)
-    complexity = complexity_level.value
+    complexity_result = classify_signal_complexity(request_content, kit)
+
+    complexity = "moderate"
+    if complexity_result.signals:
+        payload = complexity_result.signals[0].body.get("data", {})
+        if isinstance(payload, dict):
+            complexity = payload.get("level", "moderate")
 
     # --- 2. Capability assessment via T6 self_model ---
     capability_gaps: list[str] = []
     try:
         from kernel.self_model.engine import assess_capability
-        from kernel.lifecycle_controller.types import IdentityContext
-        
-        identity = IdentityContext(agent_name="CorporateGateway", role_description="Gateway", skills=["routing"])
-        cap_result = await assess_capability(tags, identity, kit)
-        
-        if cap_result.gap:
-            capability_gaps = cap_result.gap.missing_knowledge + cap_result.gap.missing_tools
-            
+        cap_result = assess_capability(request_content)
+        if cap_result.signals:
+            payload = cap_result.signals[0].body.get("data", {})
+            if isinstance(payload, dict):
+                capability_gaps = payload.get("gaps", [])
     except Exception as exc:
         log.warning("capability_assessment_skipped", error=str(exc))
 
