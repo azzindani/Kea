@@ -31,7 +31,7 @@ from shared.standard_io import (
     processing_error,
 )
 
-from kernel.workforce_manager.types import MissionChunk
+from ..workforce_manager.types import MissionChunk
 
 from .types import Sprint, SprintResult, SprintReview
 
