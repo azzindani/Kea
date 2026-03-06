@@ -30,23 +30,6 @@ from shared.schemas import (
     MissionStatusResponse,
 )
 
-from kernel.corporate_gateway.engine import (
-    assess_strategy,
-    classify_intent,
-    handle_interrupt_logic,
-    synthesize_response,
-)
-from kernel.corporate_gateway.types import (
-    ClientIntent,
-    CorporateExecuteResult,
-    CorporateGateInResult,
-    CorporateQuality,
-    MissionSummary,
-    SessionState,
-)
-from kernel.task_decomposition import decompose_goal
-from kernel.workforce_manager import MissionChunk
-
 from services.corporate_gateway.clients.corporate_ops import get_corporate_ops_client
 from services.corporate_gateway.clients.vault_ledger import (
     get_vault_client,
@@ -71,6 +54,12 @@ async def _corporate_gate_in(
     kit: InferenceKit,
 ) -> CorporateGateInResult:
     """Phase 1 — classify intent, assess strategy, decompose objective."""
+    from kernel.corporate_gateway.engine import classify_intent, assess_strategy
+    from kernel.corporate_gateway.types import (
+        ClientIntent, CorporateGateInResult, SessionState,
+    )
+    from kernel.task_decomposition import decompose_goal
+    from kernel.workforce_manager import MissionChunk
     start = time.perf_counter()
     settings = get_settings()
     vault = await get_vault_client()
@@ -217,6 +206,8 @@ async def _corporate_execute(
     request: CorporateProcessRequest,
 ) -> CorporateExecuteResult:
     """Phase 2 — delegate to Corporate Ops via HTTP."""
+    from kernel.corporate_gateway.engine import handle_interrupt_logic
+    from kernel.corporate_gateway.types import ClientIntent, CorporateExecuteResult
     start = time.perf_counter()
     settings = get_settings()
     co_client = await get_corporate_ops_client()
@@ -336,6 +327,7 @@ async def _corporate_gate_out(
     kit: InferenceKit,
 ) -> CorporateProcessResponse:
     """Phase 3 — collect artifacts, quality chain, synthesize, persist."""
+    from kernel.corporate_gateway.engine import synthesize_response
     start = time.perf_counter()
     settings = get_settings()
     vault = await get_vault_client()
