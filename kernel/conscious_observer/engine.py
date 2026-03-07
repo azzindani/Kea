@@ -379,52 +379,62 @@ def _synthesize_artifact(loop_result: LoopResult) -> str:
     Prioritizes ACTUAL results from the world (action_outputs). If missing,
     generates a professional 'Mission Report' summary.
     """
-    parts: list[str] = []
-
     # 1. PRIMARY: Action Outputs (What the agent actually did/found)
     if loop_result.action_outputs:
+        # Action outputs often contain intermediate JSON dumps from tools.
+        # We want to extract the actual deliverable content, prioritizing the LAST meaningful string.
+        # We will iterate backwards to find the first non-JSON/non-intermediate output.
         valid_outputs = [o.strip() for o in loop_result.action_outputs if o]
-        for out in valid_outputs:
+        
+        deliverable = ""
+        for out in reversed(valid_outputs):
+            # Very basic heuristic to skip raw JSON thoughts and intermediate tool calls
+            # that were dumped as strings
+            if out.startswith('{"thoughts":') or out.startswith('{"action":'):
+                continue
+                
             clean_out = out
             for noise_key in ("answer=", "output=", "content=", "text=", "result=", "instruction="):
                 if clean_out.lower().startswith(noise_key):
                     clean_out = clean_out[len(noise_key):].strip()
                     break
 
-            if clean_out.rstrip(".!?").endswith("?"):
-                continue
-
-            suffix = "." if not clean_out.endswith((".", "!", "?")) else ""
-            parts.append(clean_out + suffix)
+            if clean_out:
+                deliverable = clean_out
+                break
+                
+        if deliverable:
+            return deliverable
+            
+        # Fallback if everything was JSON (should not happen for final deliverables)
+        if valid_outputs:
+            return valid_outputs[-1]
 
     # 2. SECONDARY: Composite Mission Report (If no direct strings were produced)
-    if not parts:
-        reason = loop_result.termination_reason.value
-        status_str = reason.replace("_", " ").upper()
+    reason = loop_result.termination_reason.value
+    status_str = reason.replace("_", " ").upper()
+    
+    # Professional Synthesis Header
+    header = f"PROTOCOL {status_str}"
+    
+    if loop_result.total_cycles > 0:
+        tasks_done = len(loop_result.objectives_completed)
+        status = "Completed" if tasks_done > 0 else "Orchestrated"
         
-        # Professional Synthesis Header
-        header = f"PROTOCOL {status_str}"
-        # 3. Fallback: Detailed Mission Report (Better than 4)
-        if loop_result.total_cycles > 0:
-            tasks_done = len(loop_result.objectives_completed)
-            status = "Completed" if tasks_done > 0 else "Orchestrated"
-            
-            # Build node summary if available
-            node_summary = ""
-            if loop_result.final_state and "node_outputs" in loop_result.final_state:
-                outputs = loop_result.final_state["node_outputs"]
-                if outputs:
-                    node_summary = f" (Execution nodes: {len(outputs)})"
+        # Build node summary if available
+        node_summary = ""
+        if loop_result.final_state and "node_outputs" in loop_result.final_state:
+            outputs = loop_result.final_state["node_outputs"]
+            if outputs:
+                node_summary = f" (Execution nodes: {len(outputs)})"
 
-            return (
-                f"✔️ MISSION ACCOMPLISHED: {status} {loop_result.total_cycles} cognitive cycles{node_summary}. "
-                f"Produced {len(loop_result.artifacts_produced)} artifacts for {loop_result.agent_id}."
-            )
+        return (
+            f"✔️ MISSION ACCOMPLISHED: {status} {loop_result.total_cycles} cognitive cycles{node_summary}. "
+            f"Produced {len(loop_result.artifacts_produced)} artifacts for {loop_result.agent_id}."
+        )
 
-        # 4. Absolute Final Fallback
-        return f"Mission complete: processed objective for {loop_result.agent_id}."
-
-    return " ".join(parts)
+    # 3. Absolute Final Fallback
+    return f"Mission complete: processed objective for {loop_result.agent_id}."
 
 
 def _build_shortcut_dag(objective: str) -> ExecutableDAG:
@@ -642,13 +652,24 @@ class ConsciousObserver:
             )
 
             # Premium Final Result Logging
+            final_content = "No output produced."
+            if observer_result.filtered_output:
+                final_content = observer_result.filtered_output.content
+            elif observer_result.partial_output:
+                final_content = observer_result.partial_output
+
+            artifacts_count = 0
+            if exec_res and hasattr(exec_res, "loop_result") and exec_res.loop_result:
+                artifacts_count = len(exec_res.loop_result.artifacts_produced)
+
             log_final_result(
                 logger=log,
                 objective=spawn_request.objective,
-                content=observer_result.partial_output or "No output produced.",
-                artifacts_count=0,
+                content=final_content,
+                artifacts_count=artifacts_count,
                 trace_id=trace_id
             )
+
 
             return ok(signals=[signal], metrics=metrics)
 
@@ -1632,15 +1653,7 @@ class ConsciousObserver:
                 grounding_score=grounding.grounding_score if grounding else 0.8,
                 content_preview=(verdict.content[:100] + "...") if len(verdict.content) > 100 else verdict.content,
             )
-            # Log the FINAL result that will be returned to Tier 8 / User
-            # This ensures the 'real output' is visible in logs as requested.
-            log_final_result(
-                logger=log,
-                objective=exec_res.objective or "unknown",
-                content=verdict.content,
-                artifacts_count=len(exec_res.loop_result.artifacts_produced),
-                trace_id=trace_id
-            )
+
             return ConsciousObserverResult(
                 trace_id=trace_id,
                 agent_id=exec_res.loop_result.agent_id,
