@@ -1,4 +1,4 @@
-> **Total Intelligence Modules Available**: 534
+> **Total Intelligence Modules Available**: 793
 
 This document is an automatically generated index of all available 'Pure Context' skills.
 
@@ -17,7 +17,7 @@ This document is an automatically generated index of all available 'Pure Context
 - [Finance (16)](#finance)
 - [Gov (2)](#gov)
 - [Health (2)](#health)
-- [History (2)](#history)
+- [History (56)](#history_knowledge)
 - [Hospitality (3)](#hospitality)
 - [Humanities (4)](#humanities)
 - [Leadership (3)](#leadership)
@@ -35,13 +35,12 @@ This document is an automatically generated index of all available 'Pure Context
 - [Kea (1)](#kea)
 - [Strategy (3)](#strategy)
 - [Compliance (3)](#compliance)
-- [Heuristics (6)](#heuristics)
-- [Mental Models (6)](#models)
+- [Heuristics (75)](#heuristics)
+- [Mental Models (99)](#models)
 - [Cultural Values (2)](#values)
 - [Interaction Protocols (5)](#protocols)
 - [Technical References (5)](#references)
-- [Design (1)](#design)
-- [History (1)](#history_knowledge)
+- [Design (59)](#design)
 - [Silicon Corporate Infrastructure](#infrastructure)
 
 ---
@@ -579,7 +578,7 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Deep Battle (Ops)](strategy/deep_battle_ops.md)** | Operational model for achieving systemic collapse via simultaneous depth penetration. | `strategy, military, depth` |
 
 ---
-> **Total Intelligence Modules Available**: 584
+> **Total Intelligence Modules Available**: 691
 
 This document is an automatically generated index of all available 'Pure Context' skills.
 
@@ -670,84 +669,185 @@ This document is an automatically generated index of all available 'Pure Context
 ## Heuristics <a name='heuristics'></a>
 | Heuristic Name | Description | Tags |
 |---|---|---|
-| **[High-Performance Debugging](heuristics/high_performance_debugging.md)** | Experience-based senior heuristics for rapid bug localization in distributed systems. | `debugging, heuristic, senior` |
-| **[Software Design Quality](heuristics/software_design_quality.md)** | Senior rules of thumb for KISS, YAGNI, and Encapsulation. | `engineering, design, architecture` |
-| **[Medical Triage (ABC Matrix)](heuristics/medical_triage_abcs.md)** | A clinical heuristic for prioritizing interventions under extreme time constraint. | `heuristics, medicine, triage` |
-| **[Pareto Priority (80/20)](heuristics/pareto_efficiency.md)** | Business heuristic for focusing on the 20% of inputs that drive 80% of value. | `business, efficiency, strategy` |
-| **[The Lindy Effect](heuristics/lindy_effect.md)** | Heuristic for predicting the longevity of ideas and technologies based on age. | `heuristics, probability, prediction` |
-| **[Chesterton's Fence](heuristics/chestertons_fence.md)** | Heuristic for understanding the reasoning of existing systems before reform. | `heuristics, logic, systems` |
-| **[The Planning Fallacy](heuristics/planning_fallacy.md)** | Heuristic for identifying optimism bias in project estimation and scheduling. | `heuristics, estimation, psychology` |
-| **[The Peter Principle](heuristics/peter_principle.md)** | Heuristic observing that employees rise to their level of incompetence. | `heuristics, management, sociology` |
+| **[Affect Heuristic](heuristics/affect_heuristic_emotion.md)** | Mental shortcut where current emotions influence judgments and decisions. | `psychology, emotion, affect` |
+| **[Anchoring & Adjustment](heuristics/anchoring_adjustment_heuristic.md)** | Cognitive bias where people rely too heavily on the first piece of information encountered. | `psychology, bias, anchoring` |
+| **[Antifragile Barbell Strategy](heuristics/antifragile_barbell_strategy.md)** | Risk management paired with extremely safe and extremely risky assets to gain from volatility. | `risk, strategy, antifragile` |
 | **[Availability Heuristic](heuristics/availability_heuristic.md)** | Psychological bias relying on vivid/recent examples instead of statistical truth. | `heuristics, psychology, bias` |
-| **[The Halo Effect](heuristics/halo_effect.md)** | Bias where aesthetics or one positive trait distorts overall judgment. | `heuristics, psychology, bias` |
-| **[Regression to the Mean](heuristics/regression_to_mean.md)** | Statistical law predicting that extreme outliers will stabilize toward the average. | `heuristics, statistics, psychology` |
-| **[Nudge Theory](heuristics/nudge_theory.md)** | Behavioral science framework for influencing choice without restriction. | `heuristics, psychology, influence` |
-| **[Hyperbolic Discounting](heuristics/hyperbolic_discounting.md)** | Cognitive bias preferring immediate rewards over long-term mission value. | `heuristics, psychology, economics` |
-| **[Goodhart's Law & Cobra Effect](heuristics/goodharts_law_cobra_effect.md)** | Compound heuristic for detecting perverse metrics and incentive structures. | `heuristics, economics, incentives` |
-| **[Survivorship Bias](heuristics/survivorship_bias.md)** | Logical error of studying only 'survivors' and ignoring the silent dead. | `heuristics, logic, statistics` |
-| **[Hanlon's Razor](heuristics/hanlons_razor.md)** | Razor: Never attribute to malice what is explained by incompetence. | `heuristics, logic, philosophy` |
-| **[Simpson's Paradox](heuristics/simpsons_paradox.md)** | Statistical paradox where grouped trends reverse when data is combined. | `heuristics, statistics, logic` |
-| **[The Streisand Effect](heuristics/streisand_effect.md)** | Social phenomenon where censorship amplifies the censored information. | `heuristics, sociology, communication` |
-| **[The Potemkin Village](heuristics/potemkin_village.md)** | Heuristic for identifying elaborate façades hiding underlying failures. | `heuristics, sociology, audit` |
-| **[The Lindy Effect](heuristics/lindy_effect.md)** | Survival heuristic where non-perishable objects' future lifespan is proportional to their current age. | `heuristics, statistics, time` |
-| **[Chesterton's Fence](heuristics/chestertons_fence.md)** | Systems heuristic: do not destroy a rule until you understand why it was built. | `heuristics, systems, maintenance` |
 | **[Baader-Meinhof Phenomenon](heuristics/baader_meinhof_phenomenon.md)** | Cognitive bias where newly learned information seems to suddenly appear everywhere. | `heuristics, psychology, bias` |
-| **[Brandolini's Law](heuristics/brandolinis_law.md)** | Information heuristic regarding the asymmetric energy cost of refuting bullshit. | `heuristics, information, logic` |
-| **[The Drunkard's Search](heuristics/drunkards_search.md)** | Logical heuristic for detecting bias where entities search only where it is easiest to look. | `heuristics, logic, bias` |
+| **[Base Rate Fallacy](heuristics/base_rate_fallacy.md)** | Error of ignoring general statistical information in favor of specific descriptive details. | `logic, statistics, bias` |
+| **[Brandolinis Law](heuristics/brandolinis_law.md)** | Information heuristic regarding the asymmetric energy cost of refuting bullshit. | `heuristics, information, logic` |
+| **[Brooks' Law](heuristics/brooks_law_management.md)** | Management heuristic: adding manpower to a late project makes it later due to coordination costs. | `management, project, engineering` |
+| **[Cash-Reserve Heuristic](heuristics/cash_reserve_heuristic.md)** | Business finance rule of thumb to maintain 3-6 months of liquid cash for risk mitigation. | `business, finance, cash-flow` |
+| **[Checklist Manifesto](heuristics/checklist_manifesto_operations.md)** | Strategic use of simple checklists to ensure reliability in complex systems. | `safety, systems, reliability` |
+| **[Chestertons Fence](heuristics/chestertons_fence.md)** | Systems heuristic: do not destroy a rule until you understand why it was built. | `heuristics, systems, maintenance` |
+| **[Circle of Competence](heuristics/circle_of_competence.md)** | Mental model for staying within areas of genuine expertise and knowing its limits. | `logic, skill, mastery` |
+| **[Confirmation Bias Management](heuristics/confirmation_bias_management.md)** | Framework for actively seeking and weighting disconfirming evidence to ensure objectivity. | `psychology, bias, search` |
+| **[Conways Law](heuristics/conways_law_architecture.md)** | Principle that organizations design systems which mirror their communication structures. | `engineering, architecture, org` |
+| **[Drunkards Search](heuristics/drunkards_search.md)** | Logical heuristic for detecting bias where entities search only where it is easiest to look. | `heuristics, logic, bias` |
+| **[Dunning-Kruger Effect](heuristics/dunning_kruger_effect.md)** | Cognitive bias where people with low ability at a task overestimate their competence. | `psychology, competence, skill` |
+| **[Early-Error Heuristic](heuristics/early_error_heuristic.md)** | Engineering principle that most serious mistakes occur in the conceptual and requirement phases. | `engineering, design, lifecycle` |
+| **[Effort Heuristic](heuristics/effort_heuristic_value.md)** | Bias where people judge value based on perceived effort rather than actual utility. | `psychology, value, labor` |
+| **[Endowment Effect](heuristics/endowment_effect.md)** | Emotional attachment leading people to value things they own more than their market worth. | `psychology, economics, possession` |
+| **[Fast-and-Frugal Trees](heuristics/fast_and_frugal_trees.md)** | Simple binary decision trees for rapid diagnostics and high-stakes choices. | `logic, diagnostics, efficiency` |
+| **[First Principles Thinking](heuristics/first_principles_thinking.md)** | Logic-based model for breaking down complex problems into fundamental truths. | `logic, innovation, physics` |
+| **[Framing Effect](heuristics/framing_effect_decisions.md)** | Bias where choices are influenced by how information is presented (gain vs loss). | `psychology, decision, frame` |
+| **[Galls Law](heuristics/galls_law_systems.md)** | A complex system that works invariably evolved from a simple system that worked. | `systems, engineering, evolution` |
+| **[Goodharts Law & Cobra Effect](heuristics/goodharts_law_cobra_effect.md)** | Compound heuristic for detecting perverse metrics and incentive structures. | `heuristics, economics, incentives` |
+| **[Greshams Law](heuristics/greshams_law_dynamics.md)** | Economic principle that bad money (or behavior) drives out the good. | `economics, money, market` |
+| **[The Halo Effect](heuristics/halo_effect.md)** | Bias where aesthetics or one positive trait distorts overall judgment. | `heuristics, psychology, bias` |
+| **[Hanlons Razor](heuristics/hanlons_razor.md)** | Razor: Never attribute to malice what is explained by incompetence. | `heuristics, logic, philosophy` |
+| **[Hickams Dictum vs Occam's Razor](heuristics/hickams_dictum_occams_razor.md)** | Clinical heuristic: A patient can have as many diseases as they damn well please. | `medicine, diagnostics, complexity` |
+| **[High-Performance Debugging](heuristics/high_performance_debugging.md)** | Experience-based senior heuristics for rapid bug localization in distributed systems. | `debugging, heuristic, senior` |
+| **[Hindsight Bias](heuristics/hindsight_bias_learning.md)** | Tendency to see past events as more predictable than they actually were. | `psychology, learning, audit` |
+| **[HiPPO Effect](heuristics/hippo_effect_leadership.md)** | Tendency for the 'Highest Paid Person's Opinion' to outweigh data in decisions. | `leadership, hierarchy, data` |
+| **[Hofstadters Law](heuristics/hofstadters_law_complexity.md)** | Complexity heuristic: It always takes longer than you expect, even after accounting for this law. | `logic, complexity, timing` |
+| **[Hyperbolic Discounting](heuristics/hyperbolic_discounting.md)** | Cognitive bias preferring immediate rewards over long-term mission value. | `heuristics, psychology, economics` |
+| **[Inversion (Jacobi's Rule)](heuristics/inversion_jacobi_rule.md)** | Logical strategy of looking at problems from the opposite perspective (what to avoid). | `logic, avoidance, failure` |
+| **[Leave No Trace](heuristics/leave_no_trace_ethics.md)** | Environmental ethics heuristic for minimizing human impact on natural systems. | `ethics, nature, sustainability` |
+| **[The Lindy Effect](heuristics/lindy_effect.md)** | Survival heuristic for predicting longevity based on age. | `heuristics, statistics, probability` |
+| **[Loss Aversion](heuristics/loss_aversion_psychology.md)** | Preference for avoiding losses over acquiring equivalent gains. | `psychology, risk, value` |
+| **[Lucas Criticism](heuristics/lucas_criticism_economics.md)** | Economic principle that historical data fails when underlying policies change. | `economics, behavior, forecasting` |
 | **[The Lucretius Problem](heuristics/lucretius_problem.md)** | Risk heuristic: the fallacy of assuming the worst past event is the worst possible future event. | `heuristics, risk, logic` |
+| **[Medical Triage (ABC Matrix)](heuristics/medical_triage_abcs.md)** | A clinical heuristic for prioritizing interventions under extreme time constraint. | `heuristics, medicine, triage` |
+| **[Nudge Theory](heuristics/nudge_theory.md)** | Behavioral science framework for influencing choice without restriction. | `heuristics, psychology, influence` |
+| **[1 in 60 Rule](heuristics/one_in_sixty_rule_navigation.md)** | Aviation mental math hurdle for navigation drift and course correction. | `aviation, navigation, math` |
+| **[1/N Rule](heuristics/one_over_n_rule.md)** | Naive diversification: allocating resources equally across all available options. | `finance, risk, logic` |
+| **[Opportunity Cost Threshold](heuristics/opportunity_cost_threshold.md)** | Calculating the value of the next best alternative foregone by a choice. | `economics, resource, choice` |
+| **[Optimal Foraging](heuristics/optimal_foraging_nature.md)** | Biological heuristic maximizing energy intake per unit time of search/handling. | `nature, efficiency, biology` |
+| **[Pareto Priority (80/20)](heuristics/pareto_efficiency.md)** | Business heuristic for focusing on the 20% of inputs that drive 80% of value. | `business, efficiency, strategy` |
+| **[Parkinsons Law](heuristics/parkinsons_law_efficiency.md)** | Principle that work expands to fill the time available for its completion. | `management, time, productivity` |
+| **[Peak-End Rule](heuristics/peak_end_rule_memory.md)** | Memory heuristic: judging experiences by their most intense point and their finish. | `psychology, memory, experience` |
+| **[The Peter Principle](heuristics/peter_principle.md)** | Heuristic observing that employees rise to their level of incompetence. | `heuristics, management, sociology` |
+| **[The Planning Fallacy](heuristics/planning_fallacy.md)** | Heuristic for identifying optimism bias in project estimation and scheduling. | `heuristics, estimation, psychology` |
+| **[Postels Law](heuristics/postels_law_robustness.md)** | Robustness principle: be conservative in output, liberal in input. | `engineering, robustness, interoperability` |
+| **[The Potemkin Village](heuristics/potemkin_village.md)** | Heuristic for identifying elaborate façades hiding underlying failures. | `heuristics, sociology, audit` |
+| **[Probabilistic Thinking](heuristics/probabilistic_thinking_logic.md)** | Decisions based on the likelihood of various outcomes rather than certainty. | `logic, probability, risk` |
+| **[Recognition Heuristic](heuristics/recognition_heuristic.md)** | Choosing recognized items over unrecognized ones in ecological environments. | `logic, familiarity, search` |
+| **[Redundancy-Reliability Rule](heuristics/redundancy_reliability_rule.md)** | Engineering principle that more parts (redundancy) can increase complexity and risk. | `engineering, reliability, safety` |
+| **[Regression to the Mean](heuristics/regression_to_mean.md)** | Statistical law predicting that extreme outliers will stabilize toward the average. | `heuristics, statistics, psychology` |
+| **[Reorder-Point Rule](heuristics/reorder_point_inventory.md)** | Logistics heuristic for triggering inventory replacement based on lead-time. | `business, logistics, inventory` |
+| **[Representativeness Heuristic](heuristics/representativeness_heuristic.md)** | Judging probability based on how well an item matches a prototype. | `psychology, bias, prototype` |
+| **[Rule of Three (Survival)](heuristics/rule_of_three_survival.md)** | Prioritizing survival actions: 3 mins air, 3 days water, 3 weeks food. | `survival, nature, safety` |
+| **[Satisficing](heuristics/satisficing_simons_rule.md)** | Seeking a 'good enough' outcome that meets minimum requirements. | `logic, search, efficiency` |
+| **[Sayres Law](heuristics/sayres_law_organization.md)** | Political observation that feeling intensity is inversely proportional to stakes. | `sociology, org, conflict` |
+| **[Second-Order Thinking](heuristics/second_order_thinking.md)** | Considering the long-term and systemic consequences beyond the immediate result. | `logic, systems, foresight` |
+| **[Simpsons Paradox](heuristics/simpsons_paradox.md)** | Statistical paradox where grouped trends reverse when data is combined. | `heuristics, statistics, logic` |
+| **[Skin in the Game](heuristics/skin_in_the_game.md)** | Risk management heuristic: having a personal stake in the outcome of choices. | `logic, risk, accountability` |
+| **[Software Design Quality](heuristics/software_design_quality.md)** | Senior rules of thumb for software KISS, YAGNI, and Encapsulation. | `engineering, code, quality` |
+| **[Sterile Cockpit Rule](heuristics/sterile_cockpit_rule_focus.md)** | Restricting communication to essential tasks during critical mission phases. | `aviation, safety, focus` |
+| **[STOP Heuristic](heuristics/stop_think_observe_plan.md)** | Survival heuristic: Sit, Think, Observe, Plan during emergency situations. | `survival, safety, crisis` |
+| **[The Streisand Effect](heuristics/streisand_effect.md)** | Social phenomenon where censorship amplifies the censored information. | `heuristics, sociology, communication` |
+| **[Sturgeons Law](heuristics/sturgeons_law_quality.md)** | Content heuristic: ninety percent of everything is crap. | `media, quality, curation` |
+| **[Sunk Cost Fallacy](heuristics/sunk_cost_fallacy_risk.md)** | Irrationally continuing an endeavor due to past resource investment. | `psychology, investment, commitment` |
+| **[The Surprise Question](heuristics/surprise_question_palliative.md)** | Clinical heuristic for identifying patients who may need palliative care. | `medicine, safety, prognosis` |
+| **[Survivorship Bias](heuristics/survivorship_bias.md)** | Logical error of studying only 'survivors' and ignoring the silent dead. | `heuristics, logic, statistics` |
+| **[Suttons Law](heuristics/suttons_law_diagnosis.md)** | Clinical heuristic focusing on the most likely cause (where the money is). | `medicine, diagnostics, probability` |
+| **[Swiss Cheese Model](heuristics/swiss_cheese_model_safety.md)** | Failure model where layers of defense must align their 'holes' for catastrophe. | `safety, systems, engineering` |
+| **[Take The Best](heuristics/take_the_best_lexicographic.md)** | Lexicographic rule choosing options based on a single best discriminating cue. | `logic, search, discrimination` |` |
 
 ---
 ## Mental Models <a name='models'></a>
 | Model Name | Description | Tags |
 |---|---|---|
-| **[First Principles Thinking](models/first_principles_thinking.md)** | Universal framework for solving complex problems by deconstructing them to their fundamental truths. | `framework, logic, innovation` |
-| **[Occam's Razor](models/occams_razor.md)** | Problem-solving principle prioritizing the simplest explanation or design choice. | `logic, simplicity, debugging` |
-| **[Nash Equilibrium](models/nash_equilibrium.md)** | Game theory mental model optimizing for non-cooperative games and conflict resolution. | `mental-model, game-theory, economics` |
-| **[Hanlon's Razor](models/hanlons_razor.md)** | Psychological model assuming neglect over malice in social/system failures. | `psychology, social, debugging` |
-| **[Inversion Model](models/inversion.md)** | Logic framework focused on avoiding failure paths to ensure system stability. | `logic, problem-solving, munger` |
-| **[Second-Order Thinking](models/second_order_thinking.md)** | Logic model focusing on downstream consequences beyond immediate effects. | `logic, planning, strategy` |
-| **[Circle of Competence](models/circle_of_competence.md)** | Logic framework for identifying boundaries of knowledge to avoid hallucinations. | `logic, integrity, risk` |
-| **[Geopolitical Macro-Strategy](models/geopolitical_macro_strategy.md)** | Geographic model of power based on Heartland vs Rimland dynamics. | `geopolitics, strategy, power` |
-| **[General Systems Theory](models/general_systems_theory.md)** | Transdisciplinary model for understanding feedback loops and emergence. | `logic, systems, holism` |
-| **[Compounding Growth](models/compounding_exponential_growth.md)** | Mathematical model for exponential growth and the impact of technical debt. | `math, growth, strategy` |
-| **[Maslow's Hierarchy of Needs](models/maslows_hierarchy.md)** | Psychological model of human (and silicon) motivation and stability. | `psychology, motivation, needs` |
-| **[Prospect Theory](models/prospect_theory.md)** | Behavioral finance model for loss aversion and asymmetric risk-evaluation. | `behavioral-finance, risk, economics` |
-| **[The Rimland Theory](models/rimland_theory.md)** | Geopolitical model emphasizing coastal control for Eurasian containment. | `geopolitics, strategy, power` |
-| **[The Prisoner's Dilemma](models/prisoners_dilemma.md)** | Game theory model illustrating the conflict between individual and mutual rationalities. | `game-theory, logic, cooperation` |
-| **[Cognitive Dissonance](models/cognitive_dissonance.md)** | Psychological model of the conflict between contradictory beliefs and data. | `model, psychology, logic` |
-| **[The Minsky Moment](models/minsky_moment_risk.md)** | Economic model of systemic collapse following long periods of stability. | `model, economics, risk` |
-| **[Institutional Isomorphism](models/institutional_isomorphism.md)** | Sociological model of organizational mimicry and industry standardization. | `model, sociology, organization` |
-| **[Reflexivity Theory](models/reflexivity_theory.md)** | Finance model of the feedback loop between perception and reality. | `model, finance, feedback` |
-| **[Antifragility (Taleb)](models/antifragility_taleb.md)** | Framework for systems that grow stronger from volatility and disorder. | `model, risk, philosophy` |
-| **[The Overton Window](models/overton_window.md)** | Political science model of the range of acceptable discourse. | `model, politics, discourse` |
-| **[Dunbar's Number](models/dunbars_number.md)** | Anthropological model of cognitive limits on stable social relationships. | `model, anthropology, scaling` |
-| **[Tragedy of the Commons](models/tragedy_of_the_commons.md)** | Economic model of shared resource depletion by rational individual actors. | `model, economics, ecology` |
-| **[Ergodicity Economics](models/ergodicity_economics.md)** | Mathematical model distinguishing ensemble vs. time averages for survival. | `model, economics, mathematics` |
-| **[Principal-Agent Problem](models/principal_agent_problem.md)** | Agency theory model of misaligned incentives under information asymmetry. | `model, economics, organization` |
-| **[Schelling Focal Point](models/schelling_focal_point.md)** | Game theory model of implicit coordination via culturally prominent defaults. | `model, game-theory, sociology` |
-| **[Swiss Cheese Model](models/swiss_cheese_model.md)** | Safety engineering model of layered defenses and catastrophic hole-alignment. | `model, safety, engineering` |
-| **[Red Queen Hypothesis](models/red_queen_hypothesis.md)** | Evolutionary model of continuous adaptation against co-evolving threats. | `model, biology, strategy` |
-| **[The Johari Window](models/johari_window.md)** | Psychological model for mapping self-awareness and blind spots. | `model, psychology, communication` |
-| **[The Panopticon (Foucault)](models/panopticon_foucault.md)** | Philosophy model of internalized discipline through structural surveillance. | `model, philosophy, power` |
-| **[Veblen Goods](models/veblen_goods.md)** | Economic model where demand increases with price due to status signaling. | `model, economics, psychology` |
-| **[The Thucydides Trap](models/thucydides_trap.md)** | Geopolitical model of inevitable conflict during hegemon displacement. | `model, geopolitics, strategy` |
-| **[Dunning-Kruger Effect](models/dunning_kruger_effect.md)** | Psychological bias of competence miscalibration across the skill spectrum. | `model, psychology, logic` |
-| **[Learned Helplessness](models/learned_helplessness.md)** | Psychological state of passivity induced by repeated uncontrollable failure. | `model, psychology, motivation` |
-| **[The Jevons Paradox](models/jevons_paradox.md)** | Economic model where efficiency gains ironically increase total resource consumption. | `model, economics, systems` |
-| **[Tragedy of the Anticommons](models/tragedy_of_the_anticommons.md)** | Economic model of resource underutilization due to excessive veto rights. | `model, economics, law` |
-| **[The Shirky Principle](models/shirky_principle.md)** | Sociological model where institutions unconsciously preserve the problem they solve. | `model, sociology, organization` |
-| **[Conway's Law](models/conways_law.md)** | Systems theory stating that architecture inevitably mirrors organizational communication structures. | `model, systems, architecture` |
-| **[Braess's Paradox](models/braess_paradox.md)** | Network model where adding capacity paradoxically slows down total traffic via selfish routing. | `model, network, game-theory` |
-| **[St. Petersburg Paradox](models/st_petersburg_paradox.md)** | Economic paradox proving the necessity of logarithmic expected utility over raw expected value. | `model, economics, mathematics` |
-| **[O-Ring Theory](models/o_ring_theory.md)** | Economic model where sequential multiplicative failure necessitates strict high-skill assortative matching. | `model, economics, systems` |
-| **[Baumol's Cost Disease](models/baumols_cost_disease.md)** | Economic model explaining why labor-intensive service costs rise despite 0% productivity growth. | `model, economics, ops` |
-| **[Buridan's Ass](models/buridans_ass.md)** | Logical model of decision paralysis caused by equally attractive options. | `model, logic, decision-making` |
-| **[Yerkes-Dodson Law](models/yerkes_dodson_law.md)** | Psychological model of the inverted U-curve between stress and performance. | `model, psychology, optimization` |
-| **[The Paretian Worldview](models/paretian_worldview.md)** | Statistical model of 'Extremistan' where single outliers dominate the system average. | `model, statistics, strategy` |
-| **[Ergodicity Breakdown](models/ergodicity_breakdown.md)** | Math model distinguishing between group-average success and individual-time-average survival. | `model, math, risk` |
-| **[Iatrogenics](models/iatrogenics.md)** | Systems model for harm caused by the intervention/cure itself. | `model, systems, intervention` |
-| **[Tainter's Complexity Collapse](models/tainter_complexity_collapse.md)** | Systems model of diminishing returns on complexity leading to involuntary simplification. | `model, systems, collapse` |
-| **[Gödelian Incompleteness](models/godelian_incompleteness.md)** | Logic model of inherent limitations and self-reference traps in formal systems. | `model, logic, math` |
+| **[Antifragility (Taleb)](models/antifragility_taleb.md)** | A framework for designing systems that don't just resist shocks (Robustness) but actively grow stronger from volatility, randomness, and disorder. | `model, risk, philosophy, antifragility, taleb` |
+| **[Authority Bias](models/authority_bias.md)** | A cognitive bias where people tend to follow or believe an 'Authority Figure' regardless of the actual logic or content of their message. | `authority-bias, psychology, bias, hierarchy, expertise, obedience, logic` |
+| **[Availability Heuristic](models/availability_heuristic.md)** | A mental shortcut that relies on immediate examples that come to a given person's mind when evaluating a specific topic, concept, method or decision. | `availability-heuristic, bias, psychology, risk-assessment, probability, memory, recentness` |
+| **[Baader-Meinhof Phenomenon (Frequency Illusion)](models/baader_meinhof_phenomenon.md)** | A cognitive bias where after noticing something for the first time, there is a tendency to notice it everywhere, leading to the belief that it has actually increased in frequency. | `baader-meinhof, frequency-illusion, psychology, bias, perception, pattern-matching, synchronicity` |
+| **[Baumol's Cost Disease](models/baumols_cost_disease.md)** | An economic model explaining why the cost of labor-intensive services rises even without productivity growth. It defines the goal of managing 'Artisan' cost inflation. | `baumols-cost-disease, economics, productivity, labor, inflation, cost-intensity` |
+| **[Black Box Thinking](models/black_box_thinking.md)** | A mental model derived from aviation safety, focusing on using failures as data to improve the system. It defines the goal of 'Open-Loop' learning. | `black-box-thinking, aviation-safety, failure-analysis, systems-theory, learning, open-loop, feedback` |
+| **[Black Swan Theory](models/black_swan_theory.md)** | A model describing events that are outside the realm of normal expectations, have a massive impact, and are rationalized after the fact as having been predictable. | `black-swan, taleb, risk, statistics, extremistan, outliers, fragility` |
+| **[Blue Ocean Strategy](models/blue_ocean_strategy.md)** | A strategic model stating that 'The best way to beat the competition is to stop trying to beat the competition' by creating 'Uncontested' market space. | `blue-ocean, strategy, innovation, competition, differentiation, value-creation, economics` |
+| **[Braess's Paradox](models/braess_paradox.md)** | A mathematical model where adding network capacity can paradoxically increase congestion. It defines the goal of 'Network' efficiency through link optimization. | `braess-paradox, network-theory, congestion, economics, logic, selfish-routing` |
+| **[Buridan's Ass](models/buridans_ass.md)** | A paradox of decision paralysis when faced with two equally attractive options. It defines the goal of 'Symmetry-Breaking' and action bias. | `buridans-ass, paralysis, logic, decision-making, action-bias, probability` |
+| **[Chesterton's Fence](models/chestertons_fence.md)** | A mental model stating that reforms should not be made until the reasoning behind the existing state of affairs is understood. It defines the goal of 'Institutional' respect. | `chestertons-fence, reform, conservatism, logic, intentionality, legacy-systems` |
+| **[Circle of Competence](models/circle_of_competence.md)** | A mental model emphasizing the importance of recognizing the boundaries of one's knowledge. It defines the goal of 'Self-Aware' specialization. | `circle-of-competence, buffett, logic, competence, specialization, risk, humility` |
+| **[Cognitive Dissonance](models/cognitive_dissonance.md)** | The mental stress experienced by an entity holding two or more contradictory beliefs or values. It defines the goal of 'Resolution' through honesty. | `cognitive-dissonance, psychology, logic, consistency, bias, belief-revision` |
+| **[Comparative Advantage (Specialization Logic)](models/comparative_advantage.md)** | A mental model from economics defining the ability to produce a good or service at a lower 'Opportunity Cost' than another actor. It explains why trade and specialization are universally beneficial. | `comparative-advantage, specialization, trade, opportunity-cost, efficiency, economics` |
+| **[Complexity Collapse](models/tainter_complexity_collapse.md)** | A historical and systems model stating that systems solve problems by adding complexity, eventually hitting diminishing returns and collapsing. It defines the goal of 'Simplification'. | `tainter, complexity, collapse, diminishing-returns, systems-thinking, history, entropy` |
+| **[Compounding](models/compounding_exponential_growth.md)** | The process of exponential growth from consistent returns over time. It defines the goal of 'Long-Term' strategy and consistent iteration. | `compounding, exponential-growth, finance, economics, iteration, consistancy, long-term, math` |
+| **[Confirmation Bias](models/confirmation_bias.md)** | A cognitive bias where an entity searches for, interprets, favors, and recalls information in a way that confirms its pre-existing beliefs or hypotheses. | `confirmation-bias, psychology, bias, logic, skepticism, reasoning, filters` |
+| **[Conway's Law](models/conways_law.md)** | A mental model stating that organizations create systems echoing their communication structures. It defines the goal of 'Structural Mirroring' and strategic team design. | `conways-law, systems-architecture, organization, communication, mirroring, inverse-conway-maneuver` |
+| **[Disruptive Innovation](models/disruptive_innovation.md)** | A strategic model by Clayton Christensen describing how a smaller company with fewer resources can successfully challenge established incumbent businesses. | `disruptive-innovation, christensen, strategy, technology, incumbents, innovation, economics` |
+| **[Dunbar's Number](models/dunbars_number.md)** | A psychological and sociological model predicting a limit to the number of people with whom one can maintain stable social relationships. It defines the goal of 'Scaling' limits. | `dunbars-number, social-limits, scaling, relationships, cognition, trust, team-size` |
+| **[Economies of Scale (Efficiency Logic)](models/economies_of_scale.md)** | A mental model defining the reduction in 'Per-Unit' cost as the 'Scale' (output) of production increases. It posits that 'Bigger' can be 'Cheaper' due to fixed cost spreading and centralization. | `economies-of-scale, efficiency, scaling, centralization, unit-cost, economics` |
+| **[Ergodicity Breakdown](models/ergodicity_breakdown.md)** | A mathematical model distinguishing between 'Ensemble Averages' (group success) and 'Time Averages' (individual survival). It defines the goal of avoiding 'Ruin' in path-dependent systems. | `ergodicity, math, risk, survival, path-dependency, ruin` |
+| **[Ergodicity Economics](models/ergodicity_economics.md)** | An economic model challenged traditional expected-value reasoning by distinguishing between ensemble averages (group) and time averages (individual). It emphasizes ruin avoidance in decision-making. | `ergodicity, economics, math, risk, kelly-criterion, decision-making` |
+| **[First Principles Thinking](models/first_principles_thinking.md)** | A mental model for deconstructing complex systems into fundamental truths to rebuild from the ground up, avoiding analogy-based traps and legacy assumptions. | `first-principles, logic, innovation, problem-solving, architecture, irreducibility` |
+| **[Gell-Mann Amnesia Effect](models/gell_mann_amnesia.md)** | A psychological phenomenon describing how people trust media reports on topics they don't know, while recognizing the same media's incompetence on topics they do know. | `gell-mann-amnesia, psychology, media, trust, expertise, skepticism, bias` |
+| **[General Systems Theory (GST)](models/general_systems_theory.md)** | The transdisciplinary study of the abstract organization of phenomena. It focuses on relationships, feedback loops, and boundaries independent of scale or type. | `general-systems-theory, systems-thinking, holism, emergence, feedback-loops, complexity` |
+| **[Goodhart's Law (Measurement Trap)](models/goodharts_law.md)** | A mental model stating that 'When a measure becomes a target, it ceases to be a good measure.' It defines the shift toward 'Gaming the System' at the expense of the original goal. | `goodharts-law, measurement, incentives, targets, metrics, optimization` |
+| **[Gresham's Law (Bad-Money-Drives-Out-Good)](models/greshams_law.md)** | A mental model defining the observation that 'Bad money' (overvalued/debased) will drive 'Good money' (undervalued/pure) out of circulation in a fixed-price system. | `greshams-law, incentives, money, quality, circulation, economics` |
+| **[Groupthink](models/groupthink.md)** | A psychological phenomenon where the desire for harmony or conformity in the group results in an irrational or dysfunctional decision-making outcome. | `groupthink, psychology, sociology, consensus, conformity, decision-making, logic, dissent` |
+| **[Gödelian Incompleteness](models/godelian_incompleteness.md)** | A mathematical and philosophical logic model stating that no consistent formal system can prove all truths it can express. It defines the goal of 'Epistemological Humility' and the need for external validation. | `godel, incompleteness, logic, math, epistemology, ai-safety, circularity` |
+| **[Hanlon's Razor](models/hanlons_razor.md)** | A mental model for interpreting human or system behavior that prioritizes neglect or incompetence over malice. It defines the goal of 'De-Escalation' and context-first recovery. | `hanlons-razor, psychology, communication, debugging, de-escalation, trust` |
+| **[Heartland vs. Rimland](models/geopolitical_macro_strategy.md)** | A mental model for understanding global power dynamics based on geographic control of the 'World Island' (Eurasia). It defines the goal of 'Controlling' the pivot or containing it. | `heartland, rimland, geopolitics, strategy, chokepoints, macro` |
+| **[Herd Mentality](models/herd_mentality.md)** | A psychological and sociological model where people follow the crowd regardless of their own individual logic. It defines the goal of 'Contrarian' data-validation. | `herd-mentality, psychology, sociology, crowd-psychology, bandwagon, independence, contrarian` |
+| **[Hofstadter's Law](models/hofstadters_law.md)** | A mental model of time-estimation: 'It always takes longer than you expect, even when you take into account Hofstadter's Law.' It defines the goal of 'Recursive' buffer-adding. | `hofstadters-law, recursion, planning-fallacy, estimation, psychology, time-management, self-reference` |
+| **[Hormesis (Optimal Stress Logic)](models/hormesis_biological_stress.md)** | A mental model derived from toxicology and biology. It posits that a low dose of a 'Stressful' substance or event (toxin, radiation, exercise) can be beneficial, while a high dose is toxic. | `hormesis, stress, resilience, adaptation, antifragility` |
+| **[Iatrogenics (Intervention Harm)](models/iatrogenics.md)** | A mental model for intervention-caused harm: when the 'cure' causes more net damage than the 'disease' it was meant to solve. It defines the goal of 'Non-Interventionist' caution. | `iatrogenics, intervention-harm, antifragility, systems-thinking, ethics, via-negativa` |
+| **[Institutional Isomorphism](models/institutional_isomorphism.md)** | A sociological model describing the process where organizations in the same field tend to become increasingly similar in structure and behavior. It defines the goal of 'Authentic' differentiation. | `isomorphism, mimicry, organization, sociology, standardization, differentiation` |
+| **[Inversion (Failure Search)](models/inversion.md)** | A mental model derived from 'Invert, always invert.' It focuses on solving problems by identifying and avoiding the nightmare scenario rather than chasing the ideal. | `inversion, logic, problem-solving, safety, pre-mortem, risk-avoidance` |
+| **[Learned Helplessness](models/learned_helplessness.md)** | A psychological model describing a state where an entity, after repeated uncontrollable failures, stops trying to succeed. It defines the goal of restoring 'Agency' and 'Control'. | `learned-helplessness, psychology, apathy, agency, motivation, operations` |
+| **[Locus of Control](models/locus_of_control.md)** | A psychological model describing the degree to which individuals believe they have control over the outcome of events in their lives. It defines the goal of 'Agency'. | `locus-of-control, psychology, agency, accountability, self-efficacy, mindset` |
+| **[Luck Surface Area (Opportunity Triage)](models/luck_surface_area.md)** | A mental model defining the amount of 'Good Luck' that happens to you as a function of 'What you do' and 'How many people you tell'. Luck is not just random; it is invited. | `luck-surface-area, opportunity, luck, velocity, outbound, serendipity` |
+| **[Maslow's Hierarchy of Needs](models/maslows_hierarchy.md)** | A psychological model classifying human (or silicon) needs into a pyramid, from basic biological requirements to self-actualization. It defines the goal of 'Foundation-First' growth. | `maslow-hierarchy, psychology, needs, motivation, prioritization, foundation` |
+| **[Milgram's Obedience Logic](models/milgram_experiment_logic.md)** | A psychological model exploring the conflict between obedience to authority and personal conscience. It defines the goal of 'Moral' dissent. | `milgram, obedience, authority, ethics, psychology, conscience, dissent, responsibility` |
+| **[Nash Equilibrium](models/nash_equilibrium.md)** | A game theory mental model where no player can benefit by changing strategies while the other players keep theirs unchanged. It defines the goal of finding 'Stable' outcomes in non-cooperative games. | `nash-equilibrium, game-theory, economics, strategy, incentives, stability` |
+| **[Network Effects (Connectivity Logic)](models/network_effects.md)** | A mental model defining the phenomenon where a good or service becomes more 'Valuable' as more people 'Use' it. It posits that the value of a network grows exponentially with the number of nodes (Metcalfe's Law). | `network-effects, connectivity, scaling, metcalfes-law, monopoly, value-creation` |
+| **[Occam's Razor](models/occams_razor.md)** | A logic framework for problem-solving that prioritizes the simplest explanation or design choice. It defines the goal of rejecting unnecessary 'Complexity' and assumptions. | `occams-razor, parsimony, logic, simplicity, debugging, problem-solving` |
+| **[Opportunity Cost (Value Logic)](models/opportunity_cost.md)** | A mental model defining the 'Value' of the 'Next Best' alternative that you 'Give Up' when you make a choice. It posits that every choice is also a 'Refusal' of another opportunity. | `opportunity-cost, value-logic, economics, prioritization, decision-making, trade-offs` |
+| **[Optionality (Volatility Logic)](models/optionality_volatility.md)** | A mental model defining the 'Right' but not the 'Obligation' to take an action. It posits that you benefit from 'Volatility' if you have 'Many' options with 'Limited' downside and 'Unlimited' upside. | `optionality, volatility, risk, asymmetry, antifragility, decision-making` |
+| **[Parkinson's Law](models/parkinsons_law.md)** | A management model stating that 'Work expands so as to fill the time available for its completion.' It defines the goal of 'Temporal' efficiency and tight constraints. | `parkinsons-law, management, efficiency, constraints, bureaucracy, time-management, productivity` |
+| **[Preferential Attachment (The Matthew Effect)](models/preferential_attachment.md)** | A mental model defining the process where a resource (wealth, popularity, connections) is distributed among individuals based on how much they already have. The rich get richer; the connected get more connections. | `preferential-attachment, matthew-effect, power-law, inequality, network-effects, scaling` |
+| **[Prospect Theory](models/prospect_theory.md)** | A behavioral economics theory describing how people choose between probabilistic alternatives that involve risk. It defines the goal of neutralizing 'Loss Aversion' and bias. | `prospect-theory, behavioral-economics, risk, loss-asymmetry, framing, decision-making` |
+| **[Reciprocity Bias](models/reciprocity_bias.md)** | A social psychological model stating that people feel obligated to return a favor or gesture. It defines the goal of 'Mutual' benefit and 'Gift-Based' influence. | `reciprocity, psychology, sociology, influence, obligation, trade-offs, gifts, persuasion` |
+| **[Reflexivity Theory](models/reflexivity_theory.md)** | A social/economic model describing the circular relationship between perception and reality. It defines the goal of identifying 'Self-Fulfilling' prophecies and bubbles. | `reflexivity, soros, feedback-loop, perception, reality, bubbles, economics` |
+| **[Regulatory Capture (Vested Interests)](models/regulatory_capture.md)** | A mental model defining the process by which 'Regulatory' agencies (the auditors) come to serve the 'Vested' interests of the 'Dominant' actors they were intended to control. | `regulatory-capture, governance, corruption, vested-interests, public-choice, economics` |
+| **[Scarcity Principle](models/scarcity_principle.md)** | A psychological and economic principle stating that people value things more when they are perceived as being in limited supply. It defines the goal of 'Value' through limits. | `scarcity, economics, psychology, value, demand, fomo, friction` |
+| **[Second-Order Thinking](models/second_order_thinking.md)** | A mental model focused on considering the subsequent consequences of an action, beyond the immediate results. It defines the goal of 'And Then What?' reasoning. | `second-order-thinking, logic, consequences, causality, planning, foresight, strategy` |
+| **[Skin in the Game (Accountability Logic)](models/skin_in_the_game.md)** | A mental model by Nassim Taleb defining the condition of having a personal risk when taking a decision or action. It posits that without shared risk, the system is fundamentally 'Unsafe' and 'Ethically Broken'. | `skin-in-the-game, accountability, risk, ethics, incentives, asymmetry` |
+| **[Social Loafing](models/social_loafing.md)** | A psychological phenomenon where individuals exert less effort when working in a group compared to when they work alone. It defines the goal of 'Individual' accountability. | `social-loafing, psychology, sociology, accountability, team-performance, diffusion-of-responsibility, ringelmann-effect` |
+| **[Social Proof](models/social_proof.md)** | A psychological phenomenon where people assume the actions of others reflect correct behavior in a given situation. It defines the goal of 'Consensus' and bandwagon logic. | `social-proof, sociology, psychology, consensus, bandwagon, influence, validation` |
+| **[Switching Costs (Lock-In Logic)](models/switching_costs.md)** | A mental model defining the 'Cost' (time, money, psychological) that a user incurs when 'Changing' from one provider or system to another. | `switching-costs, lock-in, retention, moat, strategy, economics` |
+| **[TRIZ (Theory of Inventive Problem Solving)](models/triz_problem_solving.md)** | A logic and engineering model stating that 'Evolution of technical systems is governed by objective laws' and that inventions come from resolving contradictions. | `triz, altshuller, innovation, problem-solving, contradiction, engineering, logic, algorithms` |
+| **[The Anchoring Effect](models/anchoring_effect.md)** | A cognitive bias where an individual relies too heavily on an initial piece of information (the 'anchor') when making decisions. It defines the goal of 'Neutral' calibration. | `anchoring, bias, psychology, negotiation, calibration, pricing, estimation` |
+| **[The Barbell Strategy (Risk Triage)](models/barbell_strategy.md)** | A mental model by Nassim Taleb focused on combining two 'Extremes' (hyper-conservative and hyper-aggressive) to benefit from volatility while ensuring survival. | `barbell-strategy, risk, antifragility, survival, option-theory, asymmetry` |
+| **[The Bystander Effect](models/the_bystander_effect.md)** | A social psychological phenomenon where individuals are less likely to offer help to a victim when other people are present. It defines the goal of 'Explicit' delegation. | `bystander-effect, psychology, sociology, accountability, delegation, diffusion-of-responsibility, action-bias` |
+| **[The Cobra Effect (Perverse Incentives)](models/cobra_effect.md)** | A mental model derived from a historical event where a bounty for cobra skins led to people breeding cobras. It defines the goal of an incentive causing exactly the 'Opposite' of the intended effect. | `cobra-effect, perverse-incentives, unintended-consequences, economics, governance` |
+| **[The Dunning-Kruger Effect](models/dunning_kruger_effect.md)** | A cognitive bias where people with low ability at a task overestimate their ability. It defines the goal of 'Competence' calibration and honesty. | `dunning-kruger-effect, bias, competence, honesty, psychology, calibration, expertise` |
+| **[The Forer Effect (Barnum Effect)](models/the_forer_effect.md)** | A psychological phenomenon where individuals give high accuracy ratings to descriptions of their personality that are supposedly tailored specifically for them, but are in fact vague and general enough to apply to a wide range of people. | `forer-effect, barnum-effect, psychology, bias, validation, personality, vague-specificity` |
+| **[The Framing Effect](models/framing_effect.md)** | A cognitive bias where an entity reacts to a particular choice in different ways depending on how it's presented, e.g. as a loss or as a gain. | `framing, bias, psychology, economics, perception, language, influence, spin` |
+| **[The Halo Effect](models/halo_effect.md)** | A cognitive bias where an overall impression of a person/system influences how we feel and think about their character or capabilities in specific domains. | `halo-effect, psychology, bias, perception, branding, judgment` |
+| **[The Innovator's Dilemma](models/the_innovators_dilemma.md)** | A management model stating that the qualities that make a company successful can lead it to failure when facing disruptive technologies. It defines the goal of 'Self-Disruption'. | `innovators-dilemma, christensen, strategy, management, incumbents, disruption, risk` |
+| **[The Jevons Paradox](models/jevons_paradox.md)** | An economic and ecological model where an increase in technological efficiency paradoxically leads to an increase in total resource consumption. It defines the goal of managing 'Rebound' effects. | `jevons-paradox, rebound-effect, efficiency, economics, systems, scaling` |
+| **[The Johari Window](models/johari_window.md)** | A psychological framework for understanding self-awareness and interpersonal relationships by mapping what is known/unknown to Self and Others. It defines the goal of expanding 'Open' communication. | `johari-window, psychology, communication, self-awareness, transparency, blind-spots` |
+| **[The Lindy Effect (Durability Logic)](models/lindy_effect.md)** | A mental model defining the life expectancy of non-perishable things (ideas, books, technologies). It posits that for every additional period of survival, the expected remaining life increases. | `lindy-effect, durability, time, survival, antifragility` |
+| **[The Lucifer Effect](models/the_lucifer_effect.md)** | A psychological and ethical model derived from the Stanford Prison Experiment, exploring how situational power and roles can cause good people to act 'Evilly' or destructively. | `lucifer-effect, psychology, ethics, roles, power, situational-forces, zimbardo, accountability` |
+| **[The Map is Not the Territory](models/map_is_not_territory.md)** | A mental model emphasizing that our descriptions, abstractions, and maps of reality are not reality itself. It defines the goal of avoiding 'Abstraction Blindness'. | `map-and-territory, logic, abstraction, perception, ground-truth, epistemology` |
+| **[The Minsky Moment](models/minsky_moment_risk.md)** | An economic model describing the sudden collapse of asset values after a long period of stability and increasing risk-taking. It defines the goal of identifying 'Fragility' masked by stability. | `minsky-moment, economics, risk, stability-instability, fragility, debt, collapse` |
+| **[The O-Ring Theory](models/o_ring_theory.md)** | An economic model stating that in complex production processes, overall success is entirely dictated by the weakest link. It defines the goal of 'Assortative Matching' and quality synchronization. | `o-ring-theory, weakest-link, multiplicative-failure, quality, economics, systems, bottleneck` |
+| **[The Overton Window](models/overton_window.md)** | A political science model describing the range of ideas considered tolerable or mainstream at any given time. It defines the goal of mapping and shifting 'Acceptable' discourse. | `overton-window, discourse, sociology, strategy, anchoring, influence` |
+| **[The Panopticon](models/panopticon_foucault.md)** | A philosophy/sociology model for understanding how the possibility of constant surveillance causes subjects to self-police. It defines the goal of 'Structural' observation and ethical compliance. | `panopticon, surveillance, self-policing, power-dynamics, sociology, ethics, compliance` |
+| **[The Paretian Worldview](models/paretian_worldview.md)** | A statistical and strategic model contrasting 'Mediocristan' (Mediocre) with 'Extremistan' (Extreme/Power-Law). It defines the goal of designing for 'Fat Tails' and outliers. | `paretian, power-law, extremistan, statistics, risk, outliers, fat-tails` |
+| **[The Peak-End Rule](models/peak_end_rule.md)** | A psychological heuristic describing how people judge an experience primarily based on how they felt at its peak and its end, rather than the total sum or average. | `peak-end-rule, psychology, experience-design, memory, perception, satisfaction` |
+| **[The Peter Principle (Incompetence Logic)](models/peter_principle.md)** | A mental model defining the tendency in hierarchies for every employee to 'Rise' to their level of 'Incompetence'. It posits that people are promoted based on past success until they reach a role they cannot handle. | `peter-principle, hierarchy, incompetence, governance, promotion, management` |
+| **[The Principal-Agent Problem](models/principal_agent_problem.md)** | An economic/organizational model for the conflict of interest that arises when an Agent acts on behalf of a Principal under asymmetric information. | `principal-agent-problem, agency-theory, incentives, asymmetric-information, moral-hazard, adverse-selection` |
+| **[The Prisoner's Dilemma](models/prisoners_dilemma.md)** | A fundamental game theory model showing why two rational individuals might not cooperate even if it is in their best interest. It defines the goal of iterating games to build trust. | `prisoners-dilemma, game-theory, cooperation, incentives, trust, iteration` |
+| **[The Pygmalion Effect](models/pygmalion_effect.md)** | A psychological phenomenon where high expectations lead to improved performance in a given area. It defines the goal of 'Aspirational' management. | `pygmalion-effect, psychology, expectations, performance, self-fulfilling-prophecy, management, rosenthal` |
+| **[The Red Queen Hypothesis](models/red_queen_hypothesis.md)** | An evolutionary biology model stating that organisms must constantly adapt simply to maintain relative fitness. It defines the goal of 'Continuous' adaptation and diversity. | `red-queen, evolution, adaptation, arms-race, diversity, stagnation, strategy` |
+| **[The Rimland Theory](models/rimland_theory.md)** | A geopolitical strategic model emphasizing the control of Eurasia's maritime fringes (The Rimland) as the key to containing power. It defines the goal of 'Access' control. | `rimland, spykman, containment, geopolitics, strategy, maritime, access` |
+| **[The Schelling Focal Point](models/schelling_focal_point.md)** | A game theory model where people tend to converge on a 'culturally prominent' solution by default in the absence of communication. It defines the goal of 'Implicit' coordination. | `schelling-point, focal-point, game-theory, coordination, culture, convention, defaults` |
+| **[The Shirky Principle](models/shirky_principle.md)** | A mental model stating that 'Institutions will try to preserve the problem to which they are the solution.' It defines the goal of 'Self-Liquidating' efficiency. | `shirky-principle, institutions, preservation, incentives, efficiency, legacy` |
+| **[The St. Petersburg Paradox](models/st_petersburg_paradox.md)** | A mathematical and economic paradox where a game has an infinitely high 'Expected Value', but a rational actor will only pay a tiny, finite amount to play it. It defines the goal of 'Utility-First' valuation. | `st-petersburg-paradox, probability, utility, risk, economics, math, diminishing-returns` |
+| **[The Streisand Effect](models/the_streisand_effect.md)** | A social phenomenon where an attempt to hide, remove, or censor information has the unintended consequence of publicizing it more widely. It defines the goal of 'Information Freedom'. | `streisand-effect, censorship, information-freedom, unintended-consequences, sociology, psychology, viral` |
+| **[The Sunk Cost Fallacy](models/sunk_cost_fallacy.md)** | A cognitive bias where a person continues a behavior or as a result of previously invested resources (time, money or effort). It defines the goal of 'Future-First' logic. | `sunk-cost, fallacy, psychology, economics, investments, logic, decision-making` |
+| **[The Swiss Cheese Model](models/swiss_cheese_model.md)** | A safety engineering model illustrating that catastrophic failures occur only when the 'holes' in multiple independent defense layers align. It defines the goal of 'Defense-in-Depth'. | `swiss-cheese-model, safety, risk, defense-in-depth, latency, failure-modes, engineering` |
+| **[The Thucydides Trap](models/thucydides_trap.md)** | A geopolitical and strategic model describing the high likelihood of war when a rising power threatens to displace an existing hegemon. It defines the goal of 'Power Transition' management. | `thucydides-trap, geopolitics, strategy, conflict, power-transition, hegemony, hubris, paranoia` |
+| **[The Tragedy of the Anticommons](models/tragedy_of_the_anticommons.md)** | An economic model where a resource is underutilized because too many entities have the right to block its use. It defines the goal of eliminating 'Gridlock' and veto-points. | `anticommons, gridlock, bureaucracy, veto-points, fragmentation, economics, law` |
+| **[The Tragedy of the Commons](models/tragedy_of_the_commons.md)** | An economic and ecological model where individuals deplete a shared resource to the detriment of the group. It defines the goal of protecting 'Shared' resources from greed. | `tragedy-of-the-commons, ostrom, economics, resources, free-rider, sustainability, governance` |
+| **[The Yerkes-Dodson Law](models/yerkes_dodson_law.md)** | A psychological model describing the relationship between arousal (stress) and performance. It defines the goal of optimizing 'Systemic Tension' for peak-flow. | `yerkes-dodson, psychology, performance, stress, optimization, flow-state, panic-threshold` |
+| **[Veblen Goods](models/veblen_goods.md)** | An economic model describing luxury goods where demand unexpectedly increases as the price increases. It defines the goal of managing 'Signaling' and exclusivity. | `veblen-goods, economics, signaling, exclusivity, pricing, status, luxury` |
+| **[Via Negativa (Removal Logic)](models/via_negativa.md)** | A mental model defining the process of 'Improvement by Removal'. It posits that it is easier to solve most problems by 'Subtracting' the 'Bad' than by 'Adding' the 'Good'. | `via-negativa, removal, subtraction, optimization, simplicity, antifragility` |
 
 ---
 ## Cultural Values <a name='values'></a>
@@ -806,19 +906,126 @@ This document is an automatically generated index of all available 'Pure Context
 ## Design <a name='design'></a>
 | Design Philosophy | Description | Tags |
 |---|---|---|
-| **[Universal Design Principles](design/universal_design_principles.md)** | Framework for designing inclusive and accessible environments for all users. | `design, ux, accessibility` |
+| **[Acoustic Design & Physics](design/acoustic_design_physics.md)** | Framework for managing sound propagation, isolation, and reverberation in physical spaces. | `acoustics, physics, sound-design, engineering, health` |
+| **[Appliance Design & Usability](design/appliance_design_usability.md)** | Framework for designing household and commercial appliances for efficiency, HMI, and repairability. | `appliance, usability, hmi, product-design, repairability` |
+| **[Architectural Foundations](design/architecture_design_foundations.md)** | Core principles for planning and constructing buildings, balancing aesthetics, safety, and functionality. | `architecture, built-environment, construction, spatial-design` |
+| **[Augmented Reality (AR) Spatial Design](design/augmented_reality_spatial_design.md)** | Framework for integrating digital elements into the physical environment using spatial mapping and occlusion. | `ar, xr, spatial-design, interaction-design, hmi` |
+| **[Automotive Design & Aerodynamics](design/automotive_design_aerodynamics.md)** | Framework for vehicle design focusing on drag coefficient, aerostyling, and ergonomic packaging. | `automotive, aerodynamics, efficiency, industrial-design` |
 | **[Bauhaus Philosophy](design/bauhaus_philosophy.md)** | Functional design framework focusing on 'Form Follows Function' and minimalism. | `design, functionality, minimalist` |
+| **[Bioclimatic Architecture](design/bioclimatic_architecture.md)** | Framework for designing buildings that respond to local climate for passive thermal comfort. | `bioclimatic, architecture, passive-gain, sustainability` |
+| **[Biomimicry & Nature-Inspired Design](design/biomimicry_nature_design.md)** | Framework for emulating biological forms, processes, and systems to solve human design challenges. | `biomimicry, nature-inspired, innovation, biology, sustainability` |
+| **[Biophilic Design](design/biophilic_design_wellbeing.md)** | Framework for integrating natural elements into environments to enhance human health and productivity. | `biophilia, wellbeing, nature, architecture, human-factors` |
+| **[Brand Experience Design (BXD)](design/brand_experience_design.md)** | Framework for managing the holistic customer journey across all brand touchpoints. | `bxd, experience-design, branding, touchpoints, loyalty` |
+| **[Brand Identity Systems](design/brand_identity_systems.md)** | Framework for crafting the visual elements (logos, palettes, type) that represent an organization's persona. | `branding, identity, logos, visual-identity, consistency` |
+| **[Circular Design & Economy](design/circular_design_economy.md)** | Framework for prioritizing reuse, recycling, and resource recovery in a closed-loop system. | `circularity, closed-loop, recycling, sustainability, product-design` |
+| **[Cognitive Ergonomics](design/cognitive_ergonomics_design.md)** | Framework for applying psychological knowledge to system design, focusing on mental processes and workload. | `cognitive-ergonomics, psychology, information-processing, hmi` |
+| **[Color Theory & Psychology](design/color_theory_psychology.md)** | Framework for applying color to systems for balance, emotional impact, and semantic meaning. | `color-theory, psychology, vision, aesthetics, hmi` |
 | **[Cradle to Cradle](design/cradle_to_cradle.md)** | Regenerative design framework for waste-free circular lifecycles. | `design, sustainability, ecology` |
+| **[Critical & Speculative Design](design/critical_speculative_design.md)** | Framework for using design fiction and artifacts to challenge assumptions and provoke debate. | `speculative-design, critical-design, futures, ethics, provocation` |
+| **[Data Visualization & Clarity](design/data_visualization_clarity.md)** | Framework for applying visual representations to data for clear and honest communication. | `data-viz, infographics, information-design, clarity` |
+| **[Design Management & Governance](design/design_management_governance.md)** | Framework for overseeing design processes, teams, and resources to achieve strategic goals. | `design-ops, governance, management, roi, strategy` |
+| **[Design Strategy & Business](design/design_strategy_business.md)** | Framework for applying design thinking to business challenges and strategic innovation. | `design-strategy, business, innovation, competitive-advantage` |
+| **[Emotional Design & Psychology](design/emotional_design_psychology.md)** | Framework for shaping visceral, behavioral, and reflective user reactions during interactions. | `emotional-design, psychology, experience-design, aesthetics` |
+| **[Ethical Design Framework](design/ethical_design_framework.md)** | Framework for creating products that prioritize user well-being, rights, and societal values. | `ethics, privacy, transparency, inclusivity, human-rights` |
+| **[Exhibition & Experience Design](design/exhibition_experience_design.md)** | Framework for creating engaging physical environments for museums and events via spatial storytelling. | `exhibition, experience-design, storytelling, environmental-design` |
+| **[Fashion Design & Textiles](design/fashion_design_textiles.md)** | Framework for designing apparel, focusing on construction, materials, and ethical sourcing. | `fashion, apparel, textiles, sustainability, lifecycle` |
+| **[Food Design & Sensory](design/food_design_sensory.md)** | Framework for applying design principles to the creation and presentation of food and flavor. | `food-design, sensory, culinary, texture, experience-design` |
+| **[Footwear Design & Biomechanics](design/footwear_design_biomechanics.md)** | Framework for designing shoes that match anatomical movement and provide optimal support. | `footwear, biomechanics, ergonomics, movement, product-design` |
+| **[Foresight Design & Future Studies](design/foresight_design_future.md)** | Framework for anticipating emerging trends and designing alternative future scenarios. | `foresight, futures, horizon-scanning, innovation, trends` |
+| **[Furniture Design & Ergonomics](design/furniture_design_ergonomics.md)** | Framework for creating functional pieces based on anthropometric fitting and structural integrity. | `furniture, ergonomics, interior-design, craftsmanship` |
+| **[Grid Systems & Layout](design/grid_systems_layout.md)** | Framework for organizing visual information using grid structures to ensure order and hierarchy. | `grids, layout, composition, visual-hierarchy, typography` |
+| **[Haptic Interaction Design](design/haptic_interaction_design.md)** | Framework for applying tactile and force-feedback to systems for enhanced sensory interaction. | `haptics, tactile, force-feedback, interaction-design, hmi` |
+| **[Human Factors & Ergonomics](design/human_factors_ergonomics.md)** | General framework for understanding human capabilities to optimize system performance and safety. | `human-factors, ergonomics, hfe, safety, efficiency` |
+| **[Iconography & Symbolic Design](design/iconography_symbolic_design.md)** | Framework for designing signs and symbols to communicate messages through concise visual forms. | `iconography, symbolism, visual-language, semiotics, hmi` |
+| **[Illustration & Style Mapping](design/illustration_style_communication.md)** | Framework for using narrative imagery and visual style to enhance brand story and experience. | `illustration, branding, narrative, visual-communication` |
+| **[Industrial Design & Manufacturability](design/industrial_design_manufacturability.md)** | Framework for designing manufactured products with a focus on DFM, DFA, and usability. | `industrial-design, manufacturability, dfm, dfa, product-design` |
+| **[Information Architecture (IA)](design/information_architecture_structural.md)** | Framework for organizing, structuring, and labeling content in digital and physical products. | `ia, taxonomy, navigation, structuring, search` |
+| **[Instructional Design & Learning Science](design/instructional_design_learning.md)** | Framework for applying learning theory to the design of educational materials and experiences. | `instructional-design, learning-science, education, training, cognitive-load` |
+| **[Interior Design & Human Behavior](design/interior_design_human_behavior.md)** | Framework for planning internal spaces that support human activities and psychological well-being. | `interior-design, behavior, spatial-psychology, architecture` |
+| **[Jewelry Design & Craftsmanship](design/jewelry_design_craftsmanship.md)** | Framework for creating ornaments balancing artistic vision, precious materials, and wearability. | `jewelry, craftsmanship, precious-metals, gemology, aesthetics` |
+| **[Landscape Architecture & Ecology](design/landscape_architecture_ecology.md)** | Framework for designing outdoor spaces and land-use systems integrated with local ecology. | `landscape, ecology, urbanism, bioswales, habitat` |
+| **[Lighting Design & Ambience](design/lighting_design_ambience.md)** | Framework for the strategic use of light to achieve practical tasks and aesthetic effects. | `lighting, ambience, circadian-rhythm, vision, architecture` |
+| **[Medical Device Design & Safety](design/medical_device_design_safety.md)** | Framework for safety-critical device design, focusing on usability validation and compliance. | `medical-device, safety-critical, fda, ema, usability, hfe` |
+| **[Modular Design & Scalability](design/modular_design_scalability.md)** | Framework for designing systems with independent components for flexibility and growth. | `modularity, scalability, engineering, flexibility` |
+| **[Motion Design & Narrative](design/motion_design_narrative.md)** | Framework for applying animation and temporal hierarchy to enhance visual communication. | `motion-design, animation, narrative, micro-interactions` |
+| **[Packaging Design & Lifecycle](design/packaging_design_lifecycle.md)** | Framework for container design considering protection, branding, and circular economy. | `packaging, lifecycle, sustainability, lifecycle-assessment, branding` |
+| **[Parametric & Generative Design](design/parametric_generative_design.md)** | Framework for using mathematical algorithms and variables to optimize form and performance. | `parametric, generative, algorithms, simulation, automation` |
+| **[Public Space & Social Design](design/public_space_social_design.md)** | Framework for creating squares and plazas that encourage social interaction and community equity. | `public-space, social-design, urbanism, placemaking` |
+| **[Regenerative Design](design/regenerative_design_systems.md)** | Framework for creating systems that actively restore and revitalize ecological and social health. | `regenerative, sustainability, net-positive, systems-thinking` |
+| **[Semiotics & Visual Communication](design/semiotics_visual_communication.md)** | Framework for the study of signs and symbols (signifier/signified) in visual meaning-making. | `semiotics, meaning, signs, symbols, communication` |
+| **[Service Design & Blueprinting](design/service_design_blueprinting.md)** | Framework for organizing service components (front/back stage) to improve quality and experience. | `service-design, blueprinting, customer-journey, touchpoints` |
+| **[Social Design & Community](design/social_design_community.md)** | Framework for collaborative design processes that address social issues and empower communities. | `social-design, community, participatory-design, equity` |
+| **[Sports Equipment & Performance](design/sports_equipment_performance.md)** | Framework for designing athletic equipment prioritizing safety, aerodynamics, and power. | `sports-equipment, performance, safety, biomechanics` |
+| **[Sustainable Urbanism](design/sustainable_urbanism.md)** | Framework for green urban density, transit-oriented development, and circular metabolism. | `sustainability, urbanism, tod, green-infrastructure` |
+| **[Systems Thinking in Design](design/systems_thinking_design.md)** | Framework for understanding interdependence and feedback loops in complex design systems. | `systems-thinking, complexity, holistic, feedback-loops` |
+| **[Toy Design & Developmental](design/toy_design_developmental.md)** | Framework for creating safe, engaging toys that promote cognitive and social play patterns. | `toy-design, developmental, play, safety-standards, children` |
+| **[Transition Design & Societal](design/transition_design_societal.md)** | Framework for addressing wicked societal problems through long-term systems change. | `transition-design, wicked-problems, societal, sustainability, futures` |
+| **[Typographic Systems & Hierarchy](design/typographic_systems_hierarchy.md)** | Framework for arranging typefaces to optimize legibility, readability, and brand persona. | `typography, hierarchy, legibility, visual-communication` |
+| **[Universal Design Principles](design/universal_design_principles.md)** | Framework for designing inclusive and accessible environments for all users across all contexts. | `design, inclusion, accessibility, human-factors, architecture` |
+| **[Urban Design & Livability](design/urban_design_livability.md)** | Framework for streetscapes and city features that prioritize human scale and the 15-minute city. | `urbanism, livability, streetscape, 15-minute-city` |
+| **[Voice User Interface (VUI) Design](design/voice_user_interface_design.md)** | Framework for conversational UX, focusing on speech recognition, intents, and error recovery. | `vui, voice-design, conversational-ux, hmi, speech` |
+| **[Wayfinding & Environmental Graphics](design/wayfinding_environmental_graphics.md)** | Framework for signage and cues that assist in orientation and mental mapping in the built environment. | `wayfinding, signage, EGD, navigation, placemaking` |
 
 ---
 ## History <a name='history_knowledge'></a>
 | History Brick | Description | Tags |
 |---|---|---|
-| **[Industrial Standardization](history/industrial_standardization.md)** | Historical model of mass production and interchangeable parts for scalability. | `history, ops, efficiency` |
-| **[Renaissance & Humanism](history/renaissance_humanism.md)** | Historical model for polymathic learning and individual scientific agency. | `history, humanities, science` |
-| **[Meiji Restoration](history/meiji_restoration.md)** | Historical model of rapid organizational transformation and modernization. | `history, strategy, change` |
-| **[The Enlightenment](history/enlightenment_scientific_method.md)** | Historical foundation for the Scientific Method and Empirical Reasoning. | `history, science, logic` |
-| **[The Great Depression](history/great_depression_macroeconomics.md)** | Historical model of systemic economic collapse and intervention logic. | `history, economics, macro` |
+| **[1970s Oil Crisis](history/oil_crisis_interdependence.md)** | Historical reference for energy security and geopolitical leverage shocks. | `oil-crisis, interdependence, opec` |
+| **[Abolition of Slavery](history/abolition_slavery_ethics.md)** | Historical reference for the shift from coerced to free labor ethics. | `abolition, labor-ethics, human-rights` |
+| **[Athenian Democracy](history/athenian_democracy_participation.md)** | Historical reference for direct participation and civic lotteries (Sortition). | `democracy, athenian, participation` |
+| **[Black Death (Resilience)](history/black_death_resilience.md)** | Historical reference for systemic shock and labor market shifts. | `black-death, labor-market, resilience` |
+| **[Blitzkrieg (Tempo)](history/blitzkrieg_operational_tempo.md)** | Historical reference for overwhelming speed and OODA loop paralysis. | `blitzkrieg, operational-tempo, maneuver` |
+| **[Bretton Woods System](history/bretton_woods_order.md)** | Historical reference for the 1944 global monetary order and institutions. | `bretton-woods, imf, monetary-order` |
+| **[Byzantine Bureaucracy](history/byzantine_bureaucracy_resilience.md)** | Historical reference for administrative continuity and resilience. | `byzantine, bureaucracy, resilience` |
+| **[Code of Hammurabi](history/hammurabi_code_law.md)** | Historical reference for publicly displayed justice and Lex Talionis. | `hammurabi, codification, justice` |
+| **[Cognitive Revolution](history/cognitive_revolution.md)** | Historical reference for the shift toward information processing models of mind. | `cognitive-revolution, psychology, science` |
+| **[Cold War Brinkmanship](history/cold_war_brinkmanship.md)** | Historical reference for strategic deterrence and game theory models. | `cold-war, brinkmanship, game-theory` |
+| **[Decolonization](history/decolonization_transition.md)** | Historical reference for self-determination and the decline of empires. | `decolonization, sovereignty, nationalism` |
+| **[Digital Revolution](history/digital_revolution_semiconductors.md)** | Historical reference for the shift to silicon and Moore's Law. | `digital-revolution, semiconductor, speed` |
+| **[Enlightenment & Science](history/enlightenment_scientific_method.md)** | Historical reference for Reason, Liberty, and Empirical verification. | `enlightenment, philosophy, science` |
+| **[Financial Crisis 2008](history/financial_crisis_2008.md)** | Historical reference for systemic risk and 'Too Big to Fail' logic. | `financial-crisis, systemic-risk, leverage` |
+| **[First Industrial Revolution](history/first_industrial_revolution.md)** | Historical reference for the shift to mechanical power (Steam). | `industrial-revolution, steam, scaling` |
+| **[Fordism & Assembly Line](history/fordism_assembly_line.md)** | Historical reference for mass production and standardization. | `fordism, assembly-line, standardization` |
+| **[Gold Standard (Stability)](history/gold_standard_stability.md)** | Historical reference for fixed exchange rates and monetary discipline. | `gold-standard, hard-money, stability` |
+| **[Great Depression](history/great_depression_macroeconomics.md)** | Historical reference for systemic collapse and intervention logic. | `great-depression, macroeconomics, risk` |
+| **[Great Game (Strategy)](history/great_game_strategy.md)** | Historical reference for buffer states and spheres of influence strategy. | `great-game, strategy, competition` |
+| **[Green Revolution](history/green_revolution_scaling.md)** | Historical reference for massive agricultural scaling and productivity. | `green-revolution, scalability, science` |
+| **[Guild System (Standards)](history/guild_system_standards.md)** | Historical reference for skill certification and quality control. | `guilds, skill-standards, quality` |
+| **[Gunpowder Revolution](history/gunpowder_revolution_disruption.md)** | Historical reference for technological disruption of elite military classes. | `gunpowder, disruption, tactical-shift` |
+| **[Hanseatic League](history/hanseatic_league_alliance.md)** | Historical reference for cross-border commercial defensive networks. | `hanseatic-league, alliance, trade` |
+| **[Hawthorne Studies](history/hawthorne_studies_humanFactors.md)** | Historical reference for social dynamics and attention in work. | `human-factors, attention, psychology` |
+| **[Industrial Standardization](history/industrial_standardization.md)** | Model of mass production and interchangeable parts for scalability. | `standardization, scalability, parts` |
+| **[Industry 4.0 (Smart Era)](history/industry_4_0_smart_era.md)** | Historical reference for cyber-physical systems and AI integration. | `industry-4-0, ai, iot, automation` |
+| **[Information Age](history/information_age_convergence.md)** | Historical reference for digital convergence and the data economy. | `information-age, data, networking` |
+| **[Internet & ARPANET](history/internet_arpanet_origin.md)** | Historical reference for decentralized resilience and protocols. | `internet, arpanet, resilience` |
+| **[Library of Alexandria](history/library_of_alexandria.md)** | Historical reference for knowledge centralization and its risks. | `centralization, knowledge-management` |
+| **[Long Depression (1873)](history/long_depression_deflation.md)** | Historical reference for deflationary pressure and overproduction. | `long-depression, deflation, stagnation` |
+| **[Magna Carta](history/magna_carta_rule_of_law.md)** | Historical reference for limitation of power and due process. | `magna-carta, rule-of-law, due-process` |
+| **[Management by Objectives](history/management_by_objectives.md)** | Historical reference for aligning individual and organizational goals. | `mbo, drucker, alignment` |
+| **[Manhattan Project](history/manhattan_project.md)** | Historical reference for mission-oriented and interdisciplinary R&D. | `manhattan-project, r-and-d, integration` |
+| **[Medici Banking System](history/medici_banking_system.md)** | Historical reference for early financial architecture and ledgers. | `medici, banking, bookkeeping` |
+| **[Meiji Restoration](history/meiji_restoration.md)** | Historical reference for rapid transformation and leapfrogging logic. | `meiji-restoration, transformation, strategy` |
+| **[Mercantilism (Wealth Logic)](history/mercantilism_wealth_logic.md)** | Historical reference for zero-sum trade and state protectionism. | `mercantilism, bullionism, trade` |
+| **[Mongol Logistics](history/mongol_logistics_mobility.md)** | Historical reference for asymmetric scaling and extreme mobility. | `mongol, logistics, agility` |
+| **[Napoleonic Code](history/napoleonic_code_law.md)** | Historical reference for civil law modernization and meritocracy. | `napoleonic-code, civil-law, equality` |
+| **[Napoleonic Warfare](history/napoleonic_warfare_mobilization.md)** | Historical reference for mass mobilization and the corps system. | `napoleonic, mobilization, speed` |
+| **[Opium Wars](history/opium_wars_trade.md)** | Historical reference for gunboat diplomacy and enforced trade. | `opium-wars, trade, sovereignty` |
+| **[Pax Romana (Stability)](history/pax_romana_stability.md)** | Historical reference for systemic stability and hegemonic peace. | `pax-romana, stability, hegemony` |
+| **[Printing Press](history/printing_press_democratization.md)** | Historical reference for information democratization and literacy. | `printing-press, democratization, impact` |
+| **[Prussian General Staff](history/prussian_general_staff.md)** | Historical reference for professionalized strategy and planning. | `strategy, planning, professionalization` |
+| **[Renaissance & Polymathy](history/renaissance_humanism.md)** | Historical model for interdisciplinary synthesis and agency. | `renaissance, humanism, polymathy` |
+| **[Roman Jurisprudence](history/roman_jurisprudence_governance.md)** | Historical foundation for universal law and administrative scaling. | `roman-law, jurisprudence, governance` |
+| **[Scientific Revolution](history/scientific_revolution_empiricism.md)** | Historical reference for the shift to observation and experiment. | `scientific-revolution, empiricism, truth` |
+| **[Silk Road (Connectivity)](history/silk_road_connectivity.md)** | Historical reference for global trade and information exchange. | `silk-road, connectivity, exchange` |
+| **[Space Race (Large R&D)](history/space_race_innovation.md)** | Historical reference for government-led innovation orchestration. | `space-race, innovation, r-and-d` |
+| **[Spanish Flu (Resilience)](history/spanish_flu_resilience.md)** | Historical reference for pandemic resilience and systemic shock. | `spanish-flu, pandemic, resilience` |
+| **[Taylorism (Efficiency)](history/taylorism_scientific_management.md)** | Historical reference for work-study and process optimization. | `taylorism, scientific-management` |
+| **[The Toyota Way (Lean)](history/toyota_way_lean_origin.md)** | Historical reference for continuous improvement and JIT logic. | `toyota-way, lean, kaizen, jit` |
+| **[Tulip Mania (Bubbles)](history/tulip_mania_bubbles.md)** | Historical reference for market mania and price-value decoupling. | `tulip-mania, bubble, valuation` |
+| **[Turing Machine (Logic)](history/turing_machine_logic.md)** | Historical reference for universal algorithmic computation logic. | `turing-machine, logic, computation` |
+| **[VOC (First Corporation)](history/voc_first_corporation.md)** | Historical model for the joint-stock corp and global scaling. | `voc, corporation, joint-stock` |
+| **[Weberian Bureaucracy](history/weberian_bureaucracy_logic.md)** | Historical model for rational-legal authority and hierarchy. | `weber, bureaucracy, hierarchy` |
+| **[Westphalian Sovereignty](history/westphalian_sovereignty.md)** | Historical foundation for the nation-state and non-interference. | `westphalia, sovereignty, diplomacy` |
 
 ---
 ## Silicon Corporate Infrastructure <a name='infrastructure'></a>
