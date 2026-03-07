@@ -323,6 +323,7 @@ def _infer_tools(sub_goal: SubGoal) -> list[str]:
     """Infer required MCP tool categories from sub-goal."""
     tools: list[str] = []
     desc_lower = sub_goal.description.lower()
+    domain_lower = sub_goal.domain.lower()
 
     if any(kw in desc_lower for kw in ("search", "web", "browse")):
         tools.append("web_search")
@@ -332,6 +333,14 @@ def _infer_tools(sub_goal: SubGoal) -> list[str]:
         tools.append("http_client")
     if any(kw in desc_lower for kw in ("database", "query", "sql")):
         tools.append("database")
+        
+    # Kea specific heuristic
+    if any(kw in desc_lower for kw in ("compare", "competition", "competitor")):
+        tools.append("competitor_discovery")
+    if "tech" in desc_lower or "technology" in domain_lower:
+        tools.append("get_tech_dashboard")
+    if "industry" in desc_lower or "business" in domain_lower:
+        tools.extend(["get_industry_performance", "get_industry_health_dashboard"])
 
     return tools
 

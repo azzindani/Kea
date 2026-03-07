@@ -114,11 +114,14 @@ def _infer_action_type(task: SubTaskItem) -> str:
     """Infer the action type from task metadata."""
     if task.required_tools:
         return "tool_call"
+    
+    # Generic fallback text matching
     desc = task.description.lower()
-    if any(kw in desc for kw in ("analyze", "evaluate", "assess", "score")):
+    if any(kw in desc for kw in ("analyze", "evaluate", "assess", "score", "compare")):
         return "llm_inference"
-    if any(kw in desc for kw in ("aggregate", "merge", "combine", "transform")):
+    if any(kw in desc for kw in ("aggregate", "merge", "combine", "transform", "summarize")):
         return "data_transform"
+        
     return "general"
 
 
