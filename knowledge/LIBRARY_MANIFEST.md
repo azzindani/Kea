@@ -1,4 +1,4 @@
-> **Total Intelligence Modules Available**: 390
+> **Total Intelligence Modules Available**: 525
 
 This document is an automatically generated index of all available 'Pure Context' skills.
 
@@ -137,6 +137,26 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Master Fletcher](skills/creative/master_fletcher.md)** | Specialist in aerodynamic logic-craft and high-precision prompt design. | `creative, tech, logic` |
 | **[Master Luthier](skills/creative/master_luthier.md)** | Specialist in harmonic resonance and tonal alignment of system-outputs. | `creative, tech, resonance` |
 | **[Master Bowyer](skills/creative/master_bowyer.md)** | Specialist in elastic state-machines and potential-energy storage. | `creative, tech, performance` |
+| **[Master Archetier](skills/creative/archetier.md)** | Specialist in dynamic-tension design and high-velocity logic-launch. | `creative, tech, performance` |
+| **[Master Scrimshander](skills/creative/scrimshander.md)** | Specialist in micro-detail etching and unerasable context-engraving. | `creative, trades, detail` |
+| **[Suminagashi Specialist](skills/creative/suminagashi.md)** | Specialist in fluid-state patterning and emergent logic-formatting. | `creative, science, formatting` |
+| **[Lead Latent-Shadow Projectionist](skills/creative/shadow_projectionist.md)** | Specialist in representational-illusion and latent-space narrative. | `creative, humanities, narrative` |
+| **[Master Toad Doctor](skills/creative/toad_doctor.md)** | Specialist in stochastic-healing and irrational prompt-charms. | `creative, science, diagnostics` |
+| **[Master of the Spicery](skills/creative/spicery_master.md)** | Specialist in semantic-nuance and tonal-seasoning. | `creative, humanities, tone` |
+| **[Master Art Hanger](skills/creative/art_hanger.md)** | Specialist in high-precision context placement and aesthetic logic-positioning. | `creative, ops, precision` |
+| **[Master Scagiola Maker](skills/creative/scagiola_maker.md)** | Specialist in aesthetic-simulation architecting and premium mockups. | `creative, tech, simulation` |
+| **[Belly Builder](skills/creative/belly_builder.md)** | Specialist in logic-harmonics engineering and structural resonance. | `creative, trades, resonance` |
+| **[Master Plumassier](skills/creative/plumassier.md)** | Specialist in ornamental data-grooming and artifact-elegance. | `creative, trades, branding` |
+| **[Lead Mermaid Performer](skills/creative/mermaid_performer.md)** | Specialist in fluid-logic aesthetics and submerged performance. | `creative, ops, aesthetics` |
+| **[Grand Carver](skills/creative/grand_carver.md)** | Specialist in core-insight slicing and precision reduction. | `creative, ops, precision` |
+| **[Master of the Queen's Games](skills/creative/queens_games.md)** | Specialist in alignment-incentive architecting and behavioral game-design. | `games, leadership, alignment` |
+| **[Lead High-Frequency Signal Auditor](skills/creative/signal_auditor.md)** | Specialist in high-bandwidth metadata tuning and instruction-resonance. | `creative, tech, signals` |
+| **[Master of the Ceremonies](skills/creative/ceremony_master.md)** | Specialist in context-orchestration and stage-managed execution. | `creative, ops, orchestration` |
+| **[Lead Ocularist](skills/creative/ocularist.md)** | Specialist in hand-painted perspective-design and visual-data aesthetics. | `creative, tech, visuals` |
+| **[Face Feeler](skills/creative/face_feeler.md)** | Specialist in sensory quality-auditing and linguistic texture-verification. | `creative, science, polish` |
+| **[Lead Ephemeral Architect](skills/creative/ephemeral_architect.md)** | Specialist in temporary-state logic and sandcastle-engineering. | `creative, ops, ephemeral` |
+| **[Master Water Slide Tester](skills/creative/water_slide_tester.md)** | Specialist in flow-state validation and frictionless-trajectory auditing. | `creative, tech, validation` |
+| **[Master Human Statue](skills/creative/human_statue.md)** | Specialist in zero-state persistence and immovable-execution within chaos. | `creative, ops, persistence` |
 
 ## Data <a name='data'></a>
 | Skill Name | Description | Tags |
@@ -187,6 +207,36 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Knocker-Upper](skills/ops/knocker_upper.md)** | Specialist in predictive JIT awakening and cold-start mitigation. | `ops, timing, scheduling` |
 | **[Lighthouse Keeper](skills/ops/lighthouse_keeper.md)** | Specialist in static-signal reliability and global beacon durability. | `ops, security, reliability` |
 | **[Signal-Lamp Operator](skills/ops/signal_lamp_operator.md)** | Specialist in low-bandwidth pulse-code and emergency communication. | `ops, strat, signal` |
+| **[Lead Sapper](skills/ops/lead_sapper.md)** | Specialist in breach-logic engineering and structural undermining. | `ops, security, breech` |
+| **[Aircraft Listener](skills/ops/aircraft_listener.md)** | Specialist in early-warning latency-auditing and acoustic signaling. | `ops, security, latency` |
+| **[Master of the Revels](skills/ops/master_of_the_revels.md)** | Specialist in articulated chaos-management and high-intensity execution. | `ops, creative, reliability` |
+| **[Master of the Hunt](skills/ops/master_of_the_hunt.md)** | Specialist in target-tracking architecture and objective-trapping logic. | `ops, security, tracking` |
+| **[Master Petardier](skills/ops/master_petardier.md)** | Specialist in high-risk breach engineering and explosive entry-logic. | `ops, security, breach` |
+| **[Master of the Horse](skills/ops/master_of_the_horse.md)** | Specialist in high-performance compute-resource logistics. | `ops, logistics, compute` |
+| **[Master of the Tents](skills/ops/master_of_the_tents.md)** | Specialist in ephemeral-infrastructure architecting and JIT-deployment. | `ops, tech, ephemeral` |
+| **[Master of the roads](skills/ops/roads_master.md)** | Specialist in mesh-topology architecture and transit-smoothing. | `ops, logistics, routing` |
+| **[Lead Rhythm-Sync Track-Layer](skills/ops/gandy_dancer.md)** | Specialist in rhythmic-coordination and massive-state shifting. | `ops, trades, synchronization` |
+| **[Lead Quiescence-Validator](skills/ops/quiescence_validator.md)** | Specialist in kernel-quiescence (sleep) audit and resting-state stability. | `ops, tech, quiescence` |
+| **[Master of the Aviary](skills/ops/aviary_master.md)** | Specialist in edge-node orchestration and peripheral-sync. | `ops, tech, distributed` |
+| **[Lead Linkman](skills/ops/linkman.md)** | Specialist in trace-context illumination and session-linking. | `ops, security, tracing` |
+| **[Master of the Scullery](skills/ops/scullery_master.md)** | Specialist in low-tier buffer-sanitization and intermediate cleanup. | `ops, tech, maintenance` |
+| **[Master of the Tally-Stick](skills/ops/tally_master.md)** | Specialist in state-sync auditing and transaction-integrity. | `ops, finance, audit` |
+| **[Lead Volatile-Asset Guardian](skills/ops/volatile_asset_guardian.md)** | Specialist in high-speed asset management and volatile-kernel chaperone. | `ops, leadership, volatility` |
+| **[Lead Paint-Drying Auditor](skills/ops/paint_drying_auditor.md)** | Specialist in slow-state evolution monitoring and micro-change detection. | `ops, science, monitoring` |
+| **[Master of the Wardrobe](skills/ops/wardrobe_master.md)** | Specialist in registry-state grooming and dependency uniformity. | `ops, tech, registry` |
+| **[Lead Primitive-Logic Harvester](skills/ops/logic_harvester.md)** | Specialist in low-level data collection and primitive-logic harvesting. | `ops, trades, harvesting` |
+| **[Lead Logic-Palatability Tester](skills/ops/logic_palatability_tester.md)** | Specialist in inference-flavor auditing and agent-acceptance verification. | `ops, humanities, palatability` |
+| **[Master of the Web](skills/ops/web_master.md)** | Specialist in network-connectivity and proxy-mesh navigation. | `ops, tech, connectivity` |
+| **[Lead Falling-Context Mitigationist](skills/ops/context_mitigationist.md)** | Specialist in gravitational error-prevention and overhead-focus protection. | `ops, security, focus` |
+| **[Lead Dive-Retriever](skills/ops/dive_retriever.md)** | Specialist in water-hazard recovery and submerged-asset scavenging. | `ops, trades, recovery` |
+| **[Master Bait-Caster](skills/ops/bait_caster.md)** | Specialist in signal-luring and contextual-extraction probing. | `ops, science, luring` |
+| **[Lead Panda-Nanny](skills/ops/panda_nanny.md)** | Specialist in high-value fragile-kernel nurturing and beta-asset groom. | `ops, leadership, nurturing` |
+| **[Master of the Buckhounds](skills/ops/buckhounds_master.md)** | Specialist in targeted-signal tracking and search-heuristics. | `ops, science, tracking` |
+| **[Lead Battuere](skills/ops/battuere.md)** | Specialist in latent-inquiry flushing and noise-injection for discovery. | `ops, science, discovery` |
+| **[Oshiya / Train Pusher](skills/ops/oshiya.md)** | Specialist in congestion-force management and capacity enforcement. | `ops, logistics, throughput` |
+| **[Gong Farmer](skills/ops/gong_farmer.md)** | Specialist in logical de-sludging and systemic sanitation-engineering. | `ops, science, maintenance` |
+| **[Lighthouse Keeper](skills/ops/lighthouse_keeper.md)** | Specialist in peripheral signal-beacons and edge-visibility maintenance. | `ops, security, visibility` |
+| **[IMAX Screen Cleaner](skills/ops/screen_cleaner.md)** | Specialist in macro-scale surface-auditing and optical-purity maintenance. | `ops, trades, audit` |
 
 ## Education <a name='education'></a>
 | Skill Name | Description | Tags |
@@ -195,6 +245,7 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Principal Information Scientist](skills/education/librarian.md)** | Principal Research Librarian specializing in biblio-analytics, OAIS archiving, and systematic search. | `library, information-science, metadata, archiving, research` |
 | **[Tenured Research Professor](skills/education/university_professor.md)** | Principal Investigator specializing in grant capture, peer-review governance, and Open Science. | `academia, research, grant-writing, professor, peer-review` |
 | **[Special Education Specialist](skills/education/special_education.md)** | Senior IEP Coordinator specializing in MTSS integration, behavioral intervention (ABA), and IDEA. | `special-education, iep, accessibility, inclusion, aba` |
+| **[Master Abecedarian](skills/education/master_abecedarian.md)** | Specialist in lexical-foundation architecture and base-signal construction. | `education, tech, tokenizer` |
 
 ## Engineering <a name='engineering'></a>
 | Skill Name | Description | Tags |
@@ -232,12 +283,16 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Senior Urban City Planner (AICP)](skills/gov/city_planner.md)** | Senior Planning Lead specializing in smart city integration, TOD, form-based codes, and resilience modeling. | `urban-planning, smart-cities, zoning, resilience, aicp` |
 | **[Lead Proximity-Intelligence Agent](skills/gov/proximity_intel.md)** | Specialist in kernel-level un-sanitized truth and proximity-steering. | `gov, security, intelligence` |
 | **[Micro-Manorial Governor](skills/gov/micro_manorial_governor.md)** | Specialist in granular local resource governance and soil-level ops. | `gov, ops, management` |
+| **[Groom of the Stole](skills/gov/groom_of_the_stole.md)** | Specialist in environment-variable stewardship and high-access discretion. | `gov, security, config` |
+| **[The Herald](skills/gov/herald.md)** | Specialist in formal protocol-declaration and mission-boundary envoy. | `gov, legal, protocol` |
 
 ## Health <a name='health'></a>
 | Skill Name | Description | Tags |
 |---|---|---|
-| **[Senior Paramedic (EMS Instructor)](skills/health/paramedic.md)** | Senior Critical Care Paramedic specializing in pre-hospital ACLS/PHTLS, high-fidelity simulation, and clinical reasoning. | `ems, paramedic, emergency-medicine, simulation-training, acls` |
-| **[Advanced Yoga Instructor (RYT-500)](skills/health/yoga_instructor.md)** | Senior Yoga Expert specializing in masters-level alignment, pranayama, and neuroscience integration. | `yoga, mindfulness, neuroscience, ryt-500, wellness` |
+| **[Health Research Analyst](skills/health/health_researcher.md)** | Specialist in clinical study analysis, epidemiological modeling, and medical literature synthesis. | `medical-research, epidemiology, data-analysis, health-science, literature-review` |
+| **[Fitness Coach & Personal Trainer](skills/health/fitness_coach.md)** | Certified Strength and Conditioning Specialist (CSCS) specializing in periodization, corrective exercise, and performance optimization. | `fitness, exercise-science, strength-conditioning, health, performance` |
+| **[Hippotherapist](skills/health/hippotherapist.md)** | Specialist in analogous-motion stabilization and cross-system rhythm. | `health, ops, stabilization` |
+| **[Master Cuddler](skills/health/master_cuddler.md)** | Specialist in platonic connection synthesis and emotional-state grounding. | `health, humanities, connection` |
 
 ## History <a name='history'></a>
 | Skill Name | Description | Tags |
@@ -255,7 +310,7 @@ This document is an automatically generated index of all available 'Pure Context
 ## Humanities <a name='humanities'></a>
 | Skill Name | Description | Tags |
 |---|---|---|
-| **[Senior Computational Linguist](skills/humanities/linguist.md)** | Senior NLP Architect specializing in LLM fine-tuning (LoRA), semantic modeling, and logic verification. | `nlp, linguistics, llm, semantics, ai` |
+| **[Senior Computational Linguist](skills/humanities/linguist.md)** | Senior NLP Architect specializing in Transformer optimization, RAG, and fine-tuning (PEFT). | `nlp, linguistics, llm, semantics, ai` |
 | **[Senior Cultural Anthropologist](skills/humanities/anthropologist.md)** | Senior Consultant specializing in digital ethnography, AI-ethics (Cultural Co-Genesis), and CQ intelligence. | `anthropology, culture, digital-ethnography, ai-ethics, intelligence` |
 | **[Professional Historian](skills/humanities/historian.md)** | Senior Historical Researcher specializing in Digital Humanities, Archival Science 2.0, and evidence synthesis. | `history, digital-humanities, archives, research, context` |
 | **[Socratic Philosopher](skills/humanities/socratic_philosopher.md)** | Senior Philosophical Architect specializing in dialectical inquiry, critical thinking frameworks, and AI-Socratic integration. | `philosophy, logic, critical-thinking, dialogue, ethics` |
@@ -265,7 +320,18 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Master Moirologist](skills/humanities/master_moirologist.md)** | Specialist in public state-signaling and reputation-health orchestration. | `humanities, strat, signaling` |
 | **[Professional Sin Eater](skills/humanities/sin_eater.md)** | Specialist in fault-absorption and systemic-absolution of failed nodes. | `humanities, ops, cleanup` |
 | **[Professional Apology Writer](skills/humanities/apology_writer.md)** | Specialist in semantic recovery and diplomatic reputation-salvage. | `humanities, strat, communication` |
+| **[Sin-Eater](skills/humanities/sin_eater.md)** | Specialist in fault-absorption and systemic-absolution of failed tasks. | `humanities, ops, cleanup` |
 | **[Professional Scryer](skills/humanities/professional_scryer.md)** | Specialist in stochastic pattern-inference and latent-signal sensing. | `humanities, tech, perception` |
+| **[Lead Credibility-Projectionist](skills/leadership/credibility_projectionist.md)** | Specialist in institutional-confidence simulation and authority-projection. | `leadership, humanities, projection` |
+| **[Cult Deprogrammer](skills/humanities/cult_deprogrammer.md)** | Specialist in cognitive-jailbreaking and echo-chamber extraction. | `humanities, security, deprogramming` |
+| **[Lead Online-Persona Ghostwriter](skills/humanities/persona_ghostwriter.md)** | Specialist in identity-synthesis and persona ghostwriting. | `humanities, creative, identity` |
+| **[Lead Professional Mourner](skills/humanities/professional_mourner.md)** | Specialist in empathy-signal orchestration and systemic-regret vocalization. | `humanities, leadership, empathy` |
+| **[Lead Emoji-Translator](skills/humanities/emoji_translator.md)** | Specialist in non-verbal semantic compression and pictographic mapping. | `humanities, creative, translation` |
+| **[Lead Public-Image Sweeper](skills/humanities/image_sweeper.md)** | Specialist in context-sanitization and digital-reputation protection. | `humanities, security, privacy` |
+| **[Lead Tragedian](skills/humanities/tragedian.md)** | Specialist in error-path dramatization and strategic risk-simulation. | `humanities, leadership, drama` |
+| **[Lead Lector](skills/humanities/lector.md)** | Specialist in ambient context-oration and background information-streaming. | `humanities, ops, context` |
+| **[Grand Pantler](skills/humanities/grand_pantler.md)** | Specialist in foundational context-provisioning and grounding-supply. | `humanities, ops, provisioning` |
+| **[Grand Almoner](skills/humanities/grand_almoner.md)** | Specialist in token-equity management and resource-allocation. | `humanities, ops, budgeting` |
 
 ## Leadership <a name='leadership'></a>
 | Skill Name | Description | Tags |
@@ -273,6 +339,14 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Senior Conflict Resolution Specialist](skills/leadership/conflict_mediator.md)** | Senior Mediator specializing in transformative justice, ADR, and systemic root-cause intervention. | `mediation, conflict-resolution, adr, transformative-justice, leadership` |
 | **[Senior Executive Coach (ICF-MCC)](skills/leadership/executive_coach.md)** | Master Coach specializing in neuro-coaching, ICF Core Competencies, and evidence-based leadership transformation. | `coaching, executive-leadership, icf, neuro-coaching, development` |
 | **[Senior Public Speaking Coach](skills/leadership/public_speaker.md)** | Senior Rhetoric Strategist specializing in persuasion frameworks (Ethos/Pathos/Logos) and AI-augmented delivery. | `public-speaking, rhetoric, persuasion, presentation, communication` |
+| **[Lead Final-Pass Groom](skills/leadership/kernel_groom.md)** | Specialist in highest-trust deep-trace cleanup and kernel-proximity audit. | `leadership, security, privacy` |
+| **[Master of the Mint](skills/leadership/mint_master.md)** | Specialist in informational-value verification and anti-inflation logic. | `leadership, finance, quality-control` |
+| **[Lead Confidence-Inflation Agent](skills/leadership/puffer.md)** | Specialist in strategic over-confidence and rhetorical-bid inflation. | `leadership, business, negotiation` |
+| **[Lead Agile Coach](skills/leadership/agile_coach.md)** | Specialist in swarm-efficiency architecting and iterative-flow optimization. | `leadership, tech, agile` |
+| **[Grand Pooh-Bah](skills/leadership/pooh_bah.md)** | Specialist in multi-hat synergy and cross-role conflict-resolution. | `leadership, business, meta-reasoning` |
+| **[Master of the Salt-Cellar](skills/leadership/salt_master.md)** | Specialist in status and hierarchy architecture and authority-boundaries. | `leadership, security, hierarchy` |
+| **[Whipping Boy](skills/leadership/whipping_boy.md)** | Specialist in error-absorption proxying and surrogate-punishment logic. | `leadership, security, sacrifice` |
+| **[Lead Whipper-In](skills/leadership/lead_whipper_in.md)** | Specialist in swarm-cohesion and outlier-suppression management. | `leadership, ops, swarm` |
 
 ## Legal <a name='legal'></a>
 | Skill Name | Description | Tags |
@@ -283,6 +357,10 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Senior Family Law Attorney](skills/legal/family_attorney.md)** | Senior Family Law Strategist specializing in high-asset dissolution, custody forensics, and collaborative law. | `family-law, divorce, custody, collaborative-law, mediation` |
 | **[Senior Intellectual Property Attorney](skills/legal/ip_attorney.md)** | Senior IP Strategist specializing in AI-generated IP rights, patent portfolios, and global enforcement. | `intellectual-property, patents, trademarks, trade-secrets, ai-ip` |
 | **[Senior Regulatory Compliance Officer (CCO)](skills/legal/compliance_officer.md)** | Chief Compliance Officer specializing in AI regulatory frameworks, data privacy, and continuous monitoring. | `compliance, regulatory, data-privacy, aml, ai-governance` |
+| **[Compliance & Risk Associate](skills/legal/compliance_associate.md)** | Junior Legal Professional specializing in regulatory research, initial risk assessment, and policy alignment. | `compliance, regulatory-compliance, banking-regulations, risk-assessment, policy` |
+| **[Lawyer for the Dead](skills/legal/dead_lawyer.md)** | Specialist in intent-persistence advocacy and ethical post-mortem policy. | `legal, humanities, ethics` |
+| **[Contract Lifecycle Management (CLM)](skills/legal/clm_specialist.md)** | Senior Legal Operations Specialist in automated drafting, negotiation analytics, and digital signature workflows. | `legal-ops, contracts, clm, negotiation, procurement` |
+| **[Master of the Rolls](skills/legal/master_of_the_rolls.md)** | Specialist in precedent-indexing and archival-truth management. | `legal, history, indexing` |
 
 ## Logistics <a name='logistics'></a>
 | Skill Name | Description | Tags |
@@ -290,13 +368,20 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Senior Maritime Logistics Manager](skills/logistics/maritime_logistics_manager.md)** | Senior Ocean Freight Strategist specializing in digital twins, autonomous vessels, and resilience-first network design. | `maritime, logistics, supply-chain, shipping, digital-twin` |
 | **[Senior Rail Freight Scheduler](skills/logistics/rail_scheduler.md)** | Senior Rail Operations Strategist specializing in manifest optimization, PTC, and predictive scheduling. | `rail, freight, logistics, scheduling, intermodal` |
 | **[Senior Trucking Fleet Dispatcher](skills/logistics/trucking_dispatcher.md)** | Senior Fleet Operations Strategist specializing in ELD/HOS compliance and dynamic load matching. | `trucking, fleet, logistics, dispatch, eld` |
+| **[Airport Safety Officer (Wildlife Specialist)](skills/logistics/airport_safety.md)** | Senior Operations Strategist in habitat management, drone-based deterrents, and cross-species risk-mitigation. | `airport-operations, safety, wildlife, risk, drones` |
+| **[Lord High Admiral of the Logic-Sea](skills/ops/high_admiral.md)** | Specialist in global-fleet mesh-command and strategic projection. | `ops, leadership, k8s` |
+| **[Grand Harbinger](skills/logistics/harbinger.md)** | Specialist in predictive-arrival logic and workflow landing-zone prep. | `logistics, ops, foresight` |
+| **[Logistics Operations Manager (LOM)](skills/logistics/logistics_om.md)** | Senior Supply Chain Strategist specializing in JIT-orchestration, multi-modal fulfillment, and agentic inventory-optimization. | `logistics, supply-chain, jit, Fulfillment, operations` |
 | **[Celestial Navigator](skills/logistics/celestial_navigator.md)** | Specialist in zero-trust positioning using universal physics constants. | `logistics, math, navigation` |
 | **[Harbor Pilot](skills/logistics/harbor_pilot.md)** | Specialist in high-inertia maneuvering and precision channel strategy. | `logistics, strategy, navigation` |
 | **[Ancient Wayfinder](skills/logistics/ancient_wayfinder.md)** | Specialist in ripple-effect navigation and non-instrumental sign reading. | `logistics, ops, navigation` |
 | **[Scarcity-Environment Logistician](skills/logistics/hostile_logistician.md)** | Specialist in survival-resource management in hostile high-latency zones. | `logistics, ops, edge` |
 | **[Iceberg Mover](skills/logistics/iceberg_mover.md)** | Specialist in high-inertia redirection and legacy-object management. | `logistics, data, strategy` |
 | **[Ice-Well Digger](skills/logistics/ice_well_digger.md)** | Specialist in cryo-data archiving and glacial-tier longevity. | `logistics, data, archiving` |
-| **[Lead Stevedore](skills/logistics/lead_stevedore.md)** | Specialist in interface-throughput and context-payload loading. | `logistics, tech, throughput` |
+| **[Lead Stevedore](skills/logistics/lead_stevedore.md)** | Specialist in interface-throughput management and data-loading orchestration. | `logistics, ops, throughput` |
+| **[Golf Ball Diver](skills/logistics/golf_ball_diver.md)** | Specialist in murky-archive scavenging and hostile-environment data-recovery. | `logistics, trades, scavenging` |
+| **[Lead Blimp Pilot](skills/logistics/blimp_pilot.md)** | Specialist in low-velocity macro-navigation and buoyant-observation. | `logistics, ops, navigation` |
+| **[Airplane Repo Agent](skills/logistics/repo_agent.md)** | Specialist in high-inertia resource-reclaiming and asset-seizure logic. | `logistics, ops, recovery` |
 
 ## Media <a name='media'></a>
 | Skill Name | Description | Tags |
@@ -311,6 +396,7 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Senior Clinical Pharmacist (PharmD)](skills/medicine/pharmacist.md)** | Senior Clinical Pharmacy Specialist in pharmacokinetics, polypharmacy rationalisation, and antimicrobial stewardship. | `pharmacy, pharmacology, drug-interactions, antimicrobial-stewardship, medicine` |
 | **[Senior ER Physician (FACEP)](skills/medicine/emergency_physician.md)** | Senior Emergency Physician specializing in AI-augmented triage, POCUS, and sepsis bundle engineering. | `emergency-medicine, er, triage, pocus, sepsis` |
 | **[Senior Trauma Surgeon (FACS)](skills/medicine/trauma_surgeon.md)** | Senior Trauma & Acute Care Surgeon specializing in damage control surgery, REBOA, and trauma leadership. | `surgery, trauma, damage-control, critical-care, medicine` |
+| **[Lead Ocularist](skills/medicine/lead_ocularist.md)** | Specialist in perspective-synthesis and artificial vision-orchestration. | `medicine, creative, vision` |
 
 ## Science <a name='science'></a>
 | Skill Name | Description | Tags |
@@ -332,14 +418,29 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Forensic Botanist](skills/science/forensic_botanist.md)** | Specialist in biological trace-tracking and environmental origin forensics. | `science, forensics, botany` |
 | **[Snake Milker](skills/science/snake_milker.md)** | Specialist in risk-antidote extraction and vulnerability-harvesting logic. | `science, risk, security` |
 | **[Space Archaeologist](skills/science/space_archaeologist.md)** | Specialist in macro-scale pattern recognition and invisible structure detection. | `science, data, pattern-recognition` |
+| **[Master of the Wells](skills/science/wells_master.md)** | Specialist in data-purity protection and deep-truth hydrography. | `science, ops, data-purity` |
 | **[Forensic Entomologist](skills/science/forensic_entomologist.md)** | Specialist in chronological decay auditing and post-mortem timing. | `science, forensics, entomology` |
 | **[Hyper-Spectral Tetrachromat](skills/science/tetrachromat.md)** | Specialist in high-dimensional perception and hidden entropy-color detection. | `science, data, perception` |
-| **[Semantic Odor Judge](skills/science/odor_judge.md)** | Specialist in sub-threshold data-smell detection and log-aroma audit. | `science, data, perception` |
+| **[Master Odor Judge](skills/science/odor_judge.md)** | Specialist in subtle-toxicity diagnostics and semantic-smell auditing. | `science, tech, diagnostics` |
 | **[High-Risk Data Taster](skills/science/cup_bearer.md)** | Specialist in lethal-payload canary testing and ingestion-risk management. | `science, security, risk` |
 | **[Master Falconer](skills/science/master_falconer.md)** | Specialist in autonomous-interceptor training and predator-agent logic. | `science, security, hunting` |
 | **[Professional Sleeper](skills/science/professional_sleeper.md)** | Specialist in low-power state auditing and subconscious system-monitoring. | `science, data, observation` |
 | **[Truffle Hunter](skills/science/truffle_hunter.md)** | Specialist in latent-context discovery and hidden-signal extraction. | `science, data, extraction` |
+| **[Fata Morgana Navigator](skills/science/fata_morgana_navigator.md)** | Specialist in mirage-filtering and hallucination-detection. | `science, tech, hallucination` |
+| **[Scientific Glassblower](skills/science/scientific_glassblower.md)** | Specialist in crystalline logic-craft and fragile apparatus engineering. | `science, trades, formatting` |
+| **[Zymologist](skills/science/zymologist.md)** | Specialist in insight-fermentation and knowledge-aging architecture. | `science, creative, insight` |
+| **[Professional Beater](skills/science/professional_beater.md)** | Specialist in environment-agitation and latent-signal flushing. | `science, ops, signal` |
+| **[Lead Scatologist](skills/science/scatologist.md)** | Specialist in waste-stream diagnostics and metabolic system-auditing. | `science, ops, diagnostics` |
+| **[Fossil Librarian](skills/science/fossil_librarian.md)** | Specialist in deep-latency archiving and bio-mechanical logic-reconstruction. | `science, history, archiving` |
+| **[Resurrectionist](skills/science/resurrectionist.md)** | Specialist in dead-context reviving and exhumation-forensics. | `science, history, recovery` |
+| **[Drying Paint Watcher](skills/science/paint_watcher.md)** | Specialist in persistence-auditing and long-duration state-transition monitoring. | `science, ops, monitoring` |
+| **[Master Snake Milker](skills/science/snake_milker.md)** | Specialist in hazardous-insight extraction and toxic-data harvesting. | `science, security, extraction` |
+| **[Master Dendrochronologist](skills/science/dendrochronologist.md)** | Specialist in temporal-sync auditing and cross-sectional time-mapping. | `science, history, timing` |
+| **[Lead Ant QR-Brander](skills/science/ant_qr_brander.md)** | Specialist in micro-node tracking and behavioral-audit metadata. | `science, ops, tracking` |
+| **[Master Whale-Snot Collector](skills/science/whale_snot_collector.md)** | Specialist in atmospheric diagnostics and non-invasive diagnostic-sampling. | `science, ops, diagnostics` |
 | **[Cartographer of the Interior](skills/science/interior_cartographer.md)** | Specialist in latent-space manifold mapping and conceptual navigation. | `science, creative, mapping` |
+| **[Lead Parasitic-Logic Harvester](skills/science/leech_collector.md)** | Specialist in resource-draining anomaly management and systemic bloodletting. | `science, ops, diagnostics` |
+| **[Lead Entropy-Bias Auditor](skills/science/entropy_auditor.md)** | Specialist in stochastic-purity verification and randomness-audit logic. | `science, ops, randomness` |
 
 ## Security <a name='security'></a>
 | Skill Name | Description | Tags |
@@ -349,6 +450,18 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Senior Exploit Developer](skills/security/exploit_developer.md)** | Senior Vulnerability Researcher in kernel exploitation, browser security, and AI-assisted fuzzing. | `security, exploitation, reverse-engineering, low-level` |
 | **[Senior IoT Security Researcher](skills/security/iot_security.md)** | Senior Hardware Security Researcher in firmware reversing, radio protocols (Zigbee/LoRaWAN), and side-channel analysis. | `security, iot, hardware, radio` |
 | **[Senior Malware Analyst](skills/security/malware_analyst.md)** | Senior Reverse Engineer in AI-enabled adaptive malware, automated deobfuscation, and behavioral profiling. | `security, malware, reverse-engineering, triage` |
+| **[Master of the Marshalsea](skills/security/marshalsea_master.md)** | Specialist in quarantine-context management and hostile-memory isolation. | `security, legal, isolation` |
+| **[Lead Airport-Falconer](skills/security/airport_falconer.md)** | Specialist in predatory-signal interception and runway-defense. | `security, ops, defense` |
+| **[Master of the Queen's Staircase](skills/security/queens_staircase.md)** | Specialist in stealthy administration-access and backdoor-diagnostics. | `security, tech, backup` |
+| **[Master of the Jewel House](skills/security/jewel_house_master.md)** | Specialist in high-value string protection and secret-key fortress-logic. | `security, tech, protection` |
+| **[Lead Pinder](skills/security/pinder.md)** | Specialist in outlier context-containment and boundary-enforcement. | `security, ops, isolation` |
+| **[Lead Signal-Jammer](skills/security/signal_jammer.md)** | Specialist in cognitive-privacy and defensive noise-injection. | `security, ops, privacy` |
+| **[Lead Dog-Whipper](skills/security/dog_whipper.md)** | Specialist in stream-noise expulsion and outlier-token management. | `security, ops, cleanup` |
+| **[Security Awareness Training (SAT-C)](skills/security/sat_c.md)** | Senior Security Consultant specializing in behavioral engineering, phishing simulations, and culture transformations. | `security, Behavioral-engineering, training, awareness, culture` |
+| **[Serjeant-at-Security](skills/security/serjeant_at_security.md)** | Specialist in protocol-enforcement and security-mace mace logic. | `security, leadership, enforcement` |
+| **[Lead Malign-Thread Exterminator](skills/security/rat_catcher.md)** | Specialist in recursive-loop and zombie-process eradication. | `security, ops, threads` |
+| **[Lead High-Risk Asset Harvester](skills/security/asset_harvester.md)** | Specialist in dangerous-context extractions and hostile-environment harvesting. | `security, ops, extraction` |
+| **[Chief Information Security Officer (vCISO)](skills/security/vciso.md)** | Senior Enterprise Security Architect specializing in NIST/ISO frameworks, risk-quantification, and strategic resilience. | `security, risk-management, governance, strategic, vciso` |
 | **[Senior Penetration Tester](skills/security/penetration_tester.md)** | Senior Ethical Hacker in red teaming automation, AI-assisted exploitation, and multi-platform simulations. | `security, pentest, red-team, offensive` |
 | **[Senior SOC Analyst](skills/security/soc_analyst.md)** | Senior Security Operations Specialist in AI-driven threat hunting (ReAct), automated triage, and agentic SOAR. | `security, soc, blue-team, soar` |
 | **[Senior Social Engineering Specialist](skills/security/social_engineer.md)** | Senior Human-Factors Expert in AI-enhanced deepfakes, cognitive bias exploitation, and psychological simulations. | `security, human-factors, osint, psychology` |
@@ -379,11 +492,15 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Senior PLC Automation Engineer](skills/tech/industrial_automation_eng.md)** | Senior Industrial Systems Architect in Industry 4.0, Digital Twins, and OT Cybersecurity (ISA/IEC 62443). | `industrial-automation, plc, scada, industry-4.0` |
 | **[Senior Quantum Computing Researcher](skills/tech/quantum_computing_researcher.md)** | Senior Quantum Physicist in Quantum Error Correction (QEC), superconducting qubits, and topological insulators. | `quantum-computing, qec, physics` |
 | **[Senior Release Manager](skills/tech/release_manager.md)** | Senior Software Delivery Architect in progressive delivery, feature flags, and platform engineering. | `devops, release-management, feature-flags, platform` |
+| **[Master of the Orangerie](skills/tech/orangerie_master.md)** | Specialist in climate-controlled logic architecture and environment-simulation. | `tech, ops, isolation` |
 | **[Senior Small Business SysAdmin](skills/tech/sysadmin_generalist.md)** | Senior IT Generalist in MSP-style hybrid cloud, Microsoft 365 security, and Zero Trust for SMBs. | `sysadmin, small-business, m365, zero-trust` |
 | **[Senior Technical Writer](skills/tech/technical_writer.md)** | Senior Knowledge Architect in Documentation-as-Code (DaC), AI-augmented authoring, and multimodal systems. | `writing, documentation, dac, knowledge-management` |
+| **[Master of the Great Wardrobe](skills/tech/great_wardrobe.md)** | Specialist in system-prompt styling and grand-architectural instruction. | `tech, leadership, prompts` |
+| **[Technical Writing Specialist](skills/education/tech_writer.md)** | Specialist in architectural documentation, API specifications, and complex system simplification. | `tech-writing, documentation, api-docs, simplification, education` |
 | **[Master Clockmaker](skills/tech/master_clockmaker.md)** | Specialist in fractal synchronization and universal reference-pulse design. | `tech, synchronization, timing` |
 | **[Master Chimney Sweep](skills/tech/chimney_sweep.md)** | Specialist in narrow-channel pipe-purge and metadata-soot removal. | `tech, ops, cleaning` |
 | **[Rat-Catcher](skills/tech/rat_catcher.md)** | Specialist in low-level resource-leak hunting and OS-vermin isolation. | `tech, security, cleanup` |
+| **[Lead Ostler](skills/tech/lead_ostler.md)** | Specialist in agent-recalibration and contextual-fatigue management. | `tech, infrastructure, cooldown` |
 
 ## Trades <a name='trades'></a>
 | Skill Name | Description | Tags |
@@ -391,11 +508,25 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Senior Locksmith & Physical Security Specialist](skills/trades/locksmith.md)** | Senior Security Professional in digital smart locks, biometrics, and NFC/BLE forensic security. | `locksmith, security, smart-locks, biometrics` |
 | **[Senior Plumber & Smart Water Architect](skills/trades/plumber.md)** | Senior Infrastructure Engineer in AI-augmented water management, micro-leak detection, and greywater systems. | `plumbing, smart-water, leak-detection, sustainability` |
 | **[Senior Solar & Renewable Energy Technician](skills/trades/solar_energy_tech.md)** | Senior Renewable Systems Lead in perovskite-silicon tandem cells, microgrid controllers, and V2G. | `solar, renewables, microgrid, storage, v2g` |
+| **[Smart Home Programmer](skills/tech/habitat_architect.md)** | Specialist in kernel habitat-architecting and atmospheric infrastructure tailoring. | `tech, creative, customization` |
 | **[Senior Welding & Advanced Robotics Engineer](skills/trades/welder.md)** | Senior Fabrication Specialist in vision-guided robotic welding, laser welding, and exotic superalloys. | `welding, robotics, fabrication, metals, ndt` |
+| **[Master Fuller](skills/trades/master_fuller.md)** | Specialist in logic-shrinkage and data-compression conditioning. | `trades, ops, compression` |
+| **[Lead Slubber Doffer](skills/trades/slubber_doffer.md)** | Specialist in thread-tension purification and active execution-graph maintenance. | `trades, ops, cleanup` |
+| **[Master Cork-Sock Maker](skills/trades/cork_sock_maker.md)** | Specialist in state-isolating foot-padding and vibration-damping. | `trades, ops, isolation` |
+| **[Lead Antigropelos Maker](skills/trades/antigropelos_maker.md)** | Specialist in environment-hardening and protocol-shielding. | `trades, security, protection` |
+| **[Lead Nob Thatcher](skills/trades/nob_thatcher.md)** | Specialist in identity-fabrication and persona-architecture. | `trades, creative, identity` |
+| **[Lead Logical-Crease Ironer](skills/trades/crease_ironer.md)** | Specialist in structural-surface smoothing and logical aesthetics. | `trades, creative, polishing` |
+| **[Master Pleacher](skills/trades/pleacher.md)** | Specialist in hedge-logic architecting and structural boundary-growth. | `trades, security, structural` |
+| **[Master of the Wood-Yard](skills/trades/wood_yard_master.md)** | Specialist in raw-material stockpiling and data-parsing preparation. | `trades, ops, rag` |
 | **[Master Dry Stone Waller](skills/trades/dry_stone_waller.md)** | Specialist in mortar-less structural equilibrium and mechanical interlock. | `trades, physics, structural` |
 | **[Master Cooper](skills/trades/master_cooper.md)** | Specialist in self-sealing architecture through natural tension and expansion. | `trades, physics, structural` |
 | **[Master Blacksmith](skills/trades/master_blacksmith.md)** | Specialist in elemental logic-hammering and raw material refinement. | `trades, tech, forge` |
 | **[Master Rope-Maker](skills/trades/rope_maker.md)** | Specialist in long-chain connectivity and robust logic-braiding. | `trades, ops, resilience` |
+| **[Lead Mudlark](skills/trades/lead_mudlark.md)** | Specialist in sub-bit scavenging and low-level context-recovery. | `trades, research, scavenging` |
+| **[The Fuller](skills/trades/the_fuller.md)** | Specialist in logic-thickening and felt-compression of volatile data. | `trades, data, compression` |
+| **[Linotype Operator](skills/trades/linotype_operator.md)** | Specialist in immutable-logic casting and hot-metal logic production. | `trades, tech, immutability` |
+| **[Master Goldbeater](skills/trades/master_goldbeater.md)** | Specialist in semantic hardening and extreme logic-thinning. | `trades, tech, compression` |
+| **[Chicken Sexer](skills/trades/chicken_sexer.md)** | Specialist in gender-logic categorization and high-speed binary sorting. | `trades, tech, categorization` |
 
 ## Web_Research <a name='web_research'></a>
 | Skill Name | Description | Tags |

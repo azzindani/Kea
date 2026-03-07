@@ -22,7 +22,7 @@ from shared.logging.main import get_logger
 from shared.standard_io import Result, Signal
 
 from ..classification.engine import classify
-from ..classification.types import ClassProfileRules, FallbackTrigger
+from ..classification.types import ClassProfileRules, FallbackTrigger, PatternRule
 
 from .types import (
     ClientIntent,
@@ -94,39 +94,17 @@ async def classify_intent(
             return ClientIntent.INTERRUPT
 
     # --- T1 classification for deeper analysis ---
-    classify_result = classify(
+    classify_result = await classify(
         text=request_content,
-        config=ClassProfileRules(
-            profiles={
-                "new_task": {
-                    "keywords": ["build", "create", "design", "implement",
-                                 "develop", "write", "make", "generate",
-                                 "analyze", "research"],
-                    "weight": 1.0,
-                },
-                "follow_up": {
-                    "keywords": ["what was", "recall", "remember", "show me",
-                                 "from before", "earlier", "previous",
-                                 "last time"],
-                    "weight": 1.0,
-                },
-                "status_check": {
-                    "keywords": ["progress", "status", "how far", "update",
-                                 "how's it going", "eta", "remaining"],
-                    "weight": 1.0,
-                },
-                "revision": {
-                    "keywords": ["change", "modify", "update", "fix",
-                                 "revise", "instead", "rather"],
-                    "weight": 1.0,
-                },
-                "conversation": {
-                    "keywords": ["what do you think", "opinion", "explain",
-                                 "tell me about", "discuss", "how does",
-                                 "why is"],
-                    "weight": 1.0,
-                },
-            }
+        profile_rules=ClassProfileRules(
+            labels=["new_task", "follow_up", "status_check", "revision", "conversation"],
+            pattern_rules=[
+                PatternRule(label="new_task", pattern=r"(?i)\b(build|create|design|implement|develop|write|make|generate|analyze|research)\b", weight=1.0),
+                PatternRule(label="follow_up", pattern=r"(?i)\b(what was|recall|remember|show me|from before|earlier|previous|last time)\b", weight=1.0),
+                PatternRule(label="status_check", pattern=r"(?i)\b(progress|status|how far|update|how's it going|eta|remaining)\b", weight=1.0),
+                PatternRule(label="revision", pattern=r"(?i)\b(change|modify|update|fix|revise|instead|rather)\b", weight=1.0),
+                PatternRule(label="conversation", pattern=r"(?i)\b(what do you think|opinion|explain|tell me about|discuss|how does|why is)\b", weight=1.0),
+            ]
         ),
         kit=kit,
     )
@@ -134,7 +112,7 @@ async def classify_intent(
     # Extract classification result
     top_profile = "new_task"
     if classify_result.signals:
-        payload = classify_result.signals[0].payload
+        payload = classify_result.signals[0].body.get("data", {})
         if isinstance(payload, dict):
             top_profile = payload.get("profile", "new_task")
 
@@ -192,23 +170,24 @@ async def assess_strategy(
 
     # --- 1. Complexity assessment via T6 activation_router ---
     from kernel.activation_router.engine import classify_signal_complexity
-    complexity_result = classify_signal_complexity(request_content, kit)
-
-    complexity = "moderate"
-    if complexity_result.signals:
-        payload = complexity_result.signals[0].payload
-        if isinstance(payload, dict):
-            complexity = payload.get("level", "moderate")
+    from kernel.self_model.types import SignalTags
+    
+    tags = SignalTags(intent="new_task", urgency="normal")
+    complexity_level = await classify_signal_complexity(tags, text=request_content, kit=kit)
+    complexity = complexity_level.value
 
     # --- 2. Capability assessment via T6 self_model ---
     capability_gaps: list[str] = []
     try:
         from kernel.self_model.engine import assess_capability
-        cap_result = assess_capability(request_content)
-        if cap_result.signals:
-            payload = cap_result.signals[0].payload
-            if isinstance(payload, dict):
-                capability_gaps = payload.get("gaps", [])
+        from kernel.lifecycle_controller.types import IdentityContext
+        
+        identity = IdentityContext(agent_name="CorporateGateway", role_description="Gateway", skills=["routing"])
+        cap_result = await assess_capability(tags, identity, kit)
+        
+        if cap_result.gap:
+            capability_gaps = cap_result.gap.missing_knowledge + cap_result.gap.missing_tools
+            
     except Exception as exc:
         log.warning("capability_assessment_skipped", error=str(exc))
 
