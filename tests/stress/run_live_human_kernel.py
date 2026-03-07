@@ -98,8 +98,14 @@ async def test_run_live_kernel():
     if result.is_success:
         obs_res = result.signals[0].body.get("data", {}) or {}
         filtered_out = obs_res.get('filtered_output') or {}
-        output_content = filtered_out.get('content', 'NO CONTENT')
+        output_content = filtered_out.get('content')
         
+        if not output_content:
+            # Fallback for ESCALATED or ABORTED states
+            phase = obs_res.get('final_phase', 'UNKNOWN')
+            partial_out = obs_res.get('partial_output', 'NO CONTENT')
+            output_content = f"⚠️ MISSION {str(phase).upper()}\nPartial output captured before halt:\n\n{partial_out}"
+            
         print("\n" + "="*80)
         print("🏆 FINAL LIVE ANALYSIS:")
         print("="*80)
