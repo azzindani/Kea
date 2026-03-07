@@ -106,6 +106,7 @@ class LoadAction(StrEnum):
 
     CONTINUE = "continue"     # Normal operation
     SIMPLIFY = "simplify"     # Downgrade pipeline
+    RECOVER = "recover"       # Survival mode (purge memory & replan)
     ESCALATE = "escalate"     # Ask T5/T7 for help
     ABORT = "abort"           # Kill current cycle
 

@@ -1440,6 +1440,38 @@ class ConsciousObserver:
                     termination_reason = LoopTerminationReason.LIFECYCLE_SIGNAL
                     break
 
+                elif recommendation.action == LoadAction.RECOVER:
+                    log.warning(
+                        "🛡️ CLM: SURVIVAL MODE ACTIVATED (RECOVER)",
+                        cycle=cycle_num,
+                        reasoning=recommendation.reasoning,
+                        trace_id=trace_id,
+                    )
+                    # 1. Purge the poisoned short-term memory outputs so they don't break the next prompt
+                    recent_outputs.clear()
+                    
+                    # 2. False Success Blacklisting: find tools that "succeeded" mechanically this cycle,
+                    #    but caused semantic drift. Yank them out of success and strictly blacklist them.
+                    false_successes = []
+                    for tool_name, record in list(tool_memory.succeeded.items()):
+                        if record.cycle_number == cycle_num + 1:
+                            false_successes.append(tool_name)
+                            tool_memory.blacklisted.add(tool_name)
+                            del tool_memory.succeeded[tool_name]
+                    
+                    if false_successes:
+                        log.notice(
+                            "Survival Mode: Purged poisoned memory and blacklisted false-success tools",
+                            blacklisted=false_successes,
+                            trace_id=trace_id,
+                        )
+                    
+                    # 3. Destroy the current plan so the next cycle is forced to Replan
+                    active_dag = None
+                    
+                    # 4. We do NOT break here. We `continue` to the next cycle and let the Replan take over!
+                    continue
+
                 elif recommendation.action == LoadAction.SIMPLIFY:
                     if simplify_steps_used < max_simplify:
                         current_activation_map = _downgrade_activation_map(

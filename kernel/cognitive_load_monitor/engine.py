@@ -389,19 +389,29 @@ def recommend_action(
     # ESCALATE conditions
     if (
         load.aggregate >= settings.load_threshold_escalate
-        or has_drift
         or (has_loop and loops.loop_count >= 2)
     ):
         reasoning_parts = []
         if load.aggregate >= settings.load_threshold_escalate:
             reasoning_parts.append(f"load high ({load.aggregate:.2f})")
-        if has_drift:
-            reasoning_parts.append("goal drift detected")
         if has_loop:
             reasoning_parts.append(f"loop detected ({loops.loop_count}x)")
         return LoadRecommendation(
             action=LoadAction.ESCALATE,
             reasoning=f"ESCALATE: {', '.join(reasoning_parts)}",
+            load_snapshot=load,
+            loop_detected=has_loop,
+            stall_detected=stall,
+            oscillation_detected=has_oscillation,
+            drift_detected=has_drift,
+        )
+
+    # RECOVER conditions (Survival Mode)
+    if has_drift:
+        reasoning_parts = ["goal drift detected"]
+        return LoadRecommendation(
+            action=LoadAction.RECOVER,
+            reasoning=f"RECOVER: {', '.join(reasoning_parts)}",
             load_snapshot=load,
             loop_detected=has_loop,
             stall_detected=stall,
