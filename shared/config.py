@@ -887,7 +887,7 @@ class KernelSettings(BaseModel):
     rag_knowledge_rule_limit: int = 2
     rag_knowledge_procedure_limit: int = 2
     rag_knowledge_persona_limit: int = 1
-    rag_tool_search_limit: int = 50
+    rag_tool_search_limit: int = 100
     rag_tool_min_similarity: float = 0.3
     rag_retrieval_timeout: float = 10.0
     rag_jit_tool_refresh_enabled: bool = True

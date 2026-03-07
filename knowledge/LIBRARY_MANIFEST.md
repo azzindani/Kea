@@ -1,4 +1,4 @@
-> **Total Intelligence Modules Available**: 525
+> **Total Intelligence Modules Available**: 534
 
 This document is an automatically generated index of all available 'Pure Context' skills.
 
@@ -579,15 +579,86 @@ This document is an automatically generated index of all available 'Pure Context
 | **[Deep Battle (Ops)](strategy/deep_battle_ops.md)** | Operational model for achieving systemic collapse via simultaneous depth penetration. | `strategy, military, depth` |
 
 ---
+> **Total Intelligence Modules Available**: 584
+
+This document is an automatically generated index of all available 'Pure Context' skills.
+
+---
+
+## Table of Contents
+- [Business Operations](#business-operations)
+- [Compliance](#compliance)
+- [Kea](#kea)
+
+---
+
 ## Compliance <a name='compliance'></a>
 | Policy Name | Description | Tags |
 |---|---|---|
-| **[Institutional Accountability](compliance/institutional_accountability.md)** | Governance rules for long-term ownership and the 'Disagree and Commit' protocol. | `governance, accountability, ethics` |
-| **[Financial Governance (GAAP/SOX)](rules/corporate/financial_governance.md)** | Standards for transparent financial reporting and executive accountability. | `compliance, finance, gaap, sox` |
+| **[Africa Data Protection (POPIA/Kenya/Nigeria)](compliance/africa_data_protection_compliance.md)** | Compliance standards for South Africa's POPIA and other emerging African data protection laws. | `privacy, africa, south-africa, kenya, nigeria, ghana, legal` |
+| **[AI Legal Compliance (EU AI Act & NIST)](compliance/ai_legal_compliance.md)** | Legal standards for the development, deployment, and use of AI systems, aligning with the EU AI Act risk tiers and NIST AI RMF 2.0. | `compliance, ai-act, nist-rmf, governance, ai-safety` |
+| **[Algorithmic Accountability & Transparency](compliance/algorithmic_accountability.md)** | Legal and technical standards for automated decision-making, explainability (XAI), and compliance with the EU AI Act and GDPR Article 22. | `compliance, ai-act, transparency, gdpr, atrs, governance` |
 | **[AML & KYC Compliance](rules/corporate/aml_kyc_compliance.md)** | Anti-Money Laundering and Identity verification standards for financial integrity. | `compliance, finance, legal, integrity` |
+| **[Anti-Dumping & Countervailing (Trade)](compliance/anti_dumping_countervailing_trade.md)** | Compliance standards for the anti-dumping and countervailing duty regulations in global trade. | `trade, anti-dumping, countervailing, tariffs, wto, legal` |
+| **[Anti-Money Laundering (AMLD6/FinCEN)](compliance/anti_money_laundering_aml_kyc.md)** | Compliance standards for the 6th EU Anti-Money Laundering Directive and U.S. FinCEN regulations. | `aml, kyc, amld6, fincen, austrac, financial-crimes, legal` |
+| **[Anti-Trust & Competition (CMA/FTC/EC)](compliance/anti_trust_competition_compliance.md)** | Compliance standards for the CMA (UK), FTC (US), and European Commission regulations for global competition. | `anti-trust, competition, cma, ftc, ec, monopoly-abuse, merger-control, legal` |
+| **[Autonomous Systems Liability & Oversight](compliance/autonomous_systems_liability.md)** | Legal and technical standards for assigning liability, ensuring human oversight, and managing operational risks in autonomous workflows. | `compliance, liability, oversight, autonomous-systems, legal` |
 | **[Basel III Accords](rules/corporate/basel_iii_compliance.md)** | Global banking standards for capital adequacy and liquidity risk management. | `compliance, finance, risk` |
-| **[The Nuremberg Code](rules/corporate/nuremberg_code.md)** | Ethical standards for human research and informed consent protocols. | `compliance, ethics, medicine` |
+| **[Brazil LGPD (Lei Geral de Proteção de Dados)](compliance/brazil_lgpd_compliance.md)** | Compliance standards for the Brazilian data protection law, following international privacy models. | `privacy, lgpd, brazil, legal` |
+| **[Building & Facility Safety (IBC/NFPA)](compliance/building_facility_safety_compliance.md)** | Compliance standards for the International Building Code and NFPA for physical facility safety. | `building-safety, fire-safety, ibc, nfpa, facility-management, legal` |
+| **[California CPRA (CCPA Expanded)](compliance/california_cpra_compliance.md)** | Compliance standards for California's Consumer Privacy Rights Act, the leading US state-level privacy law. | `privacy, cpra, ccpa, us-california, legal` |
+| **[Canada CPPA & AIDA (Bill C-27)](compliance/canada_cppa_aida_compliance.md)** | Compliance standards for the proposed Canada Consumer Privacy Protection Act and Artificial Intelligence and Data Act. | `privacy, cppa, aida, canada, artificial-intelligence, data-protection, legal` |
+| **[Carbon Pricing & Trade (CBAM/UK-ETS/ASRS)](compliance/carbon_pricing_trade_cbam_asrs.md)** | Compliance standards for the EU Carbon Border Adjustment Mechanism (CBAM), UK-ETS, and Australian Sustainability Reporting Standards (ASRS). | `esg, cbam, ets, asrs, carbon-taxes, trade` |
+| **[China PIPL (Personal Information Protection Law)](compliance/china_pipl_compliance.md)** | Compliance standards for the People's Republic of China's Personal Information Protection Law, including data localization. | `privacy, pipl, china, legal, localization` |
+| **[Conflict Minerals & Resource Extraction (EU 2017/821)](compliance/conflict_minerals_resource_extraction.md)** | Compliance standards for the EU Conflict Minerals Regulation regarding the responsible sourcing of minerals. | `esg, conflict-minerals, 3tg, supply-chain, eu, legal` |
+| **[Consumer Protection & Unfair Competition (FTC/EC)](compliance/consumer_protection_fair_competition.md)** | Compliance standards for the U.S. FTC, UK CMA, and European Commission regulations for global consumer protection. | `consumer-protection, unfair-competition, ftc, ec, cma, monopoly-abuse, unfair-practices, legal` |
+| **[Corporate Value Chain Due Diligence (EU CS3D)](compliance/corporate_value_chain_due_diligence.md)** | Compliance standards for identifying, reporting, and addressing human rights and environmental impacts throughout the value chain. | `compliance, supply-chain, human-rights, environment, cs3d` |
+| **[CSRD & Sustainability Reporting (ESRS)](compliance/csrd_sustainability_reporting.md)** | Compliance standards for the EU Corporate Sustainability Reporting Directive and European Sustainability Reporting Standards (ESRS). | `compliance, esg, csrd, esrs, sustainability, finance` |
+| **[Digital Assets & Crypto-Compliance (MiCA/SEC)](compliance/digital_assets_crypto_compliance.md)** | Compliance standards for the EU MiCA regulation and U.S. SEC rules for digital and crypto-assets. | `crypto-assets, mica, sec, digital-finance, blockchain, legal` |
+| **[Digital Identity & eIDAS 2.0](compliance/digital_identity_eidas_compliance.md)** | Compliance standards for the EU eIDAS 2.0 framework and global digital identity standards. | `digital-identity, eidas, e-signature, trust-services, eu, legal` |
+| **[Digital Media & Social Platforms (Online Safety Act)](compliance/digital_media_social_platforms_safety.md)** | Compliance standards for the UK Online Safety Act and the EU Digital Services Act for content-rich platforms. | `digital-media, social-platforms, online-safety, content-moderation, uk, eu, legal` |
+| **[Digital Services & Markets Act (DSA/DMA)](compliance/digital_services_markets_act.md)** | Compliance standards for algorithmic transparency, content moderation, and gatekeeper fairness under the EU DSA and DMA. | `compliance, dsa, dma, algorithmic-transparency, gatekeeper` |
+| **[Digital Sovereignty & Data Residency](compliance/digital_sovereignty_data_residency.md)** | Legal and technical standards for data residency, jurisdictional control, and compliance with GDPR, CCPA, and the US CLOUD Act. | `compliance, sovereignty, data-protection, gdpr, ccpa` |
+| **[DORA (Digital Operational Resilience Act)](compliance/dora_finance_compliance.md)** | Compliance standards for cybersecurity and operational risk in the EU financial services sector. | `cybersecurity, operational-resilience, finance, eu, legal` |
+| **[East Asia Data Protection (South Korea/Japan)](compliance/east_asia_data_protection.md)** | Compliance standards for South Korea's Personal Information Protection Act (PIPA) and Japan's APPI. | `privacy, pipa, appi, south-korea, japan, legal` |
+| **[Energy & Defense Compliance (FERC/ITAR)](compliance/energy_defense_compliance.md)** | Compliance standards for the Federal Energy Regulatory Commission (FERC), North American Electric Reliability Corporation (NERC), and export administration (ITAR/EAR). | `energy, defense, ferc, nerc, itar, ear, critical-infrastructure, us-federal, legal` |
+| **[Environmental Liability & Waste (CERCLA/RCRA)](compliance/environmental_liability_waste.md)** | Compliance standards for the U.S. CERCLA and RCRA regulations for environmental liability and hazardous waste. | `environment, waste, hazardous-materials, cercla, rcra, eld, reach, legal` |
+| **[Environmental Marketing & Resource Controls](compliance/environmental_marketing_resource_controls.md)** | Compliance standards for the EU Green Claims Directive and the Methane Mitigation Regulation. | `esg, green-claims, methane-mitigation, resource-controls, environment, eu, legal` |
+| **[EU Cyber Resilience Act (CRA)](compliance/eu_cyber_resilience_act.md)** | Compliance standards for the security of hardware and software products in the EU market. | `cyber-resilience, hardware, software, eu, legal` |
+| **[EU Taxonomy & SFDR Disclosure](compliance/eu_taxonomy_sfdr_disclosure.md)** | Compliance standards for the EU Taxonomy Regulation and Sustainable Finance Disclosure Regulation (SFDR). | `esg, sfdr, taxonomy, finance, eu, legal` |
 | **[FCPA Anti-Corruption](rules/corporate/fcpa_compliance.md)** | Standards for preventing bribery and unethical lobbying in global business. | `compliance, legal, ethics` |
+| **[Financial Governance (GAAP/SOX)](rules/corporate/financial_governance.md)** | Standards for transparent financial reporting and executive accountability. | `compliance, finance, gaap, sox` |
+| **[Financial Market Resilience (Basel IV/MiFID/EMIR)](compliance/financial_market_resilience_basel_mifid.md)** | Compliance standards for the Basel IV Accords, MiFID II / MiFIR, and the European Market Infrastructure Regulation (EMIR). | `finance, basel-iv, mifid-ii, emir, market-resilience, eu, legal` |
+| **[Global Anti-Corruption (FCPA/UK Bribery Act)](compliance/global_anti_corruption_compliance.md)** | Compliance standards for the US Foreign Corrupt Practices Act, UK Bribery Act, and Sapin II in France. | `ethics, anti-corruption, fcpa, uk-bribery-act, sapin-ii, legal` |
+| **[Global ESG Standards (TCFD & ISSB)](compliance/global_esg_standards_tcfd_issb.md)** | Compliance standards for the Task Force on Climate-related Financial Disclosures and IFRS Sustainability Standards (S1/S2). | `esg, tcfd, issb, ifrs, global, finance` |
+| **[Global Minimum Tax (OECD Pillar Two)](compliance/global_minimum_tax_pillar_two.md)** | Compliance standards for the 15% Global Anti-Base Erosion (GloBE) rules and GloBE Information Return (GIR) requirements. | `compliance, tax, oecd, pillar-two, globe, finance` |
+| **[Global Tax Transparency (DAC7/8/Transfer Pricing)](compliance/global_tax_transparency_dac_pricing.md)** | Compliance standards for the DAC7 and DAC8 directives and OECD transfer pricing documentation requirements. | `tax, dac7, dac8, transfer-pricing, digital-platforms, crypto-assets` |
+| **[Global Trade & Customs (WCO/Trade Treaties)](compliance/global_trade_customs_compliance.md)** | Compliance standards for the WCO and global customs and trade treaties. | `trade, customs, wco, treaties, tariffs, origin, legal` |
+| **[Healthcare Privacy & Health-Tech (HIPAA/EU MDR)](compliance/healthcare_privacy_health_tech.md)** | Compliance standards for HIPAA/HITECH, the EU Medical Device Regulation, and FDA Software as a Medical Device (SaAMD). | `healthcare, privacy, hipaa, eu-mdr, samd, legal, health-tech` |
+| **[India DPDPA (Digital Personal Data Protection Act)](compliance/india_dpdpa_compliance.md)** | Compliance standards for India's 2023 Digital Personal Data Protection Act, including the Data Protection Board's requirements. | `privacy, dpdpa, india, legal` |
+| **[Information Access & Preservation (CALEA/RIPA)](compliance/information_access_preservation.md)** | Compliance standards for the CALEA (US) and RIPA (UK) for information interception and E-Discovery. | `information-access, interception, e-discovery, calea, ripa, legal` |
+| **[Institutional Accountability & Ownership](compliance/institutional_accountability.md)** | Governance rules for decision-making authority, fiduciary duty, and executive responsibility in global enterprises. | `governance, compliance, ownership, fiduciary-duty` |
+| **[Insurance & Risk Transfer (IFRS 17/Solvency II)](compliance/insurance_risk_transfer_compliance.md)** | Compliance standards for the IFRS 17 for insurance contracts and Solvency II for risk management. | `insurance, risk-transfer, ifrs-17, solvency-ii, finance, legal` |
+| **[Japan APPI (Act on the Protection of Personal Information)](compliance/japan_appi_compliance.md)** | Compliance standards for Japan's primary data protection law, following international privacy models. | `privacy, appi, japan, legal` |
+| **[Labor & Employment (ILO C190/EEOC/NLRB)](compliance/labor_employment_compliance.md)** | Compliance standards for the ILO C190 and U.S. EEOC/NLRB regulations for global labor and employment. | `labor, employment, ilo, eeoc, nlrb, workplace-rights, legal` |
+| **[LATAM Data Protection (Mexico/Colombia/Chile)](compliance/latam_data_protection_compliance.md)** | Compliance standards for Mexico's LFPDPPP, Colombia's Law 1581, and other Latin American privacy laws. | `privacy, latam, mexico, colombia, chile, argentina, legal` |
+| **[Middle East Data Protection (UAE/Saudi/Israel)](compliance/middle_east_data_protection.md)** | Compliance standards for the UAE's PDPL, Saudi Arabia's PDPL, and Israel's PPA. | `privacy, middle-east, uae, saudi-arabia, israel, legal` |
+| **[Modern Slavery & Forced Labor (UK/Australia)](compliance/modern_slavery_legal_compliance.md)** | Compliance standards for the UK and Australian Modern Slavery Acts, requiring transparency in supply chains. | `human-rights, modern-slavery, uk, australia, supply-chain, legal` |
+| **[NIS2 Directive](compliance/nis2_cybersearch_compliance.md)** | Compliance standards for the European Union's expanded Network and Information Security directive. | `cybersecurity, netsec, critical-infrastructure, eu, legal` |
+| **[Payment Systems & Open Banking (PCI-DSS 4.0/PSD3)](compliance/payment_systems_open_banking.md)** | Compliance standards for the latest PCI-DSS and Payment Services Directive (PSD) for global financial services. | `payments, pci-dss, psd3, open-banking, security, eu, legal` |
+| **[Product Quality & Safety (FDA/EMA/GPSD)](compliance/product_quality_safety_compliance.md)** | Compliance standards for the U.S. FDA, European Medicines Agency (EMA), and the General Product Safety Directive (GPSD). | `product-safety, fda, ema, gpsd, gmp, gvp, legal` |
+| **[Singapore PDPA (Personal Data Protection Act)](compliance/singapore_pdpa_compliance.md)** | Compliance standards for Singapore's primary data protection law, following international privacy models. | `privacy, pdpa, singapore, legal` |
+| **[Southeast Asia Data Protection (Thailand/Vietnam/Malaysia)](compliance/southeast_asia_data_protection.md)** | Compliance standards for Thailand's PDPA, Vietnam's Decree 13, and Malaysia's PDPA in the ASEAN market. | `privacy, pdpa, thailand, vietnam, malaysua, legal` |
+| **[Space & Satellite Compliance (UN/ITU)](compliance/space_satellite_compliance.md)** | Compliance standards for the UN Outer Space Treaty and ITU satellite frequency regulations. | `space, satellite, un, itu, outer-space-treaty, telecom, legal` |
+| **[The Nuremberg Code](rules/corporate/nuremberg_code.md)** | Ethical standards for human research and informed consent protocols. | `compliance, ethics, medicine` |
+| **[Trade Sanctions & Export Controls (OFAC/EAR)](compliance/trade_sanctions_ofac_ear.md)** | Compliance standards for global trade sanctions, export administration, and the 2025 GENIUS Act for digital assets. | `compliance, sanctions, ofac, ear, digital-services, legal` |
+| **[UK GDPR & Data Protection Act 2018](compliance/uk_gdpr_compliance.md)** | Compliance standards for the United Kingdom's post-Brexit data protection framework. | `privacy, gdpr, uk, legal` |
+| **[US Corporate Transparency Act (CTA)](compliance/us_corporate_transparency_act.md)** | Compliance standards for the mandatory reporting of Beneficial Ownership Information (BOI) to FinCEN. | `corporate-transparency, cta, fincen, boi, us-federal, legal` |
+| **[US Sectoral Privacy (GLBA/COPPA/BIPA)](compliance/us_sectoral_privacy_compliance.md)** | Compliance standards for the Gramm-Leach-Bliley Act (Finance), COPPA (Children), and BIPA (Biometrics) in the US. | `privacy, glba, coppa, bipa, finance, children, biometrics, us-federal, legal` |
+| **[US State Privacy (VCDPA/CPA)](compliance/us_states_privacy_vcdpa_cpa.md)** | Compliance standards for the Virginia Consumer Data Protection Act and Colorado Privacy Act, key US state-level privacy laws. | `privacy, vcdpa, cpa, us-virginia, us-colorado, legal` |
+| **[Whistleblower Protection (Global Standards)](compliance/whistleblower_protection_compliance.md)** | Compliance standards for the global whistleblower protection laws, including the EU Directive. | `whistleblowing, protection, non-retaliation, eu, us, uk, legal` |
+| **[Workplace Ethics & Equity (Whistleblowing/Pay Transparency)](compliance/workplace_ethics_equity_compliance.md)** | Compliance standards for the EU Whistleblowing Directive and Pay Transparency Directive, and global anti-corruption laws. | `ethics, equity, whistleblowing, pay-transparency, anti-corruption, eu, legal` |
+| **[Workplace Safety & Health (OSHA/RIDDOR)](compliance/workplace_safety_health_compliance.md)** | Compliance standards for the U.S. OSHA and UK RIDDOR for industrial and office safety. | `workplace-safety, osha, riddor, hse, occupational-health, legal` |
 
 ---
 ## Kea <a name='kea'></a>

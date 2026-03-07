@@ -323,7 +323,6 @@ def _infer_tools(sub_goal: SubGoal) -> list[str]:
     """Infer required MCP tool categories from sub-goal."""
     tools: list[str] = []
     desc_lower = sub_goal.description.lower()
-    domain_lower = sub_goal.domain.lower()
 
     if any(kw in desc_lower for kw in ("search", "web", "browse")):
         tools.append("web_search")
@@ -333,14 +332,6 @@ def _infer_tools(sub_goal: SubGoal) -> list[str]:
         tools.append("http_client")
     if any(kw in desc_lower for kw in ("database", "query", "sql")):
         tools.append("database")
-        
-    # Kea specific heuristic
-    if any(kw in desc_lower for kw in ("compare", "competition", "competitor")):
-        tools.append("competitor_discovery")
-    if "tech" in desc_lower or "technology" in domain_lower:
-        tools.append("get_tech_dashboard")
-    if "industry" in desc_lower or "business" in domain_lower:
-        tools.extend(["get_industry_performance", "get_industry_health_dashboard"])
 
     return tools
 
@@ -394,13 +385,21 @@ async def decompose_goal(context: WorldState, kit: InferenceKit | None = None) -
         # Step 5: LLM Advanced Decomposition (Only for Non-Atomic goals)
         if kit and kit.has_llm and assessment.level != ComplexityLevel.ATOMIC:
             try:
+                # Extract tools so the LLM actually knows what it can use
+                available_tools = context.context.get("available_tools", []) if context.context else []
+                tool_list_str = ", ".join(available_tools) if available_tools else "generic tools"
+                
                 system_msg = LLMMessage(
                     role="system",
                     content=(
-                        "Decompose the task into sub-tasks. "
-                        "Respond EXACTLY in JSON: [{\"id\": \"...\", \"description\": \"...\", \"domain\": \"...\", "
-                        "\"required_skills\": [\"...\"], \"required_tools\": [\"...\"], \"depends_on\": [\"id_...\"], "
-                        "\"inputs\": [\"...\"], \"outputs\": [\"...\"], \"action_type\": \"...\" (must be one of: tool_call, llm_inference, data_transform, general), \"parallelizable\": true/false}]"
+                        "Decompose the user's task into an array of sub-tasks. "
+                        f"You HAVE access to these exact tools: [{tool_list_str}]. You MUST prioritize assigning these specific tools to 'required_tools'. "
+                        "Respond EXACTLY in JSON list format and NOTHING ELSE. Example:\n"
+                        "[\n  {\n    \"id\": \"task_1\",\n    \"description\": \"...\",\n    \"domain\": \"...\",\n"
+                        "    \"required_skills\": [],\n    \"required_tools\": [\"<tool_name_from_list>\"],\n"
+                        "    \"depends_on\": [],\n    \"inputs\": [\"goal_context\"],\n    \"outputs\": [\"result_1\"],\n"
+                        "    \"action_type\": \"tool_call\",\n    \"parallelizable\": false\n  }\n]\n"
+                        "(action_type must be: tool_call, llm_inference, data_transform, or general)."
                     )
                 )
                 user_msg = LLMMessage(role="user", content=f"Goal: {context.goal}\nContext: {json.dumps(context.context)}")
