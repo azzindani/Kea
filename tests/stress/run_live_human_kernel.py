@@ -96,8 +96,9 @@ async def test_run_live_kernel():
     
     # 4. Extract and print result
     if result.is_success:
-        obs_res = result.signals[0].body.get("data", {})
-        output_content = obs_res.get('filtered_output', {}).get('content', 'NO CONTENT')
+        obs_res = result.signals[0].body.get("data", {}) or {}
+        filtered_out = obs_res.get('filtered_output') or {}
+        output_content = filtered_out.get('content', 'NO CONTENT')
         
         print("\n" + "="*80)
         print("🏆 FINAL LIVE ANALYSIS:")
