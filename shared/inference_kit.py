@@ -33,6 +33,9 @@ class InferenceKit(BaseModel):
     # Embedding/Reranking Provider
     embedder: Any | None = None
     
+    # Tool Executor (optional, usually provided by service layer)
+    tool_executor: Any | None = None
+    
     @property
     def has_llm(self) -> bool:
         """Check if an LLM provider is available and configured."""

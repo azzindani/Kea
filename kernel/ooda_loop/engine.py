@@ -461,9 +461,22 @@ async def act(
             )
             log.debug(f"🛡️ OODA Act: Validating tool call against retrieved schema for {tool_name}", node_id=node_id, status="PASS")
             
-            # In kernel simulator, we simulate success for registered tools
-            node_outputs["arguments"] = arguments
-            node_outputs["answer"] = f"Simulated output from {tool_name} for task: {node.instruction.description[:50]}"
+            # Real World Execution vs Simulation
+            if kit and kit.tool_executor:
+                try:
+                    log.info(f"🔌 OODA Act: Executing REAL tool call → {tool_name}", node_id=node_id)
+                    tool_resp = await kit.tool_executor(tool_name, arguments)
+                    node_outputs.update(tool_resp)
+                    if "answer" not in node_outputs and "content" in node_outputs:
+                        node_outputs["answer"] = str(node_outputs["content"])
+                except Exception as e:
+                    log.error(f"❌ OODA Act: Real tool execution failed", node_id=node_id, error=str(e))
+                    node_outputs["answer"] = f"Error executing {tool_name}: {str(e)}"
+                    node_outputs["error"] = str(e)
+            else:
+                # In kernel simulator, we simulate success for registered tools
+                node_outputs["arguments"] = arguments
+                node_outputs["answer"] = f"Simulated output from {tool_name} for task: {node.instruction.description[:50]}"
             
         else:
             # Fallback for 'general' or 'data_transform' nodes
